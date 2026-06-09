@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "solar-system-demo",
+  "title": "Solar System Practice",
+  "description": "Demo learning pack — multiple-choice practice on the solar system.",
+  "homeSubtitle": "The demo pack. Build your own with the create-learning-pack skill.",
+  "themeColor": "#0f766e",
+  "categories": [
+    {
+      "key": "planets",
+      "label": "Planets & Moons",
+      "shortLabel": "Planets",
+      "weight": 0.6
+    },
+    {
+      "key": "space-exploration",
+      "label": "Space Exploration",
+      "shortLabel": "Exploration",
+      "weight": 0.4
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+import manifest from '../../content/pack/pack.json';
+
+/**
+ * App config — built entirely from the ACTIVE PACK's manifest at
+ * `content/pack/pack.json`. That directory is gitignored (packs are
+ * private); `scripts/ensure-pack.ts` seeds it from the committed demo
+ * pack and `npm run pack:use <dir>` swaps in a real one. Next inlines
+ * the JSON at build time, so every pack build is fully static.
+ *
+ * The manifest is validated by tools/pack/schema.ts before activation;
+ * by the time it's here we trust the shape.
+ */
+
+export interface CategoryDef {
+  /** Stable string key used in storage rows and URLs. */
+  key: string;
+  /** Full display label. */
+  label: string;
+  /** Shorter chip-friendly label. Falls back to `label`. */
+  shortLabel?: string;
+  /** Optional selection weight (e.g. an exam blueprint percentage). */
+  weight?: number;
+}
+
+export interface AppConfig {
+  /** Pack identifier — also namespaces localStorage. */
+  packId: string;
+  /** Tab title / OS app name. */
+  title: string;
+  /** One-line description used for <meta description>. */
+  description: string;
+  /** Greeting shown beneath the H1 on the home page. */
+  homeSubtitle: string;
+  /** PWA theme-color (browser chrome / iOS status bar). */
+  themeColor: string;
+  categories: CategoryDef[];
+}
+
+export const APP_CONFIG: AppConfig = {
+  packId: manifest.id,
+  title: manifest.title,
+  description: manifest.description,
+  homeSubtitle: manifest.homeSubtitle,
+  themeColor: manifest.themeColor,
+  categories: manifest.categories as CategoryDef[],
+};

@@ -1,0 +1,162 @@
+[
+  {
+    "id": "demo-planets-001",
+    "categoryKey": "planets",
+    "difficulty": 1,
+    "prompt": "Which planet is closest to the Sun?",
+    "options": [
+      { "key": "A", "text": "Venus" },
+      { "key": "B", "text": "Mercury" },
+      { "key": "C", "text": "Mars" },
+      { "key": "D", "text": "Earth" }
+    ],
+    "correctKey": "B",
+    "explanation": "Mercury orbits at about 58 million km from the Sun, the innermost of the eight planets. Venus is second — it is the hottest planet, but not the closest, which is a common mix-up.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-planets-002",
+    "categoryKey": "planets",
+    "difficulty": 2,
+    "prompt": "Which planet has the most confirmed moons as of the mid-2020s?",
+    "options": [
+      { "key": "A", "text": "Jupiter" },
+      { "key": "B", "text": "Uranus" },
+      { "key": "C", "text": "Saturn" },
+      { "key": "D", "text": "Neptune" }
+    ],
+    "correctKey": "C",
+    "explanation": "Saturn overtook Jupiter after a wave of small-moon discoveries, passing 140 confirmed moons. Jupiter held the record for decades, which makes it the tempting distractor.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-planets-003",
+    "categoryKey": "planets",
+    "difficulty": 2,
+    "prompt": "Why does Venus have a higher average surface temperature than Mercury, despite being farther from the Sun?",
+    "options": [
+      { "key": "A", "text": "Venus has a thick carbon dioxide atmosphere that traps heat" },
+      { "key": "B", "text": "Venus is volcanically active and heated from inside" },
+      { "key": "C", "text": "Venus rotates so slowly that one side always faces the Sun" },
+      { "key": "D", "text": "Venus reflects less sunlight than Mercury" }
+    ],
+    "correctKey": "A",
+    "explanation": "Venus's dense CO2 atmosphere produces a runaway greenhouse effect, keeping the surface around 465°C day and night. Mercury, with almost no atmosphere, swings between extremes but averages cooler.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-planets-004",
+    "categoryKey": "planets",
+    "difficulty": 3,
+    "prompt": "Which of these moons is known to have a subsurface liquid-water ocean and erupting water plumes?",
+    "options": [
+      { "key": "A", "text": "Phobos, a moon of Mars" },
+      { "key": "B", "text": "Enceladus, a moon of Saturn" },
+      { "key": "C", "text": "Callisto, a moon of Jupiter" },
+      { "key": "D", "text": "Triton, a moon of Neptune" }
+    ],
+    "correctKey": "B",
+    "explanation": "Cassini flew through Enceladus's south-polar water plumes, confirming a salty subsurface ocean. Triton has nitrogen geysers (not water), Callisto may hide an ocean but shows no plumes, and Phobos is a dry rubble pile.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-planets-005",
+    "categoryKey": "planets",
+    "difficulty": 3,
+    "prompt": "What primarily defines the difference between a planet and a dwarf planet like Pluto?",
+    "options": [
+      { "key": "A", "text": "A dwarf planet is smaller than any moon in the solar system" },
+      { "key": "B", "text": "A dwarf planet has not cleared other objects from its orbital neighbourhood" },
+      { "key": "C", "text": "A dwarf planet does not orbit the Sun directly" },
+      { "key": "D", "text": "A dwarf planet lacks enough gravity to be round" }
+    ],
+    "correctKey": "B",
+    "explanation": "Under the 2006 IAU definition, a planet must orbit the Sun, be massive enough to be round, AND have cleared its orbital neighbourhood. Pluto fails only the third test — it shares the Kuiper belt with many similar bodies. It is round, and it is larger than several moons.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-planets-006",
+    "categoryKey": "planets",
+    "difficulty": 4,
+    "prompt": "Jupiter's Great Red Spot is best described as which of the following?",
+    "options": [
+      { "key": "A", "text": "A persistent anticyclonic storm larger than Earth" },
+      { "key": "B", "text": "A volcanic hotspot seen through the cloud deck" },
+      { "key": "C", "text": "An impact scar left by a comet collision" },
+      { "key": "D", "text": "A region of red phosphorus deserts" }
+    ],
+    "correctKey": "A",
+    "explanation": "The Great Red Spot is a high-pressure anticyclonic storm that has persisted for at least 190 years and is wider than Earth. Jupiter is a gas giant with no surface for volcanoes or deserts, and comet scars (like Shoemaker-Levy 9's) fade within months.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-explore-001",
+    "categoryKey": "space-exploration",
+    "difficulty": 1,
+    "prompt": "Which mission first landed humans on the Moon?",
+    "options": [
+      { "key": "A", "text": "Apollo 11" },
+      { "key": "B", "text": "Apollo 13" },
+      { "key": "C", "text": "Gemini 4" },
+      { "key": "D", "text": "Mercury-Atlas 6" }
+    ],
+    "correctKey": "A",
+    "explanation": "Apollo 11 landed Armstrong and Aldrin at Tranquility Base on 20 July 1969. Apollo 13 famously aborted its landing after an oxygen-tank explosion; Gemini and Mercury were earlier Earth-orbit programmes.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-explore-002",
+    "categoryKey": "space-exploration",
+    "difficulty": 2,
+    "prompt": "Which two spacecraft are the only human-made objects to have entered interstellar space?",
+    "options": [
+      { "key": "A", "text": "Pioneer 10 and Pioneer 11" },
+      { "key": "B", "text": "Voyager 1 and Voyager 2" },
+      { "key": "C", "text": "New Horizons and Cassini" },
+      { "key": "D", "text": "Galileo and Juno" }
+    ],
+    "correctKey": "B",
+    "explanation": "Voyager 1 crossed the heliopause in 2012 and Voyager 2 in 2018, both still transmitting. The Pioneers are headed out but fell silent before crossing; Cassini, Galileo and Juno were orbiters deliberately ended at their planets; New Horizons is still inside the heliosphere.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-explore-003",
+    "categoryKey": "space-exploration",
+    "difficulty": 3,
+    "prompt": "Why do Mars rovers like Perseverance use a 'sky crane' landing system instead of airbags or simple parachutes?",
+    "options": [
+      { "key": "A", "text": "Mars's atmosphere is too thick for parachutes to open safely" },
+      { "key": "B", "text": "The rovers are too heavy for airbags, and the thin atmosphere makes parachutes alone insufficient" },
+      { "key": "C", "text": "Airbag materials cannot survive the radiation on the way to Mars" },
+      { "key": "D", "text": "The sky crane is reusable for return missions" }
+    ],
+    "correctKey": "B",
+    "explanation": "Mars's atmosphere is thick enough to demand heat shielding but ~100× thinner than Earth's, so parachutes only slow a one-tonne rover to ~300 km/h. Airbags worked for the ~180 kg Spirit/Opportunity but cannot absorb a car-sized rover's impact — hence rocket-powered descent with the rover winched down on cables.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-explore-004",
+    "categoryKey": "space-exploration",
+    "difficulty": 4,
+    "prompt": "The James Webb Space Telescope orbits the Sun-Earth L2 point rather than orbiting Earth like Hubble. What is the main advantage of L2 for Webb?",
+    "options": [
+      { "key": "A", "text": "It allows the telescope to keep the Sun, Earth and Moon behind its sunshield at all times" },
+      { "key": "B", "text": "It is close enough for astronauts to service the telescope" },
+      { "key": "C", "text": "It eliminates the need for station-keeping fuel" },
+      { "key": "D", "text": "It provides constant shadow, removing the need for a sunshield" }
+    ],
+    "correctKey": "A",
+    "explanation": "At L2, all three bright/warm bodies — Sun, Earth, Moon — stay in roughly the same direction, so one fixed sunshield can block them while the cold side observes deep space. L2 is 1.5 million km away (no servicing), halo orbits still need station-keeping burns, and Webb sits in full sunlight, which is exactly why the sunshield exists.",
+    "source": "original",
+    "reviewStatus": "approved"
+  }
+]

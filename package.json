@@ -1,0 +1,46 @@
+{
+  "name": "quizmill",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "predev": "tsx scripts/ensure-pack.ts",
+    "dev": "next dev",
+    "prebuild": "tsx scripts/ensure-pack.ts",
+    "build": "next build",
+    "postbuild": "tsx scripts/finalise-build.ts",
+    "start": "next start",
+    "lint": "next lint",
+    "pack:validate": "tsx tools/pack/validate.ts",
+    "pack:use": "tsx scripts/use-pack.ts",
+    "pretest": "tsx scripts/ensure-pack.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "NEXT_PUBLIC_BASE_PATH= npm run build && vitest run --config vitest.e2e.config.ts",
+    "test:e2e:watch": "E2E_HEADED=1 npm run test:e2e"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.106.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.469.0",
+    "next": "15.1.6",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "tailwind-merge": "^2.6.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.5",
+    "@types/react-dom": "^19.0.3",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.18.0",
+    "eslint-config-next": "15.1.6",
+    "postcss": "^8.4.49",
+    "puppeteer": "^25.1.0",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.22.3",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

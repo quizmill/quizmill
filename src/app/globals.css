@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  body {
+    font-family:
+      -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto,
+      'Helvetica Neue', Arial, sans-serif;
+    font-feature-settings: 'ss01' on, 'cv11' on;
+  }
+  /* Prevent rubber-banding and pull-to-refresh interfering with quiz interactions */
+  body {
+    overscroll-behavior-y: contain;
+  }
+  /* No tap highlight on mobile */
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer utilities {
+  .tap-feedback {
+    transition: transform 80ms ease, background-color 120ms ease;
+  }
+  .tap-feedback:active {
+    transform: scale(0.98);
+  }
+
+  .animate-celebration {
+    animation: celebration 2s ease-out forwards;
+  }
+  @keyframes celebration {
+    0% {
+      transform: scale(0.5) rotate(-6deg);
+      opacity: 0;
+    }
+    15% {
+      transform: scale(1.18) rotate(2deg);
+      opacity: 1;
+    }
+    30% {
+      transform: scale(1) rotate(0deg);
+      opacity: 1;
+    }
+    85% {
+      transform: scale(1) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1.1) rotate(0deg);
+      opacity: 0;
+    }
+  }
+
+  /* Same pop-in, but HOLDS at full opacity — for the game-offer
+     variant where we wait for the kid to choose. */
+  .animate-celebration-stay {
+    animation: celebration-pop-in 0.55s ease-out forwards;
+  }
+  @keyframes celebration-pop-in {
+    0% {
+      transform: scale(0.5) rotate(-6deg);
+      opacity: 0;
+    }
+    65% {
+      transform: scale(1.18) rotate(2deg);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1) rotate(0deg);
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-celebration {
+      animation: celebration-reduced 1.5s ease-out forwards;
+    }
+    .animate-celebration-stay {
+      animation: celebration-reduced-stay 0.3s ease-out forwards;
+    }
+    @keyframes celebration-reduced {
+      0% { opacity: 0; }
+      10% { opacity: 1; }
+      85% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    @keyframes celebration-reduced-stay {
+      0% { opacity: 0; }
+      100% { opacity: 1; }
+    }
+  }
+}

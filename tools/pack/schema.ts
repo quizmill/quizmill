@@ -1,0 +1,234 @@
+import { z } from 'zod';
+
+/**
+ * Learning-pack format (schemaVersion 1).
+ *
+ * A pack is a directory of three JSON files that fully describes one
+ * deployable practice app for the generic `pack` variant:
+ *
+ *   pack.json        manifest — identity, branding, categories
+ *   questions.json   the MCQ bank
+ *   scenarios.json   optional shared scenario stems (may be `[]` / absent)
+ *
+ * The shape is a generalised MCQ format proven by several hundred
+ * imported/generated questions in the engine's ancestor project; categories
+ * are declared in the manifest and cross-checked by `validatePack`,
+ * not hard-coded.
+ *
+ * Packs are PRIVATE by default: the active pack lives at gitignored
+ * `content/pack/`, authored packs under gitignored `packs/`. Only the
+ * demo pack (`content/pack-demo/`) is committed.
+ */
+
+const slug = /^[a-z0-9][a-z0-9-]*$/;
+
+export const packCategorySchema = z.object({
+  /** Stable key — used in URLs, storage rows, and questions' categoryKey. */
+  key: z.string().regex(slug).max(40),
+  label: z.string().min(2).max(80),
+  /** Chip-friendly short label; falls back to `label`. */
+  shortLabel: z.string().min(1).max(24).optional(),
+  /** Optional selection weight, e.g. an exam blueprint percentage. */
+  weight: z.number().positive().max(1).optional(),
+});
+
+export const packManifestSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    /** Pack identifier (slug). Becomes part of file paths — keep stable. */
+    id: z.string().regex(slug).max(40),
+    /** App title (tab title / home H1). */
+    title: z.string().min(3).max(60),
+    /** One-line <meta description>. */
+    description: z.string().min(10).max(200),
+    /** Greeting under the H1 on the home page. */
+    homeSubtitle: z.string().min(3).max(120),
+    /** PWA theme colour, e.g. "#1e3a5f". */
+    themeColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+    categories: z.array(packCategorySchema).min(1).max(12),
+  })
+  .superRefine((m, ctx) => {
+    const keys = m.categories.map((c) => c.key);
+    if (new Set(keys).size !== keys.length) {
+      ctx.addIssue({ code: 'custom', message: 'category keys must be unique' });
+    }
+  });
+
+export const packOptionKeySchema = z.enum(['A', 'B', 'C', 'D']);
+
+export const packOptionSchema = z.object({
+  key: packOptionKeySchema,
+  text: z.string().min(1).max(800),
+});
+
+export const packScenarioSchema = z.object({
+  id: z.string().regex(slug),
+  title: z.string().min(5).max(120),
+  /** Shared narrative across the scenario's questions. Optional — see
+   *  the CCA scenario schema for the rationale. */
+  stem: z.string().min(50).optional(),
+  tags: z.array(z.string()).optional(),
+});
+
+export const packQuestionSchema = z
+  .object({
+    id: z.string().regex(slug),
+    /** Must match a manifest category key — cross-checked in validatePack. */
+    categoryKey: z.string().regex(slug),
+    scenarioId: z.string().optional(),
+    difficulty: z.union([
+      z.literal(1),
+      z.literal(2),
+      z.literal(3),
+      z.literal(4),
+      z.literal(5),
+    ]),
+    prompt: z.string().min(20),
+    options: z.array(packOptionSchema).length(4),
+    correctKey: packOptionKeySchema,
+    /** Teaches WHY the answer is right (and ideally why distractors are
+     *  wrong) — this is the pedagogical payload, don't skimp. */
+    explanation: z.string().min(40),
+    source: z.enum(['original', 'generated', 'curated']),
+    sourceRef: z.string().optional(),
+    reviewStatus: z.enum(['draft', 'reviewed', 'approved']),
+    tags: z.array(z.string()).optional(),
+  })
+  .superRefine((q, ctx) => {
+    const keys = q.options.map((o) => o.key);
+    if (new Set(keys).size !== 4) {
+      ctx.addIssue({ code: 'custom', message: 'options must have unique keys A,B,C,D' });
+    }
+    if (!keys.includes(q.correctKey)) {
+      ctx.addIssue({ code: 'custom', message: 'correctKey must reference one of the options' });
+    }
+  });
+
+export type PackCategory = z.infer<typeof packCategorySchema>;
+export type PackManifest = z.infer<typeof packManifestSchema>;
+export type PackScenario = z.infer<typeof packScenarioSchema>;
+export type PackQuestion = z.infer<typeof packQuestionSchema>;
+
+export interface PackValidationResult {
+  ok: boolean;
+  errors: string[];
+  /** Non-fatal issues worth fixing (e.g. a category with no questions). */
+  warnings: string[];
+}
+
+/**
+ * Whole-pack validation: per-file schemas plus the cross-file checks a
+ * single Zod schema can't express (unique ids, category/scenario
+ * references, weight sanity). Pure function over parsed JSON so it's
+ * unit-testable and reusable by both the CLI and the use-pack script.
+ */
+export function validatePack(input: {
+  manifest: unknown;
+  questions: unknown;
+  scenarios?: unknown;
+}): PackValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  const manifest = packManifestSchema.safeParse(input.manifest);
+  if (!manifest.success) {
+    for (const issue of manifest.error.issues) {
+      errors.push(`pack.json: ${issue.path.join('.') || '(root)'}: ${issue.message}`);
+    }
+  }
+
+  if (!Array.isArray(input.questions)) {
+    errors.push('questions.json: must be a JSON array');
+  }
+  const questions: PackQuestion[] = [];
+  if (Array.isArray(input.questions)) {
+    input.questions.forEach((raw, i) => {
+      const q = packQuestionSchema.safeParse(raw);
+      if (q.success) {
+        questions.push(q.data);
+      } else {
+        const id =
+          typeof raw === 'object' && raw !== null && 'id' in raw
+            ? String((raw as { id: unknown }).id)
+            : `#${i}`;
+        for (const issue of q.error.issues) {
+          errors.push(
+            `questions.json[${id}]: ${issue.path.join('.') || '(root)'}: ${issue.message}`,
+          );
+        }
+      }
+    });
+    if (input.questions.length === 0) {
+      errors.push('questions.json: pack has no questions');
+    }
+  }
+
+  const scenarios: PackScenario[] = [];
+  if (input.scenarios !== undefined) {
+    if (!Array.isArray(input.scenarios)) {
+      errors.push('scenarios.json: must be a JSON array');
+    } else {
+      input.scenarios.forEach((raw, i) => {
+        const s = packScenarioSchema.safeParse(raw);
+        if (s.success) {
+          scenarios.push(s.data);
+        } else {
+          for (const issue of s.error.issues) {
+            errors.push(
+              `scenarios.json[#${i}]: ${issue.path.join('.') || '(root)'}: ${issue.message}`,
+            );
+          }
+        }
+      });
+    }
+  }
+
+  // Cross-file checks only make sense once per-file parses succeeded.
+  if (manifest.success && questions.length > 0) {
+    const seen = new Set<string>();
+    for (const q of questions) {
+      if (seen.has(q.id)) errors.push(`questions.json[${q.id}]: duplicate question id`);
+      seen.add(q.id);
+    }
+
+    const categoryKeys = new Set(manifest.data.categories.map((c) => c.key));
+    for (const q of questions) {
+      if (!categoryKeys.has(q.categoryKey)) {
+        errors.push(
+          `questions.json[${q.id}]: categoryKey "${q.categoryKey}" not declared in pack.json categories`,
+        );
+      }
+    }
+
+    const scenarioIds = new Set(scenarios.map((s) => s.id));
+    for (const q of questions) {
+      if (q.scenarioId && !scenarioIds.has(q.scenarioId)) {
+        errors.push(
+          `questions.json[${q.id}]: scenarioId "${q.scenarioId}" not found in scenarios.json`,
+        );
+      }
+    }
+
+    for (const c of manifest.data.categories) {
+      if (!questions.some((q) => q.categoryKey === c.key)) {
+        warnings.push(
+          `pack.json: category "${c.key}" has no questions — its home card will be an empty state`,
+        );
+      }
+    }
+
+    const weights = manifest.data.categories
+      .map((c) => c.weight)
+      .filter((w): w is number => w !== undefined);
+    if (weights.length > 0) {
+      const sum = weights.reduce((a, b) => a + b, 0);
+      if (weights.length !== manifest.data.categories.length) {
+        warnings.push('pack.json: some categories have weights and some do not');
+      } else if (Math.abs(sum - 1) > 0.01) {
+        warnings.push(`pack.json: category weights sum to ${sum.toFixed(2)}, expected ~1.0`);
+      }
+    }
+  }
+
+  return { ok: errors.length === 0, errors, warnings };
+}
