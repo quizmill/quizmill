@@ -1,0 +1,88 @@
+# quizmill — project notes for Claude Code
+
+Open-source practice-app engine: a **learning pack** (directory of
+JSON: manifest + MCQ bank + optional scenarios) becomes a static,
+installable, offline-first practice app. Packs are private by default
+and typically authored by a local AI agent via the bundled
+`create-learning-pack` skill. Tagline: *the mill that grinds questions
+into knowledge* — the mill wheel = the practice loop (answer → review
+→ retry).
+
+## Architecture in one breath
+
+`content/pack/` (gitignored) holds the ACTIVE pack; `scripts/
+ensure-pack.ts` seeds it from the committed demo (`content/pack-demo/`,
+solar system) via the `predev`/`prebuild`/`pretest` npm hooks, and
+`npm run pack:use <dir>` swaps in a validated real pack. `src/config`
+builds the app identity from the pack manifest at build time (Next
+inlines the JSON; fully static export to `out/`). The PWA icon +
+webmanifest are generated from the manifest by `scripts/pack-assets.ts`
+(gitignored in `public/`).
+
+- `tools/pack/schema.ts` — Zod pack format (schemaVersion 1) +
+  `validatePack` cross-file checks (unique ids, category/scenario refs,
+  weights). The validator CLI is the agent contract: loop until clean.
+- `src/lib/` — engine: `selection.ts` (unseen-biased pick, seedable),
+  `mistakes.ts` (re-ask until rescued; packs use per-question rescue —
+  topic = question id), `storage.ts` (localStorage, namespaced
+  `quizmill.<packId>.*`), `sync.ts` (optional Supabase mirror, dormant
+  without `NEXT_PUBLIC_SUPABASE_URL`/`_PUBLISHABLE_KEY`), `useStorage.ts`
+  (React hooks, event bus `quizmill:storage`).
+- `src/pack/` — the app UI: Home, PracticeRunner, ReviewRunner,
+  runner.ts (pure session logic), data.ts (typed pack loader),
+  DownvoteBrowser (Settings extra).
+- Engine never imports question *shapes* — it sees only the
+  denormalised `Attempt`/`Session` fields (`src/data/types.ts`).
+
+## Commands
+
+```
+npm run dev                      # demo pack at localhost:3000
+npm test                         # vitest unit (49 tests)
+npm run test:e2e                 # build + Puppeteer vs demo pack
+npm run pack:validate <dir>      # schema + cross-ref checks
+npm run pack:use <dir>           # validate + activate a pack
+```
+
+## Lineage & boundaries
+
+Extracted (fresh history) from a private multi-variant practice
+platform at `~/code/personal/learning` (branch
+`feature/learning-packs-poc` was the POC). That repo stays private —
+it contains licensed third-party exam content and must never be merged
+or mirrored here. Don't copy files from it without checking provenance.
+
+## Status (2026-06-09)
+
+Locked in: GitHub org+repo `quizmill/quizmill`, npm org `@quizmill`
+(no packages published yet — bare name `quizmill` still unclaimed on
+npm), domain `quizmill.dev` registered (`.app`/`.io`/`.org` were
+available, unregistered; `.com` is parked for sale on BrandBucket —
+ignored). v0.1 committed; CI (`.github/workflows/ci.yml`: unit + build
++ E2E) runs on push.
+
+## Roadmap (agreed, in order)
+
+1. **Deploy the demo app** → add a Cloudflare Pages deploy step to CI
+   (idempotent `wrangler pages project create` + `pages deploy out`,
+   needs `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` repo
+   secrets), serve at `try.quizmill.dev` (CNAME → pages.dev + domain
+   claim via CF API).
+2. **Landing/docs site** at `quizmill.dev` root — likely a separate
+   small repo (`quizmill/website`); one page: what it is, 3-command
+   quickstart, the agent story, pack format, links to try + GitHub.
+3. **`npx quizmill` CLI** — scaffold a pack workspace + run the engine
+   without cloning; first npm publish (claims the bare name).
+4. Later ideas: pack export/import bundle, FSRS-based spaced
+   repetition (`ts-fsrs`), pack repo template (`quizmill/pack-template`),
+   hosted pack registry.
+
+## Conventions
+
+- Tests accompany behaviour changes; E2E asserts against the demo pack
+  (if a different pack is active locally, `rm -rf content/pack` and
+  re-run to reseed before E2E).
+- Question ids are immutable once published — attempt history points
+  at them.
+- Pack schema changes bump `schemaVersion` and must stay
+  backward-readable.
