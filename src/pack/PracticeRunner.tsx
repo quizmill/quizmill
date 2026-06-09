@@ -12,6 +12,7 @@ import {
   useStorageData,
 } from '@/lib/useStorage';
 import { VoteRow } from '@/components/VoteRow';
+import { SourceRef } from '@/components/SourceRef';
 import { McqMarkdown } from '@/components/McqMarkdown';
 import {
   packQuestions,
@@ -342,6 +343,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
           <div className="text-[15px] leading-relaxed text-ink-800">
             <McqMarkdown text={current.explanation} />
           </div>
+          <SourceRef sourceRef={current.sourceRef} />
           <VoteRow questionId={current.id} />
           <Button size="lg" block onClick={handleNext} className="mt-1">
             {state.currentIndex + 1 === state.questions.length

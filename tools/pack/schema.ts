@@ -83,7 +83,9 @@ export const packQuestionSchema = z
       z.literal(4),
       z.literal(5),
     ]),
-    prompt: z.string().min(20),
+    /** Floor of 10 keeps junk out while allowing legitimately terse
+     *  prompts like arithmetic ("What is 7 × 8?"). */
+    prompt: z.string().min(10),
     options: z.array(packOptionSchema).length(4),
     correctKey: packOptionKeySchema,
     /** Teaches WHY the answer is right (and ideally why distractors are
