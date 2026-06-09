@@ -65,4 +65,6 @@ function main(): void {
   );
 }
 
-main();
+// use-pack.ts imports readPackDir from this module — only behave as a
+// CLI when invoked directly.
+if (require.main === module) main();

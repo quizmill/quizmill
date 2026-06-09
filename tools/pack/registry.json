@@ -1,0 +1,11 @@
+{
+  "$comment": "Published learning packs — public repos installable with `npm run pack:use <repo>`. PRs adding community packs welcome: the repo must contain a pack.json/questions.json that passes `npm run pack:validate`.",
+  "packs": [
+    {
+      "id": "claude-cert",
+      "title": "Claude Cert Practice",
+      "description": "Claude Certified Architect (Foundations) exam practice — agentic architecture, Claude Code, prompt engineering, tools & MCP, context management. Curated from MIT-licensed community question banks, with per-question attribution.",
+      "repo": "quizmill/pack-claude-cert"
+    }
+  ]
+}
