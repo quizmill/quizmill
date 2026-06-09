@@ -78,22 +78,40 @@ Real packs published (ported from `~/code/personal/learning`):
   learning repo. Non-verbal (all image-based) and GL material
   (© GL Assessment, 5-option + images) deliberately not ported.
 
+## Built locally, awaiting review/publish (2026-06-09 late)
+
+- **Website** at `~/code/personal/quizmill-website` (local git repo,
+  NOT pushed — Peter reviews in the morning). Interactive single page:
+  live practice loop in the hero, pack→app phone switcher, agent
+  terminal animation. Brand defined in its README (mill-wheel mark,
+  paper/ink/grain palette, Fraunces display). Deploy: push to
+  `quizmill/website`, then `wrangler pages deploy . --project-name
+  quizmill` + custom domain quizmill.dev (CI workflow included; needs
+  `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID` secrets).
+- **CLI** in `cli/` — `npx quizmill new|validate|run|build|list|
+  upgrade`, zero-dep wrapper that caches the engine in `~/.quizmill/
+  engine` (override `QUIZMILL_ENGINE` for dev). Publish-ready; blocked
+  on `npm login` (bare name `quizmill` still free, claims it).
+- Local wrangler auth is EXPIRED (`wrangler login` needed) and npm is
+  logged out — both deploys/publishes are deliberately deferred.
+
 ## Roadmap (agreed, in order)
 
-1. **Deploy the demo app** → add a Cloudflare Pages deploy step to CI
-   (idempotent `wrangler pages project create` + `pages deploy out`,
-   needs `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` repo
-   secrets), serve at `try.quizmill.dev` (CNAME → pages.dev + domain
-   claim via CF API).
-2. **Landing/docs site** at `quizmill.dev` root — likely a separate
-   small repo (`quizmill/website`); one page: what it is, 3-command
-   quickstart, the agent story, pack format, links to try + GitHub.
-3. **`npx quizmill` CLI** — scaffold a pack workspace + run the engine
-   without cloning; first npm publish (claims the bare name).
-4. Later ideas: pack export/import bundle, FSRS-based spaced
-   repetition (`ts-fsrs`), pack repo template (`quizmill/pack-template`),
-   hosted pack registry, schema v2 (2–6 options + question images —
-   unblocks porting the 11+ non-verbal bank).
+1. **Morning review** → push `quizmill/website`, `wrangler login`,
+   deploy website (quizmill.dev) + demo app (`try.quizmill.dev`:
+   `pages deploy out` from a demo build), add CF secrets to both repos
+   for CI deploys.
+2. **`npm login` + publish the CLI** (claims the bare `quizmill` name),
+   then add an "npx quizmill" card to the website + README.
+3. **Auto-deployed pack gallery** — CI matrix over
+   `tools/pack/registry.json`: every registry pack gets its own Pages
+   deployment (`<pack-id>.quizmill.dev`), website gallery links them.
+4. Later ideas: `quizmill deploy` (one-command CF Pages under the
+   user's account), pack export/import bundle, FSRS-based spaced
+   repetition (`ts-fsrs`), pack repo template (`quizmill/pack-template`
+   with "Use this template"), hosted registry at registry.quizmill.dev,
+   schema v2 (2–6 options + question images — unblocks porting the 11+
+   non-verbal bank).
 
 ## Conventions
 
