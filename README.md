@@ -18,6 +18,27 @@ npm install
 npm run dev          # runs the bundled demo pack (solar system)
 ```
 
+## Install a published pack
+
+Packs can live in their own GitHub repos. `pack:use` installs straight
+from a repo reference — public repos anonymously, private repos through
+your own `git clone` credentials:
+
+```
+npm run pack:list                            # the published-pack registry
+npm run pack:use quizmill/pack-claude-cert   # install one
+npm run dev
+```
+
+| Pack | What | |
+|---|---|---|
+| [pack-claude-cert](https://github.com/quizmill/pack-claude-cert) | Unofficial Claude Certified Architect (Foundations) practice — 635 questions across the five exam domains, curated from MIT-licensed community banks with per-question attribution | public |
+| `your-name/your-pack` | Private repos install exactly the same way (family packs, exam prep, team material) — anyone whose `git clone` works can run it | private |
+
+`owner/repo`, `owner/repo#branch`, full GitHub URLs and SSH remotes all
+work. Re-running `pack:use` refreshes the pack; switching back is
+`rm -rf content/pack && npm run dev` (reseeds the demo).
+
 ## Build a pack about anything
 
 Packs are **private by default** — they live in the gitignored `packs/`
@@ -43,6 +64,26 @@ npm run pack:validate packs/my-topic      # schema + cross-reference checks
 npm run pack:use packs/my-topic           # activate
 npm run dev
 ```
+
+## Publish a pack
+
+A pack repo is just the pack directory pushed to GitHub — `pack.json`,
+`questions.json`, optional `scenarios.json`, plus a README (see
+[pack-claude-cert](https://github.com/quizmill/pack-claude-cert) for
+the shape). Once pushed, anyone can install it:
+
+```
+npm run pack:use your-name/your-pack-repo
+```
+
+Keep it private and it still works for everyone with repo access. If
+the pack is public and you want it listed in `npm run pack:list`, PR an
+entry into [`tools/pack/registry.json`](tools/pack/registry.json).
+
+If your questions build on someone else's bank, keep the upstream
+license, record provenance in each question's `sourceRef` (the app
+links to it in the answer panel), and reproduce upstream notices —
+again, pack-claude-cert is the worked example.
 
 ## Pack format
 

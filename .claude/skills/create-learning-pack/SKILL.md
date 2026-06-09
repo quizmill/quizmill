@@ -77,6 +77,21 @@ example.
    then `npm run build` and host the static `out/` anywhere — see the
    README's "Deploying a pack" section.
 
+## Publishing a pack
+
+If the user wants to share the pack, push the `packs/<pack-id>/`
+directory to its own GitHub repo (add a README; see
+`quizmill/pack-claude-cert` for the shape). Anyone can then install it
+with `npm run pack:use <owner>/<repo>` — private repos work for anyone
+whose `git clone` has access. Public packs can be listed in
+`npm run pack:list` via a PR to `tools/pack/registry.json`.
+
+If questions derive from someone else's bank: confirm the upstream
+license permits redistribution (drop the questions if there is none),
+set each question's `sourceRef` to the upstream URL (the app links it
+in the answer panel), and reproduce upstream license texts in the pack
+repo (NOTICE.md).
+
 ## Iterating on an existing pack
 
 Edit the files under `packs/<pack-id>/`, re-run `pack:validate`, then

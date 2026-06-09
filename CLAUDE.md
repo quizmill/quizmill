@@ -13,7 +13,11 @@ into knowledge* — the mill wheel = the practice loop (answer → review
 `content/pack/` (gitignored) holds the ACTIVE pack; `scripts/
 ensure-pack.ts` seeds it from the committed demo (`content/pack-demo/`,
 solar system) via the `predev`/`prebuild`/`pretest` npm hooks, and
-`npm run pack:use <dir>` swaps in a validated real pack. `src/config`
+`npm run pack:use <dir | owner/repo | github URL>` swaps in a validated
+real pack — remote sources are fetched by `scripts/remote-pack.ts`
+(codeload tarball, then git-clone HTTPS/SSH fallback, so private repos
+work). `tools/pack/registry.json` lists published packs
+(`npm run pack:list`). `src/config`
 builds the app identity from the pack manifest at build time (Next
 inlines the JSON; fully static export to `out/`). The PWA icon +
 webmanifest are generated from the manifest by `scripts/pack-assets.ts`
@@ -38,10 +42,11 @@ webmanifest are generated from the manifest by `scripts/pack-assets.ts`
 
 ```
 npm run dev                      # demo pack at localhost:3000
-npm test                         # vitest unit (49 tests)
+npm test                         # vitest unit (58 tests)
 npm run test:e2e                 # build + Puppeteer vs demo pack
 npm run pack:validate <dir>      # schema + cross-ref checks
-npm run pack:use <dir>           # validate + activate a pack
+npm run pack:use <dir|owner/repo># validate + activate a pack (local or GitHub)
+npm run pack:list                # published packs from the registry
 ```
 
 ## Lineage & boundaries
@@ -61,6 +66,18 @@ available, unregistered; `.com` is parked for sale on BrandBucket —
 ignored). v0.1 committed; CI (`.github/workflows/ci.yml`: unit + build
 + E2E) runs on push.
 
+Real packs published (ported from `~/code/personal/learning`):
+
+- `quizmill/pack-claude-cert` (PUBLIC) — 635 CCA-F questions curated
+  from MIT-licensed community banks (haytamAroui, Connectry-io), with
+  per-question `sourceRef` attribution + NOTICE.md. 60 questions from
+  `paullarionov/claude-certified-architect` were EXCLUDED (no upstream
+  license) — don't re-add without a license appearing upstream.
+- `quizmill/pack-eleven-plus` (PRIVATE — must stay private) — 300
+  agent-authored english/maths/verbal questions, ids stable from the
+  learning repo. Non-verbal (all image-based) and GL material
+  (© GL Assessment, 5-option + images) deliberately not ported.
+
 ## Roadmap (agreed, in order)
 
 1. **Deploy the demo app** → add a Cloudflare Pages deploy step to CI
@@ -75,7 +92,8 @@ ignored). v0.1 committed; CI (`.github/workflows/ci.yml`: unit + build
    without cloning; first npm publish (claims the bare name).
 4. Later ideas: pack export/import bundle, FSRS-based spaced
    repetition (`ts-fsrs`), pack repo template (`quizmill/pack-template`),
-   hosted pack registry.
+   hosted pack registry, schema v2 (2–6 options + question images —
+   unblocks porting the 11+ non-verbal bank).
 
 ## Conventions
 
