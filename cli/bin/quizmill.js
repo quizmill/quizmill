@@ -24,6 +24,10 @@ const ENGINE_REPO = 'https://github.com/quizmill/quizmill.git';
 const HOME = process.env.QUIZMILL_HOME || path.join(os.homedir(), '.quizmill');
 const ENGINE = process.env.QUIZMILL_ENGINE || path.join(HOME, 'engine');
 const CLI_VERSION = require('../package.json').version;
+// The engine ref this CLI builds with: its own release tag, so the CLI and
+// engine stay in lockstep (a dev build — the 0.0.0-dev sentinel — tracks main).
+const ENGINE_REF = CLI_VERSION === '0.0.0-dev' ? 'main' : `v${CLI_VERSION}`;
+const REF_MARKER = path.join(ENGINE, '.quizmill-engine-ref');
 
 const log = (s) => console.log(s);
 const die = (s) => {
@@ -35,14 +39,45 @@ function run(cmd, args, opts = {}) {
   execFileSync(cmd, args, { stdio: 'inherit', ...opts });
 }
 
+/** Fetch a ref (tag or branch) into the cache and hard-reset onto it. */
+function fetchRef(ref) {
+  run('git', ['fetch', '--depth', '1', 'origin', ref], { cwd: ENGINE });
+  run('git', ['reset', '--hard', 'FETCH_HEAD'], { cwd: ENGINE });
+  fs.writeFileSync(REF_MARKER, ref);
+  // package.json can differ between versions — force a clean reinstall.
+  fs.rmSync(path.join(ENGINE, 'node_modules'), { recursive: true, force: true });
+}
+
 function ensureEngine() {
   if (!fs.existsSync(path.join(ENGINE, 'package.json'))) {
-    log(`… first run: fetching the quizmill engine into ${ENGINE}`);
+    log(`… fetching the quizmill engine (${ENGINE_REF}) into ${ENGINE}`);
     fs.mkdirSync(path.dirname(ENGINE), { recursive: true });
-    run('git', ['clone', '--depth', '1', ENGINE_REPO, ENGINE]);
+    try {
+      run('git', ['clone', '--depth', '1', '--branch', ENGINE_REF, ENGINE_REPO, ENGINE]);
+      fs.writeFileSync(REF_MARKER, ENGINE_REF);
+    } catch {
+      // The tag may not be published yet (a just-released CLI) — use main.
+      fs.rmSync(ENGINE, { recursive: true, force: true });
+      run('git', ['clone', '--depth', '1', '--branch', 'main', ENGINE_REPO, ENGINE]);
+      fs.writeFileSync(REF_MARKER, 'main');
+    }
+  } else if (!process.env.QUIZMILL_ENGINE) {
+    // Keep the cached engine in lockstep with this CLI version — so
+    // `npx quizmill@latest build` always uses the matching engine.
+    const current = fs.existsSync(REF_MARKER)
+      ? fs.readFileSync(REF_MARKER, 'utf8').trim()
+      : '';
+    if (current !== ENGINE_REF) {
+      log(`… aligning engine to ${ENGINE_REF}`);
+      try {
+        fetchRef(ENGINE_REF);
+      } catch {
+        log('  (offline or ref missing — using the cached engine as-is)');
+      }
+    }
   }
   if (!fs.existsSync(path.join(ENGINE, 'node_modules'))) {
-    log('… installing engine dependencies (first run only)');
+    log('… installing engine dependencies');
     run('npm', ['install', '--no-fund', '--no-audit'], { cwd: ENGINE });
   }
 }
@@ -58,12 +93,11 @@ function engineSha() {
 function engineNpm(args) {
   ensureEngine();
   const env = { ...process.env };
-  // The cached engine is a shallow, tagless clone, so its own
-  // `git describe` can't resolve a release tag — the in-app version would
-  // fall back to the 0.0.0-dev sentinel. Stamp the build with the CLI's
-  // version instead (the CLI is published in lockstep with the engine).
-  // Skipped when QUIZMILL_ENGINE points at a real checkout (let its git
-  // tags win) or when the caller set the version explicitly.
+  // Stamp the build with the CLI version, which always matches the pinned
+  // engine ref — robust even if the cache fell back to main (no tag, so the
+  // engine's own git-describe would land on the 0.0.0-dev sentinel).
+  // Skipped under QUIZMILL_ENGINE (let a real checkout's git tags win) or
+  // when the caller set the version explicitly.
   if (!process.env.QUIZMILL_ENGINE && !env.NEXT_PUBLIC_APP_VERSION) {
     env.NEXT_PUBLIC_APP_VERSION = CLI_VERSION;
   }
@@ -170,28 +204,19 @@ function cmdValidate(arg) {
 }
 
 function cmdUpgrade() {
-  ensureEngine();
   if (process.env.QUIZMILL_ENGINE) {
-    log('QUIZMILL_ENGINE points at your own checkout — its update is up to you.');
-  } else {
-    const before = engineSha();
-    try {
-      // The cache is a depth-1 shallow clone, so `git pull --ff-only` can't
-      // fast-forward across the grafted history once main advances. Fetch
-      // the latest main and hard-reset onto it — the cache holds no local
-      // commits worth keeping (gitignored content/ and out/ are untouched).
-      run('git', ['fetch', '--depth', '1', 'origin', 'main'], { cwd: ENGINE });
-      run('git', ['reset', '--hard', 'FETCH_HEAD'], { cwd: ENGINE });
-    } catch {
-      log('… update failed — re-cloning the engine fresh');
-      fs.rmSync(ENGINE, { recursive: true, force: true });
-      ensureEngine();
-    }
-    const after = engineSha();
-    log(before === after ? `engine already current (${after})` : `engine ${before} → ${after}`);
+    ensureEngine();
+    log(`✓ quizmill ${CLI_VERSION} — using QUIZMILL_ENGINE (${engineSha()})`);
+    return;
   }
-  run('npm', ['install', '--no-fund', '--no-audit'], { cwd: ENGINE });
-  log(`✓ quizmill ${CLI_VERSION} ready — engine deps installed`);
+  // Force a re-align to this CLI's engine ref (blank the marker so
+  // ensureEngine re-fetches even if it thinks it's already current).
+  const before = engineSha();
+  if (fs.existsSync(REF_MARKER)) fs.writeFileSync(REF_MARKER, '');
+  ensureEngine();
+  const after = engineSha();
+  log(before === after ? `engine already current (${after})` : `engine ${before} → ${after}`);
+  log(`✓ quizmill ${CLI_VERSION} — engine at ${ENGINE_REF}`);
 }
 
 const HELP = `quizmill — the mill that grinds questions into knowledge
