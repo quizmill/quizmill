@@ -78,31 +78,36 @@ Real packs published (ported from `~/code/personal/learning`):
   learning repo. Non-verbal (all image-based) and GL material
   (© GL Assessment, 5-option + images) deliberately not ported.
 
-## Built locally, awaiting review/publish (2026-06-09 late)
+## Shipped (2026-06-10)
 
-- **Website** at `~/code/personal/quizmill-website` (local git repo,
-  NOT pushed — Peter reviews in the morning). Interactive single page:
-  live practice loop in the hero, pack→app phone switcher, agent
+- **Engine** pushed to `quizmill/quizmill` (public); CI green on main.
+- **Website** repo at `quizmill/website` (sibling checkout
+  `../quizmill-website`), deployed to Cloudflare Pages: live at
+  https://quizmill.pages.dev (project `quizmill`). Interactive single
+  page: live practice loop in the hero, pack→app phone switcher, agent
   terminal animation. Brand defined in its README (mill-wheel mark,
-  paper/ink/grain palette, Fraunces display). Deploy: push to
-  `quizmill/website`, then `wrangler pages deploy . --project-name
-  quizmill` + custom domain quizmill.dev (CI workflow included; needs
-  `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID` secrets).
+  paper/ink/grain palette, Fraunces display).
+- **Demo app** (solar-system pack static build) live at
+  https://quizmill-try.pages.dev (project `quizmill-try`,
+  `wrangler pages deploy out`).
 - **CLI** in `cli/` — `npx quizmill new|validate|run|build|list|
   upgrade`, zero-dep wrapper that caches the engine in `~/.quizmill/
-  engine` (override `QUIZMILL_ENGINE` for dev). Publish-ready; blocked
-  on `npm login` (bare name `quizmill` still free, claims it).
-- Local wrangler auth is EXPIRED (`wrangler login` needed) and npm is
-  logged out — both deploys/publishes are deliberately deferred.
+  engine` (override `QUIZMILL_ENGINE` for dev). Publish blocked only
+  on an npm 2FA OTP (`npm publish --otp=<code>` from `cli/`; bare
+  name `quizmill` confirmed free).
+- Custom domain pending: quizmill.dev is registered but its zone is
+  not yet in the Cloudflare account — add the site in the CF dashboard,
+  point nameservers at the registrar, then attach quizmill.dev to the
+  `quizmill` Pages project and try.quizmill.dev to `quizmill-try`.
 
 ## Roadmap (agreed, in order)
 
-1. **Morning review** → push `quizmill/website`, `wrangler login`,
-   deploy website (quizmill.dev) + demo app (`try.quizmill.dev`:
-   `pages deploy out` from a demo build), add CF secrets to both repos
+1. **npm 2FA publish** of the CLI, then add an "npx quizmill" card to
+   the website + README.
+2. **Domain cutover** — quizmill.dev zone into Cloudflare, custom
+   domains on both Pages projects, CF API token secrets
+   (`CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`) into both repos
    for CI deploys.
-2. **`npm login` + publish the CLI** (claims the bare `quizmill` name),
-   then add an "npx quizmill" card to the website + README.
 3. **Auto-deployed pack gallery** — CI matrix over
    `tools/pack/registry.json`: every registry pack gets its own Pages
    deployment (`<pack-id>.quizmill.dev`), website gallery links them.
