@@ -1,0 +1,150 @@
+import { describe, expect, it } from 'vitest';
+import type { Attempt, Session } from '@/data/types';
+import {
+  accuracyByCategory,
+  accuracyByDay,
+  completedSessionDates,
+  weakestQuestions,
+} from '@/lib/stats';
+import { currentStreak } from '@/lib/streak';
+
+const NOON = new Date('2026-06-10T12:00:00').getTime();
+
+let n = 0;
+function attempt(over: Partial<Attempt> = {}): Attempt {
+  n += 1;
+  return {
+    id: `a${n}`,
+    sessionId: 's1',
+    questionId: `q${n}`,
+    answeredAt: NOON,
+    selectedAnswer: 'A',
+    isCorrect: true,
+    timeTakenSeconds: 5,
+    subject: 'alpha',
+    topic: `q${n}`,
+    difficulty: 2,
+    ...over,
+  };
+}
+
+const CATEGORIES = [
+  { key: 'alpha', label: 'Alpha' },
+  { key: 'beta', label: 'Beta', shortLabel: 'B' },
+];
+
+describe('accuracyByCategory', () => {
+  it('returns all categories, zeroed when unattempted, in given order', () => {
+    const rows = accuracyByCategory([], CATEGORIES);
+    expect(rows.map((r) => r.key)).toEqual(['alpha', 'beta']);
+    expect(rows[0]).toMatchObject({ attempted: 0, correct: 0, accuracyPct: 0 });
+  });
+
+  it('aggregates and rounds per category, using shortLabel for display', () => {
+    const attempts = [
+      attempt({ subject: 'alpha', isCorrect: true }),
+      attempt({ subject: 'alpha', isCorrect: true }),
+      attempt({ subject: 'alpha', isCorrect: false }),
+      attempt({ subject: 'beta', isCorrect: false }),
+    ];
+    const [alpha, beta] = accuracyByCategory(attempts, CATEGORIES);
+    expect(alpha).toMatchObject({ attempted: 3, correct: 2, accuracyPct: 67 });
+    expect(beta).toMatchObject({ label: 'B', attempted: 1, accuracyPct: 0 });
+  });
+
+  it('ignores attempts for categories not in the pack', () => {
+    const rows = accuracyByCategory([attempt({ subject: 'other' })], CATEGORIES);
+    expect(rows.every((r) => r.attempted === 0)).toBe(true);
+  });
+});
+
+describe('accuracyByDay', () => {
+  it('buckets by local day, sorted oldest-first, omitting empty days', () => {
+    const day = 24 * 3600_000;
+    const attempts = [
+      attempt({ answeredAt: NOON, isCorrect: true }),
+      attempt({ answeredAt: NOON, isCorrect: false }),
+      attempt({ answeredAt: NOON - 2 * day, isCorrect: true }),
+    ];
+    const points = accuracyByDay(attempts, null);
+    expect(points.map((p) => p.date)).toEqual(['2026-06-08', '2026-06-10']);
+    expect(points[1]).toMatchObject({ attempted: 2, correct: 1, accuracyPct: 50 });
+  });
+
+  it('filters to one category when asked', () => {
+    const attempts = [
+      attempt({ subject: 'alpha' }),
+      attempt({ subject: 'beta' }),
+    ];
+    expect(accuracyByDay(attempts, 'beta')[0].attempted).toBe(1);
+  });
+});
+
+describe('weakestQuestions', () => {
+  it('applies the minimum-attempts floor and sorts weakest-first', () => {
+    const attempts = [
+      // q-hard: 0/2
+      attempt({ questionId: 'q-hard', isCorrect: false }),
+      attempt({ questionId: 'q-hard', isCorrect: false }),
+      // q-meh: 1/2
+      attempt({ questionId: 'q-meh', isCorrect: false }),
+      attempt({ questionId: 'q-meh', isCorrect: true }),
+      // q-once: below the floor, excluded
+      attempt({ questionId: 'q-once', isCorrect: false }),
+    ];
+    const rows = weakestQuestions(attempts);
+    expect(rows.map((r) => r.questionId)).toEqual(['q-hard', 'q-meh']);
+    expect(rows[0].accuracyPct).toBe(0);
+  });
+
+  it('breaks accuracy ties toward more attempts (stronger signal)', () => {
+    const attempts = [
+      attempt({ questionId: 'q-two', isCorrect: false }),
+      attempt({ questionId: 'q-two', isCorrect: false }),
+      attempt({ questionId: 'q-three', isCorrect: false }),
+      attempt({ questionId: 'q-three', isCorrect: false }),
+      attempt({ questionId: 'q-three', isCorrect: false }),
+    ];
+    expect(weakestQuestions(attempts)[0].questionId).toBe('q-three');
+  });
+});
+
+describe('currentStreak', () => {
+  const today = new Date('2026-06-10T12:00:00');
+  const day = (offset: number) =>
+    new Date(today.getTime() - offset * 24 * 3600_000);
+
+  it('is 0 with no completed sessions', () => {
+    expect(currentStreak([], today)).toBe(0);
+  });
+
+  it('counts consecutive days back from today', () => {
+    expect(currentStreak([day(0), day(1), day(2)], today)).toBe(3);
+  });
+
+  it("doesn't require today yet — counts back from yesterday", () => {
+    expect(currentStreak([day(1), day(2)], today)).toBe(2);
+  });
+
+  it('breaks on a gap', () => {
+    expect(currentStreak([day(0), day(2), day(3)], today)).toBe(1);
+  });
+});
+
+describe('completedSessionDates', () => {
+  it('keeps only sessions with an end timestamp', () => {
+    const sessions: Session[] = [
+      {
+        id: 's1', subject: 'alpha', startedAt: NOON, endedAt: NOON + 60_000,
+        questionCount: 10, correctCount: 5,
+      },
+      {
+        id: 's2', subject: 'alpha', startedAt: NOON, endedAt: null,
+        questionCount: 10, correctCount: 0,
+      },
+    ];
+    const dates = completedSessionDates(sessions);
+    expect(dates).toHaveLength(1);
+    expect(dates[0].getTime()).toBe(NOON + 60_000);
+  });
+});

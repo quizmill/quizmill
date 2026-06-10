@@ -15,6 +15,7 @@ import {
   launchBrowser,
   newPage,
   resetOrigin,
+  seedAttempts,
   waitForText,
 } from '../e2e/helpers';
 
@@ -100,10 +101,26 @@ describe('pack practice flow', () => {
       await clickButtonByText(page, isLast ? 'See results' : 'Next question');
     }
 
+    // Finishing the first session unlocks the 'First steps' sticker —
+    // the celebration toast renders with the results screen (and
+    // auto-dismisses ~2s later, hence the immediate wait).
+    await page.waitForSelector('[data-testid="celebration"]', {
+      timeout: 5_000,
+    });
+
     await waitForText(page, 'Practice complete');
     const resultBody = await bodyText(page);
     expect(resultBody).toMatch(new RegExp(`\\d+\\/${total}`));
     expect(resultBody).toMatch(/\d+% correct/);
+
+    // ...and the cabinet now shows it as earned.
+    await page.goto(baseUrl() + '/stickers/');
+    await waitForText(page, 'Sticker cabinet');
+    const earned = await page.$eval(
+      '[data-testid="sticker-first-session"]',
+      (el) => el.getAttribute('data-earned'),
+    );
+    expect(earned).toBe('true');
   }, 60_000);
 
   it('answered count persists to the home page and the vote row shows in feedback', async () => {
@@ -130,4 +147,121 @@ describe('pack practice flow', () => {
     expect(attempts).toHaveLength(1);
     expect(attempts[0].subject).toBe('planets');
   }, 60_000);
+});
+
+describe('home navigation', () => {
+  it('links to progress, sticker cabinet, and settings', async () => {
+    await waitForText(page, 'Solar System Practice');
+    for (const [label, href] of [
+      ['Progress', '/progress'],
+      ['Sticker cabinet', '/stickers'],
+      ['Settings', '/settings'],
+    ]) {
+      const link = await page.$(`a[aria-label="${label}"]`);
+      expect(link, `${label} link`).toBeTruthy();
+      const target = await page.evaluate(
+        (el) => el.getAttribute('href'),
+        link!,
+      );
+      expect(target).toContain(href);
+    }
+  });
+});
+
+describe('sticker cabinet page', () => {
+  it('starts with every sticker locked, including per-category mastery', async () => {
+    await page.goto(baseUrl() + '/stickers/');
+    await waitForText(page, 'Sticker cabinet');
+
+    const count = await page.$eval(
+      '[data-testid="sticker-count"]',
+      (el) => el.textContent ?? '',
+    );
+    expect(count).toMatch(/^0\s*\/\s*\d+ stickers$/);
+
+    // Mastery tiles are generated from the demo pack's categories.
+    for (const id of ['mastery-planets', 'mastery-space-exploration']) {
+      const earned = await page.$eval(
+        `[data-testid="sticker-${id}"]`,
+        (el) => el.getAttribute('data-earned'),
+      );
+      expect(earned).toBe('false');
+    }
+
+    const body = await bodyText(page);
+    expect(body).toContain('Hot streaks');
+    expect(body).toContain('Category mastery');
+    expect(body).toContain('Milestones');
+  });
+});
+
+describe('progress page', () => {
+  it('shows the empty state before any practice', async () => {
+    await page.goto(baseUrl() + '/progress/');
+    await waitForText(page, 'No practice yet');
+  });
+
+  it('renders category accuracy, the daily streak, and weak spots from history', async () => {
+    // Seeded session completed ~24h ago → a 1-day streak; the twice-wrong
+    // question should surface as the top weak spot.
+    await seedAttempts(page, [
+      { questionId: 'demo-planets-001', subject: 'planets', topic: 'demo-planets-001', isCorrect: false, agoMs: 60_000 },
+      { questionId: 'demo-planets-001', subject: 'planets', topic: 'demo-planets-001', isCorrect: false, agoMs: 50_000 },
+      { questionId: 'demo-planets-002', subject: 'planets', topic: 'demo-planets-002', isCorrect: true, agoMs: 40_000 },
+      { questionId: 'demo-planets-003', subject: 'planets', topic: 'demo-planets-003', isCorrect: true, agoMs: 30_000 },
+    ]);
+    await page.goto(baseUrl() + '/progress/');
+    await waitForText(page, 'Accuracy by category');
+
+    await page.waitForSelector('[data-testid="daily-streak"]');
+    const streak = await page.$eval(
+      '[data-testid="daily-streak"]',
+      (el) => el.textContent ?? '',
+    );
+    expect(streak).toContain('1-day streak');
+
+    const planets = await page.$eval(
+      '[data-testid="category-accuracy-planets"]',
+      (el) => el.textContent ?? '',
+    );
+    expect(planets).toContain('50%');
+    expect(planets).toContain('2/4');
+
+    const body = await bodyText(page);
+    expect(body).toContain('Weak spots');
+    expect(body).toContain('Practise');
+  });
+});
+
+describe('settings install card', () => {
+  it('offers Add to Home Screen guidance', async () => {
+    await page.goto(baseUrl() + '/settings/');
+    await waitForText(page, 'Add to Home Screen');
+    const body = await bodyText(page);
+    expect(body).toContain('works offline');
+  });
+});
+
+describe('service worker', () => {
+  it('registers and activates (powers the "new version ready" banner)', async () => {
+    // resetOrigin unregistered any previous SW; UpdateNotifier re-registers
+    // on mount. `ready` resolves once the new worker is activated.
+    const state = await page.evaluate(async () => {
+      if (!('serviceWorker' in navigator)) return 'unsupported';
+      // `ready` resolves with an active worker that may still be
+      // 'activating' — wait out the transition.
+      const reg = await navigator.serviceWorker.ready;
+      const sw = reg.active;
+      if (!sw) return 'none';
+      if (sw.state !== 'activated') {
+        await new Promise<void>((resolve) =>
+          sw.addEventListener('statechange', () => {
+            if (sw.state === 'activated') resolve();
+          }),
+        );
+      }
+      return sw.state;
+    });
+    expect(state).toBe('activated');
+  }, 30_000);
 });

@@ -34,7 +34,10 @@ webmanifest are generated from the manifest by `scripts/pack-assets.ts`
   (React hooks, event bus `quizmill:storage`).
 - `src/pack/` — the app UI: Home, PracticeRunner, ReviewRunner,
   runner.ts (pure session logic), data.ts (typed pack loader),
-  DownvoteBrowser (Settings extra).
+  StickersPage + achievements{,-engine}.ts (sticker cabinet; mastery
+  stickers generated per pack category), ProgressPage (CSS-only charts
+  over `src/lib/stats.ts`), DownvoteBrowser (Settings extra).
+  InstallPrompt (`src/components/`) covers Add-to-Home-Screen.
 - Engine never imports question *shapes* — it sees only the
   denormalised `Attempt`/`Session` fields (`src/data/types.ts`).
 

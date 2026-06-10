@@ -14,6 +14,9 @@ import {
 import { VoteRow } from '@/components/VoteRow';
 import { SourceRef } from '@/components/SourceRef';
 import { McqMarkdown } from '@/components/McqMarkdown';
+import { Celebration } from '@/components/Celebration';
+import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
+import { loadAttempts, loadSessions } from '@/lib/storage';
 import { unresolvedMistakeIds } from '@/lib/mistakes';
 import {
   packQuestions,
@@ -47,6 +50,7 @@ export function PackReviewRunner() {
   const recordAttempt = useRecordAttempt();
   const startSession = useStartSession();
   const endSession = useEndSession();
+  const { nextUnlock, checkNow, clearNextUnlock } = useAchievementUnlock();
 
   const [state, setState] = useState<RunnerState | null>(null);
   const [nothingToReview, setNothingToReview] = useState(false);
@@ -81,7 +85,7 @@ export function PackReviewRunner() {
       correctCount: 0,
       startedAt: now,
     };
-    startSession(buildSessionStart(initial, picked[0].categoryKey));
+    startSession(buildSessionStart(initial, picked[0].categoryKey, 'review'));
     setState(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted, attempts]);
@@ -122,6 +126,9 @@ export function PackReviewRunner() {
     const { correct, total, pct } = scoreSummary(state);
     return (
       <main className="flex flex-col gap-5">
+        {nextUnlock ? (
+          <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
+        ) : null}
         <BackLink />
         <div className="rounded-2xl border border-ink-200 bg-white p-8 text-center shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
@@ -181,6 +188,8 @@ export function PackReviewRunner() {
       attemptId: crypto.randomUUID(),
     });
     recordAttempt(attempt);
+    // Same re-read rationale as the practice runner — see there.
+    checkNow(loadSessions(), loadAttempts());
     setState(advanceAfterAnswer(state, attempt.isCorrect));
     setStage('feedback');
   }
@@ -188,7 +197,11 @@ export function PackReviewRunner() {
   function handleNext() {
     if (!state) return;
     if (isLastQuestion(state)) {
-      endSession(buildSessionEnd(state, state.questions[0].categoryKey, Date.now()));
+      endSession(
+        buildSessionEnd(state, state.questions[0].categoryKey, Date.now(), 'review'),
+      );
+      // The 'comeback' sticker unlocks on the review-session end record.
+      checkNow(loadSessions(), loadAttempts());
       setFinished(true);
       return;
     }
@@ -201,6 +214,9 @@ export function PackReviewRunner() {
 
   return (
     <main className="flex flex-col gap-5">
+      {nextUnlock ? (
+        <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
+      ) : null}
       <header className="flex items-center justify-between">
         <BackLink />
         <ProgressBar

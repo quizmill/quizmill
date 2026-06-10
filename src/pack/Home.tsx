@@ -1,16 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, RefreshCw, Settings } from 'lucide-react';
+import { ArrowRight, BarChart3, RefreshCw, Settings, Trophy } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
 import { StatTile } from '@/components/StatTile';
+import { InstallBanner } from '@/components/InstallPrompt';
 import { useStorageData } from '@/lib/useStorage';
 import { unresolvedMistakeCount } from '@/lib/mistakes';
 import { packQuestions } from '@/pack/data';
 
 /** Home screen for the generic pack variant — category cards + stats,
- *  all driven by the active pack's manifest. Mirrors the CCA home
- *  minus the CCA-specific bits (achievements, blueprint-weight title). */
+ *  all driven by the active pack's manifest. */
 export default function PackHome() {
   const { attempts } = useStorageData();
   const totalAnswered = attempts.length;
@@ -44,14 +44,32 @@ export default function PackHome() {
           <h1 className="text-3xl font-bold text-ink-900">{APP_CONFIG.title}</h1>
           <p className="mt-1 text-ink-500">{APP_CONFIG.homeSubtitle}</p>
         </div>
-        <Link
-          href="/settings"
-          aria-label="Settings"
-          className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm"
-        >
-          <Settings className="h-4 w-4" />
-        </Link>
+        <nav className="flex items-center gap-2">
+          <Link
+            href="/progress"
+            aria-label="Progress"
+            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm"
+          >
+            <BarChart3 className="h-4 w-4" />
+          </Link>
+          <Link
+            href="/stickers"
+            aria-label="Sticker cabinet"
+            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm"
+          >
+            <Trophy className="h-4 w-4" />
+          </Link>
+          <Link
+            href="/settings"
+            aria-label="Settings"
+            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm"
+          >
+            <Settings className="h-4 w-4" />
+          </Link>
+        </nav>
       </header>
+
+      <InstallBanner />
 
       <section className="grid grid-cols-2 gap-3">
         <StatTile

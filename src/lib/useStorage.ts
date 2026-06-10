@@ -113,6 +113,35 @@ export function useResetToday() {
 }
 
 /**
+ * Earned achievements ("stickers"). Reactive — re-reads from storage on
+ * the quizmill:storage event, so the cabinet updates when a runner
+ * records an unlock (storage.recordEarnedAchievements emits no event
+ * itself; the unlock hook's state change re-renders the runner, and
+ * cross-page reads happen on mount).
+ */
+export function useEarnedAchievements(): {
+  earned: Set<string>;
+  earnedList: storage.EarnedAchievement[];
+} {
+  const [list, setList] = useState<storage.EarnedAchievement[]>([]);
+  useEffect(() => {
+    const refresh = () => setList(storage.loadAchievements());
+    refresh();
+    if (typeof window === 'undefined') return;
+    window.addEventListener(EVENT, refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener(EVENT, refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
+  return {
+    earned: new Set(list.map((e) => e.id)),
+    earnedList: list,
+  };
+}
+
+/**
  * Per-question thumbs-up / thumbs-down votes plus optional downvote
  * comment. Reactive — re-reads from storage on the quizmill:storage event.
  */

@@ -94,7 +94,11 @@ export function buildAttempt(args: BuildAttemptArgs): Attempt {
 }
 
 /** Persisted "session started" record. endedAt: null while running. */
-export function buildSessionStart(state: RunnerState, categoryKey: string): Session {
+export function buildSessionStart(
+  state: RunnerState,
+  categoryKey: string,
+  mode: Session['mode'] = 'practice',
+): Session {
   return {
     id: state.sessionId,
     subject: categoryKey,
@@ -102,6 +106,7 @@ export function buildSessionStart(state: RunnerState, categoryKey: string): Sess
     endedAt: null,
     questionCount: state.questions.length,
     correctCount: 0,
+    mode,
   };
 }
 
@@ -110,6 +115,7 @@ export function buildSessionEnd(
   state: RunnerState,
   categoryKey: string,
   endedAt: number,
+  mode: Session['mode'] = 'practice',
 ): Session {
   return {
     id: state.sessionId,
@@ -118,6 +124,7 @@ export function buildSessionEnd(
     endedAt,
     questionCount: state.questions.length,
     correctCount: state.correctCount,
+    mode,
   };
 }
 

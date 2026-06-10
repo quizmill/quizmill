@@ -14,6 +14,7 @@ const buttonStyles = cva(
         danger: 'bg-warn-500 text-white hover:bg-warn-700',
       },
       size: {
+        sm: 'min-h-9 px-3.5 text-sm',
         md: 'min-h-12 px-5 text-base',
         lg: 'min-h-14 px-6 text-lg',
         xl: 'min-h-16 px-8 text-xl',
