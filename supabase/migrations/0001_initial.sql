@@ -1,5 +1,5 @@
 -- ─────────────────────────────────────────────────────────────────────
--- ISEB Practice — initial schema for cloud sync.
+-- quizmill — initial schema for cloud sync.
 --
 -- Mirrors the localStorage shapes used by the client so the JS sync
 -- layer can map one-to-one. Each row has a `user_id` column that
@@ -10,16 +10,16 @@
 --   1. Create a new Supabase project at https://supabase.com/dashboard
 --   2. Open the project's SQL editor
 --   3. Paste this whole file and run it.
---   4. Project Settings → API: copy "Project URL" and "anon public" key
---      into .env.local as NEXT_PUBLIC_SUPABASE_URL and
---      NEXT_PUBLIC_SUPABASE_ANON_KEY (see README).
+--   4. Project Settings → API: copy "Project URL" and the publishable
+--      key into .env.local as NEXT_PUBLIC_SUPABASE_URL and
+--      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (see README).
 -- ─────────────────────────────────────────────────────────────────────
 
 -- ── Sessions ──────────────────────────────────────────────────────────
 create table if not exists public.sessions (
   id              uuid        primary key,
   user_id         uuid        not null references auth.users(id) on delete cascade,
-  subject         text        not null check (subject in ('english','maths','verbal','nonverbal')),
+  subject         text        not null,
   started_at      timestamptz not null,
   ended_at        timestamptz,
   question_count  int         not null,
