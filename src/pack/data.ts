@@ -16,6 +16,13 @@ export type PackCategory = {
   weight?: number;
 };
 
+/** An optional pack-defined level band (Year, CEFR, …) — the engine
+ *  carries no domain terminology; the pack supplies key + label. */
+export type PackLevel = {
+  key: string;
+  label: string;
+};
+
 /** Option keys, A–F (v2 allows 2–6 options; v1 packs use A–D). */
 export type OptionKey = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
@@ -27,6 +34,8 @@ export type PackManifest = {
   homeSubtitle: string;
   themeColor: string;
   categories: PackCategory[];
+  levels?: PackLevel[];
+  levelsLabel?: string;
 };
 
 export type PackScenario = {
@@ -60,6 +69,7 @@ export type PackQuestion = {
   categoryKey: string;
   scenarioId?: string;
   conceptId?: string;
+  level?: string;
   difficulty: 1 | 2 | 3 | 4 | 5;
   prompt: string;
   image?: string;
@@ -73,6 +83,7 @@ export type PackQuestion = {
 };
 
 export const packManifest = manifestJson as PackManifest;
+export const packLevels = packManifest.levels ?? [];
 export const packQuestions = questionsJson as PackQuestion[];
 export const packScenarios = scenariosJson as PackScenario[];
 export const packConcepts = conceptsJson as PackConcept[];

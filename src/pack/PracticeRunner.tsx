@@ -19,7 +19,7 @@ import { PackImage } from '@/pack/PackImage';
 import { ConceptCard } from '@/pack/ConceptCard';
 import { Celebration } from '@/components/Celebration';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
-import { loadAttempts, loadSessions } from '@/lib/storage';
+import { loadAttempts, loadSessions, loadLevelFilter } from '@/lib/storage';
 import {
   packQuestions,
   packScenarios,
@@ -33,6 +33,7 @@ import {
   buildAttempt,
   buildSessionEnd,
   buildSessionStart,
+  filterByLevel,
   historicalIdsForCategory,
   isLastQuestion,
   moveToNext,
@@ -60,19 +61,25 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   const endSession = useEndSession();
   const { nextUnlock, checkNow, clearNextUnlock } = useAchievementUnlock();
 
-  const bank = useMemo(
-    () => bankForCategory(packQuestions, categoryKey),
-    [categoryKey],
-  );
-
   const [state, setState] = useState<RunnerState | null>(null);
   const [outOfQuestions, setOutOfQuestions] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [stage, setStage] = useState<Stage>('choosing');
   const [selected, setSelected] = useState<OptionKey | null>(null);
   const [finished, setFinished] = useState(false);
+  // The active level-band filter (a manifest level key) or null = All.
+  // Read from localStorage after mount, so SSR/first paint stay stable.
+  const [levelFilter, setLevelFilter] = useState<string | null>(null);
 
-  useEffect(() => setMounted(true), []);
+  const bank = useMemo(
+    () => filterByLevel(bankForCategory(packQuestions, categoryKey), levelFilter),
+    [categoryKey, levelFilter],
+  );
+
+  useEffect(() => {
+    setMounted(true);
+    setLevelFilter(loadLevelFilter());
+  }, []);
 
   // Pick the bank once, after mount so localStorage attempts are reflected.
   useEffect(() => {

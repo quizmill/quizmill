@@ -21,6 +21,7 @@ export const SESSIONS_KEY = `${KEY_PREFIX}sessions.v1`;
 export const ATTEMPTS_KEY = `${KEY_PREFIX}attempts.v1`;
 const ACHIEVEMENTS_KEY = `${KEY_PREFIX}achievements.v1`;
 const VOTES_KEY = `${KEY_PREFIX}votes.v1`;
+const PREFS_KEY = `${KEY_PREFIX}prefs.v1`;
 
 export type VoteDir = 'up' | 'down';
 
@@ -89,6 +90,29 @@ function readJson<T>(key: string, fallback: T): T {
 function writeJson<T>(key: string, value: T): void {
   if (!browser()) return;
   window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+// ---- prefs (local-only UI preferences; deliberately not synced) ----
+
+export interface PackPrefs {
+  /** Active level-band filter (a manifest level key); absent = "All". */
+  level?: string;
+}
+
+export function loadPrefs(): PackPrefs {
+  return readJson<PackPrefs>(PREFS_KEY, {});
+}
+
+/** The active level-band filter, or null for "All". */
+export function loadLevelFilter(): string | null {
+  return loadPrefs().level ?? null;
+}
+
+export function saveLevelFilter(level: string | null): void {
+  const prefs = loadPrefs();
+  if (level) prefs.level = level;
+  else delete prefs.level;
+  writeJson(PREFS_KEY, prefs);
 }
 
 // ---- sessions ----
@@ -224,6 +248,7 @@ export function clearAll(): void {
   window.localStorage.removeItem(ATTEMPTS_KEY);
   window.localStorage.removeItem(ACHIEVEMENTS_KEY);
   window.localStorage.removeItem(VOTES_KEY);
+  window.localStorage.removeItem(PREFS_KEY);
   notify({ table: 'clear-all' });
 }
 

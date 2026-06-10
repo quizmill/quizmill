@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, BarChart3, RefreshCw, Settings, Trophy } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
@@ -7,12 +8,24 @@ import { StatTile } from '@/components/StatTile';
 import { InstallBanner } from '@/components/InstallPrompt';
 import { useStorageData } from '@/lib/useStorage';
 import { unresolvedMistakeCount } from '@/lib/mistakes';
-import { packQuestions } from '@/pack/data';
+import { loadLevelFilter, saveLevelFilter } from '@/lib/storage';
+import { cn } from '@/lib/cn';
+import { packQuestions, packLevels, packManifest } from '@/pack/data';
 
 /** Home screen for the generic pack variant — category cards + stats,
  *  all driven by the active pack's manifest. */
 export default function PackHome() {
   const { attempts } = useStorageData();
+  // Active level-band filter (a manifest level key) or null = All. Read
+  // from localStorage after mount so SSR/first paint stay stable.
+  const [level, setLevelState] = useState<string | null>(null);
+  useEffect(() => setLevelState(loadLevelFilter()), []);
+  const setLevel = (next: string | null) => {
+    setLevelState(next);
+    saveLevelFilter(next);
+  };
+  const levelsLabel = packManifest.levelsLabel ?? 'Level';
+
   const totalAnswered = attempts.length;
   const totalCorrect = attempts.filter((a) => a.isCorrect).length;
   const overallAccuracy =
@@ -27,6 +40,7 @@ export default function PackHome() {
     statsByCategory.set(cat.key, { available: 0, answered: 0, correct: 0 });
   }
   for (const q of packQuestions) {
+    if (level && q.level !== level) continue;
     const slot = statsByCategory.get(q.categoryKey);
     if (slot) slot.available++;
   }
@@ -113,6 +127,37 @@ export default function PackHome() {
           </div>
           <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-500" />
         </Link>
+      ) : null}
+
+      {packLevels.length > 0 ? (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-lg font-semibold text-ink-700">{levelsLabel}</h2>
+          <div
+            className="flex flex-wrap gap-2"
+            role="group"
+            aria-label={`Filter by ${levelsLabel}`}
+          >
+            {[{ key: null as string | null, label: 'All' }, ...packLevels].map((lv) => {
+              const active = level === lv.key;
+              return (
+                <button
+                  key={lv.key ?? '__all'}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setLevel(lv.key)}
+                  className={cn(
+                    'tap-feedback rounded-full border px-3.5 py-1.5 text-sm font-semibold transition',
+                    active
+                      ? 'border-brand-500 bg-brand-50 text-brand-700'
+                      : 'border-ink-200 bg-white text-ink-600 hover:border-brand-300',
+                  )}
+                >
+                  {lv.label}
+                </button>
+              );
+            })}
+          </div>
+        </section>
       ) : null}
 
       <section className="flex flex-col gap-3">
