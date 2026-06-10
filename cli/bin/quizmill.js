@@ -23,6 +23,7 @@ const path = require('node:path');
 const ENGINE_REPO = 'https://github.com/quizmill/quizmill.git';
 const HOME = process.env.QUIZMILL_HOME || path.join(os.homedir(), '.quizmill');
 const ENGINE = process.env.QUIZMILL_ENGINE || path.join(HOME, 'engine');
+const CLI_VERSION = require('../package.json').version;
 
 const log = (s) => console.log(s);
 const die = (s) => {
@@ -48,7 +49,17 @@ function ensureEngine() {
 
 function engineNpm(args) {
   ensureEngine();
-  run('npm', args, { cwd: ENGINE });
+  const env = { ...process.env };
+  // The cached engine is a shallow, tagless clone, so its own
+  // `git describe` can't resolve a release tag — the in-app version would
+  // fall back to the 0.0.0-dev sentinel. Stamp the build with the CLI's
+  // version instead (the CLI is published in lockstep with the engine).
+  // Skipped when QUIZMILL_ENGINE points at a real checkout (let its git
+  // tags win) or when the caller set the version explicitly.
+  if (!process.env.QUIZMILL_ENGINE && !env.NEXT_PUBLIC_APP_VERSION) {
+    env.NEXT_PUBLIC_APP_VERSION = CLI_VERSION;
+  }
+  run('npm', args, { cwd: ENGINE, env });
 }
 
 /** Resolve a pack argument: absolute path for dirs, verbatim otherwise
@@ -169,6 +180,7 @@ usage:
   quizmill build [dir|owner/repo]  build a static app into <pack-id>-app/
   quizmill list                 published packs you can install
   quizmill upgrade              update the cached engine (~/.quizmill)
+  quizmill --version            print the CLI version (stamped into builds)
 
 A learning pack is three JSON files. You can write them, but the
 intended author is your AI agent — see the create-learning-pack skill
@@ -183,6 +195,9 @@ try {
     case 'build':     cmdBuild(arg); break;
     case 'list':      engineNpm(['run', 'pack:list']); break;
     case 'upgrade':   cmdUpgrade(); break;
+    case 'version':
+    case '--version':
+    case '-v':        log(CLI_VERSION); break;
     case 'help':
     case '--help':
     case undefined:   log(HELP); break;
