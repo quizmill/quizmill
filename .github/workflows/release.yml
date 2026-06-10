@@ -74,21 +74,12 @@ jobs:
         if: steps.bump.outputs.bump != 'skip'
         id: version
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           version=$(npm version "${{ steps.bump.outputs.bump }}" --no-git-tag-version)
           (cd cli && npm version "$version" --no-git-tag-version)
-          git commit -am "$version"
-          git tag -a "$version" -m "$version"
-          git push origin main --follow-tags
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - name: GitHub release
-        if: steps.bump.outputs.bump != 'skip'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ steps.version.outputs.version }}" --generate-notes
-
+      # Publish BEFORE pushing the bump: if npm rejects (auth, scope, ...),
+      # the run fails with nothing pushed — no burned versions, just rerun.
       - name: Publish CLI to npm
         if: steps.bump.outputs.bump != 'skip'
         env:
@@ -99,3 +90,16 @@ jobs:
             exit 0
           fi
           cd cli && npm publish --provenance --access public
+
+      - name: Push bump, tag, GitHub release
+        if: steps.bump.outputs.bump != 'skip'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version='${{ steps.version.outputs.version }}'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -am "$version"
+          git tag -a "$version" -m "$version"
+          git push origin main --follow-tags
+          gh release create "$version" --generate-notes
