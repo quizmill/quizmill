@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { validatePack, type PackManifest } from '../tools/pack/schema';
 import { readPackDir } from '../tools/pack/validate';
-import { writePackAssets } from './pack-assets';
+import { writePackAssets, syncPackAssets } from './pack-assets';
 import { fetchRemotePack, parsePackSpec } from './remote-pack';
 
 const TARGET = path.join(__dirname, '..', 'content', 'pack');
@@ -80,8 +80,16 @@ function main(): void {
     JSON.stringify(input.scenarios ?? [], null, 2) + '\n',
   );
 
+  // Carry over the pack's image assets (NVR figures, etc.) so the active
+  // pack is self-contained and ensure-pack can re-mirror them on builds.
+  const destAssets = path.join(TARGET, 'assets');
+  fs.rmSync(destAssets, { recursive: true, force: true });
+  const srcAssets = path.join(dir, 'assets');
+  if (fs.existsSync(srcAssets)) fs.cpSync(srcAssets, destAssets, { recursive: true });
+
   const manifest = input.manifest as PackManifest;
   writePackAssets(manifest);
+  syncPackAssets(TARGET);
   const questions = input.questions as unknown[];
   console.log(
     `✓ activated pack "${manifest.title}" (${manifest.id}) — ` +

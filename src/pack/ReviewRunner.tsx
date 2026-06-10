@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Check, X, RefreshCw, Home } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Home } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 import {
@@ -14,6 +14,8 @@ import {
 import { VoteRow } from '@/components/VoteRow';
 import { SourceRef } from '@/components/SourceRef';
 import { McqMarkdown } from '@/components/McqMarkdown';
+import { OptionButtons } from '@/pack/OptionButtons';
+import { PackImage } from '@/pack/PackImage';
 import { Celebration } from '@/components/Celebration';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { loadAttempts, loadSessions } from '@/lib/storage';
@@ -263,61 +265,23 @@ export function PackReviewRunner() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-2.5">
-        {current.options.map((opt) => {
-          const isThis = selected === opt.key;
-          const isAnswer = opt.key === current.correctKey;
-          let visual = 'border-ink-200 bg-white hover:bg-ink-50';
-          if (stage === 'choosing' && isThis) {
-            visual =
-              'border-brand-500 bg-brand-50 text-ink-900 ring-2 ring-brand-500/30';
-          } else if (stage === 'feedback') {
-            if (isAnswer) {
-              visual = 'border-success-500 bg-success-100 text-success-700';
-            } else if (isThis) {
-              visual = 'border-warn-500 bg-warn-100 text-warn-700';
-            } else {
-              visual = 'border-ink-200 bg-ink-50/50 text-ink-500';
-            }
-          }
-          return (
-            <button
-              key={opt.key}
-              type="button"
-              onClick={() => handleSelect(opt.key)}
-              disabled={stage === 'feedback'}
-              className={cn(
-                'tap-feedback flex min-h-14 items-start gap-3 rounded-xl border-2 px-4 py-3 text-left text-[15px] font-medium shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-default',
-                visual,
-              )}
-            >
-              <span
-                className={cn(
-                  'mt-0.5 inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border text-xs font-bold',
-                  stage === 'feedback' && isAnswer
-                    ? 'border-success-500 bg-success-500 text-white'
-                    : stage === 'feedback' && isThis
-                      ? 'border-warn-500 bg-warn-500 text-white'
-                      : isThis
-                        ? 'border-brand-500 bg-brand-500 text-white'
-                        : 'border-ink-300 bg-white text-ink-600',
-                )}
-              >
-                {opt.key}
-              </span>
-              <span className="flex-1 leading-relaxed">
-                <McqMarkdown text={opt.text} />
-              </span>
-              {stage === 'feedback' && isAnswer ? (
-                <Check className="h-5 w-5 flex-shrink-0 text-success-500" />
-              ) : null}
-              {stage === 'feedback' && isThis && !isAnswer ? (
-                <X className="h-5 w-5 flex-shrink-0 text-warn-500" />
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
+      {current.image ? (
+        <div className="flex justify-center rounded-2xl border border-ink-200 bg-white p-4 shadow-sm">
+          <PackImage
+            src={current.image}
+            alt=""
+            className="max-h-72 w-auto object-contain"
+          />
+        </div>
+      ) : null}
+
+      <OptionButtons
+        options={current.options}
+        selected={selected}
+        stage={stage}
+        correctKey={current.correctKey}
+        onSelect={handleSelect}
+      />
 
       {stage === 'choosing' ? (
         <Button

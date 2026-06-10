@@ -65,3 +65,18 @@ export function writePackAssets(manifest: PackManifestLike): void {
   );
   fs.writeFileSync(path.join(PUBLIC, 'icon.svg'), icon + '\n');
 }
+
+/**
+ * Mirror a pack's image assets (`<packDir>/assets/`) into
+ * `public/pack-assets/`, where the static export serves them at
+ * `/pack-assets/…` (referenced by question/option `image` paths).
+ *
+ * The target is cleared first so switching packs never leaves a previous
+ * pack's images behind. No-op when the pack ships no `assets/` dir.
+ */
+export function syncPackAssets(packDir: string): void {
+  const dest = path.join(PUBLIC, 'pack-assets');
+  fs.rmSync(dest, { recursive: true, force: true });
+  const src = path.join(packDir, 'assets');
+  if (fs.existsSync(src)) fs.cpSync(src, dest, { recursive: true });
+}

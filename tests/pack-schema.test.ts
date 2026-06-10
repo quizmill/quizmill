@@ -23,12 +23,17 @@ function makeOptions(n: number): { key: string; text: string }[] {
 /** Overwrite the first question's options + correctKey in place. */
 function setFirstOptions(
   input: ReturnType<typeof loadDemo>,
-  options: { key: string; text: string }[],
+  options: { key: string; text: string; image?: string }[],
   correctKey: string,
 ): void {
   const q = (input.questions as { options: unknown; correctKey: string }[])[0];
   q.options = options;
   q.correctKey = correctKey;
+}
+
+/** Set the first question's prompt image. */
+function setFirstImage(input: ReturnType<typeof loadDemo>, image: string): void {
+  (input.questions as { image?: string }[])[0].image = image;
 }
 
 describe('validatePack', () => {
@@ -175,5 +180,53 @@ describe('validatePack', () => {
     const result = validatePack(input);
     expect(result.ok).toBe(true);
     expect(result.errors).toEqual([]);
+  });
+
+  // ——— schema v2: image questions ———
+
+  it('accepts a prompt image on a question', () => {
+    const input = loadDemo();
+    setFirstImage(input, 'figures/diagram-1.svg');
+    expect(validatePack(input).ok).toBe(true);
+  });
+
+  it('accepts image-answer options (every option has an image)', () => {
+    const input = loadDemo();
+    setFirstOptions(input, [
+      { key: 'A', text: 'Shape A', image: 'nvr-001-a.svg' },
+      { key: 'B', text: 'Shape B', image: 'nvr-001-b.png' },
+      { key: 'C', text: 'Shape C', image: 'nvr-001-c.svg' },
+      { key: 'D', text: 'Shape D', image: 'nvr-001-d.svg' },
+    ], 'C');
+    expect(validatePack(input).ok).toBe(true);
+  });
+
+  it('rejects a mix of image and text options', () => {
+    const input = loadDemo();
+    setFirstOptions(input, [
+      { key: 'A', text: 'Shape A', image: 'a.svg' },
+      { key: 'B', text: 'plain text, no image' },
+      { key: 'C', text: 'Shape C', image: 'c.svg' },
+      { key: 'D', text: 'Shape D', image: 'd.svg' },
+    ], 'A');
+    const result = validatePack(input);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.includes('all-or-nothing'))).toBe(true);
+  });
+
+  it('rejects an absolute or traversing image path', () => {
+    const abs = loadDemo();
+    setFirstImage(abs, '/etc/passwd.png');
+    expect(validatePack(abs).ok).toBe(false);
+
+    const trav = loadDemo();
+    setFirstImage(trav, '../secrets/leak.svg');
+    expect(validatePack(trav).ok).toBe(false);
+  });
+
+  it('rejects a non-image image path', () => {
+    const input = loadDemo();
+    setFirstImage(input, 'notes.txt');
+    expect(validatePack(input).ok).toBe(false);
   });
 });
