@@ -1,1 +1,19 @@
-[]
+[
+  {
+    "id": "greenhouse-effect",
+    "title": "The greenhouse effect",
+    "body": "A planet's surface temperature depends on far more than its distance from the Sun. A thick atmosphere of gases like carbon dioxide lets sunlight in but traps the heat trying to escape — the greenhouse effect.\n\nVenus is the classic example: a dense CO₂ atmosphere makes it the hottest planet (about 465°C), even though Mercury orbits closer to the Sun.",
+    "example": {
+      "question": "Why is Venus hotter than Mercury despite being farther from the Sun?",
+      "steps": [
+        "Mercury is closer, so it receives more sunlight.",
+        "But Mercury has almost no atmosphere, so its heat escapes to space.",
+        "Venus's thick CO₂ atmosphere traps heat — a runaway greenhouse effect."
+      ],
+      "answer": "Venus's dense CO₂ atmosphere traps the heat."
+    },
+    "commonMistakes": [
+      "Assuming the planet closest to the Sun must be the hottest — atmosphere matters more than distance."
+    ]
+  }
+]

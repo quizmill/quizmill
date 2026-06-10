@@ -5,11 +5,17 @@ import { validatePack } from '../tools/pack/schema';
 
 const DEMO = path.join(__dirname, '..', 'content', 'pack-demo');
 
-function loadDemo(): { manifest: unknown; questions: unknown; scenarios: unknown } {
+function loadDemo(): {
+  manifest: unknown;
+  questions: unknown;
+  scenarios: unknown;
+  concepts: unknown;
+} {
   return {
     manifest: JSON.parse(fs.readFileSync(path.join(DEMO, 'pack.json'), 'utf8')),
     questions: JSON.parse(fs.readFileSync(path.join(DEMO, 'questions.json'), 'utf8')),
     scenarios: JSON.parse(fs.readFileSync(path.join(DEMO, 'scenarios.json'), 'utf8')),
+    concepts: JSON.parse(fs.readFileSync(path.join(DEMO, 'concepts.json'), 'utf8')),
   };
 }
 
@@ -123,6 +129,7 @@ describe('validatePack', () => {
     const result = validatePack({
       manifest: input.manifest,
       questions: input.questions,
+      concepts: input.concepts,
     });
     expect(result.ok).toBe(true);
   });
@@ -237,7 +244,9 @@ describe('validatePack', () => {
     (input.questions as { conceptId?: string }[])[0].conceptId = 'fractions';
     const result = validatePack({
       ...input,
+      // Keep the demo's own concept(s) so its linked question still resolves.
       concepts: [
+        ...(input.concepts as unknown[]),
         {
           id: 'fractions',
           title: 'Fractions',
@@ -285,12 +294,12 @@ describe('validatePack', () => {
 
   it('accepts manifest levels and a question that tags one', () => {
     const input = loadDemo();
-    (input.manifest as { levels?: unknown; levelsLabel?: string }).levels = [
-      { key: 'easy', label: 'Easy' },
-      { key: 'hard', label: 'Hard' },
-    ];
-    (input.manifest as { levelsLabel?: string }).levelsLabel = 'Tier';
-    (input.questions as { level?: string }[])[0].level = 'hard';
+    // The demo already declares levels — add one and tag a question with it.
+    (input.manifest as { levels: { key: string; label: string }[] }).levels.push({
+      key: 'extra',
+      label: 'Extra',
+    });
+    (input.questions as { level?: string }[])[0].level = 'extra';
     const result = validatePack(input);
     expect(result.ok).toBe(true);
     expect(result.errors).toEqual([]);
