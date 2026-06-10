@@ -1,10 +1,16 @@
 {
   "name": "quizmill",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Turn a folder of JSON into an installable, offline-first practice app. The mill that grinds questions into knowledge.",
-  "bin": { "quizmill": "bin/quizmill.js" },
-  "files": ["bin"],
-  "engines": { "node": ">=18" },
+  "bin": {
+    "quizmill": "bin/quizmill.js"
+  },
+  "files": [
+    "bin"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "license": "MIT",
   "homepage": "https://quizmill.dev",
   "repository": {
@@ -12,5 +18,13 @@
     "url": "git+https://github.com/quizmill/quizmill.git",
     "directory": "cli"
   },
-  "keywords": ["quiz", "practice", "learning", "flashcards", "mcq", "pwa", "ai-agent"]
+  "keywords": [
+    "quiz",
+    "practice",
+    "learning",
+    "flashcards",
+    "mcq",
+    "pwa",
+    "ai-agent"
+  ]
 }
