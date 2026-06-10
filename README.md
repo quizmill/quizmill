@@ -13,21 +13,36 @@ optional cross-device sync.
 Like a mill, it works by going around: answer, review, retry. The
 engine is the wheel; packs are the grist.
 
+## Quick start
+
+You don't clone this repo to use quizmill — you run it with `npx`. The
+CLI keeps the engine in `~/.quizmill/engine` for you and shells out to
+it, so a pack is all you ever edit. Requires Node ≥ 18, git and npm.
+
 ```
-npm install
-npm run dev          # runs the bundled demo pack (solar system)
+npx quizmill new my-topic        # scaffold a pack (or have your AI agent fill it)
+npx quizmill run my-topic        # practice at localhost:3000
+npx quizmill build my-topic      # static app in my-topic-app/ — deploy anywhere
 ```
+
+| Command | What |
+|---|---|
+| `new [dir]` | scaffold a learning pack with an agent-ready README |
+| `validate <dir>` | schema + cross-reference checks (agents loop on this) |
+| `run [dir\|owner/repo]` | activate a pack and start the app |
+| `build [dir\|owner/repo]` | emit a deployable static app in `<pack-id>-app/` |
+| `list` | published packs you can install |
+| `upgrade` | re-align the cached engine (see [Upgrading](#upgrading)) |
 
 ## Install a published pack
 
-Packs can live in their own GitHub repos. `pack:use` installs straight
-from a repo reference — public repos anonymously, private repos through
-your own `git clone` credentials:
+Packs can live in their own GitHub repos. `run` and `build` accept a
+repo reference and install it straight from there — public repos
+anonymously, private repos through your own `git clone` credentials:
 
 ```
-npm run pack:list                            # the published-pack registry
-npm run pack:use quizmill/pack-claude-cert   # install one
-npm run dev
+npx quizmill list                            # the published-pack registry
+npx quizmill run quizmill/pack-claude-cert   # install + run one
 ```
 
 | Pack | What | |
@@ -36,48 +51,44 @@ npm run dev
 | `your-name/your-pack` | Private repos install exactly the same way (family packs, exam prep, team material) — anyone whose `git clone` works can run it | private |
 
 `owner/repo`, `owner/repo#branch`, full GitHub URLs and SSH remotes all
-work. Re-running `pack:use` refreshes the pack; switching back is
-`rm -rf content/pack && npm run dev` (reseeds the demo).
+work.
 
 ## Build a pack about anything
 
-Packs are **private by default** — they live in the gitignored `packs/`
-workspace (or your own private repo) and never enter this repo's
-history. Only the demo pack is committed.
-
 The intended authoring path is your local AI agent. With
 [Claude Code](https://claude.com/claude-code), the bundled
-`create-learning-pack` skill (`.claude/skills/`) means you can just
-say:
+`create-learning-pack` skill means you can just say:
 
 > "Make me a learning pack about Kubernetes networking"
 
 and the agent will scope it with you, write the pack, loop on the
 validator until it's clean, activate it, and start the app.
 
-Manual authoring works the same way:
+Manual authoring works the same way — scaffold, edit, validate, run:
 
 ```
-cp -r content/pack-demo packs/my-topic    # start from the demo
+npx quizmill new my-topic            # writes pack.json + questions.json + a README
 # edit pack.json + questions.json
-npm run pack:validate packs/my-topic      # schema + cross-reference checks
-npm run pack:use packs/my-topic           # activate
-npm run dev
+npx quizmill validate my-topic       # schema + cross-reference checks
+npx quizmill run my-topic            # activate + start the app
 ```
+
+Packs are **private by default** — they live wherever you put them and
+never enter this repo. Only the demo pack ships with the engine.
 
 ## Publish a pack
 
 A pack repo is just the pack directory pushed to GitHub — `pack.json`,
-`questions.json`, optional `scenarios.json`, plus a README (see
-[pack-claude-cert](https://github.com/quizmill/pack-claude-cert) for
-the shape). Once pushed, anyone can install it:
+`questions.json`, optional `scenarios.json` / `concepts.json` / `assets/`,
+plus a README (see [pack-claude-cert](https://github.com/quizmill/pack-claude-cert)
+for the shape). Once pushed, anyone can install it:
 
 ```
-npm run pack:use your-name/your-pack-repo
+npx quizmill run your-name/your-pack-repo
 ```
 
 Keep it private and it still works for everyone with repo access. If
-the pack is public and you want it listed in `npm run pack:list`, PR an
+the pack is public and you want it listed in `npx quizmill list`, PR an
 entry into [`tools/pack/registry.json`](tools/pack/registry.json).
 
 If your questions build on someone else's bank, keep the upstream
@@ -87,19 +98,36 @@ again, pack-claude-cert is the worked example.
 
 ## Pack format
 
-A pack is three JSON files, specified by the Zod schemas in
-[`tools/pack/schema.ts`](tools/pack/schema.ts) (`schemaVersion: 1`):
+A pack is a directory of JSON, specified by the Zod schemas in
+[`tools/pack/schema.ts`](tools/pack/schema.ts) (`schemaVersion: 2`;
+v1 packs still load unchanged):
 
 | File | What |
 |---|---|
-| `pack.json` | manifest — title, description, theme colour, categories |
-| `questions.json` | the bank: multiple-choice, 4 options, explanation, difficulty 1–5, provenance |
+| `pack.json` | manifest — title, description, theme colour, categories, optional `levels` + `sources` |
+| `questions.json` | the bank: multiple-choice (2–6 options keyed A–F), explanation, difficulty 1–5, provenance |
 | `scenarios.json` | optional shared scenario stems for case-study style questions |
+| `concepts.json` | optional concept cards surfaced in the answer panel (`conceptId` on a question) |
+| `assets/` | optional images referenced by `image` on a question or option |
 
-The validator (`npm run pack:validate`) cross-checks ids, category
-references, scenario references, and weights, and exits non-zero with
-per-question errors — agents loop on it until the pack is clean, so
-malformed content can't reach the app.
+Schema v2 adds, all optional and backward-compatible:
+
+- **2–6 options** keyed `A`–`F` (v1's fixed 4 is just the common case)
+- **images** — `image` on a question prompt and/or on individual
+  options, resolved from the pack's `assets/` directory
+- **concept cards** — a `concepts.json` of short explainers; a question
+  points at one with `conceptId` and it shows in the answer panel
+- **levels** — a second axis beside category: manifest `levels`
+  (`[{key,label}]`) + `levelsLabel` (the axis name, e.g. "Year" or
+  "Difficulty band") + a `level` on each question, exposed as a filter
+- **source legend** — manifest `sources` (`[{label,name,blurb,url}]`)
+  renders a "Question sources" card in Settings; questions reference an
+  entry by `sourceRef`
+
+The validator (`npx quizmill validate <dir>`) cross-checks ids,
+category / scenario / concept / level references, image paths, and
+weights, and exits non-zero with per-question errors — agents loop on
+it until the pack is clean, so malformed content can't reach the app.
 
 ## What the engine gives every pack
 
@@ -113,16 +141,15 @@ malformed content can't reach the app.
   pack; works fully offline (PWA with a versioned service worker)
 - **Optional cloud sync** — magic-link auth + Supabase mirroring with a
   retry-on-reconnect queue; dormant unless configured (see below)
-- **Static export** — `npm run build` produces a plain static site in
-  `out/`, deployable to any static host (Cloudflare Pages, GitHub
-  Pages, Netlify…)
+- **Static export** — `npx quizmill build` produces a plain static site,
+  deployable to any static host (Cloudflare Pages, GitHub Pages,
+  Netlify…)
 
 ## Deploying a pack as its own app
 
 ```
-npm run pack:use packs/my-topic
-NEXT_PUBLIC_BASE_PATH= npm run build
-# deploy out/ anywhere static
+npx quizmill build my-topic          # or: npx quizmill build owner/repo
+# deploy the my-topic-app/ directory to any static host
 ```
 
 Each deployment is one pack. The PWA name, icon, and theme colour are
@@ -144,13 +171,56 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 ```
 
 Absent these, the sync layer stays dormant and the app is pure-local.
-Row Level Security scopes every row to the signed-in user.
+Row Level Security scopes every row to the signed-in user. (Set env
+vars for an `npx` build by exporting them in the same shell — the CLI
+passes your environment through to the engine.)
 
-## Development
+## Upgrading
+
+The CLI pins the cached engine to its own version, so the simplest
+upgrade is to ask npx for the latest CLI — it re-aligns the engine to
+match on the next command:
 
 ```
-npm test             # unit tests (vitest)
-npm run test:e2e     # build + drive the demo pack with Puppeteer
+npx quizmill@latest build my-topic   # fetches the latest CLI + matching engine
+npx quizmill upgrade                  # re-align the cache without building
+```
+
+`npx quizmill@latest …` is the path you almost always want: it pulls
+the newest published CLI, which in turn pins the matching engine, so a
+fresh build always rides the latest engine features. `quizmill upgrade`
+just re-runs that alignment without building anything.
+
+To develop against a local engine checkout instead of the cached one,
+point `QUIZMILL_ENGINE` at it (see below) — the CLI then uses your
+working tree as-is and skips version pinning.
+
+## Developing the engine
+
+You only need this if you're hacking on quizmill itself, not to author
+or run packs. Clone the repo and use the npm scripts directly:
+
+```
+git clone https://github.com/quizmill/quizmill
+cd quizmill
+npm install
+npm run dev                          # demo pack at localhost:3000
+
+npm run pack:use <dir|owner/repo>    # validate + activate a pack
+npm run pack:validate <dir>          # schema + cross-reference checks
+npm run pack:list                    # published packs from the registry
+npm run build                        # static export in out/
+
+npm test                             # unit tests (vitest)
+npm run test:e2e                     # build + drive the demo pack with Puppeteer
+```
+
+To point the `npx quizmill` CLI at your checkout (so `run`/`build` use
+your working tree, version-pinning disabled):
+
+```
+export QUIZMILL_ENGINE=$(pwd)
+npx quizmill run ../my-topic
 ```
 
 ## License
