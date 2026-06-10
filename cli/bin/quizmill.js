@@ -47,6 +47,14 @@ function ensureEngine() {
   }
 }
 
+function engineSha() {
+  try {
+    return execSync('git rev-parse --short HEAD', { cwd: ENGINE }).toString().trim();
+  } catch {
+    return '?';
+  }
+}
+
 function engineNpm(args) {
   ensureEngine();
   const env = { ...process.env };
@@ -163,11 +171,27 @@ function cmdValidate(arg) {
 
 function cmdUpgrade() {
   ensureEngine();
-  if (!process.env.QUIZMILL_ENGINE) {
-    run('git', ['pull', '--ff-only'], { cwd: ENGINE });
+  if (process.env.QUIZMILL_ENGINE) {
+    log('QUIZMILL_ENGINE points at your own checkout — its update is up to you.');
+  } else {
+    const before = engineSha();
+    try {
+      // The cache is a depth-1 shallow clone, so `git pull --ff-only` can't
+      // fast-forward across the grafted history once main advances. Fetch
+      // the latest main and hard-reset onto it — the cache holds no local
+      // commits worth keeping (gitignored content/ and out/ are untouched).
+      run('git', ['fetch', '--depth', '1', 'origin', 'main'], { cwd: ENGINE });
+      run('git', ['reset', '--hard', 'FETCH_HEAD'], { cwd: ENGINE });
+    } catch {
+      log('… update failed — re-cloning the engine fresh');
+      fs.rmSync(ENGINE, { recursive: true, force: true });
+      ensureEngine();
+    }
+    const after = engineSha();
+    log(before === after ? `engine already current (${after})` : `engine ${before} → ${after}`);
   }
   run('npm', ['install', '--no-fund', '--no-audit'], { cwd: ENGINE });
-  log('✓ engine up to date');
+  log(`✓ quizmill ${CLI_VERSION} ready — engine deps installed`);
 }
 
 const HELP = `quizmill — the mill that grinds questions into knowledge
