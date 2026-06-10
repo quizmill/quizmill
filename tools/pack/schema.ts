@@ -93,12 +93,35 @@ export const packScenarioSchema = z.object({
   tags: z.array(z.string()).optional(),
 });
 
+export const packConceptExampleSchema = z.object({
+  question: z.string().min(1).max(400),
+  steps: z.array(z.string().min(1)).optional(),
+  answer: z.string().min(1).max(200),
+});
+
+/**
+ * A short teaching card (v2), in optional `concepts.json`. A question
+ * links one by `conceptId`; the feedback panel surfaces it after a wrong
+ * answer. `body` renders as McqMarkdown (paragraphs, code, links).
+ */
+export const packConceptSchema = z.object({
+  id: z.string().regex(slug),
+  title: z.string().min(3).max(120),
+  body: z.string().min(20),
+  example: packConceptExampleSchema.optional(),
+  commonMistakes: z.array(z.string().min(1)).optional(),
+  tags: z.array(z.string()).optional(),
+});
+
 export const packQuestionSchema = z
   .object({
     id: z.string().regex(slug),
     /** Must match a manifest category key — cross-checked in validatePack. */
     categoryKey: z.string().regex(slug),
     scenarioId: z.string().optional(),
+    /** Optional teaching card shown after a wrong answer — cross-checked
+     *  against concepts.json in validatePack. */
+    conceptId: z.string().optional(),
     difficulty: z.union([
       z.literal(1),
       z.literal(2),
@@ -152,6 +175,7 @@ export const packQuestionSchema = z
 export type PackCategory = z.infer<typeof packCategorySchema>;
 export type PackManifest = z.infer<typeof packManifestSchema>;
 export type PackScenario = z.infer<typeof packScenarioSchema>;
+export type PackConcept = z.infer<typeof packConceptSchema>;
 export type PackQuestion = z.infer<typeof packQuestionSchema>;
 
 export interface PackValidationResult {
@@ -171,6 +195,7 @@ export function validatePack(input: {
   manifest: unknown;
   questions: unknown;
   scenarios?: unknown;
+  concepts?: unknown;
 }): PackValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -228,6 +253,30 @@ export function validatePack(input: {
     }
   }
 
+  const concepts: PackConcept[] = [];
+  if (input.concepts !== undefined) {
+    if (!Array.isArray(input.concepts)) {
+      errors.push('concepts.json: must be a JSON array');
+    } else {
+      input.concepts.forEach((raw, i) => {
+        const c = packConceptSchema.safeParse(raw);
+        if (c.success) {
+          concepts.push(c.data);
+        } else {
+          const id =
+            typeof raw === 'object' && raw !== null && 'id' in raw
+              ? String((raw as { id: unknown }).id)
+              : `#${i}`;
+          for (const issue of c.error.issues) {
+            errors.push(
+              `concepts.json[${id}]: ${issue.path.join('.') || '(root)'}: ${issue.message}`,
+            );
+          }
+        }
+      });
+    }
+  }
+
   // Cross-file checks only make sense once per-file parses succeeded.
   if (manifest.success && questions.length > 0) {
     const seen = new Set<string>();
@@ -250,6 +299,20 @@ export function validatePack(input: {
       if (q.scenarioId && !scenarioIds.has(q.scenarioId)) {
         errors.push(
           `questions.json[${q.id}]: scenarioId "${q.scenarioId}" not found in scenarios.json`,
+        );
+      }
+    }
+
+    const seenConcepts = new Set<string>();
+    for (const c of concepts) {
+      if (seenConcepts.has(c.id)) errors.push(`concepts.json[${c.id}]: duplicate concept id`);
+      seenConcepts.add(c.id);
+    }
+    const conceptIds = new Set(concepts.map((c) => c.id));
+    for (const q of questions) {
+      if (q.conceptId && !conceptIds.has(q.conceptId)) {
+        errors.push(
+          `questions.json[${q.id}]: conceptId "${q.conceptId}" not found in concepts.json`,
         );
       }
     }

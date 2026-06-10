@@ -15,6 +15,7 @@ export function readPackDir(dir: string): {
   manifest: unknown;
   questions: unknown;
   scenarios?: unknown;
+  concepts?: unknown;
 } {
   const readJson = (name: string, optional = false): unknown => {
     const p = path.join(dir, name);
@@ -28,6 +29,7 @@ export function readPackDir(dir: string): {
     manifest: readJson('pack.json'),
     questions: readJson('questions.json'),
     scenarios: readJson('scenarios.json', true),
+    concepts: readJson('concepts.json', true),
   };
 }
 

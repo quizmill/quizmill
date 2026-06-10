@@ -79,6 +79,11 @@ function main(): void {
     path.join(TARGET, 'scenarios.json'),
     JSON.stringify(input.scenarios ?? [], null, 2) + '\n',
   );
+  // concepts.json is imported statically too — always materialise it.
+  fs.writeFileSync(
+    path.join(TARGET, 'concepts.json'),
+    JSON.stringify(input.concepts ?? [], null, 2) + '\n',
+  );
 
   // Carry over the pack's image assets (NVR figures, etc.) so the active
   // pack is self-contained and ensure-pack can re-mirror them on builds.
