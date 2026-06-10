@@ -1,6 +1,6 @@
 {
   "name": "quizmill",
-  "version": "0.2.0",
+  "version": "0.0.0-dev",
   "description": "Turn a folder of JSON into an installable, offline-first practice app. The mill that grinds questions into knowledge.",
   "bin": {
     "quizmill": "bin/quizmill.js"

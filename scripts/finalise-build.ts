@@ -28,10 +28,24 @@ function gitSha(): string {
   }
 }
 
-/** Match next.config.ts: package.json version verbatim (bumped by the
- *  release workflow). The SHA suffix below keeps per-commit busting. */
+/** Match next.config.ts: latest release tag (versions live in git
+ *  tags, not package.json — releases are tag-only). The SHA suffix
+ *  below keeps per-commit busting either way. */
 function appVersion(): string {
-  return process.env.NEXT_PUBLIC_APP_VERSION || pkg.version;
+  if (process.env.NEXT_PUBLIC_APP_VERSION) {
+    return process.env.NEXT_PUBLIC_APP_VERSION;
+  }
+  try {
+    const tag = execSync("git describe --tags --abbrev=0 --match 'v[0-9]*'", {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .toString()
+      .trim();
+    if (tag) return tag.replace(/^v/, '');
+  } catch {
+    // not a git checkout, or no release tag yet
+  }
+  return pkg.version;
 }
 
 const swPath = 'out/sw.js';
