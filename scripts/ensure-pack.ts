@@ -12,7 +12,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { writePackAssets } from './pack-assets';
+import { writePackAssets, syncPackAssets } from './pack-assets';
 
 const ROOT = path.join(__dirname, '..');
 const DEMO = path.join(ROOT, 'content', 'pack-demo');
@@ -23,6 +23,9 @@ function ensurePwaAssets(): void {
     fs.readFileSync(path.join(TARGET, 'pack.json'), 'utf8'),
   );
   writePackAssets(manifest);
+  // Re-mirror the active pack's images on every dev/build run, so a
+  // cleaned public/ or a freshly-seeded pack still serves /pack-assets/.
+  syncPackAssets(TARGET);
 }
 
 function main(): void {
@@ -42,6 +45,10 @@ function main(): void {
     const dst = path.join(TARGET, name);
     if (fs.existsSync(src)) fs.copyFileSync(src, dst);
     else if (name === 'scenarios.json') fs.writeFileSync(dst, '[]\n');
+  }
+  const demoAssets = path.join(DEMO, 'assets');
+  if (fs.existsSync(demoAssets)) {
+    fs.cpSync(demoAssets, path.join(TARGET, 'assets'), { recursive: true });
   }
   ensurePwaAssets();
   console.log('[ensure-pack] seeded content/pack/ from the demo pack');

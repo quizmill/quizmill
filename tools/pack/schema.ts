@@ -27,6 +27,20 @@ import { z } from 'zod';
 
 const slug = /^[a-z0-9][a-z0-9-]*$/;
 
+/**
+ * A pack-relative image asset path (v2). Lives in the pack's `assets/`
+ * directory and is served from `/pack-assets/` at build time. Must be a
+ * plain relative path with an image extension — no leading slash, no URL,
+ * no `..` traversal.
+ */
+export const packImagePathSchema = z
+  .string()
+  .regex(
+    /^[A-Za-z0-9][A-Za-z0-9._/-]*\.(svg|png|jpe?g|gif|webp)$/i,
+    'must be a relative image path ending in .svg/.png/.jpg/.gif/.webp',
+  )
+  .refine((p) => !p.includes('..'), { message: 'must not contain ".."' });
+
 export const packCategorySchema = z.object({
   /** Stable key — used in URLs, storage rows, and questions' categoryKey. */
   key: z.string().regex(slug).max(40),
@@ -63,7 +77,11 @@ export const packOptionKeySchema = z.enum(['A', 'B', 'C', 'D', 'E', 'F']);
 
 export const packOptionSchema = z.object({
   key: packOptionKeySchema,
+  /** Visible label, or — for image-answer questions — the image's alt text. */
   text: z.string().min(1).max(800),
+  /** Optional answer image (v2). When any option has one, all must (an
+   *  image-answer question, e.g. Non-Verbal Reasoning) — see superRefine. */
+  image: packImagePathSchema.optional(),
 });
 
 export const packScenarioSchema = z.object({
@@ -91,6 +109,9 @@ export const packQuestionSchema = z
     /** Floor of 10 keeps junk out while allowing legitimately terse
      *  prompts like arithmetic ("What is 7 × 8?"). */
     prompt: z.string().min(10),
+    /** Optional prompt image (v2), shown above the options — e.g. an NVR
+     *  figure or a diagram the question refers to. */
+    image: packImagePathSchema.optional(),
     /** 2–6 options keyed A–F in order (v2). True/false → 2; GL papers → 5. */
     options: z.array(packOptionSchema).min(2).max(6),
     correctKey: packOptionKeySchema,
@@ -116,6 +137,15 @@ export const packQuestionSchema = z
     }
     if (!keys.includes(q.correctKey)) {
       ctx.addIssue({ code: 'custom', message: 'correctKey must reference one of the options' });
+    }
+    // Image options are all-or-nothing: a mix of image and text answers
+    // renders inconsistently, and usually signals an authoring slip.
+    const withImage = q.options.filter((o) => o.image).length;
+    if (withImage > 0 && withImage !== q.options.length) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'image options must be all-or-nothing (every option needs an image, or none)',
+      });
     }
   });
 

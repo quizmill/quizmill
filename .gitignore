@@ -33,3 +33,5 @@ supabase/.temp/
 # generated from the active pack's manifest by scripts/pack-assets.ts
 /public/manifest.webmanifest
 /public/icon.svg
+# mirrored from the active pack's assets/ by scripts/pack-assets.ts
+/public/pack-assets/

@@ -35,7 +35,7 @@ export type PackScenario = {
   tags?: string[];
 };
 
-export type PackOption = { key: OptionKey; text: string };
+export type PackOption = { key: OptionKey; text: string; image?: string };
 
 export type PackQuestion = {
   id: string;
@@ -43,6 +43,7 @@ export type PackQuestion = {
   scenarioId?: string;
   difficulty: 1 | 2 | 3 | 4 | 5;
   prompt: string;
+  image?: string;
   options: PackOption[];
   correctKey: OptionKey;
   explanation: string;
