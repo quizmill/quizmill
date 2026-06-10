@@ -74,6 +74,12 @@ describe('pack home page', () => {
     const body = await bodyText(page);
     expect(/\d+ questions available/.test(body)).toBe(true);
   });
+
+  it('credits the engine with a link back to quizmill.dev', async () => {
+    await waitForText(page, /Built with\s+quizmill/);
+    const href = await page.$eval('footer a', (el) => el.getAttribute('href'));
+    expect(href).toBe('https://quizmill.dev');
+  });
 });
 
 describe('pack practice flow', () => {
