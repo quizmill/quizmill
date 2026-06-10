@@ -14,6 +14,9 @@ import {
 import { VoteRow } from '@/components/VoteRow';
 import { SourceRef } from '@/components/SourceRef';
 import { McqMarkdown } from '@/components/McqMarkdown';
+import { Celebration } from '@/components/Celebration';
+import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
+import { loadAttempts, loadSessions } from '@/lib/storage';
 import {
   packQuestions,
   packScenarios,
@@ -50,6 +53,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   const recordAttempt = useRecordAttempt();
   const startSession = useStartSession();
   const endSession = useEndSession();
+  const { nextUnlock, checkNow, clearNextUnlock } = useAchievementUnlock();
 
   const bank = useMemo(
     () => bankForCategory(packQuestions, categoryKey),
@@ -122,6 +126,9 @@ export function PackPracticeRunner({ categoryKey }: Props) {
     const { correct, total, pct } = scoreSummary(state);
     return (
       <main className="flex flex-col gap-5">
+        {nextUnlock ? (
+          <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
+        ) : null}
         <BackLink />
         <div className="rounded-2xl border border-ink-200 bg-white p-8 text-center shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
@@ -187,6 +194,9 @@ export function PackPracticeRunner({ categoryKey }: Props) {
       attemptId: crypto.randomUUID(),
     });
     recordAttempt(attempt);
+    // Achievements evaluate against what's now persisted — re-read so
+    // this can't race the useStorageData snapshot.
+    checkNow(loadSessions(), loadAttempts());
     setState(advanceAfterAnswer(state, attempt.isCorrect));
     setStage('feedback');
   }
@@ -195,6 +205,9 @@ export function PackPracticeRunner({ categoryKey }: Props) {
     if (!state) return;
     if (isLastQuestion(state)) {
       endSession(buildSessionEnd(state, categoryKey, Date.now()));
+      // Session-shaped stickers (first session, flawless round, daily
+      // streak) can only unlock once the end record is written.
+      checkNow(loadSessions(), loadAttempts());
       setFinished(true);
       return;
     }
@@ -207,6 +220,9 @@ export function PackPracticeRunner({ categoryKey }: Props) {
 
   return (
     <main className="flex flex-col gap-5">
+      {nextUnlock ? (
+        <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
+      ) : null}
       <header className="flex items-center justify-between">
         <BackLink />
         <ProgressBar

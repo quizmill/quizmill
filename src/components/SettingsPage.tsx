@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { InstallCard } from '@/components/InstallPrompt';
 import { SyncSettings } from '@/components/SyncSettings';
 import {
   useResetAll,
@@ -92,6 +93,8 @@ export function SettingsPage({ extras }: SettingsPageProps) {
       ) : null}
 
       <section className="flex flex-col gap-3">
+        <InstallCard />
+
         <SyncSettings />
 
         <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
