@@ -57,6 +57,17 @@ export const packLevelSchema = z.object({
   label: z.string().min(1).max(40),
 });
 
+export const packSourceSchema = z.object({
+  /** Short chip label shown in the legend, e.g. "GL", "MIT", "Original". */
+  label: z.string().min(1).max(24),
+  /** Display name, often with a count — e.g. "connectry-io (390)". */
+  name: z.string().min(1).max(80).optional(),
+  /** One-line description of where the questions came from. */
+  blurb: z.string().max(300).optional(),
+  /** Link to the source — repo, licence, or publisher. */
+  url: z.string().url().optional(),
+});
+
 export const packManifestSchema = z
   .object({
     schemaVersion: z.union([z.literal(1), z.literal(2)]),
@@ -79,6 +90,9 @@ export const packManifestSchema = z
      *  label (e.g. "Year", "Grade", "CEFR"). Defaults to "Level". The
      *  engine ships no domain terminology — the pack names its own axis. */
     levelsLabel: z.string().min(1).max(24).optional(),
+    /** Optional "Question sources" legend, rendered in Settings (v2) —
+     *  where the bank's questions come from: repos, licences, credits. */
+    sources: z.array(packSourceSchema).max(12).optional(),
   })
   .superRefine((m, ctx) => {
     const keys = m.categories.map((c) => c.key);
@@ -196,6 +210,7 @@ export const packQuestionSchema = z
 
 export type PackCategory = z.infer<typeof packCategorySchema>;
 export type PackLevel = z.infer<typeof packLevelSchema>;
+export type PackSource = z.infer<typeof packSourceSchema>;
 export type PackManifest = z.infer<typeof packManifestSchema>;
 export type PackScenario = z.infer<typeof packScenarioSchema>;
 export type PackConcept = z.infer<typeof packConceptSchema>;

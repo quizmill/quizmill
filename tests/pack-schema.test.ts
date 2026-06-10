@@ -324,4 +324,23 @@ describe('validatePack', () => {
     expect(result.ok).toBe(false);
     expect(result.errors.some((e) => e.includes('level keys must be unique'))).toBe(true);
   });
+
+  // ——— schema v2: source legend ———
+
+  it('accepts a sources legend', () => {
+    const input = loadDemo();
+    (input.manifest as { sources?: unknown }).sources = [
+      { label: 'MIT', name: 'connectry-io (390)', blurb: 'Community repo.', url: 'https://github.com/Connectry-io/x' },
+      { label: 'Original' },
+    ];
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('rejects a source with an invalid url', () => {
+    const input = loadDemo();
+    (input.manifest as { sources?: unknown }).sources = [{ label: 'X', url: 'not-a-url' }];
+    expect(validatePack(input).ok).toBe(false);
+  });
 });

@@ -133,8 +133,8 @@ export default function PackHome() {
         <section className="flex flex-col gap-2">
           <h2 className="text-lg font-semibold text-ink-700">{levelsLabel}</h2>
           <div
-            className="flex flex-wrap gap-2"
-            role="group"
+            className="flex gap-1 rounded-full bg-ink-100 p-1"
+            role="radiogroup"
             aria-label={`Filter by ${levelsLabel}`}
           >
             {[{ key: null as string | null, label: 'All' }, ...packLevels].map((lv) => {
@@ -143,13 +143,14 @@ export default function PackHome() {
                 <button
                   key={lv.key ?? '__all'}
                   type="button"
-                  aria-pressed={active}
+                  role="radio"
+                  aria-checked={active}
                   onClick={() => setLevel(lv.key)}
                   className={cn(
-                    'tap-feedback rounded-full border px-3.5 py-1.5 text-sm font-semibold transition',
+                    'tap-feedback flex-1 rounded-full px-2.5 py-1.5 text-sm font-semibold transition-colors',
                     active
-                      ? 'border-brand-500 bg-brand-50 text-brand-700'
-                      : 'border-ink-200 bg-white text-ink-600 hover:border-brand-300',
+                      ? 'bg-white text-ink-900 shadow-sm'
+                      : 'text-ink-600 hover:text-ink-900',
                   )}
                 >
                   {lv.label}

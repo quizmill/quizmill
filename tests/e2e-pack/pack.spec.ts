@@ -258,6 +258,14 @@ describe('schema v2 showcase (demo pack)', () => {
     expect(body).toContain('Advanced');
   });
 
+  it('lists the pack source legend in Settings', async () => {
+    await page.goto(baseUrl() + '/settings/');
+    await waitForText(page, 'Question sources');
+    const body = await bodyText(page);
+    expect(body).toContain('NASA Science');
+    expect(body).toContain('Hand-authored');
+  });
+
   it('serves a pack image asset from /pack-assets/', async () => {
     const status = await page.evaluate(async () => {
       const r = await fetch('/pack-assets/saturn.svg');

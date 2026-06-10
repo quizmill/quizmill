@@ -17,6 +17,7 @@ import { McqMarkdown } from '@/components/McqMarkdown';
 import { OptionButtons } from '@/pack/OptionButtons';
 import { PackImage } from '@/pack/PackImage';
 import { ConceptCard } from '@/pack/ConceptCard';
+import { QuestionMeta } from '@/pack/QuestionMeta';
 import { Celebration } from '@/components/Celebration';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { loadAttempts, loadSessions, loadLevelFilter } from '@/lib/storage';
@@ -245,9 +246,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
       </header>
 
       <div className="flex flex-wrap items-center gap-1.5 text-sm">
-        <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand-700">
-          {PACK_CATEGORY_LABEL[current.categoryKey] ?? current.categoryKey}
-        </span>
+        <QuestionMeta question={current} />
         {scenario ? (
           <span className="rounded-full border border-ink-300 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-700">
             {scenario.title}
