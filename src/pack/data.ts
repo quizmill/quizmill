@@ -23,6 +23,9 @@ export type PackLevel = {
   label: string;
 };
 
+/** A "Question sources" legend entry, shown in Settings. */
+export type PackSource = { label: string; name?: string; blurb?: string; url?: string };
+
 /** Option keys, A–F (v2 allows 2–6 options; v1 packs use A–D). */
 export type OptionKey = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
@@ -36,6 +39,7 @@ export type PackManifest = {
   categories: PackCategory[];
   levels?: PackLevel[];
   levelsLabel?: string;
+  sources?: PackSource[];
 };
 
 export type PackScenario = {
@@ -84,7 +88,24 @@ export type PackQuestion = {
 
 export const packManifest = manifestJson as PackManifest;
 export const packLevels = packManifest.levels ?? [];
+export const packSources = packManifest.sources ?? [];
 export const packQuestions = questionsJson as PackQuestion[];
+
+/** Level key → label, for the per-question metadata chips. */
+export const PACK_LEVEL_LABEL: Record<string, string> = Object.fromEntries(
+  packLevels.map((l) => [l.key, l.label]),
+);
+
+/** Level key → chip tone, assigned by declaration order (e.g. y4→green … exam→slate). */
+const LEVEL_TONES = [
+  'bg-success-100 text-success-700 ring-success-500/30',
+  'bg-brand-100 text-brand-800 ring-brand-500/30',
+  'bg-warn-100 text-warn-700 ring-warn-500/30',
+  'bg-ink-200 text-ink-700 ring-ink-400/30',
+];
+export const PACK_LEVEL_TONE: Record<string, string> = Object.fromEntries(
+  packLevels.map((l, i) => [l.key, LEVEL_TONES[i % LEVEL_TONES.length]]),
+);
 export const packScenarios = scenariosJson as PackScenario[];
 export const packConcepts = conceptsJson as PackConcept[];
 

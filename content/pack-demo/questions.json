@@ -3,6 +3,7 @@
     "id": "demo-planets-001",
     "categoryKey": "planets",
     "level": "basics",
+    "tags": ["mercury", "innermost"],
     "difficulty": 1,
     "prompt": "Which planet is closest to the Sun?",
     "options": [

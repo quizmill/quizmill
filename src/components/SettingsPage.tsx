@@ -11,6 +11,7 @@ import {
   useResetToday,
   useStorageData,
 } from '@/lib/useStorage';
+import { packSources } from '@/pack/data';
 
 /**
  * Settings page:
@@ -96,6 +97,41 @@ export function SettingsPage({ extras }: SettingsPageProps) {
         <InstallCard />
 
         <SyncSettings />
+
+        {packSources.length > 0 ? (
+          <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
+            <h2 className="text-lg font-semibold text-ink-900">Question sources</h2>
+            <p className="mt-1 text-sm text-ink-600">
+              Where this pack&apos;s questions come from.
+            </p>
+            <dl className="mt-3 flex flex-col gap-3">
+              {packSources.map((src) => (
+                <div key={src.label} className="flex gap-3">
+                  <dt>
+                    <span className="rounded-full border border-ink-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-500">
+                      {src.label}
+                    </span>
+                  </dt>
+                  <dd className="flex-1 text-sm text-ink-600">
+                    {src.url ? (
+                      <a
+                        href={src.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-900"
+                      >
+                        {src.name ?? src.label}
+                      </a>
+                    ) : (
+                      <span className="font-medium text-ink-800">{src.name ?? src.label}</span>
+                    )}
+                    {src.blurb ? <> — {src.blurb}</> : null}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ) : null}
 
         <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-ink-900">
