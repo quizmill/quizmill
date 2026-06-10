@@ -8,10 +8,28 @@ const repoBasePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 const isProd = process.env.NODE_ENV === 'production';
 const effectiveBasePath = isProd ? repoBasePath : '';
 
-/** Visible app version: package.json verbatim. Bumped by the release
- *  workflow on PR merge — label release:major/release:minor for the
- *  bigger bumps, unlabeled merges are patches (see release.yml). */
-const semver = process.env.NEXT_PUBLIC_APP_VERSION || pkg.version;
+/** Visible app version: the latest release tag (vX.Y.Z). Versions live
+ *  in git tags, not package.json — releases are tag-only so main's
+ *  history stays free of bump commits (see release.yml). Falls back to
+ *  the package.json sentinel outside a git checkout / before any tag. */
+function releasedVersion(): string {
+  if (process.env.NEXT_PUBLIC_APP_VERSION) {
+    return process.env.NEXT_PUBLIC_APP_VERSION;
+  }
+  try {
+    const tag = execSync("git describe --tags --abbrev=0 --match 'v[0-9]*'", {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .toString()
+      .trim();
+    if (tag) return tag.replace(/^v/, '');
+  } catch {
+    // not a git checkout, or no release tag yet
+  }
+  return pkg.version;
+}
+
+const semver = releasedVersion();
 
 /** Per-commit build tag. Changes every push so the user can tell at a
  *  glance whether the iPad has the freshest deploy. Falls back to a

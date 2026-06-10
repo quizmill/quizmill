@@ -1,6 +1,6 @@
 {
   "name": "quizmill",
-  "version": "0.2.0",
+  "version": "0.0.0-dev",
   "private": true,
   "scripts": {
     "predev": "tsx scripts/ensure-pack.ts",

@@ -1,16 +1,23 @@
 name: Release
 
-# Label-driven semver. Merging a PR into main cuts a release:
+# Label-driven semver, TAG-ONLY — releases never commit to main.
+#
+# Merging a PR into main cuts a release:
 #   release:major / release:minor — explicit bumps
 #   (no label)                    — patch
 #   release:skip                  — no release (docs, CI tweaks, ...)
 # Direct pushes to main never release; run this workflow manually
 # (workflow_dispatch) to release accumulated commits.
 #
-# A release = version bump commit (engine + cli/ in lockstep) + tag
-# vX.Y.Z + GitHub release with generated notes + npm publish of cli/.
-# npm publish needs an NPM_TOKEN repo secret (granular automation token
-# with "bypass 2FA"); until it's set, that step skips with a notice.
+# Versions live in git tags (vX.Y.Z), not package.json — the manifests
+# carry a 0.0.0-dev sentinel and the build stamps the real version from
+# `git describe` (see next.config.ts). A release = compute next version
+# from the latest tag + bump, npm-publish cli/ at that version (bumped
+# in the CI workspace only), tag the merge commit, create the GitHub
+# release. npm publish needs an NPM_TOKEN repo secret (granular
+# automation token with bypass-2FA); until it's set, that step skips
+# with a notice. Publish runs before tagging so a rejected publish
+# burns nothing — just rerun.
 
 on:
   pull_request:
@@ -28,8 +35,6 @@ permissions:
   contents: write
   id-token: write # npm --provenance
 
-# One release at a time; a queued run re-checks out main and sees the
-# previous run's bump commit, so versions never collide.
 concurrency:
   group: release
   cancel-in-progress: false
@@ -63,43 +68,56 @@ jobs:
         if: steps.bump.outputs.bump != 'skip'
         with:
           ref: main
+          fetch-depth: 0 # tags + history for git describe
+
+      - name: Compute next version from the latest tag
+        if: steps.bump.outputs.bump != 'skip'
+        id: version
+        run: |
+          if git describe --tags --exact-match HEAD 2>/dev/null; then
+            echo "::notice::HEAD is already tagged — nothing to release."
+            echo "version=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          latest=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || echo v0.0.0)
+          IFS=. read -r maj min pat <<< "${latest#v}"
+          case "${{ steps.bump.outputs.bump }}" in
+            major) next="v$((maj+1)).0.0" ;;
+            minor) next="v$maj.$((min+1)).0" ;;
+            patch) next="v$maj.$min.$((pat+1))" ;;
+          esac
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "Releasing $latest -> $next"
 
       - uses: actions/setup-node@v4
-        if: steps.bump.outputs.bump != 'skip'
+        if: steps.version.outputs.version != ''
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
-      - name: Bump version — engine + CLI in lockstep
-        if: steps.bump.outputs.bump != 'skip'
-        id: version
-        run: |
-          version=$(npm version "${{ steps.bump.outputs.bump }}" --no-git-tag-version)
-          (cd cli && npm version "$version" --no-git-tag-version)
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      # Publish BEFORE pushing the bump: if npm rejects (auth, scope, ...),
-      # the run fails with nothing pushed — no burned versions, just rerun.
       - name: Publish CLI to npm
-        if: steps.bump.outputs.bump != 'skip'
+        if: steps.version.outputs.version != ''
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           if [ -z "$NODE_AUTH_TOKEN" ]; then
             echo "::notice::NPM_TOKEN secret not set — skipping npm publish. Publish cli/ manually or add the secret."
             exit 0
           fi
-          cd cli && npm publish --provenance --access public
+          cd cli
+          # Workspace-only version stamp; never committed back.
+          npm version "${VERSION#v}" --no-git-tag-version
+          npm publish --provenance --access public
 
-      - name: Push bump, tag, GitHub release
-        if: steps.bump.outputs.bump != 'skip'
+      - name: Tag and create the GitHub release
+        if: steps.version.outputs.version != ''
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          version='${{ steps.version.outputs.version }}'
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -am "$version"
-          git tag -a "$version" -m "$version"
-          git push origin main --follow-tags
-          gh release create "$version" --generate-notes
+          git tag -a "$VERSION" -m "$VERSION"
+          git push origin "refs/tags/$VERSION"
+          gh release create "$VERSION" --generate-notes

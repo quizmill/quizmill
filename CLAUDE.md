@@ -123,17 +123,21 @@ Real packs published (ported from `~/code/personal/learning`):
 
 ## Releases
 
-Semver, label-driven (`.github/workflows/release.yml`). Merging a PR
-into main bumps **patch** by default; label `release:minor` /
-`release:major` for bigger bumps, `release:skip` for none. The
-workflow bumps `package.json` + `cli/package.json` in lockstep,
-commits, tags `vX.Y.Z`, creates a GitHub release with generated
-notes, and npm-publishes `cli/` (requires the `NPM_TOKEN` repo
-secret — a granular automation token with bypass-2FA; skips with a
-notice until set). Direct pushes to main never release — use the
-workflow's manual dispatch to release accumulated commits. The
-in-app version is `package.json` verbatim; the SW cache key appends
-the git SHA so updates are detected on every commit regardless.
+Semver, label-driven, **tag-only** (`.github/workflows/release.yml`).
+Merging a PR into main bumps **patch** by default; label
+`release:minor` / `release:major` for bigger bumps, `release:skip`
+for none. Versions live in git tags (`vX.Y.Z`) — the package.json
+files carry a permanent `0.0.0-dev` sentinel and releases NEVER
+commit to main: the workflow computes the next version from the
+latest tag, npm-publishes `cli/` at it (version stamped in the CI
+workspace only; requires the `NPM_TOKEN` secret — granular automation
+token with bypass-2FA), tags the merge commit, and creates a GitHub
+release with generated notes. Direct pushes to main never release —
+use the workflow's manual dispatch to release accumulated commits.
+The in-app version comes from `git describe` at build time
+(NEXT_PUBLIC_APP_VERSION overrides; package.json sentinel as the
+last-ditch fallback); the SW cache key appends the git SHA so updates
+are detected on every commit regardless.
 
 ## Conventions
 
