@@ -229,4 +229,55 @@ describe('validatePack', () => {
     setFirstImage(input, 'notes.txt');
     expect(validatePack(input).ok).toBe(false);
   });
+
+  // ——— schema v2: concept cards ———
+
+  it('accepts a concept and a question that links it', () => {
+    const input = loadDemo();
+    (input.questions as { conceptId?: string }[])[0].conceptId = 'fractions';
+    const result = validatePack({
+      ...input,
+      concepts: [
+        {
+          id: 'fractions',
+          title: 'Fractions',
+          body: 'A fraction is part of a whole — a body long enough for the validator.',
+          example: { question: 'What is 3/4 of 20?', steps: ['20 ÷ 4 = 5', '5 × 3 = 15'], answer: '15' },
+          commonMistakes: ['Multiplying before dividing.'],
+        },
+      ],
+    });
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('rejects a conceptId with no matching concept', () => {
+    const input = loadDemo();
+    (input.questions as { conceptId?: string }[])[0].conceptId = 'ghost-concept';
+    const result = validatePack({ ...input, concepts: [] });
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.includes('ghost-concept'))).toBe(true);
+  });
+
+  it('rejects a malformed concept (body too short)', () => {
+    const input = loadDemo();
+    const result = validatePack({
+      ...input,
+      concepts: [{ id: 'x', title: 'Too short', body: 'tiny' }],
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects duplicate concept ids', () => {
+    const input = loadDemo();
+    const result = validatePack({
+      ...input,
+      concepts: [
+        { id: 'dup', title: 'One', body: 'First concept body, long enough for the validator.' },
+        { id: 'dup', title: 'Two', body: 'Second concept body, also long enough for it here.' },
+      ],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.includes('duplicate concept id'))).toBe(true);
+  });
 });

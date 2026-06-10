@@ -7,6 +7,7 @@
 import manifestJson from '../../content/pack/pack.json';
 import questionsJson from '../../content/pack/questions.json';
 import scenariosJson from '../../content/pack/scenarios.json';
+import conceptsJson from '../../content/pack/concepts.json';
 
 export type PackCategory = {
   key: string;
@@ -35,12 +36,30 @@ export type PackScenario = {
   tags?: string[];
 };
 
+export type PackConceptExample = {
+  question: string;
+  steps?: string[];
+  answer: string;
+};
+
+/** A short teaching card, surfaced after a wrong answer (linked by a
+ *  question's conceptId). Body is rendered as McqMarkdown. */
+export type PackConcept = {
+  id: string;
+  title: string;
+  body: string;
+  example?: PackConceptExample;
+  commonMistakes?: string[];
+  tags?: string[];
+};
+
 export type PackOption = { key: OptionKey; text: string; image?: string };
 
 export type PackQuestion = {
   id: string;
   categoryKey: string;
   scenarioId?: string;
+  conceptId?: string;
   difficulty: 1 | 2 | 3 | 4 | 5;
   prompt: string;
   image?: string;
@@ -56,6 +75,12 @@ export type PackQuestion = {
 export const packManifest = manifestJson as PackManifest;
 export const packQuestions = questionsJson as PackQuestion[];
 export const packScenarios = scenariosJson as PackScenario[];
+export const packConcepts = conceptsJson as PackConcept[];
+
+/** Concept lookup by id, for the post-answer "Learn" card. */
+export const PACK_CONCEPT_BY_ID: Record<string, PackConcept> = Object.fromEntries(
+  packConcepts.map((c) => [c.id, c]),
+);
 
 /** Chip-friendly label per category key. */
 export const PACK_CATEGORY_LABEL: Record<string, string> = Object.fromEntries(

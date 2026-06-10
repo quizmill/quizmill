@@ -30,21 +30,25 @@ function ensurePwaAssets(): void {
 
 function main(): void {
   if (fs.existsSync(path.join(TARGET, 'pack.json'))) {
-    // Active pack present. Backfill scenarios.json if a hand-rolled
-    // pack omitted it (static import needs the file to exist), and
-    // regenerate the PWA assets in case they were cleaned.
-    const scenarios = path.join(TARGET, 'scenarios.json');
-    if (!fs.existsSync(scenarios)) fs.writeFileSync(scenarios, '[]\n');
+    // Active pack present. Backfill scenarios.json / concepts.json if a
+    // hand-rolled pack omitted them (static imports need the files to
+    // exist), and regenerate the PWA assets in case they were cleaned.
+    for (const optional of ['scenarios.json', 'concepts.json']) {
+      const p = path.join(TARGET, optional);
+      if (!fs.existsSync(p)) fs.writeFileSync(p, '[]\n');
+    }
     ensurePwaAssets();
     return;
   }
 
   fs.mkdirSync(TARGET, { recursive: true });
-  for (const name of ['pack.json', 'questions.json', 'scenarios.json']) {
+  for (const name of ['pack.json', 'questions.json', 'scenarios.json', 'concepts.json']) {
     const src = path.join(DEMO, name);
     const dst = path.join(TARGET, name);
     if (fs.existsSync(src)) fs.copyFileSync(src, dst);
-    else if (name === 'scenarios.json') fs.writeFileSync(dst, '[]\n');
+    else if (name === 'scenarios.json' || name === 'concepts.json') {
+      fs.writeFileSync(dst, '[]\n');
+    }
   }
   const demoAssets = path.join(DEMO, 'assets');
   if (fs.existsSync(demoAssets)) {

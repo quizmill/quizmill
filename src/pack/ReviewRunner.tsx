@@ -16,6 +16,7 @@ import { SourceRef } from '@/components/SourceRef';
 import { McqMarkdown } from '@/components/McqMarkdown';
 import { OptionButtons } from '@/pack/OptionButtons';
 import { PackImage } from '@/pack/PackImage';
+import { ConceptCard } from '@/pack/ConceptCard';
 import { Celebration } from '@/components/Celebration';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { loadAttempts, loadSessions } from '@/lib/storage';
@@ -24,6 +25,7 @@ import {
   packQuestions,
   packScenarios,
   PACK_CATEGORY_LABEL,
+  PACK_CONCEPT_BY_ID,
   type OptionKey,
   type PackQuestion,
 } from '@/pack/data';
@@ -214,6 +216,7 @@ export function PackReviewRunner() {
   }
 
   const isCorrect = stage === 'feedback' && selected === current.correctKey;
+  const concept = current.conceptId ? PACK_CONCEPT_BY_ID[current.conceptId] : undefined;
 
   return (
     <main className="flex flex-col gap-5">
@@ -321,6 +324,9 @@ export function PackReviewRunner() {
           <div className="text-[15px] leading-relaxed text-ink-800">
             <McqMarkdown text={current.explanation} />
           </div>
+          {concept ? (
+            <ConceptCard concept={concept} defaultOpen={!isCorrect} />
+          ) : null}
           <SourceRef sourceRef={current.sourceRef} />
           <VoteRow questionId={current.id} />
           <Button size="lg" block onClick={handleNext} className="mt-1">
