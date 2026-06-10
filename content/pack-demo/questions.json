@@ -2,6 +2,7 @@
   {
     "id": "demo-planets-001",
     "categoryKey": "planets",
+    "level": "basics",
     "difficulty": 1,
     "prompt": "Which planet is closest to the Sun?",
     "options": [
@@ -18,6 +19,7 @@
   {
     "id": "demo-planets-002",
     "categoryKey": "planets",
+    "level": "basics",
     "difficulty": 2,
     "prompt": "Which planet has the most confirmed moons as of the mid-2020s?",
     "options": [
@@ -34,6 +36,8 @@
   {
     "id": "demo-planets-003",
     "categoryKey": "planets",
+    "conceptId": "greenhouse-effect",
+    "level": "basics",
     "difficulty": 2,
     "prompt": "Why does Venus have a higher average surface temperature than Mercury, despite being farther from the Sun?",
     "options": [
@@ -50,6 +54,7 @@
   {
     "id": "demo-planets-004",
     "categoryKey": "planets",
+    "level": "advanced",
     "difficulty": 3,
     "prompt": "Which of these moons is known to have a subsurface liquid-water ocean and erupting water plumes?",
     "options": [
@@ -66,6 +71,7 @@
   {
     "id": "demo-planets-005",
     "categoryKey": "planets",
+    "level": "advanced",
     "difficulty": 3,
     "prompt": "What primarily defines the difference between a planet and a dwarf planet like Pluto?",
     "options": [
@@ -82,6 +88,7 @@
   {
     "id": "demo-planets-006",
     "categoryKey": "planets",
+    "level": "advanced",
     "difficulty": 4,
     "prompt": "Jupiter's Great Red Spot is best described as which of the following?",
     "options": [
@@ -96,8 +103,77 @@
     "reviewStatus": "approved"
   },
   {
+    "id": "demo-planets-007",
+    "categoryKey": "planets",
+    "level": "basics",
+    "difficulty": 1,
+    "prompt": "True or false: the Sun is a star, not a planet.",
+    "options": [
+      { "key": "A", "text": "True" },
+      { "key": "B", "text": "False" }
+    ],
+    "correctKey": "A",
+    "explanation": "The Sun is a G-type main-sequence star — a vast ball of plasma fusing hydrogen into helium. The planets orbit it; it is not itself a planet. (A two-option question shows the engine isn't fixed to four choices.)",
+    "source": "generated",
+    "reviewStatus": "reviewed"
+  },
+  {
+    "id": "demo-planets-008",
+    "categoryKey": "planets",
+    "level": "advanced",
+    "difficulty": 2,
+    "prompt": "Which is the largest planet in the Solar System, by both mass and diameter?",
+    "options": [
+      { "key": "A", "text": "Earth" },
+      { "key": "B", "text": "Jupiter" },
+      { "key": "C", "text": "Saturn" },
+      { "key": "D", "text": "Neptune" },
+      { "key": "E", "text": "Mars" }
+    ],
+    "correctKey": "B",
+    "explanation": "Jupiter dominates the Solar System's planets at about 318 Earth masses and 11 Earth diameters. Saturn is the second largest; Neptune, Earth and Mars are far smaller. (A five-option question — A through E.)",
+    "source": "generated",
+    "reviewStatus": "reviewed"
+  },
+  {
+    "id": "demo-planets-009",
+    "categoryKey": "planets",
+    "level": "advanced",
+    "difficulty": 2,
+    "prompt": "Which of these planets has the most prominent ring system?",
+    "options": [
+      { "key": "A", "text": "Saturn", "image": "saturn.svg" },
+      { "key": "B", "text": "Mars", "image": "mars.svg" },
+      { "key": "C", "text": "Neptune", "image": "neptune.svg" },
+      { "key": "D", "text": "Jupiter", "image": "jupiter.svg" }
+    ],
+    "correctKey": "A",
+    "explanation": "Saturn's bright, broad rings of ice and rock are by far the most prominent in the Solar System. The other giants have faint, dark rings and Mars has none. (The answers here are image tiles, not text.)",
+    "source": "generated",
+    "reviewStatus": "reviewed"
+  },
+  {
+    "id": "demo-planets-010",
+    "categoryKey": "planets",
+    "level": "advanced",
+    "difficulty": 2,
+    "prompt": "Which planet is shown in the figure above?",
+    "image": "saturn.svg",
+    "options": [
+      { "key": "A", "text": "Saturn" },
+      { "key": "B", "text": "Jupiter" },
+      { "key": "C", "text": "Mars" },
+      { "key": "D", "text": "Neptune" }
+    ],
+    "correctKey": "A",
+    "explanation": "The broad, bright ring system is the giveaway — this is Saturn. (This question carries a prompt image above plain text answers.)",
+    "source": "generated",
+    "reviewStatus": "reviewed"
+  },
+  {
     "id": "demo-explore-001",
     "categoryKey": "space-exploration",
+    "level": "basics",
     "difficulty": 1,
     "prompt": "Which mission first landed humans on the Moon?",
     "options": [
@@ -114,6 +190,7 @@
   {
     "id": "demo-explore-002",
     "categoryKey": "space-exploration",
+    "level": "basics",
     "difficulty": 2,
     "prompt": "Which two spacecraft are the only human-made objects to have entered interstellar space?",
     "options": [
@@ -130,6 +207,7 @@
   {
     "id": "demo-explore-003",
     "categoryKey": "space-exploration",
+    "level": "advanced",
     "difficulty": 3,
     "prompt": "Why do Mars rovers like Perseverance use a 'sky crane' landing system instead of airbags or simple parachutes?",
     "options": [
@@ -146,6 +224,7 @@
   {
     "id": "demo-explore-004",
     "categoryKey": "space-exploration",
+    "level": "advanced",
     "difficulty": 4,
     "prompt": "The James Webb Space Telescope orbits the Sun-Earth L2 point rather than orbiting Earth like Hubble. What is the main advantage of L2 for Webb?",
     "options": [

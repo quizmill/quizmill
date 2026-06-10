@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "solar-system-demo",
   "title": "Solar System Practice",
   "description": "Demo learning pack — multiple-choice practice on the solar system.",
@@ -18,5 +18,10 @@
       "shortLabel": "Exploration",
       "weight": 0.4
     }
+  ],
+  "levelsLabel": "Level",
+  "levels": [
+    { "key": "basics", "label": "Basics" },
+    { "key": "advanced", "label": "Advanced" }
   ]
 }

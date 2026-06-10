@@ -248,6 +248,25 @@ describe('settings install card', () => {
   });
 });
 
+describe('schema v2 showcase (demo pack)', () => {
+  it('renders the pack-defined level filter on the home page', async () => {
+    await waitForText(page, 'Solar System Practice');
+    const body = await bodyText(page);
+    // levelsLabel + the two bands declared in the demo manifest.
+    expect(body).toContain('Level');
+    expect(body).toContain('Basics');
+    expect(body).toContain('Advanced');
+  });
+
+  it('serves a pack image asset from /pack-assets/', async () => {
+    const status = await page.evaluate(async () => {
+      const r = await fetch('/pack-assets/saturn.svg');
+      return r.status;
+    });
+    expect(status).toBe(200);
+  });
+});
+
 describe('service worker', () => {
   it('registers and activates (powers the "new version ready" banner)', async () => {
     // resetOrigin unregistered any previous SW; UpdateNotifier re-registers
