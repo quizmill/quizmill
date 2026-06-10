@@ -51,6 +51,12 @@ export const packCategorySchema = z.object({
   weight: z.number().positive().max(1).optional(),
 });
 
+export const packLevelSchema = z.object({
+  /** Stable key — referenced by a question's `level`. */
+  key: z.string().regex(slug).max(40),
+  label: z.string().min(1).max(40),
+});
+
 export const packManifestSchema = z
   .object({
     schemaVersion: z.union([z.literal(1), z.literal(2)]),
@@ -65,11 +71,25 @@ export const packManifestSchema = z
     /** PWA theme colour, e.g. "#1e3a5f". */
     themeColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
     categories: z.array(packCategorySchema).min(1).max(12),
+    /** Optional ordered "level" bands (v2) — a coarse axis above difficulty
+     *  you can filter practice by (Year groups, CEFR levels, …). Questions
+     *  tag one via `level`; declare none and there's no filter, as today. */
+    levels: z.array(packLevelSchema).min(1).max(8).optional(),
+    /** What the pack calls its level dimension, shown as the filter's
+     *  label (e.g. "Year", "Grade", "CEFR"). Defaults to "Level". The
+     *  engine ships no domain terminology — the pack names its own axis. */
+    levelsLabel: z.string().min(1).max(24).optional(),
   })
   .superRefine((m, ctx) => {
     const keys = m.categories.map((c) => c.key);
     if (new Set(keys).size !== keys.length) {
       ctx.addIssue({ code: 'custom', message: 'category keys must be unique' });
+    }
+    if (m.levels) {
+      const levelKeys = m.levels.map((l) => l.key);
+      if (new Set(levelKeys).size !== levelKeys.length) {
+        ctx.addIssue({ code: 'custom', message: 'level keys must be unique' });
+      }
     }
   });
 
@@ -122,6 +142,8 @@ export const packQuestionSchema = z
     /** Optional teaching card shown after a wrong answer — cross-checked
      *  against concepts.json in validatePack. */
     conceptId: z.string().optional(),
+    /** Optional level band (v2) — must reference a manifest level key. */
+    level: z.string().optional(),
     difficulty: z.union([
       z.literal(1),
       z.literal(2),
@@ -173,6 +195,7 @@ export const packQuestionSchema = z
   });
 
 export type PackCategory = z.infer<typeof packCategorySchema>;
+export type PackLevel = z.infer<typeof packLevelSchema>;
 export type PackManifest = z.infer<typeof packManifestSchema>;
 export type PackScenario = z.infer<typeof packScenarioSchema>;
 export type PackConcept = z.infer<typeof packConceptSchema>;
@@ -313,6 +336,15 @@ export function validatePack(input: {
       if (q.conceptId && !conceptIds.has(q.conceptId)) {
         errors.push(
           `questions.json[${q.id}]: conceptId "${q.conceptId}" not found in concepts.json`,
+        );
+      }
+    }
+
+    const levelKeys = new Set((manifest.data.levels ?? []).map((l) => l.key));
+    for (const q of questions) {
+      if (q.level && !levelKeys.has(q.level)) {
+        errors.push(
+          `questions.json[${q.id}]: level "${q.level}" not declared in pack.json levels`,
         );
       }
     }

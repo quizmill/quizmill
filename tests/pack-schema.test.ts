@@ -280,4 +280,39 @@ describe('validatePack', () => {
     expect(result.ok).toBe(false);
     expect(result.errors.some((e) => e.includes('duplicate concept id'))).toBe(true);
   });
+
+  // ——— schema v2: levels ———
+
+  it('accepts manifest levels and a question that tags one', () => {
+    const input = loadDemo();
+    (input.manifest as { levels?: unknown; levelsLabel?: string }).levels = [
+      { key: 'easy', label: 'Easy' },
+      { key: 'hard', label: 'Hard' },
+    ];
+    (input.manifest as { levelsLabel?: string }).levelsLabel = 'Tier';
+    (input.questions as { level?: string }[])[0].level = 'hard';
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('rejects a question level not declared in the manifest', () => {
+    const input = loadDemo();
+    (input.manifest as { levels?: unknown }).levels = [{ key: 'easy', label: 'Easy' }];
+    (input.questions as { level?: string }[])[0].level = 'ghost-level';
+    const result = validatePack(input);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.includes('ghost-level'))).toBe(true);
+  });
+
+  it('rejects duplicate level keys in the manifest', () => {
+    const input = loadDemo();
+    (input.manifest as { levels?: unknown }).levels = [
+      { key: 'dup', label: 'One' },
+      { key: 'dup', label: 'Two' },
+    ];
+    const result = validatePack(input);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.includes('level keys must be unique'))).toBe(true);
+  });
 });

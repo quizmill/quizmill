@@ -26,6 +26,16 @@ export function bankForCategory(
   return questions.filter((q) => q.categoryKey === categoryKey);
 }
 
+/** Restrict a bank to one level band. A null/undefined level (the "All"
+ *  filter, or a pack with no levels) returns the bank unchanged. */
+export function filterByLevel(
+  bank: PackQuestion[],
+  level: string | null | undefined,
+): PackQuestion[] {
+  if (!level) return bank;
+  return bank.filter((q) => q.level === level);
+}
+
 /** Past-attempt IDs on the same category — used to bias toward unseen. */
 export function historicalIdsForCategory(
   attempts: { questionId: string; subject: string }[],
