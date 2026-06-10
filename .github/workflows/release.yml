@@ -1,0 +1,101 @@
+name: Release
+
+# Label-driven semver. Merging a PR into main cuts a release:
+#   release:major / release:minor — explicit bumps
+#   (no label)                    — patch
+#   release:skip                  — no release (docs, CI tweaks, ...)
+# Direct pushes to main never release; run this workflow manually
+# (workflow_dispatch) to release accumulated commits.
+#
+# A release = version bump commit (engine + cli/ in lockstep) + tag
+# vX.Y.Z + GitHub release with generated notes + npm publish of cli/.
+# npm publish needs an NPM_TOKEN repo secret (granular automation token
+# with "bypass 2FA"); until it's set, that step skips with a notice.
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump'
+        required: true
+        type: choice
+        options: [patch, minor, major]
+
+permissions:
+  contents: write
+  id-token: write # npm --provenance
+
+# One release at a time; a queued run re-checks out main and sees the
+# previous run's bump commit, so versions never collide.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve bump from PR labels
+        id: bump
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ' ') }}
+          DISPATCH_BUMP: ${{ inputs.bump }}
+        run: |
+          if [ -n "$DISPATCH_BUMP" ]; then
+            bump="$DISPATCH_BUMP"
+          elif [[ " $LABELS " == *" release:skip "* ]]; then
+            bump=skip
+          elif [[ " $LABELS " == *" release:major "* ]]; then
+            bump=major
+          elif [[ " $LABELS " == *" release:minor "* ]]; then
+            bump=minor
+          else
+            bump=patch
+          fi
+          echo "bump=$bump" >> "$GITHUB_OUTPUT"
+          echo "Resolved bump: $bump (labels: ${LABELS:-none})"
+
+      - uses: actions/checkout@v4
+        if: steps.bump.outputs.bump != 'skip'
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        if: steps.bump.outputs.bump != 'skip'
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Bump version — engine + CLI in lockstep
+        if: steps.bump.outputs.bump != 'skip'
+        id: version
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          version=$(npm version "${{ steps.bump.outputs.bump }}" --no-git-tag-version)
+          (cd cli && npm version "$version" --no-git-tag-version)
+          git commit -am "$version"
+          git tag -a "$version" -m "$version"
+          git push origin main --follow-tags
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: GitHub release
+        if: steps.bump.outputs.bump != 'skip'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ steps.version.outputs.version }}" --generate-notes
+
+      - name: Publish CLI to npm
+        if: steps.bump.outputs.bump != 'skip'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "::notice::NPM_TOKEN secret not set — skipping npm publish. Publish cli/ manually or add the secret."
+            exit 0
+          fi
+          cd cli && npm publish --provenance --access public

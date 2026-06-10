@@ -118,6 +118,20 @@ Real packs published (ported from `~/code/personal/learning`):
    schema v2 (2–6 options + question images — unblocks porting the 11+
    non-verbal bank).
 
+## Releases
+
+Semver, label-driven (`.github/workflows/release.yml`). Merging a PR
+into main bumps **patch** by default; label `release:minor` /
+`release:major` for bigger bumps, `release:skip` for none. The
+workflow bumps `package.json` + `cli/package.json` in lockstep,
+commits, tags `vX.Y.Z`, creates a GitHub release with generated
+notes, and npm-publishes `cli/` (requires the `NPM_TOKEN` repo
+secret — a granular automation token with bypass-2FA; skips with a
+notice until set). Direct pushes to main never release — use the
+workflow's manual dispatch to release accumulated commits. The
+in-app version is `package.json` verbatim; the SW cache key appends
+the git SHA so updates are detected on every commit regardless.
+
 ## Conventions
 
 - Tests accompany behaviour changes; E2E asserts against the demo pack

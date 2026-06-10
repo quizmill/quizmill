@@ -28,28 +28,10 @@ function gitSha(): string {
   }
 }
 
-/** Match next.config.ts: <major>.<minor> from package.json with the patch
- *  segment as the total commit count, so every commit bumps the version. */
-function commitCount(): string {
-  try {
-    return execSync('git rev-list --count HEAD', {
-      stdio: ['ignore', 'pipe', 'ignore'],
-    })
-      .toString()
-      .trim();
-  } catch {
-    return '0';
-  }
-}
-
+/** Match next.config.ts: package.json version verbatim (bumped by the
+ *  release workflow). The SHA suffix below keeps per-commit busting. */
 function appVersion(): string {
-  if (process.env.NEXT_PUBLIC_APP_VERSION) {
-    return process.env.NEXT_PUBLIC_APP_VERSION;
-  }
-  const parts = pkg.version.split('.');
-  const major = parts[0] ?? '0';
-  const minor = parts[1] ?? '0';
-  return `${major}.${minor}.${commitCount()}`;
+  return process.env.NEXT_PUBLIC_APP_VERSION || pkg.version;
 }
 
 const swPath = 'out/sw.js';
