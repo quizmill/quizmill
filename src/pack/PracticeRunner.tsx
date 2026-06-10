@@ -21,6 +21,7 @@ import {
   packQuestions,
   packScenarios,
   PACK_CATEGORY_LABEL,
+  type OptionKey,
 } from '@/pack/data';
 import {
   advanceAfterAnswer,
@@ -64,7 +65,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   const [outOfQuestions, setOutOfQuestions] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [stage, setStage] = useState<Stage>('choosing');
-  const [selected, setSelected] = useState<'A' | 'B' | 'C' | 'D' | null>(null);
+  const [selected, setSelected] = useState<OptionKey | null>(null);
   const [finished, setFinished] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -178,7 +179,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   const scenarioWithStem =
     scenario && scenario.stem ? { ...scenario, stem: scenario.stem } : null;
 
-  function handleSelect(key: 'A' | 'B' | 'C' | 'D') {
+  function handleSelect(key: OptionKey) {
     if (stage !== 'choosing') return;
     setSelected(key);
   }

@@ -13,6 +13,24 @@ function loadDemo(): { manifest: unknown; questions: unknown; scenarios: unknown
   };
 }
 
+/** N options keyed A,B,C… for the variable-option (v2) tests. */
+function makeOptions(n: number): { key: string; text: string }[] {
+  return ['A', 'B', 'C', 'D', 'E', 'F']
+    .slice(0, n)
+    .map((key) => ({ key, text: `Option ${key}` }));
+}
+
+/** Overwrite the first question's options + correctKey in place. */
+function setFirstOptions(
+  input: ReturnType<typeof loadDemo>,
+  options: { key: string; text: string }[],
+  correctKey: string,
+): void {
+  const q = (input.questions as { options: unknown; correctKey: string }[])[0];
+  q.options = options;
+  q.correctKey = correctKey;
+}
+
 describe('validatePack', () => {
   it('accepts the committed demo pack with no errors or warnings', () => {
     const result = validatePack(loadDemo());
@@ -102,5 +120,60 @@ describe('validatePack', () => {
       questions: input.questions,
     });
     expect(result.ok).toBe(true);
+  });
+
+  // ——— schema v2: variable option counts (2–6, keyed A–F) ———
+
+  it('accepts a 2-option (true/false) question', () => {
+    const input = loadDemo();
+    setFirstOptions(input, [
+      { key: 'A', text: 'True' },
+      { key: 'B', text: 'False' },
+    ], 'A');
+    expect(validatePack(input).ok).toBe(true);
+  });
+
+  it('accepts a 5-option (GL-style) question', () => {
+    const input = loadDemo();
+    setFirstOptions(input, makeOptions(5), 'E');
+    expect(validatePack(input).ok).toBe(true);
+  });
+
+  it('accepts a 6-option question', () => {
+    const input = loadDemo();
+    setFirstOptions(input, makeOptions(6), 'F');
+    expect(validatePack(input).ok).toBe(true);
+  });
+
+  it('rejects fewer than 2 options', () => {
+    const input = loadDemo();
+    setFirstOptions(input, [{ key: 'A', text: 'Only one' }], 'A');
+    expect(validatePack(input).ok).toBe(false);
+  });
+
+  it('rejects more than 6 options', () => {
+    const input = loadDemo();
+    setFirstOptions(input, [...makeOptions(6), { key: 'A', text: 'overflow' }], 'A');
+    expect(validatePack(input).ok).toBe(false);
+  });
+
+  it('rejects a gap in option keys (A,B,D)', () => {
+    const input = loadDemo();
+    setFirstOptions(input, [
+      { key: 'A', text: 'a' },
+      { key: 'B', text: 'b' },
+      { key: 'D', text: 'd' },
+    ], 'A');
+    const result = validatePack(input);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.includes('keyed exactly'))).toBe(true);
+  });
+
+  it('accepts schemaVersion 2 in the manifest', () => {
+    const input = loadDemo();
+    (input.manifest as { schemaVersion: number }).schemaVersion = 2;
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
   });
 });
