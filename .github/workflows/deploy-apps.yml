@@ -1,0 +1,82 @@
+name: Deploy apps
+
+# Rebuild every known pack app on the LATEST published engine and
+# publish it to Cloudflare Pages, so engine improvements roll out to the
+# live demo + showcase apps automatically — no per-app babysitting.
+#
+# Each app is built with `npx quizmill@latest build <pack>` (the same
+# path users run), so the deployed version always matches the latest
+# published CLI/engine — the CLI stamps NEXT_PUBLIC_APP_VERSION, so there
+# is no git-describe race. Triggers:
+#   - after the Release workflow completes (a new engine version shipped)
+#   - daily (picks up content changes in the separate pack repos)
+#   - manual dispatch
+#
+# Deliberately NOT here: the private eleven-plus app. It carries licensed
+# (© GL Assessment) content, is local-only, and deploys from its own
+# (private) pack repo. Don't add it.
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   CLOUDFLARE_API_TOKEN     token with "Cloudflare Pages — Edit"
+#   CLOUDFLARE_ACCOUNT_ID    70b494550992cda97e893fab035f7e9a
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  schedule:
+    - cron: '17 6 * * *' # 06:17 UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: deploy-apps
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # For workflow_run, only deploy when the Release run actually succeeded
+    # (an unmerged PR close leaves its job skipped → conclusion != success).
+    # schedule / workflow_dispatch always run.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: try
+            pack: content/pack-demo
+            app: solar-system-demo-app
+            project: quizmill-try
+          - name: claude-cert
+            pack: quizmill/pack-claude-cert
+            app: claude-cert-app
+            project: quizmill-claude-cert
+          - name: world-capitals
+            pack: quizmill/pack-world-capitals
+            app: world-capitals-app
+            project: world-capitals
+    steps:
+      # The checkout is only needed so the bundled demo pack
+      # (content/pack-demo) is on disk for the "try" build; the remote
+      # packs are fetched by the CLI from their own repos.
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build "${{ matrix.name }}" with the latest published engine
+        run: npx --yes quizmill@latest build ${{ matrix.pack }}
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy ${{ matrix.app }} --project-name ${{ matrix.project }} --branch=main
