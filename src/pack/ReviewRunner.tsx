@@ -22,6 +22,7 @@ import {
   packQuestions,
   packScenarios,
   PACK_CATEGORY_LABEL,
+  type OptionKey,
   type PackQuestion,
 } from '@/pack/data';
 import {
@@ -56,7 +57,7 @@ export function PackReviewRunner() {
   const [nothingToReview, setNothingToReview] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [stage, setStage] = useState<Stage>('choosing');
-  const [selected, setSelected] = useState<'A' | 'B' | 'C' | 'D' | null>(null);
+  const [selected, setSelected] = useState<OptionKey | null>(null);
   const [finished, setFinished] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -170,7 +171,7 @@ export function PackReviewRunner() {
   const scenarioWithStem =
     scenario && scenario.stem ? { ...scenario, stem: scenario.stem } : null;
 
-  function handleSelect(key: 'A' | 'B' | 'C' | 'D') {
+  function handleSelect(key: OptionKey) {
     if (stage !== 'choosing') return;
     setSelected(key);
   }

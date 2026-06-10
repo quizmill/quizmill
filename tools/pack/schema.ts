@@ -15,6 +15,11 @@ import { z } from 'zod';
  * are declared in the manifest and cross-checked by `validatePack`,
  * not hard-coded.
  *
+ * schemaVersion 2 relaxes the original v1 (exactly 4 options A–D) to
+ * 2–6 options keyed A–F in order — true/false, 5-option exam papers, etc.
+ * v1 packs (4 options A–D) remain valid unchanged; the validator stays
+ * backward-readable.
+ *
  * Packs are PRIVATE by default: the active pack lives at gitignored
  * `content/pack/`, authored packs under gitignored `packs/`. Only the
  * demo pack (`content/pack-demo/`) is committed.
@@ -34,7 +39,7 @@ export const packCategorySchema = z.object({
 
 export const packManifestSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.union([z.literal(1), z.literal(2)]),
     /** Pack identifier (slug). Becomes part of file paths — keep stable. */
     id: z.string().regex(slug).max(40),
     /** App title (tab title / home H1). */
@@ -54,7 +59,7 @@ export const packManifestSchema = z
     }
   });
 
-export const packOptionKeySchema = z.enum(['A', 'B', 'C', 'D']);
+export const packOptionKeySchema = z.enum(['A', 'B', 'C', 'D', 'E', 'F']);
 
 export const packOptionSchema = z.object({
   key: packOptionKeySchema,
@@ -86,7 +91,8 @@ export const packQuestionSchema = z
     /** Floor of 10 keeps junk out while allowing legitimately terse
      *  prompts like arithmetic ("What is 7 × 8?"). */
     prompt: z.string().min(10),
-    options: z.array(packOptionSchema).length(4),
+    /** 2–6 options keyed A–F in order (v2). True/false → 2; GL papers → 5. */
+    options: z.array(packOptionSchema).min(2).max(6),
     correctKey: packOptionKeySchema,
     /** Teaches WHY the answer is right (and ideally why distractors are
      *  wrong) — this is the pedagogical payload, don't skimp. */
@@ -98,8 +104,15 @@ export const packQuestionSchema = z
   })
   .superRefine((q, ctx) => {
     const keys = q.options.map((o) => o.key);
-    if (new Set(keys).size !== 4) {
-      ctx.addIssue({ code: 'custom', message: 'options must have unique keys A,B,C,D' });
+    // Keys must be exactly the contiguous prefix A,B,C… for the option
+    // count — one each, no gaps or dupes (order in the array is free).
+    const expected = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, q.options.length);
+    const keySet = new Set<string>(keys);
+    if (keySet.size !== keys.length || !expected.every((k) => keySet.has(k))) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `options must be keyed exactly ${expected.join(',')} (one each)`,
+      });
     }
     if (!keys.includes(q.correctKey)) {
       ctx.addIssue({ code: 'custom', message: 'correctKey must reference one of the options' });

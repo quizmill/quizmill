@@ -15,8 +15,11 @@ export type PackCategory = {
   weight?: number;
 };
 
+/** Option keys, A–F (v2 allows 2–6 options; v1 packs use A–D). */
+export type OptionKey = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
+
 export type PackManifest = {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   id: string;
   title: string;
   description: string;
@@ -32,7 +35,7 @@ export type PackScenario = {
   tags?: string[];
 };
 
-export type PackOption = { key: 'A' | 'B' | 'C' | 'D'; text: string };
+export type PackOption = { key: OptionKey; text: string };
 
 export type PackQuestion = {
   id: string;
@@ -41,7 +44,7 @@ export type PackQuestion = {
   difficulty: 1 | 2 | 3 | 4 | 5;
   prompt: string;
   options: PackOption[];
-  correctKey: 'A' | 'B' | 'C' | 'D';
+  correctKey: OptionKey;
   explanation: string;
   source: 'original' | 'generated' | 'curated';
   sourceRef?: string;

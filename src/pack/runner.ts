@@ -6,7 +6,7 @@
  */
 import type { Attempt, Session } from '@/data/types';
 import { pickSessionQuestions } from '@/lib/selection';
-import type { PackQuestion } from '@/pack/data';
+import type { OptionKey, PackQuestion } from '@/pack/data';
 
 export const QUESTION_COUNT = 10;
 
@@ -65,7 +65,7 @@ export function pickSessionFromBank(
 export interface BuildAttemptArgs {
   state: RunnerState;
   question: PackQuestion;
-  selected: 'A' | 'B' | 'C' | 'D';
+  selected: OptionKey;
   categoryKey: string;
   now: number;
   attemptId: string;
