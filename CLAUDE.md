@@ -69,17 +69,24 @@ available, unregistered; `.com` is parked for sale on BrandBucket —
 ignored). v0.1 committed; CI (`.github/workflows/ci.yml`: unit + build
 + E2E) runs on push.
 
-Real packs published (ported from `~/code/personal/learning`):
+Real packs published:
 
 - `quizmill/pack-claude-cert` (PUBLIC) — 635 CCA-F questions curated
   from MIT-licensed community banks (haytamAroui, Connectry-io), with
   per-question `sourceRef` attribution + NOTICE.md. 60 questions from
   `paullarionov/claude-certified-architect` were EXCLUDED (no upstream
-  license) — don't re-add without a license appearing upstream.
+  license) — don't re-add without a license appearing upstream. Ported
+  from `~/code/personal/learning`.
 - `quizmill/pack-eleven-plus` (PRIVATE — must stay private) — 300
   agent-authored english/maths/verbal questions, ids stable from the
   learning repo. Non-verbal (all image-based) and GL material
-  (© GL Assessment, 5-option + images) deliberately not ported.
+  (© GL Assessment, 5-option + images) deliberately not ported. Ported
+  from `~/code/personal/learning`.
+- `quizmill/pack-world-capitals` (PUBLIC) — 45 expert-level world-capitals
+  questions across five continents (moved/multiple/confused capitals),
+  agent-authored fresh in this engine (not ported), all `reviewStatus:
+  "draft"`. Listed in `tools/pack/registry.json`; deployed at
+  world-capitals.quizmill.dev.
 
 ## Shipped (2026-06-10)
 
@@ -98,19 +105,23 @@ Real packs published (ported from `~/code/personal/learning`):
   engine` (override `QUIZMILL_ENGINE` for dev). Publish blocked only
   on an npm 2FA OTP (`npm publish --otp=<code>` from `cli/`; bare
   name `quizmill` confirmed free).
-- Custom domain pending: quizmill.dev is registered but its zone is
-  not yet in the Cloudflare account — add the site in the CF dashboard,
-  point nameservers at the registrar, then attach quizmill.dev to the
-  `quizmill` Pages project and try.quizmill.dev to `quizmill-try`.
+- **Custom domains live**: quizmill.dev's zone is active in the
+  Cloudflare account (nameservers delegated). Pages custom domains
+  attached: quizmill.dev → `quizmill` (website),
+  try.quizmill.dev → `quizmill-try` (demo),
+  claude-cert.quizmill.dev → `quizmill-claude-cert`,
+  world-capitals.quizmill.dev → `world-capitals`. Deploys are still
+  manual (`wrangler pages deploy out --project-name <project>`).
 
 ## Roadmap (agreed, in order)
 
 1. **npm 2FA publish** of the CLI, then add an "npx quizmill" card to
    the website + README.
-2. **Domain cutover** — quizmill.dev zone into Cloudflare, custom
-   domains on both Pages projects, CF API token secrets
-   (`CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`) into both repos
-   for CI deploys.
+2. **Domain cutover** — DONE: quizmill.dev zone is in Cloudflare and
+   custom domains are attached (website, demo, and each pack
+   subdomain). Remaining: put CF API token secrets
+   (`CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`) into the repos so
+   CI can deploy (today's deploys are manual `wrangler pages deploy`).
 3. **Auto-deployed pack gallery** — CI matrix over
    `tools/pack/registry.json`: every registry pack gets its own Pages
    deployment (`<pack-id>.quizmill.dev`), website gallery links them.

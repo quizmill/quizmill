@@ -6,6 +6,12 @@
       "title": "Claude Cert Practice",
       "description": "Claude Certified Architect (Foundations) exam practice — agentic architecture, Claude Code, prompt engineering, tools & MCP, context management. Curated from MIT-licensed community question banks, with per-question attribution.",
       "repo": "quizmill/pack-claude-cert"
+    },
+    {
+      "id": "world-capitals",
+      "title": "Capitals of the World",
+      "description": "Expert-level practice on the capital cities of the world — moved capitals (Astana, Naypyidaw, Nusantara), multiple-capital countries (South Africa, Bolivia, the Netherlands), and the ones map buffs reliably get wrong. 45 questions across five continents.",
+      "repo": "quizmill/pack-world-capitals"
     }
   ]
 }
