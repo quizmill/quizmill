@@ -10,7 +10,7 @@ import { useStorageData } from '@/lib/useStorage';
 import { unresolvedMistakeCount } from '@/lib/mistakes';
 import { loadLevelFilter, saveLevelFilter } from '@/lib/storage';
 import { cn } from '@/lib/cn';
-import { packQuestions, packLevels, packManifest } from '@/pack/data';
+import { packQuestions, packLevels, packManifest, PACK_CATEGORY_TONE } from '@/pack/data';
 
 /** Home screen for the generic pack variant — category cards + stats,
  *  all driven by the active pack's manifest. */
@@ -171,11 +171,15 @@ export default function PackHome() {
             const pct =
               s.answered === 0 ? 0 : Math.round((s.correct / s.answered) * 100);
             const weight = cat.weight ? `${Math.round(cat.weight * 100)}%` : null;
+            const tone = PACK_CATEGORY_TONE[cat.key];
             return (
               <Link
                 key={cat.key}
                 href={`/practice/${cat.key}/`}
-                className="tap-feedback group flex items-center justify-between gap-3 rounded-2xl border border-ink-200 bg-white p-4 shadow-sm transition hover:border-brand-300 hover:shadow-md"
+                className={cn(
+                  'tap-feedback group flex items-center justify-between gap-3 rounded-2xl border p-4 shadow-sm transition hover:shadow-md',
+                  tone.card,
+                )}
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -185,7 +189,10 @@ export default function PackHome() {
                     {weight ? (
                       <span
                         title="Share of practice sessions this category targets"
-                        className="rounded-full bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold text-brand-700"
+                        className={cn(
+                          'rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
+                          tone.badge,
+                        )}
                       >
                         {weight}
                       </span>
@@ -197,7 +204,9 @@ export default function PackHome() {
                       : `${s.answered}/${s.available} answered · ${pct}% accuracy`}
                   </div>
                 </div>
-                <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-400 transition group-hover:text-brand-600" />
+                <ArrowRight
+                  className={cn('h-5 w-5 flex-shrink-0 transition', tone.arrow)}
+                />
               </Link>
             );
           })}

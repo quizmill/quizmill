@@ -31,11 +31,13 @@ const config: Config = {
           900: '#15305c',
         },
         success: {
+          50: '#eef9f3',
           100: '#dcf5e7',
           500: '#2f9e6e',
           700: '#1d6b4a',
         },
         warn: {
+          50: '#fdf5e9',
           100: '#fdecd5',
           500: '#c97b1a',
           700: '#8c5410',
