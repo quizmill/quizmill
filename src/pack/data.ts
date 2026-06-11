@@ -91,9 +91,18 @@ export const packLevels = packManifest.levels ?? [];
 export const packSources = packManifest.sources ?? [];
 export const packQuestions = questionsJson as PackQuestion[];
 
+/** Manifest level keys in ladder order (used by the adaptive level nudge). */
+export const packLevelKeys = packLevels.map((l) => l.key);
+
 /** Level key → label, for the per-question metadata chips. */
 export const PACK_LEVEL_LABEL: Record<string, string> = Object.fromEntries(
   packLevels.map((l) => [l.key, l.label]),
+);
+
+/** Question id → its level band. Attempts store only the category, so the
+ *  level-aware stats (e.g. the nudge) join back through this. */
+export const PACK_LEVEL_BY_QUESTION_ID: Record<string, string> = Object.fromEntries(
+  packQuestions.flatMap((q) => (q.level ? [[q.id, q.level] as const] : [])),
 );
 
 /** Level key → chip tone, assigned by declaration order (e.g. y4→green … exam→slate). */

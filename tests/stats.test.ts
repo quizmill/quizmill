@@ -4,6 +4,7 @@ import {
   accuracyByCategory,
   accuracyByDay,
   completedSessionDates,
+  levelNudge,
   weakestQuestions,
 } from '@/lib/stats';
 import { currentStreak } from '@/lib/streak';
@@ -146,5 +147,64 @@ describe('completedSessionDates', () => {
     const dates = completedSessionDates(sessions);
     expect(dates).toHaveLength(1);
     expect(dates[0].getTime()).toBe(NOON + 60_000);
+  });
+});
+
+describe('levelNudge', () => {
+  const KEYS = ['basics', 'advanced'];
+  // questionId encodes its level: "basics-1", "advanced-2", …
+  const levelOf = (id: string) => id.split('-')[0];
+  // n attempts at a level, `correct` of them right, spaced 1s apart.
+  const at = (level: string, n: number, correct: number): Attempt[] =>
+    Array.from({ length: n }, (_, i) =>
+      attempt({
+        questionId: `${level}-${i}`,
+        answeredAt: NOON + i * 1000,
+        isCorrect: i < correct,
+      }),
+    );
+
+  it('returns null when no level is selected (All)', () => {
+    expect(levelNudge(at('basics', 8, 8), levelOf, KEYS, null)).toBeNull();
+  });
+
+  it('returns null below the minimum sample', () => {
+    expect(levelNudge(at('basics', 4, 4), levelOf, KEYS, 'basics')).toBeNull();
+  });
+
+  it('suggests moving up when consistently strong and a higher level exists', () => {
+    const nudge = levelNudge(at('basics', 6, 6), levelOf, KEYS, 'basics');
+    expect(nudge).toMatchObject({ direction: 'up', from: 'basics', to: 'advanced', accuracyPct: 100 });
+  });
+
+  it('does not suggest up at the top of the ladder', () => {
+    expect(levelNudge(at('advanced', 8, 8), levelOf, KEYS, 'advanced')).toBeNull();
+  });
+
+  it('suggests moving down when struggling and a lower level exists', () => {
+    const nudge = levelNudge(at('advanced', 8, 2), levelOf, KEYS, 'advanced');
+    expect(nudge).toMatchObject({ direction: 'down', from: 'advanced', to: 'basics' });
+  });
+
+  it('does not suggest down at the bottom of the ladder', () => {
+    expect(levelNudge(at('basics', 8, 1), levelOf, KEYS, 'basics')).toBeNull();
+  });
+
+  it('returns null for unremarkable mid-range accuracy', () => {
+    expect(levelNudge(at('basics', 8, 5), levelOf, KEYS, 'basics')).toBeNull();
+  });
+
+  it('only weighs attempts at the current level', () => {
+    // Strong at basics, but selected level is advanced with too few attempts.
+    const attempts = [...at('basics', 8, 8), ...at('advanced', 3, 3)];
+    expect(levelNudge(attempts, levelOf, KEYS, 'advanced')).toBeNull();
+  });
+
+  it('weighs only the most recent window, so a fixed slump still nudges down', () => {
+    // Old perfect run, then a recent slump — recency wins within window=8.
+    const old = at('advanced', 10, 10).map((a, i) => ({ ...a, answeredAt: NOON - 10_000 + i }));
+    const recent = at('advanced', 8, 2).map((a, i) => ({ ...a, questionId: `advanced-r${i}`, answeredAt: NOON + i }));
+    const nudge = levelNudge([...old, ...recent], levelOf, KEYS, 'advanced');
+    expect(nudge).toMatchObject({ direction: 'down', to: 'basics' });
   });
 });

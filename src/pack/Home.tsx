@@ -2,15 +2,38 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, BarChart3, RefreshCw, Settings, Trophy } from 'lucide-react';
+import {
+  ArrowRight,
+  BarChart3,
+  RefreshCw,
+  Settings,
+  TrendingDown,
+  TrendingUp,
+  Trophy,
+  X,
+} from 'lucide-react';
 import { APP_CONFIG } from '@/config';
 import { StatTile } from '@/components/StatTile';
 import { InstallBanner } from '@/components/InstallPrompt';
 import { useStorageData } from '@/lib/useStorage';
 import { unresolvedMistakeCount } from '@/lib/mistakes';
-import { loadLevelFilter, saveLevelFilter } from '@/lib/storage';
+import {
+  loadLevelFilter,
+  saveLevelFilter,
+  loadDismissedNudge,
+  saveDismissedNudge,
+} from '@/lib/storage';
+import { levelNudge } from '@/lib/stats';
 import { cn } from '@/lib/cn';
-import { packQuestions, packLevels, packManifest, PACK_CATEGORY_TONE } from '@/pack/data';
+import {
+  packQuestions,
+  packLevels,
+  packLevelKeys,
+  packManifest,
+  PACK_CATEGORY_TONE,
+  PACK_LEVEL_LABEL,
+  PACK_LEVEL_BY_QUESTION_ID,
+} from '@/pack/data';
 
 /** Home screen for the generic pack variant — category cards + stats,
  *  all driven by the active pack's manifest. */
@@ -19,12 +42,36 @@ export default function PackHome() {
   // Active level-band filter (a manifest level key) or null = All. Read
   // from localStorage after mount so SSR/first paint stay stable.
   const [level, setLevelState] = useState<string | null>(null);
-  useEffect(() => setLevelState(loadLevelFilter()), []);
+  const [dismissedNudge, setDismissedNudge] = useState<string | null>(null);
+  useEffect(() => {
+    setLevelState(loadLevelFilter());
+    setDismissedNudge(loadDismissedNudge());
+  }, []);
   const setLevel = (next: string | null) => {
     setLevelState(next);
     saveLevelFilter(next);
   };
   const levelsLabel = packManifest.levelsLabel ?? 'Level';
+
+  // Adaptive nudge: once the learner is consistently strong (or struggling)
+  // at the level they've picked, suggest the adjacent one.
+  const nudge = levelNudge(
+    attempts,
+    (id) => PACK_LEVEL_BY_QUESTION_ID[id],
+    packLevelKeys,
+    level,
+  );
+  const nudgeKey = nudge ? `${nudge.from}>${nudge.to}` : null;
+  const showNudge = nudge !== null && nudgeKey !== dismissedNudge;
+  const dismissNudge = () => {
+    if (!nudgeKey) return;
+    setDismissedNudge(nudgeKey);
+    saveDismissedNudge(nudgeKey);
+  };
+  const acceptNudge = () => {
+    if (!nudge) return;
+    setLevel(nudge.to);
+  };
 
   const totalAnswered = attempts.length;
   const totalCorrect = attempts.filter((a) => a.isCorrect).length;
@@ -158,6 +205,59 @@ export default function PackHome() {
               );
             })}
           </div>
+
+          {showNudge && nudge ? (
+            <div
+              className={cn(
+                'flex items-center justify-between gap-3 rounded-2xl border p-3 shadow-sm',
+                nudge.direction === 'up'
+                  ? 'border-brand-500/30 bg-brand-50'
+                  : 'border-warn-500/30 bg-warn-50',
+              )}
+            >
+              <div className="flex min-w-0 items-center gap-2.5">
+                {nudge.direction === 'up' ? (
+                  <TrendingUp className="h-5 w-5 flex-shrink-0 text-brand-600" />
+                ) : (
+                  <TrendingDown className="h-5 w-5 flex-shrink-0 text-warn-600" />
+                )}
+                <p className="text-sm text-ink-700">
+                  {nudge.direction === 'up' ? (
+                    <>
+                      You&apos;re flying through{' '}
+                      <strong>{PACK_LEVEL_LABEL[nudge.from]}</strong> (
+                      {nudge.accuracyPct}% lately). Ready for{' '}
+                      <strong>{PACK_LEVEL_LABEL[nudge.to]}</strong>?
+                    </>
+                  ) : (
+                    <>
+                      <strong>{PACK_LEVEL_LABEL[nudge.from]}</strong> is a stretch
+                      right now ({nudge.accuracyPct}%).{' '}
+                      <strong>{PACK_LEVEL_LABEL[nudge.to]}</strong> might suit
+                      better.
+                    </>
+                  )}
+                </p>
+              </div>
+              <div className="flex flex-shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={acceptNudge}
+                  className="tap-feedback whitespace-nowrap rounded-full bg-ink-900 px-3 py-1.5 text-xs font-semibold text-white"
+                >
+                  Try {PACK_LEVEL_LABEL[nudge.to]}
+                </button>
+                <button
+                  type="button"
+                  onClick={dismissNudge}
+                  aria-label="Dismiss suggestion"
+                  className="tap-feedback inline-flex h-7 w-7 items-center justify-center rounded-full text-ink-400 hover:text-ink-700"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
