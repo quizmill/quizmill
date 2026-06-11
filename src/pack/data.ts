@@ -118,3 +118,37 @@ export const PACK_CONCEPT_BY_ID: Record<string, PackConcept> = Object.fromEntrie
 export const PACK_CATEGORY_LABEL: Record<string, string> = Object.fromEntries(
   packManifest.categories.map((c) => [c.key, c.shortLabel ?? c.label]),
 );
+
+/**
+ * Per-category colour, so the home screen reads as more than a grey list.
+ * Assigned by declaration order from a calm cycle (blue → green → amber →
+ * slate), the same auto-by-order scheme as the level tones — fully generic,
+ * no manifest field. `card` tints the category card, `badge`/`arrow` keep
+ * the accents on-tone.
+ */
+export type CategoryTone = { card: string; badge: string; arrow: string };
+const CATEGORY_TONES: CategoryTone[] = [
+  {
+    card: 'border-brand-500/20 bg-brand-50 hover:border-brand-500/40',
+    badge: 'bg-brand-100 text-brand-700',
+    arrow: 'text-brand-400 group-hover:text-brand-600',
+  },
+  {
+    card: 'border-success-500/20 bg-success-50 hover:border-success-500/40',
+    badge: 'bg-success-100 text-success-700',
+    arrow: 'text-success-500 group-hover:text-success-700',
+  },
+  {
+    card: 'border-warn-500/20 bg-warn-50 hover:border-warn-500/40',
+    badge: 'bg-warn-100 text-warn-700',
+    arrow: 'text-warn-500 group-hover:text-warn-700',
+  },
+  {
+    card: 'border-ink-400/25 bg-ink-50 hover:border-ink-400/50',
+    badge: 'bg-ink-200 text-ink-700',
+    arrow: 'text-ink-400 group-hover:text-ink-600',
+  },
+];
+export const PACK_CATEGORY_TONE: Record<string, CategoryTone> = Object.fromEntries(
+  packManifest.categories.map((c, i) => [c.key, CATEGORY_TONES[i % CATEGORY_TONES.length]]),
+);
