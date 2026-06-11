@@ -97,6 +97,9 @@ function writeJson<T>(key: string, value: T): void {
 export interface PackPrefs {
   /** Active level-band filter (a manifest level key); absent = "All". */
   level?: string;
+  /** The last adaptive level nudge the user dismissed, as "from>to", so the
+   *  same suggestion doesn't keep re-appearing. */
+  dismissedNudge?: string;
 }
 
 export function loadPrefs(): PackPrefs {
@@ -112,6 +115,18 @@ export function saveLevelFilter(level: string | null): void {
   const prefs = loadPrefs();
   if (level) prefs.level = level;
   else delete prefs.level;
+  writeJson(PREFS_KEY, prefs);
+}
+
+/** The level-nudge suggestion the user last dismissed ("from>to"), or null. */
+export function loadDismissedNudge(): string | null {
+  return loadPrefs().dismissedNudge ?? null;
+}
+
+export function saveDismissedNudge(key: string | null): void {
+  const prefs = loadPrefs();
+  if (key) prefs.dismissedNudge = key;
+  else delete prefs.dismissedNudge;
   writeJson(PREFS_KEY, prefs);
 }
 
