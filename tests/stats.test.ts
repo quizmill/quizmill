@@ -5,6 +5,8 @@ import {
   accuracyByDay,
   completedSessionDates,
   levelNudge,
+  sessionsByWeekday,
+  sessionSummary,
   weakestQuestions,
 } from '@/lib/stats';
 import { currentStreak } from '@/lib/streak';
@@ -147,6 +149,101 @@ describe('completedSessionDates', () => {
     const dates = completedSessionDates(sessions);
     expect(dates).toHaveLength(1);
     expect(dates[0].getTime()).toBe(NOON + 60_000);
+  });
+});
+
+let sn = 0;
+function session(over: Partial<Session> = {}): Session {
+  sn += 1;
+  return {
+    id: `s${sn}`,
+    subject: 'alpha',
+    startedAt: NOON,
+    endedAt: NOON + 5 * 60_000,
+    questionCount: 10,
+    correctCount: 7,
+    mode: 'practice',
+    ...over,
+  };
+}
+
+describe('sessionSummary', () => {
+  it('is all zeroes with no sessions', () => {
+    expect(sessionSummary([])).toEqual({
+      sessions: 0,
+      questions: 0,
+      medianDurationSeconds: 0,
+      medianQuestions: 0,
+    });
+  });
+
+  it('ignores unfinished sessions', () => {
+    const summary = sessionSummary([
+      session({ endedAt: null }),
+      session({ questionCount: 8 }),
+    ]);
+    expect(summary.sessions).toBe(1);
+    expect(summary.questions).toBe(8);
+    expect(summary.medianQuestions).toBe(8);
+  });
+
+  it('reports medians for duration and question count (odd case)', () => {
+    const summary = sessionSummary([
+      session({ startedAt: NOON, endedAt: NOON + 60_000, questionCount: 5 }),
+      session({ startedAt: NOON, endedAt: NOON + 120_000, questionCount: 10 }),
+      session({ startedAt: NOON, endedAt: NOON + 600_000, questionCount: 30 }),
+    ]);
+    expect(summary).toEqual({
+      sessions: 3,
+      questions: 45,
+      medianDurationSeconds: 120,
+      medianQuestions: 10,
+    });
+  });
+
+  it('averages the middle pair for an even count', () => {
+    const summary = sessionSummary([
+      session({ startedAt: NOON, endedAt: NOON + 60_000, questionCount: 5 }),
+      session({ startedAt: NOON, endedAt: NOON + 180_000, questionCount: 10 }),
+    ]);
+    expect(summary.medianDurationSeconds).toBe(120);
+    expect(summary.medianQuestions).toBe(8); // (5+10)/2 rounded
+  });
+
+  it('clamps a clock-skewed negative duration to zero', () => {
+    const summary = sessionSummary([
+      session({ startedAt: NOON, endedAt: NOON - 60_000 }),
+    ]);
+    expect(summary.medianDurationSeconds).toBe(0);
+  });
+});
+
+describe('sessionsByWeekday', () => {
+  // 2026-06-10 (NOON) is a Wednesday.
+  const day = 24 * 3600_000;
+
+  it('always returns all seven days, Monday-first', () => {
+    const rows = sessionsByWeekday([]);
+    expect(rows.map((r) => r.label)).toEqual([
+      'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun',
+    ]);
+    expect(rows.every((r) => r.sessions === 0)).toBe(true);
+  });
+
+  it('buckets completed sessions by the local weekday they started', () => {
+    const rows = sessionsByWeekday([
+      session({ startedAt: NOON }), // Wed
+      session({ startedAt: NOON }), // Wed
+      session({ startedAt: NOON + 3 * day }), // Sat
+      session({ startedAt: NOON + 4 * day }), // Sun
+    ]);
+    const byLabel = Object.fromEntries(rows.map((r) => [r.label, r.sessions]));
+    expect(byLabel).toMatchObject({ Wed: 2, Sat: 1, Sun: 1, Mon: 0 });
+  });
+
+  it('ignores unfinished sessions', () => {
+    const rows = sessionsByWeekday([session({ endedAt: null })]);
+    expect(rows.every((r) => r.sessions === 0)).toBe(true);
   });
 });
 

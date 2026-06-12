@@ -219,6 +219,24 @@ describe('progress page', () => {
     await page.goto(baseUrl() + '/progress/');
     await waitForText(page, 'Accuracy by category');
 
+    // Session dashboard: the seed wrote one completed 60s session of 4
+    // questions, so the tiles read 1 / 1m / 4 and exactly one weekday
+    // bar is non-zero.
+    const summary = await page.$eval(
+      '[data-testid="session-summary"]',
+      (el) => el.textContent ?? '',
+    );
+    expect(summary).toContain('1sessions');
+    expect(summary).toContain('1mtypical length');
+    expect(summary).toContain('4questions / session');
+
+    const weekdayCounts = await page.$$eval(
+      '[data-testid="weekday-chart"] [data-count]',
+      (els) => els.map((el) => Number(el.getAttribute('data-count'))),
+    );
+    expect(weekdayCounts).toHaveLength(7);
+    expect(weekdayCounts.reduce((a, b) => a + b, 0)).toBe(1);
+
     await page.waitForSelector('[data-testid="daily-streak"]');
     const streak = await page.$eval(
       '[data-testid="daily-streak"]',

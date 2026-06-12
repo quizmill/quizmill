@@ -9,6 +9,8 @@ import {
   accuracyByCategory,
   accuracyByDay,
   completedSessionDates,
+  sessionsByWeekday,
+  sessionSummary,
   weakestQuestions,
 } from '@/lib/stats';
 import { currentStreak } from '@/lib/streak';
@@ -27,6 +29,9 @@ export default function ProgressPage() {
   const { sessions, attempts } = useStorageData();
 
   const streak = currentStreak(completedSessionDates(sessions));
+  const summary = sessionSummary(sessions);
+  const byWeekday = sessionsByWeekday(sessions);
+  const maxWeekday = Math.max(...byWeekday.map((d) => d.sessions), 1);
   const byCategory = accuracyByCategory(attempts, APP_CONFIG.categories);
   const byDay = accuracyByDay(attempts, null).slice(-DAILY_POINT_LIMIT);
   const weakest = weakestQuestions(attempts).slice(0, WEAK_SPOT_LIMIT);
@@ -56,7 +61,8 @@ export default function ProgressPage() {
       <div>
         <h1 className="text-3xl font-bold text-ink-900">Progress</h1>
         <p className="mt-1 text-ink-500">
-          Accuracy by category, over time, and where to focus next.
+          Your sessions, accuracy by category and over time, and where to
+          focus next.
         </p>
       </div>
 
@@ -72,6 +78,56 @@ export default function ProgressPage() {
         </div>
       ) : (
         <>
+          <section className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
+              Sessions
+            </h2>
+            <div data-testid="session-summary" className="grid grid-cols-3 gap-2.5">
+              <SummaryTile value={String(summary.sessions)} label="sessions" />
+              <SummaryTile
+                value={formatDuration(summary.medianDurationSeconds)}
+                label="typical length"
+              />
+              <SummaryTile
+                value={String(summary.medianQuestions)}
+                label="questions / session"
+              />
+            </div>
+            <div
+              data-testid="weekday-chart"
+              className="rounded-2xl border border-ink-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex h-20 items-end gap-1.5">
+                {byWeekday.map((d) => (
+                  <div
+                    key={d.label}
+                    data-testid={`weekday-${d.label.toLowerCase()}`}
+                    data-count={d.sessions}
+                    className="flex h-full flex-1 flex-col justify-end"
+                    title={`${d.label}: ${d.sessions} session${d.sessions === 1 ? '' : 's'}`}
+                  >
+                    <div
+                      className={cn(
+                        'w-full rounded-t',
+                        d.sessions === 0 ? 'bg-ink-100' : 'bg-brand-500',
+                      )}
+                      style={{
+                        height: `${d.sessions === 0 ? 4 : Math.max((d.sessions / maxWeekday) * 100, 12)}%`,
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex gap-1.5 text-xs text-ink-500">
+                {byWeekday.map((d) => (
+                  <span key={d.label} className="flex-1 text-center">
+                    {d.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </section>
+
           <section className="flex flex-col gap-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
               Accuracy by category
@@ -164,6 +220,23 @@ export default function ProgressPage() {
       )}
     </main>
   );
+}
+
+function SummaryTile({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="rounded-2xl border border-ink-200 bg-white p-3 text-center shadow-sm">
+      <div className="text-xl font-bold text-ink-900">{value}</div>
+      <div className="mt-0.5 text-xs text-ink-500">{label}</div>
+    </div>
+  );
+}
+
+/** "45s", "4m", "4m 30s" — session lengths are short, hours never show. */
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s === 0 ? `${m}m` : `${m}m ${s}s`;
 }
 
 /** Bar colour by accuracy band — calm, no neon (matches the palette). */
