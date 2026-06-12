@@ -128,6 +128,66 @@ export function completedSessionDates(sessions: readonly Session[]): Date[] {
     .map((s) => new Date(s.endedAt));
 }
 
+export interface SessionSummary {
+  /** Completed sessions (endedAt set); abandoned ones aren't counted. */
+  sessions: number;
+  /** Questions across completed sessions. */
+  questions: number;
+  /** Median session length in whole seconds; 0 with no completed sessions. */
+  medianDurationSeconds: number;
+  /** Median questions per session; 0 with no completed sessions. */
+  medianQuestions: number;
+}
+
+/** Median of a list; the even case averages the middle pair. */
+function median(values: readonly number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+/**
+ * Headline session numbers for the Progress page. Medians, not means —
+ * a single marathon session shouldn't distort "typical".
+ */
+export function sessionSummary(sessions: readonly Session[]): SessionSummary {
+  const done = sessions.filter(
+    (s): s is Session & { endedAt: number } => s.endedAt !== null,
+  );
+  const durations = done.map((s) =>
+    Math.max(0, Math.round((s.endedAt - s.startedAt) / 1000)),
+  );
+  return {
+    sessions: done.length,
+    questions: done.reduce((sum, s) => sum + s.questionCount, 0),
+    medianDurationSeconds: Math.round(median(durations)),
+    medianQuestions: Math.round(median(done.map((s) => s.questionCount))),
+  };
+}
+
+export interface WeekdayCount {
+  /** 0 = Monday … 6 = Sunday. */
+  day: number;
+  label: string;
+  sessions: number;
+}
+
+const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/**
+ * Completed sessions per local weekday (of the start time), Monday-first,
+ * always all 7 days. Feeds the "when do you practise" chart.
+ */
+export function sessionsByWeekday(sessions: readonly Session[]): WeekdayCount[] {
+  const counts = new Array<number>(7).fill(0);
+  for (const s of sessions) {
+    if (s.endedAt === null) continue;
+    counts[(new Date(s.startedAt).getDay() + 6) % 7] += 1;
+  }
+  return WEEKDAY_LABELS.map((label, day) => ({ day, label, sessions: counts[day] }));
+}
+
 export interface LevelNudge {
   direction: 'up' | 'down';
   from: string; // current level key
