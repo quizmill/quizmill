@@ -249,6 +249,15 @@ describe('scratchpad', () => {
       expect(p.y).toBeLessThanOrEqual(1);
     }
 
+    // Picking a pen colour persists too (tool state, like the notes).
+    const swatch = (await page.$$('[data-testid="scratchpad-palette"] button'))[1];
+    await swatch.click();
+    const picked = await page.evaluate(
+      (k) => JSON.parse(localStorage.getItem(k) ?? '{}').color,
+      key,
+    );
+    expect(picked).toBe('#3b78e0');
+
     // A second stroke, then undo drops back to one.
     await page.mouse.move(cx - 30, cy + 30);
     await page.mouse.down();

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_SCRATCHPAD, normalizeScratchpad } from '@/lib/storage';
+import {
+  DEFAULT_PEN_COLOR,
+  EMPTY_SCRATCHPAD,
+  normalizeScratchpad,
+} from '@/lib/storage';
 
 describe('normalizeScratchpad', () => {
   it('returns an empty pad for null / undefined / non-objects', () => {
@@ -10,11 +14,12 @@ describe('normalizeScratchpad', () => {
   });
 
   it('upgrades the pre-draw shape ({ text, open }) with draw defaults', () => {
-    // What older builds wrote — no strokes, no mode.
+    // What older builds wrote — no strokes, no mode, no colour.
     expect(normalizeScratchpad({ text: 'hi', open: true })).toEqual({
       text: 'hi',
       strokes: [],
       mode: 'write',
+      color: DEFAULT_PEN_COLOR,
       open: true,
     });
   });
@@ -24,6 +29,7 @@ describe('normalizeScratchpad', () => {
       text: 'note',
       strokes: [{ color: '#1c2029', points: [{ x: 0.1, y: 0.2 }] }],
       mode: 'draw' as const,
+      color: '#3b78e0',
       open: true,
     };
     expect(normalizeScratchpad(full)).toEqual(full);
@@ -35,12 +41,20 @@ describe('normalizeScratchpad', () => {
         { color: '#fff', points: [{ x: 0, y: 0 }] }, // ok
         { color: 123, points: [] }, // bad colour
         { points: [{ x: 0, y: 0 }] }, // missing colour
+        { color: '#000', points: [{ x: 'a', y: 0 }] }, // non-numeric point
+        { color: '#000', points: [{ x: 0 }] }, // missing y
         'garbage',
         null,
       ],
     });
     expect(out.strokes).toHaveLength(1);
     expect(out.strokes[0].color).toBe('#fff');
+  });
+
+  it('defaults a missing or non-string colour', () => {
+    expect(normalizeScratchpad({ color: 42 }).color).toBe(DEFAULT_PEN_COLOR);
+    expect(normalizeScratchpad({}).color).toBe(DEFAULT_PEN_COLOR);
+    expect(normalizeScratchpad({ color: '#abc' }).color).toBe('#abc');
   });
 
   it('coerces an unknown mode to write, but keeps draw', () => {

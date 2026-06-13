@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import {
+  DEFAULT_PEN_COLOR,
   EMPTY_SCRATCHPAD,
   loadScratchpad,
   saveScratchpad,
@@ -35,15 +36,14 @@ import {
  */
 
 // On-palette pen colours (canvas needs real values, not Tailwind classes):
-// ink-800, brand-500, warn-500, success-500.
-const PEN_COLORS = ['#1c2029', '#3b78e0', '#c97b1a', '#2f9e6e'];
+// ink-800 (the shared default), brand-500, warn-500, success-500.
+const PEN_COLORS = [DEFAULT_PEN_COLOR, '#3b78e0', '#c97b1a', '#2f9e6e'];
 const PEN_WIDTH = 2.5;
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
 export function Scratchpad() {
   const [data, setData] = useState<ScratchpadData>(EMPTY_SCRATCHPAD);
-  const [color, setColor] = useState(PEN_COLORS[0]);
 
   // Mirror the latest data so the canvas pointer handlers (which don't
   // re-render mid-stroke) always commit against current state.
@@ -53,6 +53,9 @@ export function Scratchpad() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const strokeRef = useRef<ScratchStroke | null>(null);
+  // Canvas box, captured on pointerdown — it can't change mid-stroke, so we
+  // avoid a layout read on every pointermove.
+  const rectRef = useRef<DOMRect | null>(null);
 
   useEffect(() => {
     setData(loadScratchpad());
@@ -93,11 +96,10 @@ export function Scratchpad() {
     replay(ctx, rect.width, rect.height, strokes);
   }
 
-  function pointFrom(e: React.PointerEvent<HTMLCanvasElement>) {
-    const rect = e.currentTarget.getBoundingClientRect();
+  function normPoint(clientX: number, clientY: number, rect: DOMRect) {
     return {
-      x: clamp01((e.clientX - rect.left) / rect.width),
-      y: clamp01((e.clientY - rect.top) / rect.height),
+      x: clamp01((clientX - rect.left) / rect.width),
+      y: clamp01((clientY - rect.top) / rect.height),
     };
   }
 
@@ -110,15 +112,17 @@ export function Scratchpad() {
     } catch {
       /* not all environments support capture */
     }
-    const p = pointFrom(e);
-    strokeRef.current = { color, points: [p] };
+    const rect = canvas.getBoundingClientRect();
+    rectRef.current = rect;
+    const penColor = dataRef.current.color;
+    const p = normPoint(e.clientX, e.clientY, rect);
+    strokeRef.current = { color: penColor, points: [p] };
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const rect = canvas.getBoundingClientRect();
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.lineWidth = PEN_WIDTH;
-    ctx.strokeStyle = color;
+    ctx.strokeStyle = penColor;
     ctx.beginPath();
     ctx.moveTo(p.x * rect.width, p.y * rect.height);
   }
@@ -128,10 +132,10 @@ export function Scratchpad() {
     e.preventDefault();
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
-    const p = pointFrom(e);
+    const rect = rectRef.current;
+    if (!canvas || !ctx || !rect) return;
+    const p = normPoint(e.clientX, e.clientY, rect);
     strokeRef.current.points.push(p);
-    const rect = canvas.getBoundingClientRect();
     ctx.lineTo(p.x * rect.width, p.y * rect.height);
     ctx.stroke();
   }
@@ -176,6 +180,10 @@ export function Scratchpad() {
 
   function setMode(mode: ScratchpadMode) {
     commit({ ...dataRef.current, mode });
+  }
+
+  function setColor(color: string) {
+    commit({ ...dataRef.current, color });
   }
 
   function toggleOpen() {
@@ -274,11 +282,11 @@ export function Scratchpad() {
                       key={c}
                       type="button"
                       aria-label={`Pen colour ${c}`}
-                      aria-pressed={color === c}
+                      aria-pressed={data.color === c}
                       onClick={() => setColor(c)}
                       className={cn(
                         'h-6 w-6 rounded-full border-2 transition',
-                        color === c
+                        data.color === c
                           ? 'scale-110 border-ink-500'
                           : 'border-white shadow-sm',
                       )}
