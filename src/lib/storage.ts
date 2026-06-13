@@ -22,6 +22,7 @@ export const ATTEMPTS_KEY = `${KEY_PREFIX}attempts.v1`;
 const ACHIEVEMENTS_KEY = `${KEY_PREFIX}achievements.v1`;
 const VOTES_KEY = `${KEY_PREFIX}votes.v1`;
 const PREFS_KEY = `${KEY_PREFIX}prefs.v1`;
+const SCRATCHPAD_KEY = `${KEY_PREFIX}scratchpad.v1`;
 
 export type VoteDir = 'up' | 'down';
 
@@ -128,6 +129,25 @@ export function saveDismissedNudge(key: string | null): void {
   if (key) prefs.dismissedNudge = key;
   else delete prefs.dismissedNudge;
   writeJson(PREFS_KEY, prefs);
+}
+
+// ---- scratchpad (local-only working notes; deliberately not synced) ----
+
+export interface Scratchpad {
+  /** Free-text working notes — calculations, jottings for longer questions. */
+  text: string;
+  /** Whether the panel is expanded; remembered so it stays as the user left it. */
+  open: boolean;
+}
+
+const EMPTY_SCRATCHPAD: Scratchpad = { text: '', open: false };
+
+export function loadScratchpad(): Scratchpad {
+  return readJson<Scratchpad>(SCRATCHPAD_KEY, EMPTY_SCRATCHPAD);
+}
+
+export function saveScratchpad(value: Scratchpad): void {
+  writeJson(SCRATCHPAD_KEY, value);
 }
 
 // ---- sessions ----
@@ -264,6 +284,7 @@ export function clearAll(): void {
   window.localStorage.removeItem(ACHIEVEMENTS_KEY);
   window.localStorage.removeItem(VOTES_KEY);
   window.localStorage.removeItem(PREFS_KEY);
+  window.localStorage.removeItem(SCRATCHPAD_KEY);
   notify({ table: 'clear-all' });
 }
 

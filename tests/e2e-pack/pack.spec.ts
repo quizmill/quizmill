@@ -155,6 +155,62 @@ describe('pack practice flow', () => {
   }, 60_000);
 });
 
+describe('scratchpad', () => {
+  it('keeps working notes across questions and clears on demand', async () => {
+    await page.goto(baseUrl() + '/practice/planets/');
+    await waitForText(page, /Q\s*1\s*\/\s*\d+/, 20_000);
+
+    // Collapsed by default — the textarea isn't mounted until opened.
+    expect(await page.$('[data-testid="scratchpad-text"]')).toBeNull();
+
+    await page.click('[data-testid="scratchpad-toggle"]');
+    await page.waitForSelector('[data-testid="scratchpad-text"]');
+    await page.type('[data-testid="scratchpad-text"]', '7 x 8 = 56');
+
+    // Persisted under the pack's own namespace (text + open state).
+    const stored = await page.evaluate(() =>
+      localStorage.getItem('quizmill.solar-system-demo.scratchpad.v1'),
+    );
+    expect(stored).toBeTruthy();
+    expect(JSON.parse(stored as string)).toMatchObject({
+      text: '7 x 8 = 56',
+      open: true,
+    });
+
+    // Answer and advance — the note and open state survive the question change.
+    await page.evaluate(() => {
+      const aBtn = Array.from(document.querySelectorAll('button')).find((b) =>
+        /^A/.test(b.textContent?.trim() ?? ''),
+      );
+      if (aBtn) (aBtn as HTMLButtonElement).click();
+    });
+    await clickButtonByText(page, 'Check answer');
+    await waitForText(page, /Correct\.|Not quite\./);
+    await clickButtonByText(page, 'Next question');
+    await waitForText(page, /Q\s*2\s*\/\s*\d+/);
+
+    const carried = await page.$eval(
+      '[data-testid="scratchpad-text"]',
+      (el) => (el as HTMLTextAreaElement).value,
+    );
+    expect(carried).toBe('7 x 8 = 56');
+
+    // Clear empties both the field and the stored note.
+    await page.click('[data-testid="scratchpad-clear"]');
+    const afterClear = await page.$eval(
+      '[data-testid="scratchpad-text"]',
+      (el) => (el as HTMLTextAreaElement).value,
+    );
+    expect(afterClear).toBe('');
+    const cleared = await page.evaluate(() =>
+      JSON.parse(
+        localStorage.getItem('quizmill.solar-system-demo.scratchpad.v1') ?? '{}',
+      ),
+    );
+    expect(cleared.text).toBe('');
+  }, 60_000);
+});
+
 describe('home navigation', () => {
   it('links to progress, sticker cabinet, and settings', async () => {
     await waitForText(page, 'Solar System Practice');
