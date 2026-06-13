@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, type ComponentType } from 'react';
 import {
   ChevronDown,
+  Maximize2,
+  Minimize2,
   NotebookPen,
   Pencil,
   Trash2,
@@ -44,6 +46,9 @@ const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
 export function Scratchpad() {
   const [data, setData] = useState<ScratchpadData>(EMPTY_SCRATCHPAD);
+  // Full-screen view of the open panel — a transient view preference, so it's
+  // kept in component state only (not persisted with the pad's contents).
+  const [expanded, setExpanded] = useState(false);
 
   // Mirror the latest data so the canvas pointer handlers (which don't
   // re-render mid-stroke) always commit against current state.
@@ -86,7 +91,23 @@ export function Scratchpad() {
     fit();
     window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
-  }, [data.open, data.mode]);
+    // `expanded` changes the canvas box, so re-fit and replay when it toggles.
+  }, [data.open, data.mode, expanded]);
+
+  // While full-screen: lock background scroll and let Escape exit.
+  useEffect(() => {
+    if (!expanded) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExpanded(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [expanded]);
 
   function redrawNow(strokes: ScratchStroke[]) {
     const canvas = canvasRef.current;
@@ -187,10 +208,134 @@ export function Scratchpad() {
   }
 
   function toggleOpen() {
-    commit({ ...dataRef.current, open: !dataRef.current.open });
+    const open = !dataRef.current.open;
+    if (!open) setExpanded(false); // don't re-open straight into full screen
+    commit({ ...dataRef.current, open });
   }
 
   const hasNotes = data.text.trim().length > 0 || data.strokes.length > 0;
+
+  const tabs = (
+    <div className="flex gap-1 rounded-lg bg-ink-100 p-1">
+      <TabButton
+        testid="scratchpad-tab-write"
+        icon={Type}
+        label="Write"
+        active={data.mode === 'write'}
+        onClick={() => setMode('write')}
+      />
+      <TabButton
+        testid="scratchpad-tab-draw"
+        icon={Pencil}
+        label="Draw"
+        active={data.mode === 'draw'}
+        onClick={() => setMode('draw')}
+      />
+    </div>
+  );
+
+  function writeBody(full: boolean) {
+    return (
+      <>
+        <textarea
+          ref={textareaRef}
+          data-testid="scratchpad-text"
+          value={data.text}
+          onChange={(e) => handleText(e.target.value)}
+          rows={full ? undefined : 4}
+          placeholder="Jot down your working, calculations, or notes…"
+          className={cn(
+            'w-full rounded-lg border border-ink-200 bg-ink-50/40 px-3 py-2 font-mono text-sm leading-relaxed text-ink-800 placeholder:text-ink-400 focus:border-brand-400 focus:outline-none',
+            full ? 'min-h-0 flex-1 resize-none' : 'resize-y',
+          )}
+        />
+        <div className="flex items-center justify-between text-xs text-ink-400">
+          <span>Saved on this device — only you can see it.</span>
+          <button
+            type="button"
+            data-testid="scratchpad-clear"
+            onClick={clearText}
+            disabled={data.text.length === 0}
+            className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium text-ink-500 transition hover:bg-ink-100 disabled:pointer-events-none disabled:opacity-40"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Clear
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  function drawBody(full: boolean) {
+    return (
+      <>
+        <canvas
+          ref={canvasRef}
+          data-testid="scratchpad-canvas"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          className={cn(
+            'w-full touch-none rounded-lg border border-ink-200 bg-ink-50/40',
+            full ? 'min-h-0 flex-1' : 'h-48',
+          )}
+          style={{ touchAction: 'none' }}
+        />
+        <div className="flex items-center justify-between gap-2">
+          <div
+            className="flex items-center gap-1.5"
+            data-testid="scratchpad-palette"
+          >
+            {PEN_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                aria-label={`Pen colour ${c}`}
+                aria-pressed={data.color === c}
+                onClick={() => setColor(c)}
+                className={cn(
+                  'h-6 w-6 rounded-full border-2 transition',
+                  data.color === c
+                    ? 'scale-110 border-ink-500'
+                    : 'border-white shadow-sm',
+                )}
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+          <div className="flex items-center gap-1 text-xs text-ink-500">
+            <button
+              type="button"
+              data-testid="scratchpad-undo"
+              onClick={undo}
+              disabled={data.strokes.length === 0}
+              className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium transition hover:bg-ink-100 disabled:pointer-events-none disabled:opacity-40"
+            >
+              <Undo2 className="h-3.5 w-3.5" />
+              Undo
+            </button>
+            <button
+              type="button"
+              data-testid="scratchpad-clear-draw"
+              onClick={clearDrawing}
+              disabled={data.strokes.length === 0}
+              className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium transition hover:bg-ink-100 disabled:pointer-events-none disabled:opacity-40"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Clear
+            </button>
+          </div>
+        </div>
+        {full ? null : (
+          <span className="text-xs text-ink-400">
+            Saved on this device — only you can see it.
+          </span>
+        )}
+      </>
+    );
+  }
 
   return (
     <section data-testid="scratchpad" className="flex flex-col">
@@ -215,113 +360,50 @@ export function Scratchpad() {
         />
       </button>
 
-      {data.open ? (
+      {data.open && !expanded ? (
         <div className="mt-2 flex flex-col gap-2 rounded-2xl border border-ink-200 bg-white p-3 shadow-sm">
-          <div className="flex gap-1 rounded-lg bg-ink-100 p-1">
-            <TabButton
-              testid="scratchpad-tab-write"
-              icon={Type}
-              label="Write"
-              active={data.mode === 'write'}
-              onClick={() => setMode('write')}
-            />
-            <TabButton
-              testid="scratchpad-tab-draw"
-              icon={Pencil}
-              label="Draw"
-              active={data.mode === 'draw'}
-              onClick={() => setMode('draw')}
-            />
+          <div className="flex items-center gap-2">
+            <div className="flex-1">{tabs}</div>
+            <button
+              type="button"
+              data-testid="scratchpad-expand"
+              aria-label="Full screen"
+              onClick={() => setExpanded(true)}
+              className="tap-feedback inline-flex items-center justify-center rounded-lg border border-ink-200 p-2 text-ink-500 transition hover:bg-ink-100"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </button>
           </div>
+          {data.mode === 'write' ? writeBody(false) : drawBody(false)}
+        </div>
+      ) : null}
 
-          {data.mode === 'write' ? (
-            <>
-              <textarea
-                ref={textareaRef}
-                data-testid="scratchpad-text"
-                value={data.text}
-                onChange={(e) => handleText(e.target.value)}
-                rows={4}
-                placeholder="Jot down your working, calculations, or notes…"
-                className="w-full resize-y rounded-lg border border-ink-200 bg-ink-50/40 px-3 py-2 font-mono text-sm leading-relaxed text-ink-800 placeholder:text-ink-400 focus:border-brand-400 focus:outline-none"
-              />
-              <div className="flex items-center justify-between text-xs text-ink-400">
-                <span>Saved on this device — only you can see it.</span>
-                <button
-                  type="button"
-                  data-testid="scratchpad-clear"
-                  onClick={clearText}
-                  disabled={data.text.length === 0}
-                  className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium text-ink-500 transition hover:bg-ink-100 disabled:pointer-events-none disabled:opacity-40"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Clear
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <canvas
-                ref={canvasRef}
-                data-testid="scratchpad-canvas"
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerLeave={handlePointerUp}
-                onPointerCancel={handlePointerUp}
-                className="h-48 w-full touch-none rounded-lg border border-ink-200 bg-ink-50/40"
-                style={{ touchAction: 'none' }}
-              />
-              <div className="flex items-center justify-between gap-2">
-                <div
-                  className="flex items-center gap-1.5"
-                  data-testid="scratchpad-palette"
-                >
-                  {PEN_COLORS.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      aria-label={`Pen colour ${c}`}
-                      aria-pressed={data.color === c}
-                      onClick={() => setColor(c)}
-                      className={cn(
-                        'h-6 w-6 rounded-full border-2 transition',
-                        data.color === c
-                          ? 'scale-110 border-ink-500'
-                          : 'border-white shadow-sm',
-                      )}
-                      style={{ backgroundColor: c }}
-                    />
-                  ))}
-                </div>
-                <div className="flex items-center gap-1 text-xs text-ink-500">
-                  <button
-                    type="button"
-                    data-testid="scratchpad-undo"
-                    onClick={undo}
-                    disabled={data.strokes.length === 0}
-                    className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium transition hover:bg-ink-100 disabled:pointer-events-none disabled:opacity-40"
-                  >
-                    <Undo2 className="h-3.5 w-3.5" />
-                    Undo
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="scratchpad-clear-draw"
-                    onClick={clearDrawing}
-                    disabled={data.strokes.length === 0}
-                    className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium transition hover:bg-ink-100 disabled:pointer-events-none disabled:opacity-40"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Clear
-                  </button>
-                </div>
-              </div>
-              <span className="text-xs text-ink-400">
-                Saved on this device — only you can see it.
-              </span>
-            </>
-          )}
+      {data.open && expanded ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Scratchpad"
+          data-testid="scratchpad-fullscreen"
+          className="fixed inset-0 z-50 flex flex-col gap-2 bg-white p-4"
+        >
+          <div className="flex items-center justify-between">
+            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-800">
+              <NotebookPen className="h-4 w-4" />
+              Scratchpad
+            </span>
+            <button
+              type="button"
+              data-testid="scratchpad-collapse"
+              aria-label="Exit full screen"
+              onClick={() => setExpanded(false)}
+              className="tap-feedback inline-flex items-center gap-1.5 rounded-full border border-ink-200 px-3 py-1.5 text-sm font-medium text-ink-600 transition hover:bg-ink-100"
+            >
+              <Minimize2 className="h-4 w-4" />
+              Close
+            </button>
+          </div>
+          {tabs}
+          {data.mode === 'write' ? writeBody(true) : drawBody(true)}
         </div>
       ) : null}
     </section>
