@@ -209,6 +209,106 @@ describe('scratchpad', () => {
     );
     expect(cleared.text).toBe('');
   }, 60_000);
+
+  it('draws strokes on the canvas, persists them, and undo/clear work', async () => {
+    await page.goto(baseUrl() + '/practice/planets/');
+    await waitForText(page, /Q\s*1\s*\/\s*\d+/, 20_000);
+
+    await page.click('[data-testid="scratchpad-toggle"]');
+    await page.click('[data-testid="scratchpad-tab-draw"]');
+    await page.waitForSelector('[data-testid="scratchpad-canvas"]');
+
+    const box = await page.$eval('[data-testid="scratchpad-canvas"]', (el) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, h: r.height };
+    });
+
+    // Drag a short stroke across the canvas with the mouse (which fires
+    // pointer events in Chrome).
+    const cx = box.x + box.w / 2;
+    const cy = box.y + box.h / 2;
+    await page.mouse.move(cx - 40, cy);
+    await page.mouse.down();
+    await page.mouse.move(cx, cy - 20);
+    await page.mouse.move(cx + 40, cy + 10);
+    await page.mouse.up();
+
+    const key = 'quizmill.solar-system-demo.scratchpad.v1';
+    const afterDraw = await page.evaluate(
+      (k) => JSON.parse(localStorage.getItem(k) ?? '{}'),
+      key,
+    );
+    expect(afterDraw.mode).toBe('draw');
+    expect(afterDraw.strokes.length).toBe(1);
+    expect(afterDraw.strokes[0].points.length).toBeGreaterThan(1);
+    // Points are normalised to 0..1.
+    for (const p of afterDraw.strokes[0].points) {
+      expect(p.x).toBeGreaterThanOrEqual(0);
+      expect(p.x).toBeLessThanOrEqual(1);
+      expect(p.y).toBeGreaterThanOrEqual(0);
+      expect(p.y).toBeLessThanOrEqual(1);
+    }
+
+    // Picking a pen colour persists too (tool state, like the notes).
+    const swatch = (await page.$$('[data-testid="scratchpad-palette"] button'))[1];
+    await swatch.click();
+    const picked = await page.evaluate(
+      (k) => JSON.parse(localStorage.getItem(k) ?? '{}').color,
+      key,
+    );
+    expect(picked).toBe('#3b78e0');
+
+    // A second stroke, then undo drops back to one.
+    await page.mouse.move(cx - 30, cy + 30);
+    await page.mouse.down();
+    await page.mouse.move(cx + 30, cy + 30);
+    await page.mouse.up();
+    expect(
+      (await page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? '{}'), key))
+        .strokes.length,
+    ).toBe(2);
+
+    await page.click('[data-testid="scratchpad-undo"]');
+    expect(
+      (await page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? '{}'), key))
+        .strokes.length,
+    ).toBe(1);
+
+    await page.click('[data-testid="scratchpad-clear-draw"]');
+    expect(
+      (await page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? '{}'), key))
+        .strokes.length,
+    ).toBe(0);
+  }, 60_000);
+
+  it('opens a pad saved by an older build (text only, no strokes/mode)', async () => {
+    // Seed the pre-draw storage shape before loading the runner.
+    await page.evaluateOnNewDocument(() => {
+      localStorage.setItem(
+        'quizmill.solar-system-demo.scratchpad.v1',
+        JSON.stringify({ text: 'legacy note', open: true }),
+      );
+    });
+    await page.goto(baseUrl() + '/practice/planets/');
+    await waitForText(page, /Q\s*1\s*\/\s*\d+/, 20_000);
+
+    // Opens straight onto the Write tab with the old note intact, no crash.
+    await page.waitForSelector('[data-testid="scratchpad-text"]');
+    const value = await page.$eval(
+      '[data-testid="scratchpad-text"]',
+      (el) => (el as HTMLTextAreaElement).value,
+    );
+    expect(value).toBe('legacy note');
+
+    // Draw tab is available and starts empty.
+    await page.click('[data-testid="scratchpad-tab-draw"]');
+    await page.waitForSelector('[data-testid="scratchpad-canvas"]');
+    const undoDisabled = await page.$eval(
+      '[data-testid="scratchpad-undo"]',
+      (el) => (el as HTMLButtonElement).disabled,
+    );
+    expect(undoDisabled).toBe(true);
+  }, 60_000);
 });
 
 describe('home navigation', () => {

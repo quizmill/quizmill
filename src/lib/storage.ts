@@ -133,17 +133,78 @@ export function saveDismissedNudge(key: string | null): void {
 
 // ---- scratchpad (local-only working notes; deliberately not synced) ----
 
+export type ScratchpadMode = 'write' | 'draw';
+
+/**
+ * One freehand stroke. Points are normalised to 0..1 of the canvas box, so a
+ * drawing redraws correctly whatever width the panel happens to be on replay
+ * (and stays tiny in storage — vectors, not a base64 image).
+ */
+export interface ScratchStroke {
+  color: string;
+  points: { x: number; y: number }[];
+}
+
+/** Default pen colour (ink-800). Shared with the Draw palette in the UI. */
+export const DEFAULT_PEN_COLOR = '#1c2029';
+
 export interface Scratchpad {
-  /** Free-text working notes — calculations, jottings for longer questions. */
+  /** Typed notes — the Write tab. */
   text: string;
+  /** Freehand strokes — the Draw tab. */
+  strokes: ScratchStroke[];
+  /** Which tab is showing. */
+  mode: ScratchpadMode;
+  /** Selected pen colour for the Draw tab. */
+  color: string;
   /** Whether the panel is expanded; remembered so it stays as the user left it. */
   open: boolean;
 }
 
-const EMPTY_SCRATCHPAD: Scratchpad = { text: '', open: false };
+export const EMPTY_SCRATCHPAD: Scratchpad = {
+  text: '',
+  strokes: [],
+  mode: 'write',
+  color: DEFAULT_PEN_COLOR,
+  open: false,
+};
+
+function isPoint(p: unknown): boolean {
+  if (!p || typeof p !== 'object') return false;
+  const pt = p as Record<string, unknown>;
+  return typeof pt.x === 'number' && typeof pt.y === 'number';
+}
+
+function isStroke(s: unknown): s is ScratchStroke {
+  if (!s || typeof s !== 'object') return false;
+  const stroke = s as Record<string, unknown>;
+  return (
+    typeof stroke.color === 'string' &&
+    Array.isArray(stroke.points) &&
+    stroke.points.every(isPoint)
+  );
+}
+
+/**
+ * Coerce whatever is in storage into a valid Scratchpad. Tolerates the
+ * pre-draw shape (`{ text, open }`, no strokes/mode/colour) and any partial
+ * or junk data (including malformed strokes/points), so pads saved by older
+ * builds keep working and a corrupted entry can't crash a redraw.
+ */
+export function normalizeScratchpad(raw: unknown): Scratchpad {
+  if (!raw || typeof raw !== 'object') return { ...EMPTY_SCRATCHPAD };
+  const r = raw as Record<string, unknown>;
+  return {
+    text: typeof r.text === 'string' ? r.text : '',
+    strokes: Array.isArray(r.strokes) ? r.strokes.filter(isStroke) : [],
+    mode: r.mode === 'draw' ? 'draw' : 'write',
+    color: typeof r.color === 'string' ? r.color : DEFAULT_PEN_COLOR,
+    open: r.open === true,
+  };
+}
 
 export function loadScratchpad(): Scratchpad {
-  return readJson<Scratchpad>(SCRATCHPAD_KEY, EMPTY_SCRATCHPAD);
+  return normalizeScratchpad(readJson<unknown>(SCRATCHPAD_KEY, null));
 }
 
 export function saveScratchpad(value: Scratchpad): void {
