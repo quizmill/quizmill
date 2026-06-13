@@ -133,17 +133,60 @@ export function saveDismissedNudge(key: string | null): void {
 
 // ---- scratchpad (local-only working notes; deliberately not synced) ----
 
+export type ScratchpadMode = 'write' | 'draw';
+
+/**
+ * One freehand stroke. Points are normalised to 0..1 of the canvas box, so a
+ * drawing redraws correctly whatever width the panel happens to be on replay
+ * (and stays tiny in storage — vectors, not a base64 image).
+ */
+export interface ScratchStroke {
+  color: string;
+  points: { x: number; y: number }[];
+}
+
 export interface Scratchpad {
-  /** Free-text working notes — calculations, jottings for longer questions. */
+  /** Typed notes — the Write tab. */
   text: string;
+  /** Freehand strokes — the Draw tab. */
+  strokes: ScratchStroke[];
+  /** Which tab is showing. */
+  mode: ScratchpadMode;
   /** Whether the panel is expanded; remembered so it stays as the user left it. */
   open: boolean;
 }
 
-const EMPTY_SCRATCHPAD: Scratchpad = { text: '', open: false };
+export const EMPTY_SCRATCHPAD: Scratchpad = {
+  text: '',
+  strokes: [],
+  mode: 'write',
+  open: false,
+};
+
+function isStroke(s: unknown): s is ScratchStroke {
+  if (!s || typeof s !== 'object') return false;
+  const stroke = s as Record<string, unknown>;
+  return typeof stroke.color === 'string' && Array.isArray(stroke.points);
+}
+
+/**
+ * Coerce whatever is in storage into a valid Scratchpad. Tolerates the
+ * pre-draw shape (`{ text, open }`, no strokes/mode) and any partial or junk
+ * data, so pads saved by older builds keep working.
+ */
+export function normalizeScratchpad(raw: unknown): Scratchpad {
+  if (!raw || typeof raw !== 'object') return { ...EMPTY_SCRATCHPAD };
+  const r = raw as Record<string, unknown>;
+  return {
+    text: typeof r.text === 'string' ? r.text : '',
+    strokes: Array.isArray(r.strokes) ? r.strokes.filter(isStroke) : [],
+    mode: r.mode === 'draw' ? 'draw' : 'write',
+    open: r.open === true,
+  };
+}
 
 export function loadScratchpad(): Scratchpad {
-  return readJson<Scratchpad>(SCRATCHPAD_KEY, EMPTY_SCRATCHPAD);
+  return normalizeScratchpad(readJson<unknown>(SCRATCHPAD_KEY, null));
 }
 
 export function saveScratchpad(value: Scratchpad): void {
