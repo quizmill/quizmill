@@ -309,6 +309,49 @@ describe('scratchpad', () => {
     );
     expect(undoDisabled).toBe(true);
   }, 60_000);
+
+  it('expands to full screen for more space, and collapses back', async () => {
+    await page.goto(baseUrl() + '/practice/planets/');
+    await waitForText(page, /Q\s*1\s*\/\s*\d+/, 20_000);
+
+    await page.click('[data-testid="scratchpad-toggle"]');
+    await page.waitForSelector('[data-testid="scratchpad-expand"]');
+
+    // Enter full screen — the overlay appears and the inline expand button goes.
+    await page.click('[data-testid="scratchpad-expand"]');
+    await page.waitForSelector('[data-testid="scratchpad-fullscreen"]');
+    expect(await page.$('[data-testid="scratchpad-expand"]')).toBeNull();
+
+    // Typing in the full-screen pad writes to the same per-pack entry.
+    await page.type('[data-testid="scratchpad-text"]', 'big space');
+    const stored = await page.evaluate(() =>
+      JSON.parse(
+        localStorage.getItem('quizmill.solar-system-demo.scratchpad.v1') ?? '{}',
+      ),
+    );
+    expect(stored.text).toBe('big space');
+
+    // The full-screen canvas is far taller than the inline 192px box.
+    await page.click('[data-testid="scratchpad-tab-draw"]');
+    const fsHeight = await page.$eval(
+      '[data-testid="scratchpad-canvas"]',
+      (el) => el.getBoundingClientRect().height,
+    );
+    expect(fsHeight).toBeGreaterThan(300);
+
+    // Escape exits full screen back to the inline panel, notes intact.
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('[data-testid="scratchpad-fullscreen"]', {
+      hidden: true,
+    });
+    await page.waitForSelector('[data-testid="scratchpad-expand"]');
+    await page.click('[data-testid="scratchpad-tab-write"]');
+    const value = await page.$eval(
+      '[data-testid="scratchpad-text"]',
+      (el) => (el as HTMLTextAreaElement).value,
+    );
+    expect(value).toBe('big space');
+  }, 60_000);
 });
 
 describe('home navigation', () => {
