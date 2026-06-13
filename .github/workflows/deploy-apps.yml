@@ -4,10 +4,17 @@ name: Deploy apps
 # publish it to Cloudflare Pages, so engine improvements roll out to the
 # live demo + showcase apps automatically — no per-app babysitting.
 #
-# Each app is built with `npx quizmill@latest build <pack>` (the same
-# path users run), so the deployed version always matches the latest
-# published CLI/engine — the CLI stamps NEXT_PUBLIC_APP_VERSION, so there
-# is no git-describe race. Triggers:
+# Each app is built with `npx quizmill@<version> build <pack>` (the same
+# path users run), so the deployed version always matches the published
+# CLI/engine — the CLI stamps NEXT_PUBLIC_APP_VERSION, so there is no
+# git-describe race. The version is PINNED to the latest vX.Y.Z git tag
+# rather than `@latest`: the Release workflow npm-publishes the CLI and
+# then tags the merge commit, so after a release the latest tag is the
+# just-published engine. Pinning the exact version (and waiting for it to
+# land on npm) sidesteps the dist-tag propagation race that `@latest`
+# loses right after a release — it would silently rebuild on the PREVIOUS
+# engine, which is why every release used to need a manual re-dispatch.
+# Triggers:
 #   - after the Release workflow completes (a new engine version shipped)
 #   - daily (picks up content changes in the separate pack repos)
 #   - manual dispatch
@@ -62,17 +69,48 @@ jobs:
             app: world-capitals-app
             project: world-capitals
     steps:
-      # The checkout is only needed so the bundled demo pack
-      # (content/pack-demo) is on disk for the "try" build; the remote
+      # fetch-depth: 0 brings the tags so we can pin the build to the
+      # released engine version. The checkout also puts the bundled demo
+      # pack (content/pack-demo) on disk for the "try" build; the remote
       # packs are fetched by the CLI from their own repos.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Build "${{ matrix.name }}" with the latest published engine
-        run: npx --yes quizmill@latest build ${{ matrix.pack }}
+      # Pin to the latest vX.Y.Z tag (= the just-published engine) instead
+      # of @latest, and wait for that exact version to be installable —
+      # npm publish returns before the registry/CDN has fully propagated,
+      # so @latest can still resolve to the previous version right after a
+      # release. Pin + wait makes the post-release auto-deploy reliable and
+      # removes the manual re-dispatch. No tag (fresh repo) → @latest.
+      - name: Resolve engine version
+        id: engine
+        run: |
+          tag=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)
+          if [ -z "$tag" ]; then
+            echo "::notice::No version tag found — falling back to quizmill@latest."
+            echo "spec=latest" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          version="${tag#v}"
+          for i in $(seq 1 24); do
+            if npm view "quizmill@$version" version >/dev/null 2>&1; then
+              echo "quizmill@$version is available on npm."
+              echo "spec=$version" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Waiting for quizmill@$version to propagate to npm ($i/24)…"
+            sleep 5
+          done
+          echo "::error::quizmill@$version never appeared on npm after ~2 min."
+          exit 1
+
+      - name: Build "${{ matrix.name }}" on quizmill@${{ steps.engine.outputs.spec }}
+        run: npx --yes quizmill@${{ steps.engine.outputs.spec }} build ${{ matrix.pack }}
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v4
