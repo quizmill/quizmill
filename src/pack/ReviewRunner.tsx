@@ -12,6 +12,7 @@ import {
   useStorageData,
 } from '@/lib/useStorage';
 import { VoteRow } from '@/components/VoteRow';
+import { Scratchpad } from '@/components/Scratchpad';
 import { SourceRef } from '@/components/SourceRef';
 import { McqMarkdown } from '@/components/McqMarkdown';
 import { OptionButtons } from '@/pack/OptionButtons';
@@ -275,6 +276,8 @@ export function PackReviewRunner() {
           />
         </div>
       ) : null}
+
+      <Scratchpad />
 
       <OptionButtons
         options={current.options}
