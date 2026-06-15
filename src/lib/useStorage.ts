@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import * as storage from './storage';
 import { SESSIONS_KEY, ATTEMPTS_KEY } from './storage';
+import {
+  getSyncStatus,
+  subscribeSyncStatus,
+  type SyncStatus,
+} from './sync';
 import type { Attempt, Session } from '@/data/types';
 
 const EVENT = 'quizmill:storage';
@@ -74,6 +79,21 @@ export function useStorageData(): { sessions: Session[]; attempts: Attempt[] } {
   return mounted
     ? { sessions, attempts }
     : { sessions: EMPTY_SESSIONS, attempts: EMPTY_ATTEMPTS };
+}
+
+const IDLE_SYNC_STATUS: SyncStatus = { state: 'idle', pending: 0, signedIn: false };
+
+/**
+ * Reactive cloud-sync status (online/offline + queue drain). Dormant
+ * ('idle') when sync isn't configured or the user is signed out, so callers
+ * can render nothing in that case. Server snapshot is always idle.
+ */
+export function useSyncStatus(): SyncStatus {
+  return useSyncExternalStore(
+    subscribeSyncStatus,
+    getSyncStatus,
+    () => IDLE_SYNC_STATUS,
+  );
 }
 
 export function useStartSession() {

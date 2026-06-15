@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Cloud, CloudOff, LogOut, Mail } from 'lucide-react';
+import { Check, Cloud, CloudOff, LogOut, Mail, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { useSyncStatus } from '@/lib/useStorage';
 import {
   OTP_MAX_LENGTH,
   isOtpLongEnough,
@@ -32,6 +33,7 @@ export function SyncSettings() {
   const [verifying, setVerifying] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const sync = useSyncStatus();
 
   useEffect(() => {
     const sb = getSupabase();
@@ -129,6 +131,7 @@ export function SyncSettings() {
             Signed in as <strong>{signedInAs}</strong>. Your progress syncs
             automatically to your other devices.
           </p>
+          <SyncStatusLine state={sync.state} pending={sync.pending} />
           <Button variant="secondary" className="mt-4" onClick={signOut}>
             <LogOut className="h-4 w-4" />
             Sign out
@@ -200,4 +203,36 @@ export function SyncSettings() {
       )}
     </div>
   );
+}
+
+/** Live one-liner describing where cloud sync is right now: offline (with a
+ *  count of work held locally), actively syncing, or fully caught up. */
+function SyncStatusLine({ state, pending }: { state: string; pending: number }) {
+  if (state === 'offline') {
+    return (
+      <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-ink-500">
+        <CloudOff className="h-4 w-4" />
+        {pending > 0
+          ? `Offline — ${pending} ${pending === 1 ? 'change' : 'changes'} saved here, will sync when you're back online.`
+          : 'Offline — changes are saved here and will sync when you reconnect.'}
+      </p>
+    );
+  }
+  if (state === 'syncing') {
+    return (
+      <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-brand-700">
+        <RefreshCw className="h-4 w-4 animate-spin" />
+        {pending > 0 ? `Syncing ${pending}…` : 'Syncing…'}
+      </p>
+    );
+  }
+  if (state === 'synced') {
+    return (
+      <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-brand-700">
+        <Check className="h-4 w-4" />
+        Up to date
+      </p>
+    );
+  }
+  return null;
 }
