@@ -90,4 +90,11 @@ describe('computeProfileStats', () => {
     const stats = computeProfileStats([], 0, now);
     expect(stats).toMatchObject({ weekXp: 0, totalXp: 0, streakDays: 0, accuracyPct: 0 });
   });
+
+  it('still earns attempt XP in a week with no correct answers', () => {
+    const base = now.getTime();
+    const stats = computeProfileStats([attempt(base, false), attempt(base, false)], 0, now);
+    expect(stats.weekXp).toBe(2 * XP_PER_ATTEMPT); // effort counts even when wrong
+    expect(stats.accuracyPct).toBe(0);
+  });
 });

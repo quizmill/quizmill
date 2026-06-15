@@ -40,4 +40,15 @@ describe('rankLeaderboard', () => {
     const ranked = rankLeaderboard([row('Ann', 10, 9), row('Bo', 90, 1)], 'streakDays');
     expect(ranked[0].displayName).toBe('Ann');
   });
+
+  it('does not mutate the input array', () => {
+    const input = [row('Ann', 10), row('Bo', 90)];
+    const before = input.map((r) => r.displayName);
+    rankLeaderboard(input);
+    expect(input.map((r) => r.displayName)).toEqual(before);
+  });
+
+  it('returns an empty board for no rows', () => {
+    expect(rankLeaderboard([])).toEqual([]);
+  });
 });
