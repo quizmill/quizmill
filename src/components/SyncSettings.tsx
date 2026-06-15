@@ -132,7 +132,7 @@ export function SyncSettings() {
             automatically to your other devices.
           </p>
           <SyncStatusLine state={sync.state} pending={sync.pending} />
-          <Button variant="secondary" className="mt-4" onClick={signOut}>
+          <Button variant="secondary" className="mt-6" onClick={signOut}>
             <LogOut className="h-4 w-4" />
             Sign out
           </Button>
