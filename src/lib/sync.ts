@@ -45,6 +45,79 @@ let uid: string | null = null;
 let draining = false;
 let drainTimer: ReturnType<typeof setTimeout> | null = null;
 
+// ── Observable sync status ───────────────────────────────────────────────
+//
+// A tiny pub/sub so the UI can surface online/offline + "caught up" state
+// without reaching into the queue itself. Only meaningful while signed in;
+// signed out (or sync not configured) the state is 'idle' and the UI hides.
+
+export type SyncState = 'idle' | 'offline' | 'syncing' | 'synced';
+
+export interface SyncStatus {
+  /** Coarse machine state, drives which marker (if any) the UI shows. */
+  state: SyncState;
+  /** Local writes still waiting to reach the cloud. */
+  pending: number;
+  /** Whether a user is signed in (sync active at all). */
+  signedIn: boolean;
+}
+
+/** Pure derivation — exported for unit testing. */
+export function deriveSyncState(
+  signedIn: boolean,
+  online: boolean,
+  pending: number,
+  isDraining: boolean,
+): SyncState {
+  if (!signedIn) return 'idle';
+  if (!online) return 'offline';
+  if (pending > 0 || isDraining) return 'syncing';
+  return 'synced';
+}
+
+const IDLE_STATUS: SyncStatus = { state: 'idle', pending: 0, signedIn: false };
+let currentStatus: SyncStatus = IDLE_STATUS;
+const statusListeners = new Set<() => void>();
+
+function isOnline(): boolean {
+  return typeof navigator === 'undefined' || navigator.onLine !== false;
+}
+
+/** Recompute the status and notify subscribers only when it actually
+ *  changes — keeps the snapshot reference stable for useSyncExternalStore. */
+function notifyStatus(): void {
+  const signedIn = uid !== null;
+  const pending = signedIn ? loadQueue().length : 0;
+  const next: SyncStatus = {
+    state: deriveSyncState(signedIn, isOnline(), pending, draining),
+    pending,
+    signedIn,
+  };
+  const prev = currentStatus;
+  if (
+    prev.state === next.state &&
+    prev.pending === next.pending &&
+    prev.signedIn === next.signedIn
+  ) {
+    return;
+  }
+  currentStatus = next;
+  for (const cb of statusListeners) cb();
+}
+
+/** Subscribe to sync-status changes. Returns an unsubscribe fn. */
+export function subscribeSyncStatus(cb: () => void): () => void {
+  statusListeners.add(cb);
+  return () => {
+    statusListeners.delete(cb);
+  };
+}
+
+/** Current sync status snapshot (stable reference between changes). */
+export function getSyncStatus(): SyncStatus {
+  return currentStatus;
+}
+
 // ── Queue persistence ───────────────────────────────────────────────────
 
 function loadQueue(): PendingOp[] {
@@ -65,6 +138,7 @@ function enqueue(...ops: QueueOp[]): void {
   const q = loadQueue();
   for (const op of ops) q.push({ ...op, tries: 0 });
   saveQueue(q);
+  notifyStatus();
   scheduleDrain();
 }
 
@@ -249,6 +323,7 @@ async function drain(): Promise<void> {
   if (!sb) return;
 
   draining = true;
+  notifyStatus();
   try {
     let q = loadQueue();
     while (q.length > 0) {
@@ -257,6 +332,7 @@ async function drain(): Promise<void> {
         await runOp(op, uid);
         q = q.slice(1); // success → drop from front
         saveQueue(q);
+        notifyStatus();
       } catch (err) {
         // Retry later. Drop poison ops that keep failing so they don't
         // wedge the whole queue forever.
@@ -268,11 +344,13 @@ async function drain(): Promise<void> {
           continue;
         }
         saveQueue(q);
+        notifyStatus();
         break; // stop; a later drain (online/interval) retries
       }
     }
   } finally {
     draining = false;
+    notifyStatus();
   }
 }
 
@@ -324,6 +402,7 @@ function pushAllLocal(): void {
 
 async function handleSignedIn(user_id: string): Promise<void> {
   uid = user_id;
+  notifyStatus(); // signed in → start reflecting sync state
   try {
     await pullAll(user_id);
   } catch (err) {
@@ -352,7 +431,11 @@ export function startSync(): void {
   started = true;
 
   storage.onMutation(handleMutation);
-  window.addEventListener('online', () => void drain());
+  window.addEventListener('online', () => {
+    notifyStatus(); // flip offline → syncing immediately
+    void drain();
+  });
+  window.addEventListener('offline', () => notifyStatus());
   setInterval(() => void drain(), 30_000); // safety net for missed reconnects
 
   // Pick up an already-restored session, then track future auth changes.
@@ -364,6 +447,7 @@ export function startSync(): void {
       if (session.user.id !== uid) void handleSignedIn(session.user.id);
     } else {
       uid = null; // signed out → stop mirroring (local data stays put)
+      notifyStatus();
     }
   });
 }
