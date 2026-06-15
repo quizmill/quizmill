@@ -3,6 +3,7 @@ import './globals.css';
 import { APP_CONFIG } from '@/config';
 import { UpdateNotifier } from '@/components/UpdateNotifier';
 import { SyncBootstrap } from '@/components/SyncBootstrap';
+import { SocialBootstrap } from '@/components/SocialBootstrap';
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
@@ -79,6 +80,7 @@ export default function RootLayout({
         </div>
         <UpdateNotifier />
         <SyncBootstrap />
+        <SocialBootstrap />
       </body>
     </html>
   );

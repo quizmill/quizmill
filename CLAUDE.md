@@ -113,6 +113,21 @@ Real packs published:
   world-capitals.quizmill.dev → `world-capitals`. Deploys are still
   manual (`wrangler pages deploy out --project-name <project>`).
 
+## In progress (2026-06-15)
+
+- **Social layer** on branch `claude/cert-deployment-supabase-gorzgr`:
+  friend-code → accept handshake, friends + weekly leaderboard (effort XP,
+  Monday reset), a **public share-code leaderboard** viewable without
+  sign-in, and preset-only "cheers" (kids-safe — no free text). Dormant
+  unless Supabase is configured. New migration `0002_social.sql` (RLS +
+  `security definer` RPCs); pure logic in `src/lib/{friend-code,social-stats,
+  leaderboard}.ts` (tested); client in `src/lib/social.ts`; UI at `/friends`
+  + `/leaderboard`. `deploy-apps.yml` wires Supabase into the **try** app
+  only; `deploy-preview.yml` deploys this branch's tree to a Cloudflare
+  preview. Setup + manual steps in `docs/SOCIAL.md`. Pending (needs
+  dashboard): create/seed the Supabase project, add `TRY_SUPABASE_URL` /
+  `TRY_SUPABASE_PUBLISHABLE_KEY` secrets, allow the redirect URLs.
+
 ## Roadmap (agreed, in order)
 
 1. **npm 2FA publish** of the CLI, then add an "npx quizmill" card to

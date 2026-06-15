@@ -111,6 +111,16 @@ jobs:
 
       - name: Build "${{ matrix.name }}" on quizmill@${{ steps.engine.outputs.spec }}
         run: npx --yes quizmill@${{ steps.engine.outputs.spec }} build ${{ matrix.pack }}
+        env:
+          # Cloud sync + social (friends, leaderboards). Only the demo
+          # ("try") app is wired to a Supabase project; every other pack
+          # builds with these empty, so its sync/social layer stays dormant
+          # and it runs pure-local. Set the two TRY_SUPABASE_* repo secrets
+          # to switch social on for try.quizmill.dev.
+          NEXT_PUBLIC_SUPABASE_URL: >-
+            ${{ matrix.name == 'try' && secrets.TRY_SUPABASE_URL || '' }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: >-
+            ${{ matrix.name == 'try' && secrets.TRY_SUPABASE_PUBLISHABLE_KEY || '' }}
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v4

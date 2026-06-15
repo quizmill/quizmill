@@ -10,9 +10,11 @@ import {
   TrendingDown,
   TrendingUp,
   Trophy,
+  Users,
   X,
 } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
+import { SYNC_CONFIGURED } from '@/lib/supabase';
 import { StatTile } from '@/components/StatTile';
 import { InstallBanner } from '@/components/InstallPrompt';
 import { useStorageData } from '@/lib/useStorage';
@@ -106,6 +108,15 @@ export default function PackHome() {
           <p className="mt-1 text-ink-500">{APP_CONFIG.homeSubtitle}</p>
         </div>
         <nav className="flex items-center gap-2">
+          {SYNC_CONFIGURED ? (
+            <Link
+              href="/friends"
+              aria-label="Friends"
+              className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm"
+            >
+              <Users className="h-4 w-4" />
+            </Link>
+          ) : null}
           <Link
             href="/progress"
             aria-label="Progress"
