@@ -43,9 +43,13 @@ on:
         type: string
         default: latest
 
+# Only `contents: read` (for checkout). A called/reusable workflow cannot
+# request MORE than the calling job was granted, and pack repos default the
+# GITHUB_TOKEN to read-only — asking for `deployments: write` here would make
+# every caller fail at startup. The deploy uses the Cloudflare API token, not
+# GITHUB_TOKEN, so no write scope is needed.
 permissions:
   contents: read
-  deployments: write
 
 jobs:
   build-deploy:
