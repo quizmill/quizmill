@@ -121,3 +121,27 @@ jobs:
           git tag -a "$VERSION" -m "$VERSION"
           git push origin "refs/tags/$VERSION"
           gh release create "$VERSION" --generate-notes
+
+      # Tell the personal-app pack repos a new engine shipped, so they
+      # rebuild on it immediately (they also have a daily cron as a floor).
+      # The built-in GITHUB_TOKEN can't reach other repos — this uses a
+      # fine-grained PAT (PACK_DISPATCH_TOKEN) with Contents:write on the
+      # pack repos. The exact version rides in the payload so each pack pins
+      # it and waits out npm propagation (see deploy-pack.yml). Missing token
+      # → skip with a notice; the packs' daily cron still picks it up.
+      - name: Fan out engine-update to pack repos
+        if: steps.version.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ secrets.PACK_DISPATCH_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice::PACK_DISPATCH_TOKEN not set — skipping fan-out (packs will rebuild on their daily cron)."
+            exit 0
+          fi
+          for repo in quizmill/pack-claude-cert quizmill/pack-eleven-plus; do
+            echo "Dispatching engine-update (${VERSION#v}) to $repo"
+            jq -nc --arg v "${VERSION#v}" \
+              '{event_type:"engine-update",client_payload:{version:$v}}' \
+              | gh api -X POST "/repos/$repo/dispatches" --input -
+          done

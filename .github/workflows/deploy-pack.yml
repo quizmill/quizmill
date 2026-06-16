@@ -1,0 +1,101 @@
+name: Deploy pack (reusable)
+
+# Shared build+deploy recipe for a single quizmill pack app, called by a
+# pack repo's own deploy.yml (`uses: quizmill/quizmill/.github/workflows/
+# deploy-pack.yml@main`). The pack repo owns the TRIGGERS (push / cron /
+# repository_dispatch) and the SECRETS; this workflow owns the recipe, so
+# every pack app builds and deploys identically and engine changes to the
+# recipe land everywhere at once.
+#
+# The pack is always built on a PUBLISHED engine via `npx quizmill@<spec>`
+# — the same path users run — so the deployed app matches the published
+# CLI/engine. `engine` defaults to `latest` (content pushes, cron); the
+# engine's Release workflow fans out a repository_dispatch carrying the
+# exact just-published version, and the caller passes it here so the
+# post-release rebuild pins that version and waits out npm propagation
+# (npm publish returns before the registry/CDN has fully propagated, so
+# `@latest` can still resolve to the PREVIOUS version right after a
+# release).
+#
+# Caller passes its secrets with `secrets: inherit`. Expected secrets:
+#   CLOUDFLARE_API_TOKEN                    token with "Cloudflare Pages — Edit"
+#   CLOUDFLARE_ACCOUNT_ID                   70b494550992cda97e893fab035f7e9a
+#   NEXT_PUBLIC_SUPABASE_URL                (optional) enables cloud sync
+#   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY    (optional) public-safe; RLS is the guard
+
+on:
+  workflow_call:
+    inputs:
+      project:
+        description: Cloudflare Pages project name
+        required: true
+        type: string
+      app:
+        description: Built static app directory (e.g. claude-cert-app)
+        required: true
+        type: string
+      pack:
+        description: Pack ref to build (default '.', the calling repo itself)
+        type: string
+        default: '.'
+      engine:
+        description: Engine version to build on ('latest', or an exact X.Y.Z)
+        type: string
+        default: latest
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # On a pinned version (post-release dispatch), wait for that exact
+      # version to be installable from npm before building — sidesteps the
+      # dist-tag propagation race that `@latest` loses right after a release.
+      # 'latest' needs no wait.
+      - name: Resolve engine version
+        id: engine
+        run: |
+          spec='${{ inputs.engine }}'
+          if [ -z "$spec" ] || [ "$spec" = latest ]; then
+            echo "spec=latest" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          for i in $(seq 1 24); do
+            if npm view "quizmill@$spec" version >/dev/null 2>&1; then
+              echo "quizmill@$spec is available on npm."
+              echo "spec=$spec" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Waiting for quizmill@$spec to propagate to npm ($i/24)…"
+            sleep 5
+          done
+          echo "::error::quizmill@$spec never appeared on npm after ~2 min."
+          exit 1
+
+      - name: Build "${{ inputs.pack }}" on quizmill@${{ steps.engine.outputs.spec }}
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          # Stamp the visible version with this pack's commit. The SW cache
+          # key is `<this>-<engine-sha>`, so a content push busts the cache
+          # via this SHA and an engine-only rebuild busts it via the freshly
+          # cloned engine's SHA — either axis triggers the update banner.
+          export NEXT_PUBLIC_APP_VERSION="$(git rev-parse --short HEAD)"
+          npx --yes quizmill@${{ steps.engine.outputs.spec }} build ${{ inputs.pack }}
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy ${{ inputs.app }} --project-name ${{ inputs.project }} --branch=main
