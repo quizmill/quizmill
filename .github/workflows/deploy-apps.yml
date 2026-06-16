@@ -19,9 +19,18 @@ name: Deploy apps
 #   - daily (picks up content changes in the separate pack repos)
 #   - manual dispatch
 #
-# Deliberately NOT here: the private eleven-plus app. It carries licensed
-# (© GL Assessment) content, is local-only, and deploys from its own
-# (private) pack repo. Don't add it.
+# Scope: ONLY the engine's own showcase apps — the demo ("try", built
+# from the in-repo content/pack-demo) and the public showcase pack
+# world-capitals. These carry no secrets and have no cloud sync, so they
+# can be built here from an anonymous clone.
+#
+# Deliberately NOT here: any app that needs its own secrets (Cloudflare +
+# per-app Supabase) or is a private pack. Those are "personal apps"
+# (claude-cert, eleven-plus, …) and each deploys from ITS OWN repo via the
+# reusable workflow (.github/workflows/deploy-pack.yml), so per-app secrets
+# stay in the pack repo and private packs build with their own clone
+# credentials. The Release workflow fans out a repository_dispatch to those
+# repos so engine updates still land instantly. Don't add them here.
 #
 # Required repo secrets (Settings → Secrets and variables → Actions):
 #   CLOUDFLARE_API_TOKEN     token with "Cloudflare Pages — Edit"
@@ -60,10 +69,6 @@ jobs:
             pack: content/pack-demo
             app: solar-system-demo-app
             project: quizmill-try
-          - name: claude-cert
-            pack: quizmill/pack-claude-cert
-            app: claude-cert-app
-            project: quizmill-claude-cert
           - name: world-capitals
             pack: quizmill/pack-world-capitals
             app: world-capitals-app
