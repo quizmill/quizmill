@@ -90,11 +90,15 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
         run: |
-          # Stamp the visible version with this pack's commit. The SW cache
-          # key is `<this>-<engine-sha>`, so a content push busts the cache
-          # via this SHA and an engine-only rebuild busts it via the freshly
-          # cloned engine's SHA — either axis triggers the update banner.
-          export NEXT_PUBLIC_APP_VERSION="$(git rev-parse --short HEAD)"
+          # Carry THIS pack's commit in the Build tag (not the visible
+          # version). finalise-build folds NEXT_PUBLIC_APP_BUILD into the SW
+          # cache key `<semver>-<engine-sha>-<pack-sha>`, so a content-only
+          # push (engine unchanged) still changes the cache name and fires the
+          # update banner, while an engine bump busts it via the freshly cloned
+          # engine's SHA. Leaving NEXT_PUBLIC_APP_VERSION unset lets the CLI
+          # stamp the engine release semver, so Settings shows vX.Y.Z — not a
+          # SHA — matching the showcase apps (try / world-capitals).
+          export NEXT_PUBLIC_APP_BUILD="$(git rev-parse --short HEAD)"
           npx --yes quizmill@${{ steps.engine.outputs.spec }} build ${{ inputs.pack }}
 
       - name: Deploy to Cloudflare Pages
