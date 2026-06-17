@@ -95,6 +95,95 @@ export function evaluateAchievements(
   return earned;
 }
 
+/**
+ * Progress toward a single locked achievement, for the cabinet's
+ * "tap a locked one to see how" detail. Milestones are one-off events
+ * (no meaningful count toward them), so they return null — their
+ * description is the whole story.
+ */
+export interface AchievementProgress {
+  /** Count achieved so far (may exceed `target` for streak/volume). */
+  current: number;
+  /** Count needed to unlock. */
+  target: number;
+  /** What the bar counts, e.g. 'best streak', 'questions answered'. */
+  label: string;
+  /** Optional extra gate, e.g. mastery's accuracy requirement. */
+  detail?: string;
+}
+
+/**
+ * Aggregates shared across every achievement's progress, computed once
+ * so the cabinet doesn't re-walk the full history per tile.
+ */
+export interface ProgressContext {
+  bestRun: number;
+  totalAnswered: number;
+  dailyStreak: number;
+  mastery: Map<string, { attempted: number; correct: number }>;
+}
+
+export function buildProgressContext(
+  sessions: readonly Session[],
+  attempts: readonly Attempt[],
+  now: Date = new Date(),
+): ProgressContext {
+  const mastery = new Map<string, { attempted: number; correct: number }>();
+  for (const at of attempts) {
+    const m = mastery.get(at.subject) ?? { attempted: 0, correct: 0 };
+    m.attempted += 1;
+    if (at.isCorrect) m.correct += 1;
+    mastery.set(at.subject, m);
+  }
+  return {
+    bestRun: maxConsecutiveCorrect(attempts),
+    totalAnswered: attempts.length,
+    dailyStreak: currentStreak(completedSessionDates(sessions), now),
+    mastery,
+  };
+}
+
+/** Map one achievement to its progress, given precomputed aggregates. */
+export function achievementProgress(
+  a: Achievement,
+  ctx: ProgressContext,
+): AchievementProgress | null {
+  switch (a.category) {
+    case 'streak':
+      if (a.threshold === undefined) return null;
+      return { current: ctx.bestRun, target: a.threshold, label: 'best streak' };
+    case 'volume':
+      if (a.threshold === undefined) return null;
+      return {
+        current: ctx.totalAnswered,
+        target: a.threshold,
+        label: 'questions answered',
+      };
+    case 'daily':
+      if (a.threshold === undefined) return null;
+      return { current: ctx.dailyStreak, target: a.threshold, label: 'day streak' };
+    case 'mastery': {
+      if (!a.categoryKey) return null;
+      const m = ctx.mastery.get(a.categoryKey) ?? { attempted: 0, correct: 0 };
+      const pct = m.attempted
+        ? Math.round((m.correct / m.attempted) * 100)
+        : 0;
+      // The bar tracks the volume gate (need MASTERY_MIN_ATTEMPTS); the
+      // accuracy gate rides along as detail since both must be met.
+      return {
+        current: Math.min(m.attempted, MASTERY_MIN_ATTEMPTS),
+        target: MASTERY_MIN_ATTEMPTS,
+        label: 'questions practised',
+        detail: `${pct}% correct so far — need ${Math.round(
+          MASTERY_MIN_ACCURACY * 100,
+        )}%`,
+      };
+    }
+    case 'milestone':
+      return null;
+  }
+}
+
 /** Milestones are id-specific — adding one means a case here. */
 function milestoneEarned(id: string, sessions: readonly Session[]): boolean {
   switch (id) {

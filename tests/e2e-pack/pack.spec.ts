@@ -398,6 +398,35 @@ describe('sticker cabinet page', () => {
     expect(body).toContain('Category mastery');
     expect(body).toContain('Milestones');
   });
+
+  it('taps a locked sticker to reveal how to unlock it, with progress', async () => {
+    await page.goto(baseUrl() + '/stickers/');
+    await waitForText(page, 'Sticker cabinet');
+
+    // No detail open initially; the locked tile is a button.
+    expect(await page.$('[data-testid="sticker-detail"]')).toBeNull();
+    await page.click('[data-testid="sticker-volume-50"]');
+
+    await page.waitForSelector('[data-testid="sticker-detail"]', {
+      timeout: 10_000,
+    });
+    const detail = await page.$eval(
+      '[data-testid="sticker-detail"]',
+      (el) => el.textContent ?? '',
+    );
+    expect(detail).toContain('How to unlock');
+    expect(detail).toContain('Answer 50 questions');
+    expect(detail).toContain('questions answered');
+    expect(detail).toMatch(/0\s*\/\s*50/); // no practice yet → 0 / 50
+    expect(await page.$('[data-testid="sticker-detail-bar"]')).not.toBeNull();
+
+    // Escape closes it.
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(
+      () => !document.querySelector('[data-testid="sticker-detail"]'),
+      { timeout: 10_000 },
+    );
+  });
 });
 
 describe('progress page', () => {
