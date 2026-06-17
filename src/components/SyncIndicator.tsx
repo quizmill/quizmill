@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Check, CloudOff, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Check, CloudOff, RefreshCw } from 'lucide-react';
 import { useSyncStatus } from '@/lib/useStorage';
+import { retrySync } from '@/lib/sync';
 import { cn } from '@/lib/cn';
 
 /**
@@ -54,6 +55,15 @@ export function SyncIndicator() {
       label: status.pending > 0 ? `Syncing ${status.pending}…` : 'Syncing…',
       tone: 'border-brand-200 bg-brand-50/90 text-brand-700',
     };
+  } else if (status.state === 'error') {
+    content = {
+      icon: <AlertTriangle className="h-3.5 w-3.5" />,
+      label:
+        status.pending > 0
+          ? `Couldn't sync ${status.pending} · retry`
+          : "Couldn't sync · retry",
+      tone: 'border-amber-300 bg-amber-50/90 text-amber-700',
+    };
   } else if (status.state === 'synced' && showSynced) {
     content = {
       icon: <Check className="h-3.5 w-3.5" />,
@@ -64,19 +74,31 @@ export function SyncIndicator() {
 
   if (!content) return null;
 
+  const isError = status.state === 'error';
+  const className = cn(
+    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium shadow-sm backdrop-blur',
+    content.tone,
+  );
+
   return (
     <div className="pointer-events-none fixed inset-x-0 top-3 z-40 flex justify-center px-4">
-      <div
-        role="status"
-        aria-live="polite"
-        className={cn(
-          'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium shadow-sm backdrop-blur',
-          content.tone,
-        )}
-      >
-        {content.icon}
-        <span>{content.label}</span>
-      </div>
+      {isError ? (
+        // Only the error chip is interactive — tap to force a retry.
+        <button
+          type="button"
+          onClick={() => retrySync()}
+          aria-live="polite"
+          className={cn('pointer-events-auto cursor-pointer transition hover:brightness-95', className)}
+        >
+          {content.icon}
+          <span>{content.label}</span>
+        </button>
+      ) : (
+        <div role="status" aria-live="polite" className={className}>
+          {content.icon}
+          <span>{content.label}</span>
+        </div>
+      )}
     </div>
   );
 }
