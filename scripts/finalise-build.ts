@@ -1,6 +1,7 @@
 /**
  * Post-build step: replace `__BUILD_VERSION__` in out/sw.js with the
- * combined SW cache key `<semver>-<git-sha>`.
+ * combined SW cache key `<semver>-<git-sha>` (plus `-<pack-sha>` when a
+ * pack repo's deploy sets NEXT_PUBLIC_APP_BUILD).
  *
  * Why both pieces:
  *  - Semver is the user-visible version (shown in Settings, bumped via
@@ -56,7 +57,12 @@ if (!existsSync(swPath)) {
 
 const semver = appVersion();
 const sha = gitSha();
-const cacheKey = `${semver}-${sha}`;
+// A pack repo's deploy sets NEXT_PUBLIC_APP_BUILD to its own commit (the
+// visible "Build" tag). Fold it into the cache key so a content-only push
+// (engine unchanged → same semver + engine SHA) still changes the SW cache
+// name and fires the update banner. Unset for the engine's own builds.
+const build = process.env.NEXT_PUBLIC_APP_BUILD;
+const cacheKey = build ? `${semver}-${sha}-${build}` : `${semver}-${sha}`;
 
 const sw = readFileSync(swPath, 'utf8');
 const stamped = sw.replaceAll('__BUILD_VERSION__', cacheKey);
