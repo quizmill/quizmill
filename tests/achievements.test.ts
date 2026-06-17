@@ -2,12 +2,20 @@ import { describe, expect, it } from 'vitest';
 import type { Attempt, Session } from '@/data/types';
 import { buildAchievements } from '@/pack/achievements';
 import {
+  achievementProgress,
+  buildProgressContext,
   evaluateAchievements,
   maxConsecutiveCorrect,
   newlyEarnedAchievements,
   MASTERY_MIN_ATTEMPTS,
   PERFECT_SESSION_MIN_QUESTIONS,
 } from '@/pack/achievements-engine';
+
+const byId = (id: string) => {
+  const def = DEFS.find((a) => a.id === id);
+  if (!def) throw new Error(`no achievement ${id}`);
+  return def;
+};
 
 /** Synthetic two-category pack so tests don't depend on the active pack. */
 const CATEGORIES = [
@@ -200,5 +208,51 @@ describe('newlyEarnedAchievements', () => {
       NOW,
     );
     expect(fresh).toEqual(['first-session']);
+  });
+});
+
+describe('achievementProgress', () => {
+  it('tracks streak / volume / daily toward their thresholds', () => {
+    const attempts = [
+      attempt({ isCorrect: true }),
+      attempt({ isCorrect: true }),
+      attempt({ isCorrect: false }),
+    ];
+    const ctx = buildProgressContext([session()], attempts, NOW);
+
+    expect(achievementProgress(byId('streak-5'), ctx)).toEqual({
+      current: 2, // best run of 2 before the wrong answer
+      target: 5,
+      label: 'best streak',
+    });
+    expect(achievementProgress(byId('volume-50'), ctx)).toMatchObject({
+      current: 3,
+      target: 50,
+      label: 'questions answered',
+    });
+    expect(achievementProgress(byId('daily-3'), ctx)).toMatchObject({
+      current: 1, // one completed session today
+      target: 3,
+    });
+  });
+
+  it('caps mastery progress at the attempt floor and reports accuracy', () => {
+    const attempts = Array.from({ length: 40 }, (_, i) =>
+      attempt({ subject: 'alpha', isCorrect: i % 2 === 0 }), // 50%
+    );
+    const p = achievementProgress(byId('mastery-alpha'), buildProgressContext([], attempts, NOW));
+    expect(p).toMatchObject({
+      current: MASTERY_MIN_ATTEMPTS, // capped, even though 40 attempted
+      target: MASTERY_MIN_ATTEMPTS,
+      label: 'questions practised',
+    });
+    expect(p?.detail).toContain('50% correct');
+    expect(p?.detail).toContain('need 80%');
+  });
+
+  it('returns null for one-off milestones (no count to show)', () => {
+    const ctx = buildProgressContext([], [], NOW);
+    expect(achievementProgress(byId('first-session'), ctx)).toBeNull();
+    expect(achievementProgress(byId('perfect-session'), ctx)).toBeNull();
   });
 });

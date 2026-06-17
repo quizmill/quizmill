@@ -1,7 +1,8 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, X } from 'lucide-react';
 import {
   ACHIEVEMENTS,
   CATEGORY_LABEL,
@@ -9,14 +10,30 @@ import {
   type Achievement,
   type AchievementTier,
 } from '@/pack/achievements';
-import { useEarnedAchievements } from '@/lib/useStorage';
+import {
+  achievementProgress,
+  buildProgressContext,
+  type AchievementProgress,
+} from '@/pack/achievements-engine';
+import { useEarnedAchievements, useStorageData } from '@/lib/useStorage';
 import { cn } from '@/lib/cn';
 
 /** The sticker cabinet: every achievement as a tile, earned ones in
- *  colour with their unlock date, locked ones greyed out with the tier. */
+ *  colour with their unlock date, locked ones greyed out with the tier.
+ *  Tapping a locked tile opens a detail with progress toward unlocking. */
 export default function StickersPage() {
   const { earned, earnedList } = useEarnedAchievements();
+  const { sessions, attempts } = useStorageData();
   const earnedAtById = new Map(earnedList.map((e) => [e.id, e.earnedAt]));
+
+  // Aggregates for "how am I doing" — computed once, not per tile.
+  const ctx = useMemo(
+    () => buildProgressContext(sessions, attempts),
+    [sessions, attempts],
+  );
+
+  // The locked sticker whose progress detail is open (null = closed).
+  const [selected, setSelected] = useState<Achievement | null>(null);
 
   return (
     <main className="flex flex-col gap-6">
@@ -37,7 +54,7 @@ export default function StickersPage() {
       <div>
         <h1 className="text-3xl font-bold text-ink-900">Sticker cabinet</h1>
         <p className="mt-1 text-ink-500">
-          Earn stickers by practising. Locked ones show how.
+          Earn stickers by practising. Tap a locked one to see how.
         </p>
       </div>
 
@@ -56,12 +73,21 @@ export default function StickersPage() {
                   achievement={a}
                   isEarned={earned.has(a.id)}
                   earnedAt={earnedAtById.get(a.id)}
+                  onShowHow={() => setSelected(a)}
                 />
               ))}
             </div>
           </section>
         );
       })}
+
+      {selected && (
+        <StickerDetail
+          achievement={selected}
+          progress={achievementProgress(selected, ctx)}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </main>
   );
 }
@@ -70,20 +96,24 @@ interface StickerTileProps {
   achievement: Achievement;
   isEarned: boolean;
   earnedAt?: number;
+  onShowHow: () => void;
 }
 
-function StickerTile({ achievement, isEarned, earnedAt }: StickerTileProps) {
-  return (
-    <div
-      data-testid={`sticker-${achievement.id}`}
-      data-earned={isEarned ? 'true' : 'false'}
-      className={cn(
-        'flex flex-col items-center gap-1.5 rounded-2xl border-2 p-3 text-center shadow-sm',
-        isEarned
-          ? `bg-white ${TIER_BORDER[achievement.tier]}`
-          : 'border-ink-200 bg-ink-100/40',
-      )}
-    >
+function StickerTile({
+  achievement,
+  isEarned,
+  earnedAt,
+  onShowHow,
+}: StickerTileProps) {
+  const tileClass = cn(
+    'flex flex-col items-center gap-1.5 rounded-2xl border-2 p-3 text-center shadow-sm',
+    isEarned
+      ? `bg-white ${TIER_BORDER[achievement.tier]}`
+      : 'border-ink-200 bg-ink-100/40',
+  );
+
+  const inner = (
+    <>
       <div
         className={cn(
           'text-4xl leading-none',
@@ -118,6 +148,131 @@ function StickerTile({ achievement, isEarned, earnedAt }: StickerTileProps) {
           {achievement.tier} · locked
         </div>
       )}
+    </>
+  );
+
+  // Earned tiles are static; locked tiles are tappable to reveal how to
+  // unlock them. Keep the same data-testid/data-earned hooks on both.
+  if (isEarned) {
+    return (
+      <div
+        data-testid={`sticker-${achievement.id}`}
+        data-earned="true"
+        className={tileClass}
+      >
+        {inner}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      data-testid={`sticker-${achievement.id}`}
+      data-earned="false"
+      onClick={onShowHow}
+      aria-label={`${achievement.name} — locked. See how to unlock it.`}
+      className={cn(
+        tileClass,
+        'tap-feedback cursor-pointer transition-colors hover:bg-ink-100/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
+      )}
+    >
+      {inner}
+    </button>
+  );
+}
+
+interface StickerDetailProps {
+  achievement: Achievement;
+  progress: AchievementProgress | null;
+  onClose: () => void;
+}
+
+/** Modal detail for a locked sticker: the unlock criteria plus a live
+ *  progress bar. Dismiss by backdrop tap, the close button, or Escape. */
+function StickerDetail({ achievement, progress, onClose }: StickerDetailProps) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const pct =
+    progress && progress.target > 0
+      ? Math.min(100, Math.round((progress.current / progress.target) * 100))
+      : 0;
+  const reached = progress ? Math.min(progress.current, progress.target) : 0;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-ink-900/40 p-4 sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`How to unlock ${achievement.name}`}
+      data-testid="sticker-detail"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="tap-feedback -mr-2 -mt-2 rounded-full p-2 text-ink-400 hover:bg-ink-100 hover:text-ink-600"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="text-6xl leading-none grayscale" aria-hidden>
+          {achievement.emoji}
+        </div>
+        <div className="mt-2 text-xl font-bold text-ink-900">
+          {achievement.name}
+        </div>
+        <div className="mt-1 text-sm font-semibold uppercase tracking-wider text-ink-400">
+          Still locked
+        </div>
+
+        <div className="mt-4 rounded-2xl bg-ink-50 p-4 text-left">
+          <div className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+            How to unlock
+          </div>
+          <div className="mt-1 text-sm text-ink-800">
+            {achievement.description}
+          </div>
+
+          {progress ? (
+            <div className="mt-4">
+              <div className="flex items-baseline justify-between text-xs text-ink-500">
+                <span className="font-medium text-ink-700">
+                  {reached} / {progress.target}
+                </span>
+                <span>{progress.label}</span>
+              </div>
+              <div className="mt-1 h-2 overflow-hidden rounded-full bg-ink-200">
+                <div
+                  className="h-full rounded-full bg-brand-500 transition-all"
+                  style={{ width: `${pct}%` }}
+                  data-testid="sticker-detail-bar"
+                />
+              </div>
+              {progress.detail && (
+                <div className="mt-2 text-xs text-ink-500">{progress.detail}</div>
+              )}
+            </div>
+          ) : (
+            <div className="mt-3 text-xs text-ink-500">
+              A one-off achievement — it unlocks the moment you do it.
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
