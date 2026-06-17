@@ -24,6 +24,12 @@ const QUEUE_KEY = `${KEY_PREFIX}syncQueue.v1`;
 const MIGRATED_PREFIX = `${KEY_PREFIX}sync.migrated.`; // + uid
 const STORAGE_EVENT = 'quizmill:storage'; // event-bus name, not a storage key
 const MAX_TRIES = 6; // drop a poison op after this many failures
+// Hard ceiling on any single remote op. supabase-js has no built-in
+// timeout, so a request that stalls (common on flaky mobile networks)
+// would otherwise hang `await runOp` forever, latch `draining = true`,
+// and wedge the whole sync engine until a page reload. We turn a stall
+// into an ordinary retryable failure instead.
+const OP_TIMEOUT_MS = 15_000;
 
 // ── Queue shape ─────────────────────────────────────────────────────────
 
@@ -44,6 +50,28 @@ let started = false;
 let uid: string | null = null;
 let draining = false;
 let drainTimer: ReturnType<typeof setTimeout> | null = null;
+// True when the last drain pass left work behind because of failures
+// (not merely because we're mid-flight). Lets the UI distinguish "still
+// working" from "tried and couldn't" instead of spinning forever.
+let syncError = false;
+
+/** Race a promise against a timeout so a stalled request can't hang the
+ *  drain loop indefinitely. Rejects with a retryable error on timeout. */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('sync op timed out')), ms);
+    p.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
 
 // ── Observable sync status ───────────────────────────────────────────────
 //
@@ -51,7 +79,7 @@ let drainTimer: ReturnType<typeof setTimeout> | null = null;
 // without reaching into the queue itself. Only meaningful while signed in;
 // signed out (or sync not configured) the state is 'idle' and the UI hides.
 
-export type SyncState = 'idle' | 'offline' | 'syncing' | 'synced';
+export type SyncState = 'idle' | 'offline' | 'syncing' | 'synced' | 'error';
 
 export interface SyncStatus {
   /** Coarse machine state, drives which marker (if any) the UI shows. */
@@ -68,10 +96,17 @@ export function deriveSyncState(
   online: boolean,
   pending: number,
   isDraining: boolean,
+  hasError: boolean,
 ): SyncState {
   if (!signedIn) return 'idle';
   if (!online) return 'offline';
-  if (pending > 0 || isDraining) return 'syncing';
+  // An in-flight drain is always "syncing", even after an earlier failure —
+  // we're actively retrying.
+  if (isDraining) return 'syncing';
+  // Tried, still have work, and the last pass couldn't clear it → surface a
+  // distinct error so the UI isn't a perpetual spinner over stuck data.
+  if (pending > 0 && hasError) return 'error';
+  if (pending > 0) return 'syncing';
   return 'synced';
 }
 
@@ -89,7 +124,7 @@ function notifyStatus(): void {
   const signedIn = uid !== null;
   const pending = signedIn ? loadQueue().length : 0;
   const next: SyncStatus = {
-    state: deriveSyncState(signedIn, isOnline(), pending, draining),
+    state: deriveSyncState(signedIn, isOnline(), pending, draining, syncError),
     pending,
     signedIn,
   };
@@ -325,33 +360,49 @@ async function drain(): Promise<void> {
   draining = true;
   notifyStatus();
   try {
-    let q = loadQueue();
-    while (q.length > 0) {
-      const op = q[0];
+    // Work over a snapshot of the queue and attempt EVERY op, rather than
+    // stopping at the first failure. A single un-sendable op must not block
+    // the others behind it (head-of-line blocking). Ops are idempotent
+    // upserts/deletes, so if the tab closes mid-pass the untouched snapshot
+    // simply replays next time — safe to re-send.
+    const snapshot = loadQueue();
+    const kept: PendingOp[] = [];
+    let anyFailed = false;
+    for (const op of snapshot) {
       try {
-        await runOp(op, uid);
-        q = q.slice(1); // success → drop from front
-        saveQueue(q);
-        notifyStatus();
+        await withTimeout(runOp(op, uid), OP_TIMEOUT_MS);
+        // success → simply don't carry it forward
       } catch (err) {
-        // Retry later. Drop poison ops that keep failing so they don't
-        // wedge the whole queue forever.
         op.tries += 1;
         if (op.tries >= MAX_TRIES) {
-          console.warn('[sync] dropping op after repeated failures', op, err);
-          q = q.slice(1);
-          saveQueue(q);
-          continue;
+          // Drop a poison op so it can't wedge the queue forever — but make
+          // the loss loud rather than a silent console.warn.
+          console.error('[sync] dropping op after repeated failures', op, err);
+        } else {
+          anyFailed = true;
+          kept.push(op); // retry on a later drain (interval / reconnect)
         }
-        saveQueue(q);
-        notifyStatus();
-        break; // stop; a later drain (online/interval) retries
       }
     }
+    // Reconcile with anything enqueued WHILE we were draining: the live
+    // queue is [..snapshot we just processed.., ..newly appended..]. Keep
+    // the still-failing ops, then the new ones, in order.
+    const live = loadQueue();
+    const appended = live.slice(snapshot.length);
+    saveQueue([...kept, ...appended]);
+    syncError = anyFailed;
   } finally {
     draining = false;
     notifyStatus();
   }
+}
+
+/** Manually kick a drain — used by the UI's "retry" affordance when sync is
+ *  in the error state. Clears the sticky error so the next pass re-evaluates. */
+export function retrySync(): void {
+  syncError = false;
+  notifyStatus();
+  void drain();
 }
 
 function scheduleDrain(): void {
