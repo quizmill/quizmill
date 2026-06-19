@@ -483,6 +483,53 @@ describe('progress page', () => {
     expect(body).toContain('Weak spots');
     expect(body).toContain('Practise');
   });
+
+  it('estimates exam readiness once enough of the blueprint is covered', async () => {
+    // The demo manifest declares an exam goal (70% pass). Cover both
+    // domains with first attempts: planets 8/10, exploration 3/4. The
+    // blueprint-weighted estimate is 78% with a band straddling the pass
+    // line → a deterministic "borderline" verdict.
+    const planets = Array.from({ length: 10 }, (_, i) => ({
+      questionId: `rp-${i}`, subject: 'planets', topic: `rp-${i}`,
+      isCorrect: i < 8, agoMs: 60_000 - i * 100,
+    }));
+    const exploration = Array.from({ length: 4 }, (_, i) => ({
+      questionId: `re-${i}`, subject: 'space-exploration', topic: `re-${i}`,
+      isCorrect: i < 3, agoMs: 50_000 - i * 100,
+    }));
+    await seedAttempts(page, [...planets, ...exploration]);
+    await page.goto(baseUrl() + '/progress/');
+    await page.waitForSelector('[data-testid="exam-readiness"]');
+
+    const verdict = await page.$eval(
+      '[data-testid="readiness-verdict"]',
+      (el) => el.getAttribute('data-verdict'),
+    );
+    expect(verdict).toBe('borderline');
+
+    // Both domains get a readiness row, and the headline shows the estimate.
+    expect(await page.$('[data-testid="readiness-domain-planets"]')).not.toBeNull();
+    expect(
+      await page.$('[data-testid="readiness-domain-space-exploration"]'),
+    ).not.toBeNull();
+    const section = await page.$eval(
+      '[data-testid="exam-readiness"]',
+      (el) => el.textContent ?? '',
+    );
+    expect(section).toContain('Exam readiness');
+    expect(section).toContain('78%'); // blueprint-weighted estimate
+    expect(section).toContain('pass 70%'); // gauge pass-line label
+
+    // The Home screen surfaces the compact readiness chip.
+    await page.goto(baseUrl() + '/');
+    await page.waitForSelector('[data-testid="exam-readiness-chip"]');
+    const chip = await page.$eval(
+      '[data-testid="exam-readiness-chip"]',
+      (el) => el.textContent ?? '',
+    );
+    expect(chip).toContain('Exam readiness');
+    expect(chip).toContain('70%');
+  });
 });
 
 describe('settings install card', () => {

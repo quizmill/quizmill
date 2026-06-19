@@ -34,6 +34,7 @@ import {
   PACK_LEVEL_LABEL,
   PACK_LEVEL_BY_QUESTION_ID,
 } from '@/pack/data';
+import { ExamReadinessChip } from '@/pack/ExamReadiness';
 
 /** Home screen for the generic pack variant — category cards + stats,
  *  all driven by the active pack's manifest. */
@@ -152,6 +153,8 @@ export default function PackHome() {
           }
         />
       </section>
+
+      <ExamReadinessChip attempts={attempts} />
 
       {mistakeCount > 0 ? (
         <Link

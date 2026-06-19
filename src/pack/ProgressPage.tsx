@@ -15,6 +15,7 @@ import {
 } from '@/lib/stats';
 import { currentStreak } from '@/lib/streak';
 import { packQuestions, PACK_CATEGORY_LABEL } from '@/pack/data';
+import ExamReadiness from '@/pack/ExamReadiness';
 import { cn } from '@/lib/cn';
 
 const WEAK_SPOT_LIMIT = 8;
@@ -78,6 +79,8 @@ export default function ProgressPage() {
         </div>
       ) : (
         <>
+          <ExamReadiness attempts={attempts} />
+
           <section className="flex flex-col gap-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
               Sessions

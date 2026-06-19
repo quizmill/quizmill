@@ -26,6 +26,15 @@ export type PackLevel = {
 /** A "Question sources" legend entry, shown in Settings. */
 export type PackSource = { label: string; name?: string; blurb?: string; url?: string };
 
+/** Optional exam-readiness goal declared by the pack. */
+export type PackExam = {
+  label?: string;
+  passPct: number;
+  scaled?: boolean;
+  questionCount?: number;
+  scope?: { level: string };
+};
+
 /** Option keys, A–F (v2 allows 2–6 options; v1 packs use A–D). */
 export type OptionKey = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
@@ -40,6 +49,7 @@ export type PackManifest = {
   levels?: PackLevel[];
   levelsLabel?: string;
   sources?: PackSource[];
+  exam?: PackExam;
 };
 
 export type PackScenario = {
@@ -89,6 +99,8 @@ export type PackQuestion = {
 export const packManifest = manifestJson as PackManifest;
 export const packLevels = packManifest.levels ?? [];
 export const packSources = packManifest.sources ?? [];
+/** The pack's exam-readiness goal, if it declares one. */
+export const packExam = packManifest.exam;
 export const packQuestions = questionsJson as PackQuestion[];
 
 /** Manifest level keys in ladder order (used by the adaptive level nudge). */
@@ -127,6 +139,28 @@ export const PACK_CONCEPT_BY_ID: Record<string, PackConcept> = Object.fromEntrie
 export const PACK_CATEGORY_LABEL: Record<string, string> = Object.fromEntries(
   packManifest.categories.map((c) => [c.key, c.shortLabel ?? c.label]),
 );
+
+/**
+ * Whether a question counts toward exam readiness. When the exam declares a
+ * `scope.level` only questions in that level band count (a pack mixing exam
+ * and non-exam material); otherwise the whole bank is in scope.
+ */
+export function examInScope(questionId: string): boolean {
+  const level = packExam?.scope?.level;
+  if (!level) return true;
+  return PACK_LEVEL_BY_QUESTION_ID[questionId] === level;
+}
+
+/** In-scope question count per category key — the readiness coverage
+ *  denominator. Computed once over the bank. */
+export const EXAM_AVAILABLE_BY_CATEGORY: Record<string, number> = (() => {
+  const counts: Record<string, number> = {};
+  for (const q of packQuestions) {
+    if (!examInScope(q.id)) continue;
+    counts[q.categoryKey] = (counts[q.categoryKey] ?? 0) + 1;
+  }
+  return counts;
+})();
 
 /**
  * Per-category colour, so the home screen reads as more than a grey list.
