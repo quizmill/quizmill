@@ -6,6 +6,12 @@ on:
   pull_request:
   workflow_dispatch:
 
+# CI only reads the repo and runs untrusted PR code (npm lifecycle scripts,
+# build, tests). Drop the token to read-only so a malicious PR can't use it
+# to write to the repo, regardless of the repository's default permission.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
