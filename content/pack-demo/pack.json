@@ -10,12 +10,14 @@
       "key": "planets",
       "label": "Planets & Moons",
       "shortLabel": "Planets",
+      "icon": "🪐",
       "weight": 0.6
     },
     {
       "key": "space-exploration",
       "label": "Space Exploration",
       "shortLabel": "Exploration",
+      "icon": "🚀",
       "weight": 0.4
     }
   ],

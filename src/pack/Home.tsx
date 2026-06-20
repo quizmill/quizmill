@@ -31,6 +31,7 @@ import {
   packLevelKeys,
   packManifest,
   PACK_CATEGORY_TONE,
+  PACK_CATEGORY_ICON,
   PACK_LEVEL_LABEL,
   PACK_LEVEL_BY_QUESTION_ID,
 } from '@/pack/data';
@@ -276,6 +277,7 @@ export default function PackHome() {
               s.answered === 0 ? 0 : Math.round((s.correct / s.answered) * 100);
             const weight = cat.weight ? `${Math.round(cat.weight * 100)}%` : null;
             const tone = PACK_CATEGORY_TONE[cat.key];
+            const icon = PACK_CATEGORY_ICON[cat.key];
             return (
               <Link
                 key={cat.key}
@@ -285,6 +287,15 @@ export default function PackHome() {
                   tone.card,
                 )}
               >
+                <span
+                  className={cn(
+                    'flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl text-2xl leading-none',
+                    tone.badge,
+                  )}
+                  aria-hidden
+                >
+                  {icon}
+                </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-base font-semibold text-ink-900">

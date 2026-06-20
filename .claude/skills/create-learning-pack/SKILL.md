@@ -30,7 +30,11 @@ example.
 2. **Write the pack** to `packs/<pack-id>/`:
    - `pack.json` — manifest: `schemaVersion: 1`, `id`, `title`,
      `description`, `homeSubtitle`, `themeColor` (hex), `categories`
-     (key/label/shortLabel/optional weight). Keys are kebab-case slugs.
+     (key/label/shortLabel/optional `icon`/optional weight). Keys are
+     kebab-case slugs. Give each category a bespoke `icon` (a single
+     emoji that fits the category — e.g. `"🪐"`, `"🚀"`); it appears on
+     the category card and its mastery sticker. Omit it and the app
+     falls back to a generic emoji by order.
    - `questions.json` — array of questions: slug `id` (unique,
      prefix with the pack id), `categoryKey` (must match a manifest
      category), `difficulty` 1–5, `prompt` (≥20 chars), exactly 4

@@ -47,6 +47,9 @@ export const packCategorySchema = z.object({
   label: z.string().min(2).max(80),
   /** Chip-friendly short label; falls back to `label`. */
   shortLabel: z.string().min(1).max(24).optional(),
+  /** Optional bespoke icon — a single emoji shown on the category card and
+   *  its mastery sticker. Falls back to a deterministic emoji by order. */
+  icon: z.string().min(1).max(8).optional(),
   /** Optional selection weight, e.g. an exam blueprint percentage. */
   weight: z.number().positive().max(1).optional(),
 });

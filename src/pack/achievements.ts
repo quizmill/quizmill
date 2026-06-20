@@ -18,6 +18,7 @@
  *  - For mastery stickers, the pack `categoryKey` they track
  */
 import { APP_CONFIG, type CategoryDef } from '@/config';
+import { categoryIcon } from './category-icon';
 
 export type AchievementCategory =
   | 'streak'
@@ -65,18 +66,18 @@ const STATIC_ACHIEVEMENTS: readonly Achievement[] = [
   { id: 'comeback',        name: 'Comeback',    description: 'Finish a review session',          emoji: '💪', category: 'milestone', tier: 'bronze' },
 ];
 
-/** Sticker visuals for generated mastery achievements, rotated by
- *  category index so multi-category packs get visual variety. */
-const MASTERY_EMOJIS = ['📚', '🧮', '🧩', '🔬', '🪐', '🗺️', '⚙️', '🎨'] as const;
-
 /**
  * Build the full achievement list for a pack: static stickers plus one
  * gold mastery sticker per pack category. Exported separately from the
  * materialised ACHIEVEMENTS constant so tests can drive it with
  * synthetic categories.
+ *
+ * The mastery sticker reuses the category's resolved icon (authored, or
+ * a deterministic fallback by order — see `categoryIcon`), so a category
+ * card and its sticker always show the same mark.
  */
 export function buildAchievements(
-  categories: readonly Pick<CategoryDef, 'key' | 'label' | 'shortLabel'>[],
+  categories: readonly Pick<CategoryDef, 'key' | 'label' | 'shortLabel' | 'icon'>[],
 ): Achievement[] {
   const mastery: Achievement[] = categories.map((cat, i) => {
     const label = cat.shortLabel ?? cat.label;
@@ -84,7 +85,7 @@ export function buildAchievements(
       id: `mastery-${cat.key}`,
       name: `${label} mastery`,
       description: `80% on 30+ ${label} questions`,
-      emoji: MASTERY_EMOJIS[i % MASTERY_EMOJIS.length],
+      emoji: categoryIcon(cat, i),
       category: 'mastery',
       tier: 'gold',
       categoryKey: cat.key,
