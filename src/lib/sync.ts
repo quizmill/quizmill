@@ -304,9 +304,19 @@ async function runOp(op: PendingOp, user_id: string): Promise<void> {
       return;
     }
     case 'achievements': {
+      // Achievements are write-once (earned_at never changes), so use
+      // ON CONFLICT DO NOTHING (ignoreDuplicates) rather than DO UPDATE.
+      // This makes the first-sign-in bulk re-push of rows that were just
+      // pulled a true no-op, and — crucially — needs only the INSERT RLS
+      // policy: the achievements table has no UPDATE policy, so an
+      // upsert-as-update was rejected and wedged the queue ("Couldn't sync N").
+      // The local merge already keeps the earliest unlock time (storage.ts).
       const { error } = await sb
         .from('achievements')
-        .upsert(achievementToRow(op.row, user_id), { onConflict: 'user_id,achievement_id' });
+        .upsert(achievementToRow(op.row, user_id), {
+          onConflict: 'user_id,achievement_id',
+          ignoreDuplicates: true,
+        });
       if (error) throw error;
       return;
     }
