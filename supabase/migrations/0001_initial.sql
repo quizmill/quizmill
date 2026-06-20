@@ -72,6 +72,10 @@ create table if not exists public.achievements (
 
 alter table public.achievements enable row level security;
 
+-- Write-once by design: an achievement's earned_at never changes, so the
+-- client syncs it with ON CONFLICT DO NOTHING (ignoreDuplicates) and there is
+-- deliberately NO update policy. Don't add one — an upsert-as-update would be
+-- the only thing that needs it, and that path is intentionally avoided.
 create policy "achievements: owner can read"   on public.achievements for select using (auth.uid() = user_id);
 create policy "achievements: owner can insert" on public.achievements for insert with check (auth.uid() = user_id);
 create policy "achievements: owner can delete" on public.achievements for delete using (auth.uid() = user_id);
