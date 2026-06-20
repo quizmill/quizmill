@@ -26,6 +26,15 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: Lint
+        run: npm run lint
+
+      # Runs after the unit tests so the demo pack is already seeded
+      # (the `pretest` hook runs ensure-pack) — typecheck needs the active
+      # pack's JSON for the variant's static imports.
+      - name: Typecheck
+        run: npm run typecheck
+
       - name: Build static export (demo pack)
         run: npm run build
         env:
