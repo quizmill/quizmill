@@ -55,7 +55,6 @@ export function UpdateNotifier() {
       })
       .catch((err) => {
         // SW is a progressive enhancement — don't fail the page.
-        // eslint-disable-next-line no-console
         console.warn('Service worker registration failed:', err);
       });
 

@@ -9,7 +9,7 @@
     "build": "next build --webpack",
     "postbuild": "tsx scripts/finalise-build.ts",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "pack:validate": "tsx tools/pack/validate.ts",
     "pack:use": "tsx scripts/use-pack.ts",
     "pack:list": "tsx scripts/list-packs.ts",
