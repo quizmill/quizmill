@@ -169,6 +169,50 @@ function latestColdLook(
 
 const pct = (frac: number) => Math.round(frac * 100);
 
+/** Per-category "latest cold look" accuracy + coverage — the standard
+ *  per-category metric for the Progress page (used with or without an exam
+ *  goal). Same cold-look basis as the readiness estimate, so the two never
+ *  disagree. `available` is the in-scope bank size (the coverage denominator). */
+export interface CategoryColdLook {
+  key: string;
+  label: string;
+  /** Distinct in-scope questions answered (one cold look each). */
+  attempted: number;
+  correct: number;
+  accuracyPct: number;
+  available: number;
+  /** attempted / available, as a percentage (capped at 100). */
+  coveragePct: number;
+}
+
+export function coldLookByCategory(
+  attempts: readonly Attempt[],
+  categories: readonly { key: string; label: string; available: number }[],
+  opts: { inScope?: (questionId: string) => boolean } = {},
+): CategoryColdLook[] {
+  const inScope = opts.inScope ?? (() => true);
+  const looks = latestColdLook(attempts, inScope);
+  const bySubject = new Map<string, { attempted: number; correct: number }>();
+  for (const a of looks) {
+    const row = bySubject.get(a.subject) ?? { attempted: 0, correct: 0 };
+    row.attempted += 1;
+    if (a.isCorrect) row.correct += 1;
+    bySubject.set(a.subject, row);
+  }
+  return categories.map((c) => {
+    const agg = bySubject.get(c.key) ?? { attempted: 0, correct: 0 };
+    return {
+      key: c.key,
+      label: c.label,
+      attempted: agg.attempted,
+      correct: agg.correct,
+      accuracyPct: agg.attempted ? pct(agg.correct / agg.attempted) : 0,
+      available: c.available,
+      coveragePct: c.available > 0 ? Math.min(100, pct(agg.attempted / c.available)) : 0,
+    };
+  });
+}
+
 /**
  * Build the full readiness report for an exam goal over its domains.
  *

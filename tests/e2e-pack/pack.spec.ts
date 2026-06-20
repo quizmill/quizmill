@@ -435,7 +435,7 @@ describe('progress page', () => {
     await waitForText(page, 'No practice yet');
   });
 
-  it('renders category accuracy, the daily streak, and weak spots from history', async () => {
+  it('renders sessions, the daily streak, and weak spots from history', async () => {
     // Seeded session completed ~24h ago → a 1-day streak; the twice-wrong
     // question should surface as the top weak spot.
     await seedAttempts(page, [
@@ -445,7 +445,7 @@ describe('progress page', () => {
       { questionId: 'demo-planets-003', subject: 'planets', topic: 'demo-planets-003', isCorrect: true, agoMs: 30_000 },
     ]);
     await page.goto(baseUrl() + '/progress/');
-    await waitForText(page, 'Accuracy by category');
+    await page.waitForSelector('[data-testid="session-summary"]');
 
     // Session dashboard: the seed wrote one completed 60s session of 4
     // questions, so the tiles read 1 / 1m / 4 and exactly one weekday
@@ -472,12 +472,10 @@ describe('progress page', () => {
     );
     expect(streak).toContain('1-day streak');
 
-    const planets = await page.$eval(
-      '[data-testid="category-accuracy-planets"]',
-      (el) => el.textContent ?? '',
-    );
-    expect(planets).toContain('50%');
-    expect(planets).toContain('2/4');
+    // The demo declares an exam goal, so the standalone "By category" view
+    // is hidden — per-category accuracy lives in the Exam-readiness section
+    // (asserted in the readiness spec below), on the same cold-look metric.
+    expect(await page.$('[data-testid="category-accuracy-planets"]')).toBeNull();
 
     const body = await bodyText(page);
     expect(body).toContain('Weak spots');
