@@ -6,15 +6,20 @@ import { Button } from '@/components/ui/Button';
 import { APP_CONFIG } from '@/config';
 import { useStorageData } from '@/lib/useStorage';
 import {
-  accuracyByCategory,
   accuracyByDay,
   completedSessionDates,
   sessionsByWeekday,
   sessionSummary,
   weakestQuestions,
 } from '@/lib/stats';
+import { coldLookByCategory } from '@/lib/readiness';
 import { currentStreak } from '@/lib/streak';
-import { packQuestions, PACK_CATEGORY_LABEL } from '@/pack/data';
+import {
+  packQuestions,
+  PACK_CATEGORY_LABEL,
+  EXAM_AVAILABLE_BY_CATEGORY,
+  examInScope,
+} from '@/pack/data';
 import ExamReadiness from '@/pack/ExamReadiness';
 import { cn } from '@/lib/cn';
 
@@ -33,7 +38,17 @@ export default function ProgressPage() {
   const summary = sessionSummary(sessions);
   const byWeekday = sessionsByWeekday(sessions);
   const maxWeekday = Math.max(...byWeekday.map((d) => d.sessions), 1);
-  const byCategory = accuracyByCategory(attempts, APP_CONFIG.categories);
+  // Per-category accuracy uses the same "latest cold look" metric as exam
+  // readiness (one fresh answer per question), so the two never disagree.
+  const byCategory = coldLookByCategory(
+    attempts,
+    APP_CONFIG.categories.map((c) => ({
+      key: c.key,
+      label: c.shortLabel ?? c.label,
+      available: EXAM_AVAILABLE_BY_CATEGORY[c.key] ?? 0,
+    })),
+    { inScope: examInScope },
+  );
   const byDay = accuracyByDay(attempts, null).slice(-DAILY_POINT_LIMIT);
   const weakest = weakestQuestions(attempts).slice(0, WEAK_SPOT_LIMIT);
   const promptById = new Map(packQuestions.map((q) => [q.id, q.prompt]));
@@ -131,31 +146,37 @@ export default function ProgressPage() {
             </div>
           </section>
 
-          <section className="flex flex-col gap-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
-              Accuracy by category
-            </h2>
-            <div className="flex flex-col gap-3 rounded-2xl border border-ink-200 bg-white p-4 shadow-sm">
-              {byCategory.map((row) => (
-                <div key={row.key} data-testid={`category-accuracy-${row.key}`}>
-                  <div className="flex items-baseline justify-between text-sm">
-                    <span className="font-semibold text-ink-900">{row.label}</span>
-                    <span className="text-ink-500">
-                      {row.attempted === 0
-                        ? 'not started'
-                        : `${row.accuracyPct}% · ${row.correct}/${row.attempted}`}
-                    </span>
+          {/* Per-category accuracy. When the pack has an exam goal, the
+              Exam-readiness section above already shows these bars enriched
+              with coverage and the pass line, so this plainer view renders
+              only for packs without one — same cold-look metric either way. */}
+          {APP_CONFIG.exam ? null : (
+            <section className="flex flex-col gap-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
+                By category
+              </h2>
+              <div className="flex flex-col gap-3 rounded-2xl border border-ink-200 bg-white p-4 shadow-sm">
+                {byCategory.map((row) => (
+                  <div key={row.key} data-testid={`category-accuracy-${row.key}`}>
+                    <div className="flex items-baseline justify-between text-sm">
+                      <span className="font-semibold text-ink-900">{row.label}</span>
+                      <span className="text-ink-500">
+                        {row.attempted === 0
+                          ? 'not started'
+                          : `${row.accuracyPct}% · ${row.coveragePct}% seen`}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-ink-100">
+                      <div
+                        className={cn('h-full rounded-full', accuracyTone(row.accuracyPct))}
+                        style={{ width: `${row.attempted === 0 ? 0 : Math.max(row.accuracyPct, 4)}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-ink-100">
-                    <div
-                      className={cn('h-full rounded-full', accuracyTone(row.accuracyPct))}
-                      style={{ width: `${row.attempted === 0 ? 0 : Math.max(row.accuracyPct, 4)}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="flex flex-col gap-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
