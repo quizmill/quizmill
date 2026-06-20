@@ -13,6 +13,7 @@
     "pack:validate": "tsx tools/pack/validate.ts",
     "pack:use": "tsx scripts/use-pack.ts",
     "pack:list": "tsx scripts/list-packs.ts",
+    "pack:stress": "tsx scripts/gen-stress-pack.ts && tsx scripts/use-pack.ts content/pack-stress",
     "pretest": "tsx scripts/ensure-pack.ts",
     "test": "vitest run",
     "test:watch": "vitest",

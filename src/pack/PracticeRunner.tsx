@@ -20,6 +20,7 @@ import { PackImage } from '@/pack/PackImage';
 import { ConceptCard } from '@/pack/ConceptCard';
 import { QuestionMeta } from '@/pack/QuestionMeta';
 import { Celebration } from '@/components/Celebration';
+import { QuizSkeleton } from '@/components/QuizSkeleton';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { loadAttempts, loadSessions, loadLevelFilter } from '@/lib/storage';
 import {
@@ -126,14 +127,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   }
 
   if (!state) {
-    return (
-      <main className="flex flex-col gap-5">
-        <BackLink />
-        <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center text-ink-500 shadow-sm">
-          Loading…
-        </div>
-      </main>
-    );
+    return <QuizSkeleton />;
   }
 
   if (finished) {

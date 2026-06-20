@@ -15,6 +15,7 @@ import {
 import { APP_CONFIG } from '@/config';
 import { StatTile } from '@/components/StatTile';
 import { InstallBanner } from '@/components/InstallPrompt';
+import { LinkPendingSwap } from '@/components/LinkPendingSwap';
 import { useStorageData } from '@/lib/useStorage';
 import { unresolvedMistakeCount } from '@/lib/mistakes';
 import {
@@ -176,7 +177,9 @@ export default function PackHome() {
               </div>
             </div>
           </div>
-          <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-500" />
+          <LinkPendingSwap spinnerClassName="text-ink-500">
+            <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-500" />
+          </LinkPendingSwap>
         </Link>
       ) : null}
 
@@ -308,9 +311,11 @@ export default function PackHome() {
                       : `${s.answered}/${s.available} answered · ${pct}% accuracy`}
                   </div>
                 </div>
-                <ArrowRight
-                  className={cn('h-5 w-5 flex-shrink-0 transition', tone.arrow)}
-                />
+                <LinkPendingSwap spinnerClassName={tone.arrow}>
+                  <ArrowRight
+                    className={cn('h-5 w-5 flex-shrink-0 transition', tone.arrow)}
+                  />
+                </LinkPendingSwap>
               </Link>
             );
           })}
