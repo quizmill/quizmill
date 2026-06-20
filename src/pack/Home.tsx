@@ -133,9 +133,7 @@ export default function PackHome() {
 
       <InstallBanner />
 
-      <section
-        className={cn('grid gap-3', APP_CONFIG.exam ? 'grid-cols-3' : 'grid-cols-2')}
-      >
+      <section className="grid grid-cols-2 gap-3">
         <StatTile
           label="Answered"
           value={totalAnswered}
@@ -145,16 +143,22 @@ export default function PackHome() {
               : `of ${packQuestions.length} available`
           }
         />
-        <StatTile
-          label="Accuracy"
-          value={`${overallAccuracy}%`}
-          hint={
-            totalAnswered === 0
-              ? 'no data yet'
-              : `${totalCorrect}/${totalAnswered} correct`
-          }
-        />
-        <ExamReadinessTile attempts={attempts} />
+        {/* For exam packs the readiness estimate replaces the plain accuracy
+            tile (same cold-look basis as Progress; verdict shown as a pill) —
+            no more two near-identical % side by side. */}
+        {APP_CONFIG.exam ? (
+          <ExamReadinessTile attempts={attempts} />
+        ) : (
+          <StatTile
+            label="Accuracy"
+            value={`${overallAccuracy}%`}
+            hint={
+              totalAnswered === 0
+                ? 'no data yet'
+                : `${totalCorrect}/${totalAnswered} correct`
+            }
+          />
+        )}
       </section>
 
       {mistakeCount > 0 ? (
