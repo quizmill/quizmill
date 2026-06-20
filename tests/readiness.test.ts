@@ -149,12 +149,19 @@ describe('computeReadiness — verdict from the confidence band', () => {
     expect(r.verdict).toBe('not-ready');
   });
 
-  it('is borderline when the band straddles the pass line', () => {
+  it('is likely (on track) when the estimate clears the line but the band dips below', () => {
     const attempts = [...answers('alpha', 30, 21), ...answers('beta', 30, 21)];
     const r = computeReadiness(GOAL, DOMAINS, attempts);
-    expect(r.estimatePct).toBe(70);
-    expect(r.lowPct).toBeLessThan(GOAL.passPct);
-    expect(r.highPct).toBeGreaterThanOrEqual(GOAL.passPct);
+    expect(r.estimatePct).toBe(70); // estimate at/above pass
+    expect(r.lowPct).toBeLessThan(GOAL.passPct); // but lower band below it
+    expect(r.verdict).toBe('likely');
+  });
+
+  it('is borderline when the estimate is below the line but the band reaches above', () => {
+    const attempts = [...answers('alpha', 30, 20), ...answers('beta', 30, 20)];
+    const r = computeReadiness(GOAL, DOMAINS, attempts);
+    expect(r.estimatePct).toBeLessThan(GOAL.passPct); // estimate below pass
+    expect(r.highPct).toBeGreaterThanOrEqual(GOAL.passPct); // band still reaches above
     expect(r.verdict).toBe('borderline');
   });
 });

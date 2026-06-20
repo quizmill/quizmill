@@ -487,8 +487,8 @@ describe('progress page', () => {
   it('estimates exam readiness once enough of the blueprint is covered', async () => {
     // The demo manifest declares an exam goal (70% pass). Cover both
     // domains with first attempts: planets 8/10, exploration 3/4. The
-    // blueprint-weighted estimate is 78% with a band straddling the pass
-    // line → a deterministic "borderline" verdict.
+    // blueprint-weighted estimate is 78% — above the line, but the band's
+    // low end dips below → a deterministic "likely" (on track) verdict.
     const planets = Array.from({ length: 10 }, (_, i) => ({
       questionId: `rp-${i}`, subject: 'planets', topic: `rp-${i}`,
       isCorrect: i < 8, agoMs: 60_000 - i * 100,
@@ -505,7 +505,7 @@ describe('progress page', () => {
       '[data-testid="readiness-verdict"]',
       (el) => el.getAttribute('data-verdict'),
     );
-    expect(verdict).toBe('borderline');
+    expect(verdict).toBe('likely');
 
     // Both domains get a readiness row, and the headline shows the estimate.
     expect(await page.$('[data-testid="readiness-domain-planets"]')).not.toBeNull();
