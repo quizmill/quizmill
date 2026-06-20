@@ -14,6 +14,9 @@ npm-debug.log*
 .idea/
 .DS_Store
 
+# Claude Code git worktrees (committed .claude/ settings & skills stay tracked)
+/.claude/worktrees/
+
 # env
 .env*.local
 .env
