@@ -24,6 +24,11 @@
     { "key": "basics", "label": "Basics" },
     { "key": "advanced", "label": "Advanced" }
   ],
+  "exam": {
+    "label": "Mock exam",
+    "passPct": 70,
+    "questionCount": 20
+  },
   "sources": [
     { "label": "Original", "name": "Hand-authored", "blurb": "Solar-system facts written for this demo pack." },
     { "label": "NASA", "name": "NASA Science", "blurb": "Cross-checked against public NASA material.", "url": "https://science.nasa.gov/" }

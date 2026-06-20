@@ -22,6 +22,17 @@ export interface CategoryDef {
   weight?: number;
 }
 
+/** Optional exam-readiness goal, mirrored from the manifest `exam` block.
+ *  Absent → no readiness UI. */
+export interface ExamConfig {
+  label?: string;
+  passPct: number;
+  scaled?: boolean;
+  questionCount?: number;
+  /** Restrict readiness to questions in this level band. */
+  scope?: { level: string };
+}
+
 export interface AppConfig {
   /** Pack identifier — also namespaces localStorage. */
   packId: string;
@@ -34,6 +45,8 @@ export interface AppConfig {
   /** PWA theme-color (browser chrome / iOS status bar). */
   themeColor: string;
   categories: CategoryDef[];
+  /** Exam-readiness goal, when the pack declares one. */
+  exam?: ExamConfig;
 }
 
 export const APP_CONFIG: AppConfig = {
@@ -43,4 +56,5 @@ export const APP_CONFIG: AppConfig = {
   homeSubtitle: manifest.homeSubtitle,
   themeColor: manifest.themeColor,
   categories: manifest.categories as CategoryDef[],
+  exam: (manifest as { exam?: ExamConfig }).exam,
 };

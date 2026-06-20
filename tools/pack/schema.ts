@@ -68,6 +68,31 @@ export const packSourceSchema = z.object({
   url: z.string().url().optional(),
 });
 
+/**
+ * Optional exam-readiness goal (additive; valid for v1 and v2 packs). When
+ * present, the engine estimates "are you ready to sit this?" from the
+ * learner's first-attempt accuracy, blueprint-weighted across the pack's
+ * categories (their `weight`s), and surfaces it on the Progress page.
+ * Absent → no readiness UI, exactly as today.
+ */
+export const packExamSchema = z.object({
+  /** What the goal is called in the UI, e.g. "CCA-F exam". */
+  label: z.string().min(2).max(60).optional(),
+  /** Pass threshold as a percentage (1–100). For scaled exams this is the
+   *  nominal target — see `scaled`. */
+  passPct: z.number().min(1).max(100),
+  /** True when the real exam reports a SCALED score (the raw→scaled mapping
+   *  isn't public). The estimate is then shown with an explicit caveat —
+   *  we estimate raw accuracy, not the scaled result. */
+  scaled: z.boolean().optional(),
+  /** Number of questions on the real exam, if known. Informational. */
+  questionCount: z.number().int().positive().max(1000).optional(),
+  /** Restrict readiness to questions in this level band (must reference a
+   *  manifest level key). Use when a pack mixes exam and non-exam material
+   *  — e.g. only `level: "exam"` questions count toward readiness. */
+  scope: z.object({ level: z.string().regex(slug).max(40) }).optional(),
+});
+
 export const packManifestSchema = z
   .object({
     schemaVersion: z.union([z.literal(1), z.literal(2)]),
@@ -93,6 +118,8 @@ export const packManifestSchema = z
     /** Optional "Question sources" legend, rendered in Settings (v2) —
      *  where the bank's questions come from: repos, licences, credits. */
     sources: z.array(packSourceSchema).max(12).optional(),
+    /** Optional exam-readiness goal — see packExamSchema. */
+    exam: packExamSchema.optional(),
   })
   .superRefine((m, ctx) => {
     const keys = m.categories.map((c) => c.key);
@@ -209,6 +236,7 @@ export const packQuestionSchema = z
   });
 
 export type PackCategory = z.infer<typeof packCategorySchema>;
+export type PackExam = z.infer<typeof packExamSchema>;
 export type PackLevel = z.infer<typeof packLevelSchema>;
 export type PackSource = z.infer<typeof packSourceSchema>;
 export type PackManifest = z.infer<typeof packManifestSchema>;
@@ -381,6 +409,28 @@ export function validatePack(input: {
         warnings.push('pack.json: some categories have weights and some do not');
       } else if (Math.abs(sum - 1) > 0.01) {
         warnings.push(`pack.json: category weights sum to ${sum.toFixed(2)}, expected ~1.0`);
+      }
+    }
+
+    const exam = manifest.data.exam;
+    if (exam) {
+      if (exam.scope && !levelKeys.has(exam.scope.level)) {
+        errors.push(
+          `pack.json: exam.scope.level "${exam.scope.level}" not declared in pack.json levels`,
+        );
+      }
+      if (weights.length === 0) {
+        warnings.push(
+          'pack.json: exam goal set but no category weights — readiness will weight domains by bank size; add weights for an exam-blueprint estimate',
+        );
+      }
+      if (exam.scope) {
+        const inScope = questions.filter((q) => q.level === exam.scope!.level).length;
+        if (inScope === 0) {
+          warnings.push(
+            `pack.json: exam.scope.level "${exam.scope.level}" matches no questions — readiness will have nothing to measure`,
+          );
+        }
       }
     }
   }
