@@ -598,7 +598,7 @@ describe('reward mini-games', () => {
     expect(await page.$('[data-testid="games-unlocked-banner"]')).toBeNull();
   });
 
-  it('hides the games behind the version-pill easter egg in Settings', async () => {
+  it('reveals games via the version-pill easter egg and plays one', async () => {
     await page.goto(baseUrl() + '/settings/');
     await page.waitForSelector('[data-testid="app-version"]');
     // Not revealed until you tap the version pill enough times.
@@ -608,30 +608,10 @@ describe('reward mini-games', () => {
       await page.click('[data-testid="app-version"]');
     }
     await page.waitForSelector('[data-testid="games-easter-egg"]');
-    expect(await page.$('a[href="/games/"]')).not.toBeNull();
-  });
 
-  it('shows a locked arcade with progress before enough answers', async () => {
-    await page.goto(baseUrl() + '/games/');
-    await waitForText(page, 'Games are locked');
-    const body = await bodyText(page);
-    expect(body).toContain('to unlock');
-    expect(await page.$('[data-testid="games-progress-bar"]')).not.toBeNull();
-  });
-
-  it('unlocks the arcade after enough answers and plays a game', async () => {
-    // The demo pack unlocks games after 10 answers — seed 12.
-    await seedAttempts(
-      page,
-      Array.from({ length: 12 }, (_, i) => ({
-        questionId: `seed-q-${i}`,
-        subject: 'planets',
-        topic: `seed-q-${i}`,
-        isCorrect: true,
-        agoMs: 1000 + i,
-      })),
-    );
-    await page.goto(baseUrl() + '/games/');
+    // Follow the revealed link into the arcade — playable straight away,
+    // no answer-count gate.
+    await page.click('[data-testid="games-easter-egg"] a[href="/games/"]');
     await page.waitForSelector('[data-testid="games-grid"]');
 
     // Open the sliding puzzle; the game shell + board should appear.

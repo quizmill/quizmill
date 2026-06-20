@@ -346,10 +346,9 @@ describe('validatePack', () => {
 
   // ——— reward mini-games (opt-in) ———
 
-  it('accepts a games block with an unlock threshold and a game subset', () => {
+  it('accepts a games block restricted to a subset of games', () => {
     const input = loadDemo();
     (input.manifest as { games?: unknown }).games = {
-      unlockAfter: 30,
       include: ['snake', 'tile-puzzle'],
     };
     const result = validatePack(input);
@@ -357,7 +356,7 @@ describe('validatePack', () => {
     expect(result.errors).toEqual([]);
   });
 
-  it('accepts an empty games block (all games, default threshold)', () => {
+  it('accepts an empty games block (opt in, all games)', () => {
     const input = loadDemo();
     (input.manifest as { games?: unknown }).games = {};
     expect(validatePack(input).ok).toBe(true);
@@ -369,14 +368,6 @@ describe('validatePack', () => {
     const result = validatePack(input);
     expect(result.ok).toBe(false);
     expect(result.errors.some((e) => e.includes('games'))).toBe(true);
-  });
-
-  it('rejects a negative or non-integer unlockAfter', () => {
-    const input = loadDemo();
-    (input.manifest as { games?: unknown }).games = { unlockAfter: -5 };
-    expect(validatePack(input).ok).toBe(false);
-    (input.manifest as { games?: unknown }).games = { unlockAfter: 3.5 };
-    expect(validatePack(input).ok).toBe(false);
   });
 
   it('rejects an empty include array', () => {

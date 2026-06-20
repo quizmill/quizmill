@@ -36,8 +36,6 @@ export interface ExamConfig {
 /** Optional reward mini-games, mirrored from the manifest `games` block.
  *  Absent → no games anywhere. */
 export interface GamesConfig {
-  /** Answers the learner must log before games unlock (default 25). */
-  unlockAfter?: number;
   /** Restrict to a subset of the built-in games (by id). Omit → all. */
   include?: string[];
 }

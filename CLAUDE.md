@@ -40,16 +40,16 @@ webmanifest are generated from the manifest by `scripts/pack-assets.ts`
   GamesPage + games/ (reward mini-games — see below).
   InstallPrompt (`src/components/`) covers Add-to-Home-Screen.
 - Reward mini-games (opt-in): a pack adds a `games` block to its manifest
-  (`{ unlockAfter?, include? }`, mirrors the optional `exam` block) and
-  the app unlocks a small arcade once `attempts.length >= unlockAfter`
-  (default 25). Registry `src/lib/games/registry.ts` (id ↔ `GAME_IDS` in
-  schema.ts), pure logic `src/lib/games/{snake,tilePuzzle,pong}.ts`,
-  components `src/pack/games/` (GameShell/HowToPlay/GameModal + 6 games),
-  route `/games`. Games are ephemeral (no storage, don't touch
+  (`{ include? }`, mirrors the optional `exam` block — presence enables;
+  `include` narrows the set). Registry `src/lib/games/registry.ts` (id ↔
+  `GAME_IDS` in schema.ts), pure logic `src/lib/games/{snake,tilePuzzle,
+  pong}.ts`, components `src/pack/games/` (GameShell/HowToPlay/GameModal +
+  6 games), route `/games`. Games are ephemeral (no storage, don't touch
   stats/stickers) and a deliberately HIDDEN easter egg — nothing on Home;
   reached by tapping the version pill in Settings 7× (`GAMES_REVEAL_TAPS`),
-  which reveals a panel linking to `/games`. Ported from
-  `~/code/personal/learning` (original engine code, not exam content).
+  which reveals a panel linking to the (ungated) `/games` arcade — playable
+  straight away. Ported from `~/code/personal/learning` (original engine
+  code, not exam content).
 - Engine never imports question *shapes* — it sees only the
   denormalised `Attempt`/`Session` fields (`src/data/types.ts`).
 

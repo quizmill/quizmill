@@ -110,13 +110,11 @@ export const gameIdSchema = z.enum(GAME_IDS);
 
 /**
  * Optional reward mini-games (additive; valid for v1 and v2 packs). When
- * present, the app unlocks a small arcade of break-time games once the
- * learner has answered `unlockAfter` questions — a treat for keeping the
- * practice wheel turning. Absent → no games anywhere, exactly as today.
+ * present, the app offers a small arcade of break-time games as a hidden
+ * treat (found via the version-pill easter egg in Settings). Absent → no
+ * games anywhere, exactly as today.
  */
 export const packGamesSchema = z.object({
-  /** Answers the learner must log before games unlock. Default 25. */
-  unlockAfter: z.number().int().min(0).max(5000).optional(),
   /** Restrict to a subset of the built-in games (by id). Omit → all of
    *  them. Use to give a serious-exam pack a smaller, calmer set. */
   include: z.array(gameIdSchema).min(1).max(GAME_IDS.length).optional(),

@@ -15,7 +15,6 @@ import {
   packSources,
   packGames,
   gamesEnabled,
-  gamesUnlockAfter,
 } from '@/pack/data';
 import { enabledGames } from '@/lib/games/registry';
 
@@ -48,8 +47,6 @@ export function SettingsPage({ extras }: SettingsPageProps) {
   const [versionTaps, setVersionTaps] = useState(0);
   const gamesRevealed = gamesEnabled && versionTaps >= GAMES_REVEAL_TAPS;
   const gameList = enabledGames(packGames?.include);
-  const gamesUnlocked = attempts.length >= gamesUnlockAfter;
-  const gamesRemaining = Math.max(0, gamesUnlockAfter - attempts.length);
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
@@ -241,25 +238,15 @@ export function SettingsPage({ extras }: SettingsPageProps) {
               A little arcade tucked away as a reward for practising.
             </p>
             <p className="mt-2 text-sm text-ink-500">
-              {gamesUnlocked ? (
-                <>
-                  Unlocked — <strong>{gameList.length}</strong>{' '}
-                  {gameList.length === 1 ? 'game' : 'games'} to play.
-                </>
-              ) : (
-                <>
-                  Answer <strong>{gamesRemaining} more</strong>{' '}
-                  {gamesRemaining === 1 ? 'question' : 'questions'} to unlock
-                  them.
-                </>
-              )}
+              <strong>{gameList.length}</strong>{' '}
+              {gameList.length === 1 ? 'game' : 'games'} to play.
             </p>
             <Link
               href="/games/"
               className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50"
             >
               <Gamepad2 className="h-4 w-4" />
-              {gamesUnlocked ? 'Open the arcade' : 'Take a peek'}
+              Open the arcade
             </Link>
           </div>
         ) : null}

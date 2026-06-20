@@ -37,7 +37,6 @@ export type PackExam = {
 
 /** Optional reward mini-games declared by the pack. */
 export type PackGames = {
-  unlockAfter?: number;
   include?: string[];
 };
 
@@ -113,10 +112,6 @@ export const packExam = packManifest.exam;
 export const packGames = packManifest.games;
 /** Whether this pack ships the reward mini-games at all. */
 export const gamesEnabled = packGames !== undefined;
-/** Default answers-answered threshold before games unlock. */
-export const DEFAULT_GAMES_UNLOCK_AFTER = 25;
-/** Answers the learner must log before games unlock for this pack. */
-export const gamesUnlockAfter = packGames?.unlockAfter ?? DEFAULT_GAMES_UNLOCK_AFTER;
 
 export const packQuestions = questionsJson as PackQuestion[];
 
