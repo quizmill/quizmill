@@ -64,19 +64,30 @@ describe('wilsonInterval', () => {
   });
 });
 
-describe('computeReadiness — first-attempt only', () => {
-  it('ignores rescue re-asks, counting only the first time a question was seen', () => {
-    // One question, first wrong then rescued correct twice. Cold = wrong.
+describe('computeReadiness — latest cold look', () => {
+  it('ignores same-session rescue retries, keeping the first answer of the session', () => {
+    // One question, first wrong then rescued correct twice in the SAME
+    // session. The brute-forced retries don't count — cold = wrong.
     const attempts = [
-      attempt({ subject: 'alpha', questionId: 'alpha-x', isCorrect: false, answeredAt: NOON }),
-      attempt({ subject: 'alpha', questionId: 'alpha-x', isCorrect: true, answeredAt: NOON + 5000 }),
-      attempt({ subject: 'alpha', questionId: 'alpha-x', isCorrect: true, answeredAt: NOON + 9000 }),
+      attempt({ subject: 'alpha', questionId: 'alpha-x', sessionId: 's1', isCorrect: false, answeredAt: NOON }),
+      attempt({ subject: 'alpha', questionId: 'alpha-x', sessionId: 's1', isCorrect: true, answeredAt: NOON + 5000 }),
+      attempt({ subject: 'alpha', questionId: 'alpha-x', sessionId: 's1', isCorrect: true, answeredAt: NOON + 9000 }),
     ];
     const r = computeReadiness(GOAL, DOMAINS, attempts);
     const alpha = r.domains.find((d) => d.key === 'alpha')!;
-    expect(alpha.attempted).toBe(1);
-    expect(alpha.correct).toBe(0);
-    expect(alpha.accuracyPct).toBe(0);
+    expect(alpha).toMatchObject({ attempted: 1, correct: 0, accuracyPct: 0 });
+  });
+
+  it('updates to the most recent session, so re-learning a question later counts', () => {
+    // Missed cold in session 1, then got it right (first try) in a later
+    // session → the recent result wins.
+    const attempts = [
+      attempt({ subject: 'alpha', questionId: 'alpha-x', sessionId: 's1', isCorrect: false, answeredAt: NOON }),
+      attempt({ subject: 'alpha', questionId: 'alpha-x', sessionId: 's2', isCorrect: true, answeredAt: NOON + 86_400_000 }),
+    ];
+    const r = computeReadiness(GOAL, DOMAINS, attempts);
+    const alpha = r.domains.find((d) => d.key === 'alpha')!;
+    expect(alpha).toMatchObject({ attempted: 1, correct: 1, accuracyPct: 100 });
   });
 });
 

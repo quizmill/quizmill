@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
+import { Card } from '@/components/ui/Card';
 import { APP_CONFIG } from '@/config';
 import type { Attempt } from '@/data/types';
 import {
@@ -136,9 +137,10 @@ export default function ExamReadiness({ attempts }: { attempts: readonly Attempt
 
         {/* Honesty caveats */}
         <p className="text-[11px] leading-relaxed text-ink-400">
-          Estimate uses your <strong>first answer</strong> to each question (re-tries
-          after a miss don&apos;t count) across {report.judgedWeightPct}% of the exam
-          blueprint covered so far.{' '}
+          Estimate uses your <strong>most recent fresh answer</strong> to each question
+          (repeat tries within a Review session don&apos;t count, but re-answering it
+          right later does) across {report.judgedWeightPct}% of the exam blueprint
+          covered so far.{' '}
           {report.scaled
             ? 'This exam is scored on a scaled curve, so treat the pass mark as approximate. '
             : ''}
@@ -188,37 +190,32 @@ function ScoreGauge({ report, tone }: { report: ReadinessReport; tone: Tone }) {
 }
 
 /**
- * Compact Home-screen banner: verdict + estimate vs the pass mark, linking
- * to the full Progress breakdown. Hidden until there's a reading to show.
+ * Home-screen stat tile: a third tile alongside Answered / Accuracy showing
+ * the readiness estimate + verdict, linking to the full Progress breakdown.
+ * Renders nothing when the pack declares no exam goal — Home then keeps its
+ * existing two-up stats row untouched.
  */
-export function ExamReadinessChip({ attempts }: { attempts: readonly Attempt[] }) {
+export function ExamReadinessTile({ attempts }: { attempts: readonly Attempt[] }) {
   const report = readinessFor(attempts);
-  if (!report || report.judgedWeightPct === 0) return null;
+  if (!report) return null;
   const meta = VERDICT_META[report.verdict];
+  const hasReadings = report.judgedWeightPct > 0;
   return (
-    <Link
-      href="/progress"
-      data-testid="exam-readiness-chip"
-      className={cn(
-        'tap-feedback flex items-center justify-between gap-3 rounded-2xl border p-4 shadow-sm',
-        meta.banner,
-      )}
-    >
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-white/70 text-xl">
-          {meta.emoji}
+    <Link href="/progress" data-testid="exam-readiness-tile" className="tap-feedback group">
+      <Card className="h-full p-4 transition hover:border-brand-300 hover:shadow-md">
+        <div className="flex items-center justify-between text-sm font-medium uppercase tracking-wide text-ink-500">
+          Readiness
+          <ArrowRight className="h-3.5 w-3.5 text-ink-400 transition group-hover:text-brand-600" />
         </div>
-        <div className="min-w-0">
-          <div className="text-base font-semibold text-ink-900">
-            Exam readiness: {meta.label}
-          </div>
-          <div className="text-sm text-ink-600">
-            Estimated {report.estimatePct}% · pass mark {report.passPct}%
-            {report.scaled ? ' (scaled)' : ''}
-          </div>
+        <div
+          className={cn('mt-1 text-3xl font-bold', hasReadings ? meta.text : 'text-ink-400')}
+        >
+          {hasReadings ? `${report.estimatePct}%` : '—'}
         </div>
-      </div>
-      <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-500" />
+        <div className="mt-1 text-sm text-ink-500">
+          {hasReadings ? meta.short : 'keep going'}
+        </div>
+      </Card>
     </Link>
   );
 }
@@ -278,53 +275,53 @@ const DOMAIN_BG: Record<DomainReadiness['status'], string> = {
 
 interface VerdictMeta {
   label: string;
+  /** Terse verdict for the compact Home tile. */
+  short: string;
   emoji: string;
   tone: Tone;
   pill: string;
   text: string;
-  /** Tint for the compact Home banner. */
-  banner: string;
   blurb: (r: ReadinessReport, examName: string) => string;
 }
 
 const VERDICT_META: Record<ReadinessVerdict, VerdictMeta> = {
   ready: {
     label: 'On track to pass',
+    short: 'on track',
     emoji: '🎯',
     tone: 'success',
     pill: 'bg-success-100 text-success-700',
     text: 'text-success-600',
-    banner: 'border-success-500/30 bg-success-50',
     blurb: (r, name) =>
       `Your estimated score clears the ${r.passPct}% mark for ${name} even at the low end. Keep your streak warm.`,
   },
   borderline: {
     label: 'Right on the line',
+    short: 'on the line',
     emoji: '⚖️',
     tone: 'warn',
     pill: 'bg-warn-100 text-warn-700',
     text: 'text-warn-700',
-    banner: 'border-warn-500/30 bg-warn-50',
     blurb: (r) =>
       `You're hovering around the ${r.passPct}% pass mark — too close to call. Shore up the weak domains below to build a margin.`,
   },
   'not-ready': {
     label: 'Not ready yet',
+    short: 'not yet',
     emoji: '📚',
     tone: 'warn',
     pill: 'bg-warn-100 text-warn-700',
     text: 'text-warn-700',
-    banner: 'border-warn-500/30 bg-warn-50',
     blurb: (r) =>
       `Your estimate sits below the ${r.passPct}% pass mark. The focus areas below are where the points are.`,
   },
   'no-data': {
     label: 'Keep practising',
+    short: 'more data',
     emoji: '🌱',
     tone: 'brand',
     pill: 'bg-brand-100 text-brand-700',
     text: 'text-brand-600',
-    banner: 'border-brand-500/30 bg-brand-50',
     blurb: () =>
       `Not enough of the blueprint covered yet to estimate readiness. Spread your practice across the domains below.`,
   },

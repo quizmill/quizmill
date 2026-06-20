@@ -34,7 +34,7 @@ import {
   PACK_LEVEL_LABEL,
   PACK_LEVEL_BY_QUESTION_ID,
 } from '@/pack/data';
-import { ExamReadinessChip } from '@/pack/ExamReadiness';
+import { ExamReadinessTile } from '@/pack/ExamReadiness';
 
 /** Home screen for the generic pack variant — category cards + stats,
  *  all driven by the active pack's manifest. */
@@ -133,7 +133,9 @@ export default function PackHome() {
 
       <InstallBanner />
 
-      <section className="grid grid-cols-2 gap-3">
+      <section
+        className={cn('grid gap-3', APP_CONFIG.exam ? 'grid-cols-3' : 'grid-cols-2')}
+      >
         <StatTile
           label="Answered"
           value={totalAnswered}
@@ -152,9 +154,8 @@ export default function PackHome() {
               : `${totalCorrect}/${totalAnswered} correct`
           }
         />
+        <ExamReadinessTile attempts={attempts} />
       </section>
-
-      <ExamReadinessChip attempts={attempts} />
 
       {mistakeCount > 0 ? (
         <Link

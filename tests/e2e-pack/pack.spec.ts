@@ -520,15 +520,15 @@ describe('progress page', () => {
     expect(section).toContain('78%'); // blueprint-weighted estimate
     expect(section).toContain('pass 70%'); // gauge pass-line label
 
-    // The Home screen surfaces the compact readiness chip.
+    // The Home screen surfaces readiness as a third stat tile.
     await page.goto(baseUrl() + '/');
-    await page.waitForSelector('[data-testid="exam-readiness-chip"]');
-    const chip = await page.$eval(
-      '[data-testid="exam-readiness-chip"]',
+    await page.waitForSelector('[data-testid="exam-readiness-tile"]');
+    const tile = await page.$eval(
+      '[data-testid="exam-readiness-tile"]',
       (el) => el.textContent ?? '',
     );
-    expect(chip).toContain('Exam readiness');
-    expect(chip).toContain('70%');
+    expect(tile).toContain('Readiness');
+    expect(tile).toContain('78%'); // blueprint-weighted estimate
   });
 });
 
