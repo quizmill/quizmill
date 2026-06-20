@@ -190,10 +190,11 @@ function ScoreGauge({ report, tone }: { report: ReadinessReport; tone: Tone }) {
 }
 
 /**
- * Home-screen stat tile: a third tile alongside Answered / Accuracy showing
- * the readiness estimate + verdict, linking to the full Progress breakdown.
- * Renders nothing when the pack declares no exam goal — Home then keeps its
- * existing two-up stats row untouched.
+ * Home-screen stat tile (exam packs): the readiness estimate with the verdict
+ * as a coloured pill, linking to the full Progress breakdown. Replaces the
+ * plain accuracy tile for exam packs — same cold-look basis, so there aren't
+ * two near-identical percentages side by side. Renders nothing when the pack
+ * declares no exam goal.
  */
 export function ExamReadinessTile({ attempts }: { attempts: readonly Attempt[] }) {
   const report = readinessFor(attempts);
@@ -212,8 +213,16 @@ export function ExamReadinessTile({ attempts }: { attempts: readonly Attempt[] }
         >
           {hasReadings ? `${report.estimatePct}%` : '—'}
         </div>
-        <div className="mt-1 text-sm text-ink-500">
-          {hasReadings ? meta.short : 'keep going'}
+        <div className="mt-1.5">
+          <span
+            data-verdict={report.verdict}
+            className={cn(
+              'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold',
+              hasReadings ? meta.pill : 'bg-ink-100 text-ink-500',
+            )}
+          >
+            {hasReadings ? meta.label : 'keep going'}
+          </span>
         </div>
       </Card>
     </Link>
