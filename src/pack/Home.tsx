@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   ArrowRight,
   BarChart3,
+  Gamepad2,
   RefreshCw,
   Settings,
   TrendingDown,
@@ -22,6 +23,8 @@ import {
   saveLevelFilter,
   loadDismissedNudge,
   saveDismissedNudge,
+  loadGamesUnlockSeen,
+  saveGamesUnlockSeen,
 } from '@/lib/storage';
 import { levelNudge } from '@/lib/stats';
 import { cn } from '@/lib/cn';
@@ -33,6 +36,8 @@ import {
   PACK_CATEGORY_TONE,
   PACK_LEVEL_LABEL,
   PACK_LEVEL_BY_QUESTION_ID,
+  gamesEnabled,
+  gamesUnlockAfter,
 } from '@/pack/data';
 import { ExamReadinessTile } from '@/pack/ExamReadiness';
 
@@ -44,10 +49,18 @@ export default function PackHome() {
   // from localStorage after mount so SSR/first paint stay stable.
   const [level, setLevelState] = useState<string | null>(null);
   const [dismissedNudge, setDismissedNudge] = useState<string | null>(null);
+  // Default true so the unlock banner never flashes before we've read the
+  // pref on the client (SSR/first paint render it hidden).
+  const [gamesUnlockSeen, setGamesUnlockSeen] = useState(true);
   useEffect(() => {
     setLevelState(loadLevelFilter());
     setDismissedNudge(loadDismissedNudge());
+    setGamesUnlockSeen(loadGamesUnlockSeen());
   }, []);
+  const dismissGamesUnlock = () => {
+    setGamesUnlockSeen(true);
+    saveGamesUnlockSeen(true);
+  };
   const setLevel = (next: string | null) => {
     setLevelState(next);
     saveLevelFilter(next);
@@ -107,6 +120,15 @@ export default function PackHome() {
           <p className="mt-1 text-ink-500">{APP_CONFIG.homeSubtitle}</p>
         </div>
         <nav className="flex items-center gap-2">
+          {gamesEnabled ? (
+            <Link
+              href="/games"
+              aria-label="Games"
+              className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm"
+            >
+              <Gamepad2 className="h-4 w-4" />
+            </Link>
+          ) : null}
           <Link
             href="/progress"
             aria-label="Progress"
@@ -132,6 +154,39 @@ export default function PackHome() {
       </header>
 
       <InstallBanner />
+
+      {gamesEnabled && totalAnswered >= gamesUnlockAfter && !gamesUnlockSeen ? (
+        <div
+          data-testid="games-unlocked-banner"
+          className="flex items-center justify-between gap-3 rounded-2xl border border-brand-500/40 bg-brand-50 p-4 shadow-sm"
+        >
+          <Link
+            href="/games/"
+            onClick={dismissGamesUnlock}
+            className="tap-feedback flex min-w-0 items-center gap-3"
+          >
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-brand-700">
+              <Gamepad2 className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-base font-semibold text-ink-900">
+                🎮 Games unlocked!
+              </div>
+              <div className="text-sm text-ink-600">
+                You&apos;ve earned a break — tap to play.
+              </div>
+            </div>
+          </Link>
+          <button
+            type="button"
+            onClick={dismissGamesUnlock}
+            aria-label="Dismiss"
+            className="tap-feedback inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-ink-400 hover:text-ink-700"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
 
       <section
         className={cn('grid gap-3', APP_CONFIG.exam ? 'grid-cols-3' : 'grid-cols-2')}

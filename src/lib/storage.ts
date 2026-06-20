@@ -101,6 +101,9 @@ export interface PackPrefs {
   /** The last adaptive level nudge the user dismissed, as "from>to", so the
    *  same suggestion doesn't keep re-appearing. */
   dismissedNudge?: string;
+  /** Set once the learner has seen the "games unlocked!" celebration, so the
+   *  one-off banner doesn't re-appear on every Home visit afterwards. */
+  gamesUnlockSeen?: boolean;
 }
 
 export function loadPrefs(): PackPrefs {
@@ -128,6 +131,18 @@ export function saveDismissedNudge(key: string | null): void {
   const prefs = loadPrefs();
   if (key) prefs.dismissedNudge = key;
   else delete prefs.dismissedNudge;
+  writeJson(PREFS_KEY, prefs);
+}
+
+/** Whether the learner has already seen the one-off "games unlocked" banner. */
+export function loadGamesUnlockSeen(): boolean {
+  return loadPrefs().gamesUnlockSeen ?? false;
+}
+
+export function saveGamesUnlockSeen(seen: boolean): void {
+  const prefs = loadPrefs();
+  if (seen) prefs.gamesUnlockSeen = true;
+  else delete prefs.gamesUnlockSeen;
   writeJson(PREFS_KEY, prefs);
 }
 

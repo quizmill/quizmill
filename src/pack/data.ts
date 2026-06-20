@@ -35,6 +35,12 @@ export type PackExam = {
   scope?: { level: string };
 };
 
+/** Optional reward mini-games declared by the pack. */
+export type PackGames = {
+  unlockAfter?: number;
+  include?: string[];
+};
+
 /** Option keys, A–F (v2 allows 2–6 options; v1 packs use A–D). */
 export type OptionKey = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
@@ -50,6 +56,7 @@ export type PackManifest = {
   levelsLabel?: string;
   sources?: PackSource[];
   exam?: PackExam;
+  games?: PackGames;
 };
 
 export type PackScenario = {
@@ -101,6 +108,16 @@ export const packLevels = packManifest.levels ?? [];
 export const packSources = packManifest.sources ?? [];
 /** The pack's exam-readiness goal, if it declares one. */
 export const packExam = packManifest.exam;
+
+/** The pack's reward-games config, if it switches them on. */
+export const packGames = packManifest.games;
+/** Whether this pack ships the reward mini-games at all. */
+export const gamesEnabled = packGames !== undefined;
+/** Default answers-answered threshold before games unlock. */
+export const DEFAULT_GAMES_UNLOCK_AFTER = 25;
+/** Answers the learner must log before games unlock for this pack. */
+export const gamesUnlockAfter = packGames?.unlockAfter ?? DEFAULT_GAMES_UNLOCK_AFTER;
+
 export const packQuestions = questionsJson as PackQuestion[];
 
 /** Manifest level keys in ladder order (used by the adaptive level nudge). */

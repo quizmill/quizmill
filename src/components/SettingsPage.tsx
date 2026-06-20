@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { ArrowLeft, Gamepad2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { InstallCard } from '@/components/InstallPrompt';
 import { SyncSettings } from '@/components/SyncSettings';
@@ -11,7 +11,13 @@ import {
   useResetToday,
   useStorageData,
 } from '@/lib/useStorage';
-import { packSources } from '@/pack/data';
+import {
+  packSources,
+  packGames,
+  gamesEnabled,
+  gamesUnlockAfter,
+} from '@/pack/data';
+import { enabledGames } from '@/lib/games/registry';
 
 /**
  * Settings page:
@@ -32,6 +38,10 @@ export function SettingsPage({ extras }: SettingsPageProps) {
 
   const [pending, setPending] = useState<'today' | 'all' | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  const gameList = enabledGames(packGames?.include);
+  const gamesUnlocked = attempts.length >= gamesUnlockAfter;
+  const gamesRemaining = Math.max(0, gamesUnlockAfter - attempts.length);
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
@@ -133,9 +143,38 @@ export function SettingsPage({ extras }: SettingsPageProps) {
           </div>
         ) : null}
 
+        {gamesEnabled ? (
+          <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
+            <h2 className="text-lg font-semibold text-ink-900">Games</h2>
+            <p className="mt-1 text-sm text-ink-600">
+              A few quick games to enjoy between rounds of practice.
+            </p>
+            <p className="mt-2 text-sm text-ink-500">
+              {gamesUnlocked ? (
+                <>
+                  Unlocked — <strong>{gameList.length}</strong>{' '}
+                  {gameList.length === 1 ? 'game' : 'games'} to play.
+                </>
+              ) : (
+                <>
+                  Answer <strong>{gamesRemaining} more</strong>{' '}
+                  {gamesRemaining === 1 ? 'question' : 'questions'} to unlock.
+                </>
+              )}
+            </p>
+            <Link
+              href="/games/"
+              className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50"
+            >
+              <Gamepad2 className="h-4 w-4" />
+              {gamesUnlocked ? 'Open games' : 'View games'}
+            </Link>
+          </div>
+        ) : null}
+
         <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-ink-900">
-            Reset today's progress
+            Reset today&apos;s progress
           </h2>
           <p className="mt-1 text-sm text-ink-600">
             Removes only the sessions practised today.
@@ -203,8 +242,8 @@ export function SettingsPage({ extras }: SettingsPageProps) {
             </code>
           </div>
           <p className="mt-2 text-xs text-ink-500">
-            Updates fetch automatically when you're back online; you'll
-            see a banner offering to refresh.
+            Updates fetch automatically when you&apos;re back online;
+            you&apos;ll see a banner offering to refresh.
           </p>
         </div>
 

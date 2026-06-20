@@ -591,3 +591,50 @@ describe('service worker', () => {
     expect(state).toBe('activated');
   }, 30_000);
 });
+
+describe('reward mini-games', () => {
+  it('shows a Games entry on Home and a locked arcade before enough answers', async () => {
+    await waitForText(page, 'Solar System Practice');
+    // The pack opts into games, so the Home nav carries a Games link.
+    expect(await page.$('a[aria-label="Games"]')).not.toBeNull();
+
+    await page.goto(baseUrl() + '/games/');
+    await waitForText(page, 'Games are locked');
+    const body = await bodyText(page);
+    expect(body).toContain('to unlock');
+    expect(await page.$('[data-testid="games-progress-bar"]')).not.toBeNull();
+  });
+
+  it('unlocks the arcade after enough answers and plays a game', async () => {
+    // The demo pack unlocks games after 10 answers — seed 12.
+    await seedAttempts(
+      page,
+      Array.from({ length: 12 }, (_, i) => ({
+        questionId: `seed-q-${i}`,
+        subject: 'planets',
+        topic: `seed-q-${i}`,
+        isCorrect: true,
+        agoMs: 1000 + i,
+      })),
+    );
+    await page.goto(baseUrl() + '/games/');
+    await page.waitForSelector('[data-testid="games-grid"]');
+
+    // Open the sliding puzzle; the game shell + board should appear.
+    await page.click('[data-testid="game-card-tile-puzzle"]');
+    await page.waitForSelector('[data-testid="game-shell"]');
+    await page.waitForSelector('[data-testid="tile-puzzle-board"]');
+
+    // Close it again.
+    await page.click('button[aria-label="Close game"]');
+    await page.waitForFunction(
+      () => !document.querySelector('[data-testid="game-shell"]'),
+    );
+  });
+
+  it('surfaces a Games card in Settings', async () => {
+    await page.goto(baseUrl() + '/settings/');
+    await waitForText(page, 'quick games');
+    expect(await page.$('a[href="/games/"]')).not.toBeNull();
+  });
+});

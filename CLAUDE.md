@@ -36,8 +36,18 @@ webmanifest are generated from the manifest by `scripts/pack-assets.ts`
   runner.ts (pure session logic), data.ts (typed pack loader),
   StickersPage + achievements{,-engine}.ts (sticker cabinet; mastery
   stickers generated per pack category), ProgressPage (CSS-only charts
-  over `src/lib/stats.ts`), DownvoteBrowser (Settings extra).
+  over `src/lib/stats.ts`), DownvoteBrowser (Settings extra),
+  GamesPage + games/ (reward mini-games — see below).
   InstallPrompt (`src/components/`) covers Add-to-Home-Screen.
+- Reward mini-games (opt-in): a pack adds a `games` block to its manifest
+  (`{ unlockAfter?, include? }`, mirrors the optional `exam` block) and
+  the app unlocks a small arcade once `attempts.length >= unlockAfter`
+  (default 25). Registry `src/lib/games/registry.ts` (id ↔ `GAME_IDS` in
+  schema.ts), pure logic `src/lib/games/{snake,tilePuzzle,pong}.ts`,
+  components `src/pack/games/` (GameShell/HowToPlay/GameModal + 6 games),
+  route `/games`. Games are ephemeral (no storage, don't touch
+  stats/stickers); reachable from Home nav + a Settings card. Ported from
+  `~/code/personal/learning` (original engine code, not exam content).
 - Engine never imports question *shapes* — it sees only the
   denormalised `Attempt`/`Session` fields (`src/data/types.ts`).
 
