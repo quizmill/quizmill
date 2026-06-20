@@ -14,6 +14,10 @@ name: PR preview
 on:
   pull_request:
     branches: [main]
+    # Include label events so toggling `preview:stress-pack` rebuilds the
+    # preview on (or off) the large stress pack. `types` replaces the
+    # default set, so the usual three must be listed too.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions:
   contents: read
