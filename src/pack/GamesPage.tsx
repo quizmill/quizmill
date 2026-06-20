@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Gamepad2, Lock } from 'lucide-react';
 import { useStorageData } from '@/lib/useStorage';
-import { saveGamesUnlockSeen } from '@/lib/storage';
 import { enabledGames, type GameId } from '@/lib/games/registry';
 import { packGames, gamesUnlockAfter } from '@/pack/data';
 import { GameModal } from '@/pack/games/GameModal';
@@ -27,12 +26,6 @@ export default function GamesPage() {
 
   // The open game (null = the grid / lock screen is showing).
   const [active, setActive] = useState<GameId | null>(null);
-
-  // Once they've reached the arcade, the one-off "unlocked!" banner on Home
-  // has done its job — clear it so it doesn't re-appear.
-  useEffect(() => {
-    if (unlocked) saveGamesUnlockSeen(true);
-  }, [unlocked]);
 
   return (
     <main className="flex flex-col gap-6">

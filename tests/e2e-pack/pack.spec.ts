@@ -591,11 +591,27 @@ describe('service worker', () => {
 });
 
 describe('reward mini-games', () => {
-  it('shows a Games entry on Home and a locked arcade before enough answers', async () => {
+  it('keeps games OFF the Home page (no nav icon, no banner)', async () => {
     await waitForText(page, 'Solar System Practice');
-    // The pack opts into games, so the Home nav carries a Games link.
-    expect(await page.$('a[aria-label="Games"]')).not.toBeNull();
+    // Games are a hidden easter egg — nothing on Home advertises them.
+    expect(await page.$('a[aria-label="Games"]')).toBeNull();
+    expect(await page.$('[data-testid="games-unlocked-banner"]')).toBeNull();
+  });
 
+  it('hides the games behind the version-pill easter egg in Settings', async () => {
+    await page.goto(baseUrl() + '/settings/');
+    await page.waitForSelector('[data-testid="app-version"]');
+    // Not revealed until you tap the version pill enough times.
+    expect(await page.$('[data-testid="games-easter-egg"]')).toBeNull();
+
+    for (let i = 0; i < 7; i++) {
+      await page.click('[data-testid="app-version"]');
+    }
+    await page.waitForSelector('[data-testid="games-easter-egg"]');
+    expect(await page.$('a[href="/games/"]')).not.toBeNull();
+  });
+
+  it('shows a locked arcade with progress before enough answers', async () => {
     await page.goto(baseUrl() + '/games/');
     await waitForText(page, 'Games are locked');
     const body = await bodyText(page);
@@ -628,11 +644,5 @@ describe('reward mini-games', () => {
     await page.waitForFunction(
       () => !document.querySelector('[data-testid="game-shell"]'),
     );
-  });
-
-  it('surfaces a Games card in Settings', async () => {
-    await page.goto(baseUrl() + '/settings/');
-    await waitForText(page, 'quick games');
-    expect(await page.$('a[href="/games/"]')).not.toBeNull();
   });
 });

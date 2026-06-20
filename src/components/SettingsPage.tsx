@@ -19,12 +19,17 @@ import {
 } from '@/pack/data';
 import { enabledGames } from '@/lib/games/registry';
 
+/** Taps on the version pill that reveal the hidden games panel — the
+ *  Android-style "tap the build number" easter egg. Games are a treat, so
+ *  they're discovered, not advertised in the chrome. */
+const GAMES_REVEAL_TAPS = 7;
+
 /**
  * Settings page:
  *  - SyncSettings   — cloud sync sign-in (dormant unless configured)
  *  - Reset today    — remove just today's sessions
  *  - Reset all      — wipe local progress for the active pack
- *  - App version    — semver + build tag
+ *  - App version    — semver + build tag (tap it to reveal games)
  *  - `extras` slot  — e.g. the downvote browser
  */
 export interface SettingsPageProps {
@@ -39,6 +44,9 @@ export function SettingsPage({ extras }: SettingsPageProps) {
   const [pending, setPending] = useState<'today' | 'all' | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
+  // Hidden games easter egg — revealed by tapping the version pill.
+  const [versionTaps, setVersionTaps] = useState(0);
+  const gamesRevealed = gamesEnabled && versionTaps >= GAMES_REVEAL_TAPS;
   const gameList = enabledGames(packGames?.include);
   const gamesUnlocked = attempts.length >= gamesUnlockAfter;
   const gamesRemaining = Math.max(0, gamesUnlockAfter - attempts.length);
@@ -143,35 +151,6 @@ export function SettingsPage({ extras }: SettingsPageProps) {
           </div>
         ) : null}
 
-        {gamesEnabled ? (
-          <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-ink-900">Games</h2>
-            <p className="mt-1 text-sm text-ink-600">
-              A few quick games to enjoy between rounds of practice.
-            </p>
-            <p className="mt-2 text-sm text-ink-500">
-              {gamesUnlocked ? (
-                <>
-                  Unlocked — <strong>{gameList.length}</strong>{' '}
-                  {gameList.length === 1 ? 'game' : 'games'} to play.
-                </>
-              ) : (
-                <>
-                  Answer <strong>{gamesRemaining} more</strong>{' '}
-                  {gamesRemaining === 1 ? 'question' : 'questions'} to unlock.
-                </>
-              )}
-            </p>
-            <Link
-              href="/games/"
-              className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50"
-            >
-              <Gamepad2 className="h-4 w-4" />
-              {gamesUnlocked ? 'Open games' : 'View games'}
-            </Link>
-          </div>
-        ) : null}
-
         <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-ink-900">
             Reset today&apos;s progress
@@ -225,12 +204,15 @@ export function SettingsPage({ extras }: SettingsPageProps) {
         <div className="rounded-2xl border border-ink-200 bg-white p-5 text-sm text-ink-600 shadow-sm">
           <div className="flex items-center justify-between">
             <span>App version</span>
-            <code
+            <button
+              type="button"
               data-testid="app-version"
-              className="rounded bg-ink-100 px-2 py-0.5 font-mono text-xs text-ink-700"
+              aria-label="App version"
+              onClick={() => setVersionTaps((n) => n + 1)}
+              className="tap-feedback select-none rounded bg-ink-100 px-2 py-0.5 font-mono text-xs text-ink-700"
             >
               v{process.env.NEXT_PUBLIC_APP_VERSION ?? 'dev'}
-            </code>
+            </button>
           </div>
           <div className="mt-1 flex items-center justify-between text-xs text-ink-500">
             <span>Build</span>
@@ -246,6 +228,41 @@ export function SettingsPage({ extras }: SettingsPageProps) {
             you&apos;ll see a banner offering to refresh.
           </p>
         </div>
+
+        {gamesRevealed ? (
+          <div
+            data-testid="games-easter-egg"
+            className="rounded-2xl border border-brand-300 bg-brand-50 p-5 shadow-sm"
+          >
+            <h2 className="text-lg font-semibold text-ink-900">
+              🎮 You found the games!
+            </h2>
+            <p className="mt-1 text-sm text-ink-600">
+              A little arcade tucked away as a reward for practising.
+            </p>
+            <p className="mt-2 text-sm text-ink-500">
+              {gamesUnlocked ? (
+                <>
+                  Unlocked — <strong>{gameList.length}</strong>{' '}
+                  {gameList.length === 1 ? 'game' : 'games'} to play.
+                </>
+              ) : (
+                <>
+                  Answer <strong>{gamesRemaining} more</strong>{' '}
+                  {gamesRemaining === 1 ? 'question' : 'questions'} to unlock
+                  them.
+                </>
+              )}
+            </p>
+            <Link
+              href="/games/"
+              className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50"
+            >
+              <Gamepad2 className="h-4 w-4" />
+              {gamesUnlocked ? 'Open the arcade' : 'Take a peek'}
+            </Link>
+          </div>
+        ) : null}
 
         {extras}
       </section>

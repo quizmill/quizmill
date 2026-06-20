@@ -46,7 +46,9 @@ webmanifest are generated from the manifest by `scripts/pack-assets.ts`
   schema.ts), pure logic `src/lib/games/{snake,tilePuzzle,pong}.ts`,
   components `src/pack/games/` (GameShell/HowToPlay/GameModal + 6 games),
   route `/games`. Games are ephemeral (no storage, don't touch
-  stats/stickers); reachable from Home nav + a Settings card. Ported from
+  stats/stickers) and a deliberately HIDDEN easter egg — nothing on Home;
+  reached by tapping the version pill in Settings 7× (`GAMES_REVEAL_TAPS`),
+  which reveals a panel linking to `/games`. Ported from
   `~/code/personal/learning` (original engine code, not exam content).
 - Engine never imports question *shapes* — it sees only the
   denormalised `Attempt`/`Session` fields (`src/data/types.ts`).
