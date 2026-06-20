@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Attempt } from '@/data/types';
 import {
+  coldLookByCategory,
   computeReadiness,
   wilsonInterval,
   type ExamGoal,
@@ -149,12 +150,19 @@ describe('computeReadiness — verdict from the confidence band', () => {
     expect(r.verdict).toBe('not-ready');
   });
 
-  it('is borderline when the band straddles the pass line', () => {
+  it('is likely (on track) when the estimate clears the line but the band dips below', () => {
     const attempts = [...answers('alpha', 30, 21), ...answers('beta', 30, 21)];
     const r = computeReadiness(GOAL, DOMAINS, attempts);
-    expect(r.estimatePct).toBe(70);
-    expect(r.lowPct).toBeLessThan(GOAL.passPct);
-    expect(r.highPct).toBeGreaterThanOrEqual(GOAL.passPct);
+    expect(r.estimatePct).toBe(70); // estimate at/above pass
+    expect(r.lowPct).toBeLessThan(GOAL.passPct); // but lower band below it
+    expect(r.verdict).toBe('likely');
+  });
+
+  it('is borderline when the estimate is below the line but the band reaches above', () => {
+    const attempts = [...answers('alpha', 30, 20), ...answers('beta', 30, 20)];
+    const r = computeReadiness(GOAL, DOMAINS, attempts);
+    expect(r.estimatePct).toBeLessThan(GOAL.passPct); // estimate below pass
+    expect(r.highPct).toBeGreaterThanOrEqual(GOAL.passPct); // band still reaches above
     expect(r.verdict).toBe('borderline');
   });
 });
@@ -218,5 +226,42 @@ describe('computeReadiness — scope filter', () => {
     const alpha = r.domains.find((d) => d.key === 'alpha')!;
     expect(alpha.attempted).toBe(10);
     expect(alpha.correct).toBe(10);
+  });
+});
+
+describe('coldLookByCategory', () => {
+  const CATS = [
+    { key: 'alpha', label: 'Alpha', available: 50 },
+    { key: 'beta', label: 'Beta', available: 20 },
+  ];
+
+  it('reports cold-look accuracy + coverage per category, zeroed when untested', () => {
+    const [alpha, beta] = coldLookByCategory(answers('alpha', 10, 8), CATS);
+    expect(alpha).toMatchObject({
+      attempted: 10,
+      correct: 8,
+      accuracyPct: 80,
+      coveragePct: 20, // 10 of 50
+    });
+    expect(beta).toMatchObject({ attempted: 0, accuracyPct: 0, coveragePct: 0 });
+  });
+
+  it('ignores same-session rescue retries (uses the first answer of the session)', () => {
+    const attempts = [
+      attempt({ subject: 'alpha', questionId: 'alpha-x', sessionId: 's1', isCorrect: false, answeredAt: NOON }),
+      attempt({ subject: 'alpha', questionId: 'alpha-x', sessionId: 's1', isCorrect: true, answeredAt: NOON + 5000 }),
+    ];
+    expect(coldLookByCategory(attempts, CATS)[0]).toMatchObject({
+      attempted: 1,
+      correct: 0,
+      accuracyPct: 0,
+    });
+  });
+
+  it('respects the inScope filter', () => {
+    const inScope = (id: string) => Number(id.split('-')[1]) < 4; // only alpha-0..3
+    const [alpha] = coldLookByCategory(answers('alpha', 10, 10), CATS, { inScope });
+    expect(alpha.attempted).toBe(4);
+    expect(alpha.coveragePct).toBe(8); // 4 of 50
   });
 });

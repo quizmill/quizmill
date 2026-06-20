@@ -137,10 +137,10 @@ export default function ExamReadiness({ attempts }: { attempts: readonly Attempt
 
         {/* Honesty caveats */}
         <p className="text-[11px] leading-relaxed text-ink-400">
-          Estimate uses your <strong>most recent fresh answer</strong> to each question
-          (repeat tries within a Review session don&apos;t count, but re-answering it
-          right later does) across {report.judgedWeightPct}% of the exam blueprint
-          covered so far.{' '}
+          Estimate uses your <strong>most recent fresh answer</strong>{' '}
+          to each question (repeat tries within a Review session don&apos;t count,
+          but re-answering it right later does) across {report.judgedWeightPct}% of
+          the exam blueprint covered so far.{' '}
           {report.scaled
             ? 'This exam is scored on a scaled curve, so treat the pass mark as approximate. '
             : ''}
@@ -286,14 +286,24 @@ interface VerdictMeta {
 
 const VERDICT_META: Record<ReadinessVerdict, VerdictMeta> = {
   ready: {
-    label: 'On track to pass',
-    short: 'on track',
+    label: 'Ready to pass',
+    short: 'ready',
     emoji: '🎯',
     tone: 'success',
     pill: 'bg-success-100 text-success-700',
     text: 'text-success-600',
     blurb: (r, name) =>
-      `Your estimated score clears the ${r.passPct}% mark for ${name} even at the low end. Keep your streak warm.`,
+      `Your estimated score clears the ${r.passPct}% mark for ${name} even at the low end of the range. Keep your streak warm.`,
+  },
+  likely: {
+    label: 'On track',
+    short: 'on track',
+    emoji: '📈',
+    tone: 'brand',
+    pill: 'bg-brand-100 text-brand-700',
+    text: 'text-brand-600',
+    blurb: (r) =>
+      `Your estimate clears the ${r.passPct}% pass mark, but the range still dips below it — a bit more practice in the focus areas below locks it in.`,
   },
   borderline: {
     label: 'Right on the line',

@@ -435,7 +435,7 @@ describe('progress page', () => {
     await waitForText(page, 'No practice yet');
   });
 
-  it('renders category accuracy, the daily streak, and weak spots from history', async () => {
+  it('renders sessions, the daily streak, and weak spots from history', async () => {
     // Seeded session completed ~24h ago → a 1-day streak; the twice-wrong
     // question should surface as the top weak spot.
     await seedAttempts(page, [
@@ -445,7 +445,7 @@ describe('progress page', () => {
       { questionId: 'demo-planets-003', subject: 'planets', topic: 'demo-planets-003', isCorrect: true, agoMs: 30_000 },
     ]);
     await page.goto(baseUrl() + '/progress/');
-    await waitForText(page, 'Accuracy by category');
+    await page.waitForSelector('[data-testid="session-summary"]');
 
     // Session dashboard: the seed wrote one completed 60s session of 4
     // questions, so the tiles read 1 / 1m / 4 and exactly one weekday
@@ -472,12 +472,10 @@ describe('progress page', () => {
     );
     expect(streak).toContain('1-day streak');
 
-    const planets = await page.$eval(
-      '[data-testid="category-accuracy-planets"]',
-      (el) => el.textContent ?? '',
-    );
-    expect(planets).toContain('50%');
-    expect(planets).toContain('2/4');
+    // The demo declares an exam goal, so the standalone "By category" view
+    // is hidden — per-category accuracy lives in the Exam-readiness section
+    // (asserted in the readiness spec below), on the same cold-look metric.
+    expect(await page.$('[data-testid="category-accuracy-planets"]')).toBeNull();
 
     const body = await bodyText(page);
     expect(body).toContain('Weak spots');
@@ -487,8 +485,8 @@ describe('progress page', () => {
   it('estimates exam readiness once enough of the blueprint is covered', async () => {
     // The demo manifest declares an exam goal (70% pass). Cover both
     // domains with first attempts: planets 8/10, exploration 3/4. The
-    // blueprint-weighted estimate is 78% with a band straddling the pass
-    // line → a deterministic "borderline" verdict.
+    // blueprint-weighted estimate is 78% — above the line, but the band's
+    // low end dips below → a deterministic "likely" (on track) verdict.
     const planets = Array.from({ length: 10 }, (_, i) => ({
       questionId: `rp-${i}`, subject: 'planets', topic: `rp-${i}`,
       isCorrect: i < 8, agoMs: 60_000 - i * 100,
@@ -505,7 +503,7 @@ describe('progress page', () => {
       '[data-testid="readiness-verdict"]',
       (el) => el.getAttribute('data-verdict'),
     );
-    expect(verdict).toBe('borderline');
+    expect(verdict).toBe('likely');
 
     // Both domains get a readiness row, and the headline shows the estimate.
     expect(await page.$('[data-testid="readiness-domain-planets"]')).not.toBeNull();
