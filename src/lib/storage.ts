@@ -101,9 +101,6 @@ export interface PackPrefs {
   /** The last adaptive level nudge the user dismissed, as "from>to", so the
    *  same suggestion doesn't keep re-appearing. */
   dismissedNudge?: string;
-  /** Cumulative reward-games played — spent against the plays earned by
-   *  practising (every N correct answers earns one). */
-  gamesPlayed?: number;
 }
 
 export function loadPrefs(): PackPrefs {
@@ -132,21 +129,6 @@ export function saveDismissedNudge(key: string | null): void {
   if (key) prefs.dismissedNudge = key;
   else delete prefs.dismissedNudge;
   writeJson(PREFS_KEY, prefs);
-}
-
-/** Cumulative reward-games played — spent against plays earned by
- *  practising (every N correct answers earns one). */
-export function loadGamesPlayed(): number {
-  return loadPrefs().gamesPlayed ?? 0;
-}
-
-/** Record one game play and return the new cumulative total. */
-export function recordGamePlay(): number {
-  const prefs = loadPrefs();
-  const count = (prefs.gamesPlayed ?? 0) + 1;
-  prefs.gamesPlayed = count;
-  writeJson(PREFS_KEY, prefs);
-  return count;
 }
 
 // ---- scratchpad (local-only working notes; deliberately not synced) ----

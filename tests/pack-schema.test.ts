@@ -362,22 +362,6 @@ describe('validatePack', () => {
     expect(validatePack(input).ok).toBe(true);
   });
 
-  it('accepts a games block with an earn rate', () => {
-    const input = loadDemo();
-    (input.manifest as { games?: unknown }).games = { earnEvery: 20 };
-    expect(validatePack(input).ok).toBe(true);
-    (input.manifest as { games?: unknown }).games = { earnEvery: 0 }; // always free
-    expect(validatePack(input).ok).toBe(true);
-  });
-
-  it('rejects a negative or non-integer earnEvery', () => {
-    const input = loadDemo();
-    (input.manifest as { games?: unknown }).games = { earnEvery: -1 };
-    expect(validatePack(input).ok).toBe(false);
-    (input.manifest as { games?: unknown }).games = { earnEvery: 2.5 };
-    expect(validatePack(input).ok).toBe(false);
-  });
-
   it('rejects an unknown game id in include', () => {
     const input = loadDemo();
     (input.manifest as { games?: unknown }).games = { include: ['snake', 'chess'] };

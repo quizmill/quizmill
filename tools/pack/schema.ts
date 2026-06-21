@@ -114,14 +114,10 @@ export const gameIdSchema = z.enum(GAME_IDS);
 /**
  * Optional reward mini-games (additive; valid for v1 and v2 packs). When
  * present, the app offers a small arcade of break-time games as a hidden
- * treat (found via the version-pill easter egg in Settings). Absent → no
- * games anywhere, exactly as today.
+ * treat — found via the version-pill easter egg in Settings, then free to
+ * play. Absent → no games anywhere, exactly as today.
  */
 export const packGamesSchema = z.object({
-  /** Correct answers a learner must log to earn one game play — games are
-   *  earned by practising, then spent. Default 10 (≈ one good session per
-   *  game). 0 means always free (no earning needed, e.g. a public demo). */
-  earnEvery: z.number().int().min(0).max(1000).optional(),
   /** Restrict to a subset of the built-in games (by id). Omit → all of
    *  them. Use to give a serious-exam pack a smaller, calmer set. */
   include: z.array(gameIdSchema).min(1).max(GAME_IDS.length).optional(),
