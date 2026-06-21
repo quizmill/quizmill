@@ -362,6 +362,22 @@ describe('validatePack', () => {
     expect(validatePack(input).ok).toBe(true);
   });
 
+  it('accepts a games block with a daily play cap', () => {
+    const input = loadDemo();
+    (input.manifest as { games?: unknown }).games = { dailyLimit: 3 };
+    expect(validatePack(input).ok).toBe(true);
+    (input.manifest as { games?: unknown }).games = { dailyLimit: 0 }; // unlimited
+    expect(validatePack(input).ok).toBe(true);
+  });
+
+  it('rejects a negative or non-integer dailyLimit', () => {
+    const input = loadDemo();
+    (input.manifest as { games?: unknown }).games = { dailyLimit: -1 };
+    expect(validatePack(input).ok).toBe(false);
+    (input.manifest as { games?: unknown }).games = { dailyLimit: 2.5 };
+    expect(validatePack(input).ok).toBe(false);
+  });
+
   it('rejects an unknown game id in include', () => {
     const input = loadDemo();
     (input.manifest as { games?: unknown }).games = { include: ['snake', 'chess'] };

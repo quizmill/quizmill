@@ -624,5 +624,14 @@ describe('reward mini-games', () => {
     await page.waitForFunction(
       () => !document.querySelector('[data-testid="game-shell"]'),
     );
+
+    // The daily play cap (default: 1 game) now blocks a second game until
+    // tomorrow — the grid is replaced by the "come back tomorrow" card.
+    await page.waitForSelector('[data-testid="games-capped"]');
+    expect(await page.$('[data-testid="games-grid"]')).toBeNull();
+
+    // And it sticks across a reload (persisted, not just in-memory).
+    await page.reload();
+    await page.waitForSelector('[data-testid="games-capped"]');
   });
 });

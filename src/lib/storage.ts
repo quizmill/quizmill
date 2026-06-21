@@ -101,6 +101,9 @@ export interface PackPrefs {
   /** The last adaptive level nudge the user dismissed, as "from>to", so the
    *  same suggestion doesn't keep re-appearing. */
   dismissedNudge?: string;
+  /** Reward-games play cap tally: how many games played on `day`
+   *  (start-of-day epoch). Resets implicitly when the day rolls over. */
+  gamePlays?: { day: number; count: number };
 }
 
 export function loadPrefs(): PackPrefs {
@@ -129,6 +132,25 @@ export function saveDismissedNudge(key: string | null): void {
   if (key) prefs.dismissedNudge = key;
   else delete prefs.dismissedNudge;
   writeJson(PREFS_KEY, prefs);
+}
+
+/** Reward-games played so far today (for the daily play cap). Yesterday's
+ *  tally reads as 0 — the cap resets at local midnight. */
+export function loadGamePlaysToday(now: Date = new Date()): number {
+  const gp = loadPrefs().gamePlays;
+  if (!gp) return 0;
+  return gp.day === startOfTodayEpoch(now) ? gp.count : 0;
+}
+
+/** Record one game play and return the new today-count. */
+export function recordGamePlay(now: Date = new Date()): number {
+  const prefs = loadPrefs();
+  const day = startOfTodayEpoch(now);
+  const prior = prefs.gamePlays && prefs.gamePlays.day === day ? prefs.gamePlays.count : 0;
+  const count = prior + 1;
+  prefs.gamePlays = { day, count };
+  writeJson(PREFS_KEY, prefs);
+  return count;
 }
 
 // ---- scratchpad (local-only working notes; deliberately not synced) ----

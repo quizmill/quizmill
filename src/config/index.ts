@@ -39,6 +39,8 @@ export interface ExamConfig {
 /** Optional reward mini-games, mirrored from the manifest `games` block.
  *  Absent → no games anywhere. */
 export interface GamesConfig {
+  /** Games a learner may play per day (default 1; 0 = unlimited). */
+  dailyLimit?: number;
   /** Restrict to a subset of the built-in games (by id). Omit → all. */
   include?: string[];
 }

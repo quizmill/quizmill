@@ -118,6 +118,10 @@ export const gameIdSchema = z.enum(GAME_IDS);
  * games anywhere, exactly as today.
  */
 export const packGamesSchema = z.object({
+  /** How many games a learner may play per day — the play cap. Defaults to
+   *  1 (games are a treat, not a time sink); resets at local midnight. Set
+   *  0 for unlimited (e.g. a public demo). */
+  dailyLimit: z.number().int().min(0).max(50).optional(),
   /** Restrict to a subset of the built-in games (by id). Omit → all of
    *  them. Use to give a serious-exam pack a smaller, calmer set. */
   include: z.array(gameIdSchema).min(1).max(GAME_IDS.length).optional(),

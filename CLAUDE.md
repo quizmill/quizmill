@@ -40,8 +40,10 @@ webmanifest are generated from the manifest by `scripts/pack-assets.ts`
   GamesPage + games/ (reward mini-games — see below).
   InstallPrompt (`src/components/`) covers Add-to-Home-Screen.
 - Reward mini-games (opt-in): a pack adds a `games` block to its manifest
-  (`{ include? }`, mirrors the optional `exam` block — presence enables;
-  `include` narrows the set). Registry `src/lib/games/registry.ts` (id ↔
+  (`{ dailyLimit?, include? }`, mirrors the optional `exam` block —
+  presence enables; `include` narrows the set; `dailyLimit` caps plays per
+  day, default 1, 0 = unlimited — tallied in prefs `gamePlays`, resets at
+  local midnight). Registry `src/lib/games/registry.ts` (id ↔
   `GAME_IDS` in schema.ts), pure logic `src/lib/games/{snake,tilePuzzle,
   pong}.ts`, components `src/pack/games/` (GameShell/HowToPlay/GameModal +
   6 games), route `/games`. Games are ephemeral (no storage, don't touch
