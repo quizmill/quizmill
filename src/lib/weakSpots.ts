@@ -49,13 +49,38 @@ export interface WeakSpotOptions {
   maxAccuracyPct?: number;
   /** A question needs at least this many attempts to be judged shaky. */
   minQuestionAttempts?: number;
+  /** A current run of this many correct answers clears the shaky flag,
+   *  regardless of all-time accuracy. */
+  masteryStreak?: number;
 }
 
 const DEFAULTS = {
   minCategoryAttempts: 4,
   maxAccuracyPct: 70,
   minQuestionAttempts: 2,
+  masteryStreak: 2,
 };
+
+/**
+ * Question ids the learner has recently shown they know: the *current*
+ * trailing run of correct answers is at least `streak` long. Such a
+ * question is treated as cleared even when its all-time accuracy is still
+ * low — so one old mistake can't keep it on the weak-spots list after
+ * you've answered it correctly a couple of times in a row.
+ */
+export function masteredQuestionIds(
+  attempts: readonly Attempt[],
+  streak: number = DEFAULTS.masteryStreak,
+): Set<string> {
+  const sorted = [...attempts].sort((a, b) => a.answeredAt - b.answeredAt);
+  const run = new Map<string, number>();
+  for (const a of sorted) {
+    run.set(a.questionId, a.isCorrect ? (run.get(a.questionId) ?? 0) + 1 : 0);
+  }
+  const out = new Set<string>();
+  for (const [id, n] of run) if (n >= streak) out.add(id);
+  return out;
+}
 
 /**
  * Categories whose overall accuracy is weak (enough attempts, low hit
@@ -119,9 +144,14 @@ export function buildWeakSpotPool<Q extends WeakSpotQuestion>(
   // 2. Starred — the learner's own intent signal.
   for (const id of starredIds) add(id, 'starred');
 
-  // 3a. Individually shaky questions you've seen but not mastered.
+  // 3a. Individually shaky questions you've seen but not mastered. A
+  // current correct-streak clears the flag even if the all-time average
+  // is still dragged down by an early mistake.
+  const mastered = masteredQuestionIds(attempts, opts.masteryStreak);
   for (const w of weakestQuestions(attempts, opts.minQuestionAttempts)) {
-    if (w.accuracyPct <= opts.maxAccuracyPct) add(w.questionId, 'shaky');
+    if (w.accuracyPct <= opts.maxAccuracyPct && !mastered.has(w.questionId)) {
+      add(w.questionId, 'shaky');
+    }
   }
 
   // 3b. Broaden: fresh (unseen) questions in weak categories.

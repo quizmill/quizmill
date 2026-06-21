@@ -12,6 +12,7 @@ import {
   TrendingUp,
   Trophy,
   X,
+  type LucideIcon,
 } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
 import { StatTile } from '@/components/StatTile';
@@ -117,45 +118,30 @@ export default function PackHome() {
 
   return (
     <main className="flex flex-col gap-6">
-      <header className="flex items-end justify-between gap-2">
-        <div>
-          <h1 className="text-3xl font-bold text-ink-900">{APP_CONFIG.title}</h1>
-          <p className="mt-1 text-ink-500">{APP_CONFIG.homeSubtitle}</p>
-        </div>
-        <nav className="flex items-center gap-2">
-          <Link
-            href="/progress"
-            aria-label="Progress"
-            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm"
-          >
-            <BarChart3 className="h-4 w-4" />
-          </Link>
-          <Link
-            href="/starred"
-            aria-label="Starred questions"
-            className="tap-feedback relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm"
-          >
-            <Star className={cn('h-4 w-4', starredCount > 0 && 'fill-brand-500 text-brand-500')} />
-            {starredCount > 0 ? (
-              <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-brand-500 px-1 text-[10px] font-bold text-white">
-                {starredCount}
-              </span>
-            ) : null}
-          </Link>
-          <Link
-            href="/stickers"
-            aria-label="Sticker cabinet"
-            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm"
-          >
-            <Trophy className="h-4 w-4" />
-          </Link>
+      <header className="flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-3xl font-bold text-ink-900">{APP_CONFIG.title}</h1>
+            <p className="mt-1 text-ink-500">{APP_CONFIG.homeSubtitle}</p>
+          </div>
           <Link
             href="/settings"
             aria-label="Settings"
-            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm"
+            className="tap-feedback inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm hover:border-ink-300 hover:text-ink-900"
           >
             <Settings className="h-4 w-4" />
           </Link>
+        </div>
+        <nav className="flex flex-wrap gap-2">
+          <NavPill href="/progress" icon={BarChart3} label="Progress" />
+          <NavPill
+            href="/starred"
+            icon={Star}
+            label="Starred"
+            count={starredCount}
+            iconClassName={cn(starredCount > 0 && 'fill-brand-500 text-brand-500')}
+          />
+          <NavPill href="/stickers" icon={Trophy} label="Stickers" />
         </nav>
       </header>
 
@@ -361,5 +347,37 @@ export default function PackHome() {
         </div>
       </section>
     </main>
+  );
+}
+
+/** A labelled nav destination — icon + text, with an optional count badge.
+ *  Sits in the wrapping home nav row, so it stays readable and never
+ *  overflows the way a tight cluster of icon-only buttons did. */
+function NavPill({
+  href,
+  icon: Icon,
+  label,
+  count,
+  iconClassName,
+}: {
+  href: string;
+  icon: LucideIcon;
+  label: string;
+  count?: number;
+  iconClassName?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="tap-feedback inline-flex h-10 items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-700 shadow-sm hover:border-ink-300 hover:text-ink-900"
+    >
+      <Icon className={cn('h-4 w-4', iconClassName)} />
+      <span>{label}</span>
+      {count && count > 0 ? (
+        <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-brand-500 px-1 text-[10px] font-bold text-white">
+          {count}
+        </span>
+      ) : null}
+    </Link>
   );
 }
