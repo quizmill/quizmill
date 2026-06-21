@@ -7,6 +7,7 @@ import {
   BarChart3,
   RefreshCw,
   Settings,
+  Star,
   TrendingDown,
   TrendingUp,
   Trophy,
@@ -15,7 +16,7 @@ import {
 import { APP_CONFIG } from '@/config';
 import { StatTile } from '@/components/StatTile';
 import { InstallBanner } from '@/components/InstallPrompt';
-import { useStorageData } from '@/lib/useStorage';
+import { useStorageData, useStarredQuestions } from '@/lib/useStorage';
 import { unresolvedMistakeCount } from '@/lib/mistakes';
 import {
   loadLevelFilter,
@@ -40,6 +41,8 @@ import { ExamReadinessTile } from '@/pack/ExamReadiness';
  *  all driven by the active pack's manifest. */
 export default function PackHome() {
   const { attempts } = useStorageData();
+  const { stars } = useStarredQuestions();
+  const starredCount = stars.size;
   // Active level-band filter (a manifest level key) or null = All. Read
   // from localStorage after mount so SSR/first paint stay stable.
   const [level, setLevelState] = useState<string | null>(null);
@@ -115,6 +118,18 @@ export default function PackHome() {
             <BarChart3 className="h-4 w-4" />
           </Link>
           <Link
+            href="/starred"
+            aria-label="Starred questions"
+            className="tap-feedback relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm"
+          >
+            <Star className={cn('h-4 w-4', starredCount > 0 && 'fill-brand-500 text-brand-500')} />
+            {starredCount > 0 ? (
+              <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-brand-500 px-1 text-[10px] font-bold text-white">
+                {starredCount}
+              </span>
+            ) : null}
+          </Link>
+          <Link
             href="/stickers"
             aria-label="Sticker cabinet"
             className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm"
@@ -177,6 +192,29 @@ export default function PackHome() {
               </div>
               <div className="text-sm text-ink-600">
                 Retry the questions you got wrong.
+              </div>
+            </div>
+          </div>
+          <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-500" />
+        </Link>
+      ) : null}
+
+      {starredCount > 0 ? (
+        <Link
+          href="/starred"
+          className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-brand-500/40 bg-brand-50 p-4 shadow-sm"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-brand-700">
+              <Star className="h-5 w-5 fill-current" />
+            </div>
+            <div>
+              <div className="text-base font-semibold text-ink-900">
+                {starredCount} starred{' '}
+                {starredCount === 1 ? 'question' : 'questions'}
+              </div>
+              <div className="text-sm text-ink-600">
+                Review the material and practise follow-ups.
               </div>
             </div>
           </div>

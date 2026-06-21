@@ -26,6 +26,36 @@ export function bankForCategory(
   return questions.filter((q) => q.categoryKey === categoryKey);
 }
 
+/**
+ * Build the follow-up bank for a set of starred questions: every question
+ * that shares a *topic* with at least one starred question. A topic is any
+ * of a question's `conceptId`, `categoryKey`, or `tags` — so follow-up
+ * practice reinforces the same material from new angles, not just the exact
+ * questions starred. The starred questions themselves are included (they're
+ * fair game to re-ask). Order follows the source bank.
+ */
+export function relatedTopicBank(
+  questions: PackQuestion[],
+  starredIds: ReadonlySet<string>,
+): PackQuestion[] {
+  if (starredIds.size === 0) return [];
+  const concepts = new Set<string>();
+  const categories = new Set<string>();
+  const tags = new Set<string>();
+  for (const q of questions) {
+    if (!starredIds.has(q.id)) continue;
+    if (q.conceptId) concepts.add(q.conceptId);
+    categories.add(q.categoryKey);
+    for (const t of q.tags ?? []) tags.add(t);
+  }
+  return questions.filter((q) => {
+    if (starredIds.has(q.id)) return true;
+    if (q.conceptId && concepts.has(q.conceptId)) return true;
+    if (categories.has(q.categoryKey)) return true;
+    return (q.tags ?? []).some((t) => tags.has(t));
+  });
+}
+
 /** Restrict a bank to one level band. A null/undefined level (the "All"
  *  filter, or a pack with no levels) returns the bank unchanged. */
 export function filterByLevel(

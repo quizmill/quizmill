@@ -21,6 +21,7 @@ export const SESSIONS_KEY = `${KEY_PREFIX}sessions.v1`;
 export const ATTEMPTS_KEY = `${KEY_PREFIX}attempts.v1`;
 const ACHIEVEMENTS_KEY = `${KEY_PREFIX}achievements.v1`;
 const VOTES_KEY = `${KEY_PREFIX}votes.v1`;
+const STARS_KEY = `${KEY_PREFIX}stars.v1`;
 const PREFS_KEY = `${KEY_PREFIX}prefs.v1`;
 const SCRATCHPAD_KEY = `${KEY_PREFIX}scratchpad.v1`;
 
@@ -32,6 +33,16 @@ export interface QuestionVote {
   /** Optional reason — only ever set for downvotes. */
   comment?: string;
   votedAt: number; // unix ms
+}
+
+/**
+ * A question the learner flagged ("starred") to come back to — the seed
+ * for the dedicated review-and-refine flow (study the material around it,
+ * then practise follow-up questions on the same topics).
+ */
+export interface StarredQuestion {
+  questionId: string;
+  starredAt: number; // unix ms
 }
 
 export interface EarnedAchievement {
@@ -56,6 +67,8 @@ export type Mutation =
   | { table: 'achievements'; row: EarnedAchievement }
   | { table: 'votes'; row: QuestionVote }
   | { table: 'votes'; op: 'delete'; questionId: string }
+  | { table: 'stars'; row: StarredQuestion }
+  | { table: 'stars'; op: 'delete'; questionId: string }
   | { table: 'clear-all' }
   | { table: 'clear-sessions'; op: 'delete'; sessionIds: string[] };
 
@@ -332,6 +345,48 @@ export function getVote(questionId: string): QuestionVote | undefined {
   return loadVotes().find((v) => v.questionId === questionId);
 }
 
+// ---- starred questions ----
+
+export function loadStars(): StarredQuestion[] {
+  return readJson<StarredQuestion[]>(STARS_KEY, []);
+}
+
+export function saveStars(stars: StarredQuestion[]): void {
+  writeJson(STARS_KEY, stars);
+}
+
+export function isStarred(questionId: string): boolean {
+  return loadStars().some((s) => s.questionId === questionId);
+}
+
+/**
+ * Star or unstar a question. Starring an already-starred question is a
+ * no-op (the original `starredAt` is preserved); unstarring one that
+ * isn't starred is a no-op too. Emits a mutation either way so the cloud
+ * mirror stays in step.
+ */
+export function setStar(
+  questionId: string,
+  starred: boolean,
+  now: number = Date.now(),
+): void {
+  const all = loadStars();
+  const idx = all.findIndex((s) => s.questionId === questionId);
+  if (!starred) {
+    if (idx >= 0) {
+      all.splice(idx, 1);
+      saveStars(all);
+      notify({ table: 'stars', op: 'delete', questionId });
+    }
+    return;
+  }
+  if (idx >= 0) return; // already starred — keep the original time
+  const entry: StarredQuestion = { questionId, starredAt: now };
+  all.push(entry);
+  saveStars(all);
+  notify({ table: 'stars', row: entry });
+}
+
 // ---- bulk ops ----
 
 /**
@@ -344,6 +399,7 @@ export function clearAll(): void {
   window.localStorage.removeItem(ATTEMPTS_KEY);
   window.localStorage.removeItem(ACHIEVEMENTS_KEY);
   window.localStorage.removeItem(VOTES_KEY);
+  window.localStorage.removeItem(STARS_KEY);
   window.localStorage.removeItem(PREFS_KEY);
   window.localStorage.removeItem(SCRATCHPAD_KEY);
   notify({ table: 'clear-all' });
@@ -394,6 +450,7 @@ export function mergeRemote(remote: {
   attempts?: Attempt[];
   achievements?: EarnedAchievement[];
   votes?: QuestionVote[];
+  stars?: StarredQuestion[];
 }): boolean {
   if (!browser()) return false;
   let changed = false;
@@ -456,6 +513,24 @@ export function mergeRemote(remote: {
     }
     if (votesChanged) {
       saveVotes([...byQ.values()]);
+      changed = true;
+    }
+  }
+
+  if (remote.stars?.length) {
+    const byQ = new Map(loadStars().map((s) => [s.questionId, s]));
+    let starsChanged = false;
+    for (const r of remote.stars) {
+      const local = byQ.get(r.questionId);
+      // A star is an existence record; keep the earliest time so the
+      // "starred since" reading is stable across devices.
+      if (!local || r.starredAt < local.starredAt) {
+        byQ.set(r.questionId, r);
+        starsChanged = true;
+      }
+    }
+    if (starsChanged) {
+      saveStars([...byQ.values()]);
       changed = true;
     }
   }

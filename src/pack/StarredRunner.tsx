@@ -1,15 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, RefreshCw, Home } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { RefreshCw, Home } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 import {
   useRecordAttempt,
   useStartSession,
   useEndSession,
-  useStorageData,
 } from '@/lib/useStorage';
 import { VoteRow } from '@/components/VoteRow';
 import { StarButton } from '@/components/StarButton';
@@ -22,25 +20,20 @@ import { ConceptCard } from '@/pack/ConceptCard';
 import { QuestionMeta } from '@/pack/QuestionMeta';
 import { Celebration } from '@/components/Celebration';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
-import { loadAttempts, loadSessions, loadLevelFilter } from '@/lib/storage';
+import { loadAttempts, loadSessions } from '@/lib/storage';
 import {
-  packQuestions,
   packScenarios,
-  PACK_CATEGORY_LABEL,
   PACK_CONCEPT_BY_ID,
   type OptionKey,
+  type PackQuestion,
 } from '@/pack/data';
 import {
   advanceAfterAnswer,
-  bankForCategory,
   buildAttempt,
   buildSessionEnd,
   buildSessionStart,
-  filterByLevel,
-  historicalIdsForCategory,
   isLastQuestion,
   moveToNext,
-  pickSessionFromBank,
   scoreSummary,
   type RunnerState,
 } from './runner';
@@ -48,94 +41,47 @@ import {
 type Stage = 'choosing' | 'feedback';
 
 interface Props {
-  /** Pack category key from the manifest, e.g. 'planets'. */
-  categoryKey: string;
+  /** The pre-picked follow-up questions for this round. */
+  questions: PackQuestion[];
+  /** Start a fresh round (re-pick from the related-topic bank). */
+  onRestart: () => void;
+  /** Leave practice and return to the Starred page. */
+  onExit: () => void;
 }
 
 /**
- * Practice runner for the generic pack variant. Structurally the CCA
- * runner with the pack data source, no achievements engine, and the
- * shared McqMarkdown component instead of a local copy.
+ * Follow-up practice over the topics behind the learner's starred
+ * questions (see runner.relatedTopicBank). Same practice loop as the main
+ * runner, but seeded with a fixed question list the Starred page picked.
+ * Attempts are recorded as ordinary practice, so they still feed stats,
+ * stickers, and the mistakes queue.
  */
-export function PackPracticeRunner({ categoryKey }: Props) {
-  const { attempts } = useStorageData();
+export function StarredRunner({ questions, onRestart, onExit }: Props) {
   const recordAttempt = useRecordAttempt();
   const startSession = useStartSession();
   const endSession = useEndSession();
   const { nextUnlock, checkNow, clearNextUnlock } = useAchievementUnlock();
 
-  const [state, setState] = useState<RunnerState | null>(null);
-  const [outOfQuestions, setOutOfQuestions] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [state, setState] = useState<RunnerState>(() => ({
+    sessionId: crypto.randomUUID(),
+    questions,
+    currentIndex: 0,
+    correctCount: 0,
+    startedAt: Date.now(),
+  }));
   const [stage, setStage] = useState<Stage>('choosing');
   const [selected, setSelected] = useState<OptionKey | null>(null);
   const [finished, setFinished] = useState(false);
-  // The active level-band filter (a manifest level key) or null = All.
-  // Read from localStorage after mount, so SSR/first paint stay stable.
-  const [levelFilter, setLevelFilter] = useState<string | null>(null);
 
-  const bank = useMemo(
-    () => filterByLevel(bankForCategory(packQuestions, categoryKey), levelFilter),
-    [categoryKey, levelFilter],
-  );
-
+  // Persist the "session started" record once, after mount — never in the
+  // state initializer, which StrictMode runs twice (two phantom sessions).
+  const startedRef = useRef(false);
   useEffect(() => {
-    setMounted(true);
-    setLevelFilter(loadLevelFilter());
-  }, []);
-
-  // Pick the bank once, after mount so localStorage attempts are reflected.
-  useEffect(() => {
-    if (!mounted || state) return;
-    const historical = historicalIdsForCategory(attempts, categoryKey);
-    const picked = pickSessionFromBank(bank, historical);
-    if (picked === null) {
-      setOutOfQuestions(true);
-      return;
-    }
-    const sessionId = crypto.randomUUID();
-    const now = Date.now();
-    const initial: RunnerState = {
-      sessionId,
-      questions: picked,
-      currentIndex: 0,
-      correctCount: 0,
-      startedAt: now,
-    };
-    startSession(buildSessionStart(initial, categoryKey));
-    setState(initial);
+    if (startedRef.current) return;
+    startedRef.current = true;
+    startSession(buildSessionStart(state, questions[0].categoryKey));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted, bank, categoryKey]);
-
-  if (outOfQuestions) {
-    return (
-      <main className="flex flex-col gap-5">
-        <BackLink />
-        <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-sm">
-          <h1 className="text-2xl font-bold text-ink-900">
-            No {PACK_CATEGORY_LABEL[categoryKey] ?? categoryKey} questions yet
-          </h1>
-          <p className="mt-2 text-ink-600">
-            This pack has no questions for this category yet.
-          </p>
-          <Link href="/" className="mt-4 inline-block">
-            <Button size="lg">Back to home</Button>
-          </Link>
-        </div>
-      </main>
-    );
-  }
-
-  if (!state) {
-    return (
-      <main className="flex flex-col gap-5">
-        <BackLink />
-        <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center text-ink-500 shadow-sm">
-          Loading…
-        </div>
-      </main>
-    );
-  }
+  }, []);
 
   if (finished) {
     const { correct, total, pct } = scoreSummary(state);
@@ -144,40 +90,26 @@ export function PackPracticeRunner({ categoryKey }: Props) {
         {nextUnlock ? (
           <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
         ) : null}
-        <BackLink />
         <div className="rounded-2xl border border-ink-200 bg-white p-8 text-center shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
-            Practice complete
+            Follow-up complete
           </div>
           <h1 className="mt-2 text-4xl font-bold text-ink-900">
             {correct}/{total}
           </h1>
-          <p className="mt-1 text-lg font-medium text-ink-600">
-            {pct}% correct
-          </p>
+          <p className="mt-1 text-lg font-medium text-ink-600">{pct}% correct</p>
           <p className="mt-4 text-sm text-ink-500">
-            {PACK_CATEGORY_LABEL[categoryKey] ?? categoryKey}
+            Extra practice on the topics you starred.
           </p>
           <div className="mt-6 flex flex-col gap-2">
-            <Button
-              size="lg"
-              block
-              onClick={() => {
-                setState(null);
-                setFinished(false);
-                setStage('choosing');
-                setSelected(null);
-              }}
-            >
+            <Button size="lg" block onClick={onRestart}>
               <RefreshCw className="h-4 w-4" />
               Another round
             </Button>
-            <Link href="/" className="block">
-              <Button size="lg" variant="secondary" block>
-                <Home className="h-4 w-4" />
-                Back to home
-              </Button>
-            </Link>
+            <Button size="lg" variant="secondary" block onClick={onExit}>
+              <Home className="h-4 w-4" />
+              Back to starred
+            </Button>
           </div>
         </div>
       </main>
@@ -188,8 +120,6 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   const scenario = current.scenarioId
     ? packScenarios.find((s) => s.id === current.scenarioId)
     : undefined;
-  // Only show the scenario card when there's a real shared stem —
-  // see the CCA runner for the rationale.
   const scenarioWithStem =
     scenario && scenario.stem ? { ...scenario, stem: scenario.stem } : null;
 
@@ -199,29 +129,24 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   }
 
   function handleCheck() {
-    if (!state || selected === null) return;
+    if (selected === null) return;
     const attempt = buildAttempt({
       state,
       question: current,
       selected,
-      categoryKey,
+      categoryKey: current.categoryKey,
       now: Date.now(),
       attemptId: crypto.randomUUID(),
     });
     recordAttempt(attempt);
-    // Achievements evaluate against what's now persisted — re-read so
-    // this can't race the useStorageData snapshot.
     checkNow(loadSessions(), loadAttempts());
     setState(advanceAfterAnswer(state, attempt.isCorrect));
     setStage('feedback');
   }
 
   function handleNext() {
-    if (!state) return;
     if (isLastQuestion(state)) {
-      endSession(buildSessionEnd(state, categoryKey, Date.now()));
-      // Session-shaped stickers (first session, flawless round, daily
-      // streak) can only unlock once the end record is written.
+      endSession(buildSessionEnd(state, state.questions[0].categoryKey, Date.now()));
       checkNow(loadSessions(), loadAttempts());
       setFinished(true);
       return;
@@ -240,7 +165,13 @@ export function PackPracticeRunner({ categoryKey }: Props) {
         <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
       ) : null}
       <header className="flex items-center justify-between">
-        <BackLink />
+        <button
+          type="button"
+          onClick={onExit}
+          className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm font-medium text-ink-600 hover:bg-ink-100"
+        >
+          Exit
+        </button>
         <ProgressBar
           current={state.currentIndex + 1}
           total={state.questions.length}
@@ -248,6 +179,9 @@ export function PackPracticeRunner({ categoryKey }: Props) {
       </header>
 
       <div className="flex flex-wrap items-center gap-1.5 text-sm">
+        <span className="rounded-full border border-brand-500/50 bg-brand-100/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand-700">
+          Follow-up
+        </span>
         <QuestionMeta question={current} />
         {scenario ? (
           <span className="rounded-full border border-ink-300 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-700">
@@ -300,12 +234,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
       />
 
       {stage === 'choosing' ? (
-        <Button
-          size="lg"
-          block
-          onClick={handleCheck}
-          disabled={selected === null}
-        >
+        <Button size="lg" block onClick={handleCheck} disabled={selected === null}>
           Check answer
         </Button>
       ) : (
@@ -328,10 +257,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
           {!isCorrect ? (
             <div className="text-[15px] text-ink-700">
               The answer is{' '}
-              <span className="font-semibold text-ink-900">
-                {current.correctKey}
-              </span>
-              .
+              <span className="font-semibold text-ink-900">{current.correctKey}</span>.
             </div>
           ) : null}
           <div className="text-[15px] leading-relaxed text-ink-800">
@@ -351,18 +277,6 @@ export function PackPracticeRunner({ categoryKey }: Props) {
         </div>
       )}
     </main>
-  );
-}
-
-function BackLink() {
-  return (
-    <Link
-      href="/"
-      className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm font-medium text-ink-600 hover:bg-ink-100"
-    >
-      <ArrowLeft className="h-4 w-4" />
-      Home
-    </Link>
   );
 }
 

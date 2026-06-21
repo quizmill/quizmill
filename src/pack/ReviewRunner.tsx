@@ -12,6 +12,7 @@ import {
   useStorageData,
 } from '@/lib/useStorage';
 import { VoteRow } from '@/components/VoteRow';
+import { StarButton } from '@/components/StarButton';
 import { Scratchpad } from '@/components/Scratchpad';
 import { SourceRef } from '@/components/SourceRef';
 import { McqMarkdown } from '@/components/McqMarkdown';
@@ -329,6 +330,7 @@ export function PackReviewRunner() {
             <ConceptCard concept={concept} defaultOpen={!isCorrect} />
           ) : null}
           <SourceRef sourceRef={current.sourceRef} />
+          <StarButton questionId={current.id} />
           <VoteRow questionId={current.id} />
           <Button size="lg" block onClick={handleNext} className="mt-1">
             {state.currentIndex + 1 === state.questions.length
