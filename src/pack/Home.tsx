@@ -199,29 +199,6 @@ export default function PackHome() {
         </Link>
       ) : null}
 
-      {starredCount > 0 ? (
-        <Link
-          href="/starred"
-          className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-brand-500/40 bg-brand-50 p-4 shadow-sm"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-brand-700">
-              <Star className="h-5 w-5 fill-current" />
-            </div>
-            <div>
-              <div className="text-base font-semibold text-ink-900">
-                {starredCount} starred{' '}
-                {starredCount === 1 ? 'question' : 'questions'}
-              </div>
-              <div className="text-sm text-ink-600">
-                Review the material and practise follow-ups.
-              </div>
-            </div>
-          </div>
-          <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-500" />
-        </Link>
-      ) : null}
-
       {packLevels.length > 0 ? (
         <section className="flex flex-col gap-2">
           <h2 className="text-lg font-semibold text-ink-700">{levelsLabel}</h2>
