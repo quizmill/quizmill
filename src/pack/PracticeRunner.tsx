@@ -83,7 +83,11 @@ export function PackPracticeRunner({ categoryKey }: Props) {
     setLevelFilter(loadLevelFilter());
   }, []);
 
-  // Pick the bank once, after mount so localStorage attempts are reflected.
+  // Pick a session after mount (so localStorage attempts are reflected),
+  // and again whenever `state` is cleared — that's how "Another round"
+  // restarts: it sets state to null and relies on this effect re-running
+  // to deal a fresh round. `state` must stay in the deps or the restart
+  // hangs on the "Loading…" placeholder forever.
   useEffect(() => {
     if (!mounted || state) return;
     const historical = historicalIdsForCategory(attempts, categoryKey);
@@ -104,7 +108,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
     startSession(buildSessionStart(initial, categoryKey));
     setState(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted, bank, categoryKey]);
+  }, [mounted, bank, categoryKey, state]);
 
   if (outOfQuestions) {
     return (
