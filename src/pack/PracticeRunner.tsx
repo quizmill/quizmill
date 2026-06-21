@@ -21,7 +21,7 @@ import { ConceptCard } from '@/pack/ConceptCard';
 import { QuestionMeta } from '@/pack/QuestionMeta';
 import { Celebration } from '@/components/Celebration';
 import { QuizSkeleton } from '@/components/QuizSkeleton';
-import { StickyActionBar } from '@/components/StickyActionBar';
+import { QuizShell } from '@/components/QuizShell';
 import { scrollToTop } from '@/lib/scrollToTop';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { loadAttempts, loadSessions, loadLevelFilter } from '@/lib/storage';
@@ -244,18 +244,39 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   const concept = current.conceptId ? PACK_CONCEPT_BY_ID[current.conceptId] : undefined;
 
   return (
-    <main className="flex flex-col gap-5">
+    <>
       {nextUnlock ? (
         <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
       ) : null}
-      <header className="flex items-center justify-between">
-        <BackLink />
-        <ProgressBar
-          current={state.currentIndex + 1}
-          total={state.questions.length}
-        />
-      </header>
-
+      <QuizShell
+        header={
+          <header className="flex items-center justify-between">
+            <BackLink />
+            <ProgressBar
+              current={state.currentIndex + 1}
+              total={state.questions.length}
+            />
+          </header>
+        }
+        action={
+          stage === 'choosing' ? (
+            <Button
+              size="lg"
+              block
+              onClick={handleCheck}
+              disabled={selected === null}
+            >
+              Check answer
+            </Button>
+          ) : (
+            <Button size="lg" block onClick={handleNext}>
+              {state.currentIndex + 1 === state.questions.length
+                ? 'See results'
+                : 'Next question'}
+            </Button>
+          )
+        }
+      >
       <div className="flex flex-wrap items-center gap-1.5 text-sm">
         <QuestionMeta question={current} />
         {scenario ? (
@@ -344,26 +365,8 @@ export function PackPracticeRunner({ categoryKey }: Props) {
           <VoteRow questionId={current.id} />
         </div>
       ) : null}
-
-      <StickyActionBar>
-        {stage === 'choosing' ? (
-          <Button
-            size="lg"
-            block
-            onClick={handleCheck}
-            disabled={selected === null}
-          >
-            Check answer
-          </Button>
-        ) : (
-          <Button size="lg" block onClick={handleNext}>
-            {state.currentIndex + 1 === state.questions.length
-              ? 'See results'
-              : 'Next question'}
-          </Button>
-        )}
-      </StickyActionBar>
-    </main>
+      </QuizShell>
+    </>
   );
 }
 
