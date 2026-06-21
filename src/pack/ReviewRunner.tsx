@@ -23,6 +23,7 @@ import { Celebration } from '@/components/Celebration';
 import { QuizSkeleton } from '@/components/QuizSkeleton';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { loadAttempts, loadSessions } from '@/lib/storage';
+import { useCommitAfterPaint } from '@/lib/useCommitAfterPaint';
 import { unresolvedMistakeIds } from '@/lib/mistakes';
 import {
   packQuestions,
@@ -58,6 +59,7 @@ export function PackReviewRunner() {
   const startSession = useStartSession();
   const endSession = useEndSession();
   const { nextUnlock, checkNow, clearNextUnlock } = useAchievementUnlock();
+  const { schedule: commitAfterPaint } = useCommitAfterPaint();
 
   const [state, setState] = useState<RunnerState | null>(null);
   const [nothingToReview, setNothingToReview] = useState(false);
@@ -187,22 +189,29 @@ export function PackReviewRunner() {
       now: Date.now(),
       attemptId: crypto.randomUUID(),
     });
-    recordAttempt(attempt);
-    // Same re-read rationale as the practice runner — see there.
-    checkNow(loadSessions(), loadAttempts());
+    // Render feedback immediately; defer the history-walking work past
+    // the paint so the tap stays responsive (see the practice runner).
     setState(advanceAfterAnswer(state, attempt.isCorrect));
     setStage('feedback');
+    commitAfterPaint(() => {
+      recordAttempt(attempt);
+      // Same re-read rationale as the practice runner — see there.
+      checkNow(loadSessions(), loadAttempts());
+    });
   }
 
   function handleNext() {
     if (!state) return;
     if (isLastQuestion(state)) {
-      endSession(
-        buildSessionEnd(state, state.questions[0].categoryKey, Date.now(), 'review'),
-      );
-      // The 'comeback' sticker unlocks on the review-session end record.
-      checkNow(loadSessions(), loadAttempts());
       setFinished(true);
+      const ended = state;
+      commitAfterPaint(() => {
+        endSession(
+          buildSessionEnd(ended, ended.questions[0].categoryKey, Date.now(), 'review'),
+        );
+        // The 'comeback' sticker unlocks on the review-session end record.
+        checkNow(loadSessions(), loadAttempts());
+      });
       return;
     }
     setState(moveToNext(state));
