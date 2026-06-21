@@ -58,6 +58,8 @@ webmanifest are generated from the manifest by `scripts/pack-assets.ts`
 ```
 npm run dev                      # demo pack at localhost:3000
 npm test                         # vitest unit (58 tests)
+npm run lint                     # eslint (flat config) — 0 errors required
+npm run typecheck                # tsc --noEmit
 npm run test:e2e                 # build + Puppeteer vs demo pack
 npm run pack:validate <dir>      # schema + cross-ref checks
 npm run pack:use <dir|owner/repo># validate + activate a pack (local or GitHub)
@@ -164,10 +166,26 @@ are detected on every commit regardless.
 
 ## Conventions
 
+- Run `npm run lint` and `npm run typecheck` before pushing — both run
+  in CI (after the unit tests) and a lint **error** or a type error
+  fails the build. Lint **warnings** are allowed (the newer react-hooks
+  rules are warn-level on purpose); don't reach for `eslint-disable` to
+  silence a real error without a one-line reason. ESLint config lives in
+  `eslint.config.mjs` (flat config).
 - Tests accompany behaviour changes; E2E asserts against the demo pack
   (if a different pack is active locally, `rm -rf content/pack` and
   re-run to reseed before E2E).
+- **Bug fixes are red→green**: first write a failing test that
+  reproduces the bug (confirm it's red), then fix until it's green —
+  don't fix first and add a test after. React component bugs (effects,
+  state) can be exercised with happy-dom render tests under
+  `tests/*.test.tsx`; pure logic stays in node `tests/*.test.ts`.
+- **Always open a PR** for a finished change (`gh`/GitHub MCP), even
+  when not explicitly asked — push the branch, then create the PR.
 - Question ids are immutable once published — attempt history points
   at them.
 - Pack schema changes bump `schemaVersion` and must stay
   backward-readable.
+- Always open a PR and push the branch up (so a preview env is
+  created) when finishing a session's work, unless the user explicitly
+  says not to.
