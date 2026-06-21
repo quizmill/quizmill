@@ -21,6 +21,8 @@ import { ConceptCard } from '@/pack/ConceptCard';
 import { QuestionMeta } from '@/pack/QuestionMeta';
 import { Celebration } from '@/components/Celebration';
 import { QuizSkeleton } from '@/components/QuizSkeleton';
+import { StickyActionBar } from '@/components/StickyActionBar';
+import { scrollToTop } from '@/lib/scrollToTop';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { loadAttempts, loadSessions } from '@/lib/storage';
 import { useCommitAfterPaint } from '@/lib/useCommitAfterPaint';
@@ -217,6 +219,9 @@ export function PackReviewRunner() {
     setState(moveToNext(state));
     setStage('choosing');
     setSelected(null);
+    // Sticky action bar leaves the view scrolled down — show the next
+    // question from the top.
+    scrollToTop();
   }
 
   const isCorrect = stage === 'feedback' && selected === current.correctKey;
@@ -290,16 +295,7 @@ export function PackReviewRunner() {
         onSelect={handleSelect}
       />
 
-      {stage === 'choosing' ? (
-        <Button
-          size="lg"
-          block
-          onClick={handleCheck}
-          disabled={selected === null}
-        >
-          Check answer
-        </Button>
-      ) : (
+      {stage === 'feedback' ? (
         <div
           className={cn(
             'flex flex-col gap-3 rounded-2xl border p-4',
@@ -333,13 +329,27 @@ export function PackReviewRunner() {
           ) : null}
           <SourceRef sourceRef={current.sourceRef} />
           <VoteRow questionId={current.id} />
-          <Button size="lg" block onClick={handleNext} className="mt-1">
+        </div>
+      ) : null}
+
+      <StickyActionBar>
+        {stage === 'choosing' ? (
+          <Button
+            size="lg"
+            block
+            onClick={handleCheck}
+            disabled={selected === null}
+          >
+            Check answer
+          </Button>
+        ) : (
+          <Button size="lg" block onClick={handleNext}>
             {state.currentIndex + 1 === state.questions.length
               ? 'See results'
               : 'Next question'}
           </Button>
-        </div>
-      )}
+        )}
+      </StickyActionBar>
     </main>
   );
 }
