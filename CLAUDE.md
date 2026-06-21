@@ -163,6 +163,13 @@ are detected on every commit regardless.
 - Tests accompany behaviour changes; E2E asserts against the demo pack
   (if a different pack is active locally, `rm -rf content/pack` and
   re-run to reseed before E2E).
+- **Bug fixes are red→green**: first write a failing test that
+  reproduces the bug (confirm it's red), then fix until it's green —
+  don't fix first and add a test after. React component bugs (effects,
+  state) can be exercised with happy-dom render tests under
+  `tests/*.test.tsx`; pure logic stays in node `tests/*.test.ts`.
+- **Always open a PR** for a finished change (`gh`/GitHub MCP), even
+  when not explicitly asked — push the branch, then create the PR.
 - Question ids are immutable once published — attempt history points
   at them.
 - Pack schema changes bump `schemaVersion` and must stay
