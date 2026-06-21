@@ -5,9 +5,9 @@ import Link from 'next/link';
 import {
   ArrowRight,
   BarChart3,
-  RefreshCw,
   Settings,
   Star,
+  Target,
   TrendingDown,
   TrendingUp,
   Trophy,
@@ -18,6 +18,7 @@ import { StatTile } from '@/components/StatTile';
 import { InstallBanner } from '@/components/InstallPrompt';
 import { useStorageData, useStarredQuestions } from '@/lib/useStorage';
 import { unresolvedMistakeCount } from '@/lib/mistakes';
+import { buildWeakSpotPool } from '@/lib/weakSpots';
 import {
   loadLevelFilter,
   saveLevelFilter,
@@ -82,6 +83,18 @@ export default function PackHome() {
   const overallAccuracy =
     totalAnswered === 0 ? 0 : Math.round((totalCorrect / totalAnswered) * 100);
   const mistakeCount = unresolvedMistakeCount(attempts);
+
+  // The unified weak-spot pool: mistakes + starred + shaky topics. Drives
+  // the single "Practice weak spots" entry (the breakdown becomes its
+  // subtitle), with a mistakes-only shortcut kept as a secondary link.
+  const weak = buildWeakSpotPool(packQuestions, attempts, stars);
+  const weakParts = [
+    weak.breakdown.mistakes > 0
+      ? `${weak.breakdown.mistakes} ${weak.breakdown.mistakes === 1 ? 'mistake' : 'mistakes'}`
+      : null,
+    weak.breakdown.starred > 0 ? `${weak.breakdown.starred} saved` : null,
+    weak.breakdown.shaky > 0 ? `${weak.breakdown.shaky} shaky` : null,
+  ].filter((p): p is string => p !== null);
 
   const statsByCategory = new Map<
     string,
@@ -176,27 +189,39 @@ export default function PackHome() {
         )}
       </section>
 
-      {mistakeCount > 0 ? (
-        <Link
-          href="/practice/review/"
-          className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-warn-500/40 bg-warn-100/60 p-4 shadow-sm"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-warn-500/20 text-warn-700">
-              <RefreshCw className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="text-base font-semibold text-ink-900">
-                Review {mistakeCount}{' '}
-                {mistakeCount === 1 ? 'mistake' : 'mistakes'}
+      {weak.breakdown.total > 0 ? (
+        <section className="flex flex-col gap-1.5">
+          <Link
+            href="/practice/weak-spots/"
+            className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-warn-500/40 bg-warn-100/60 p-4 shadow-sm"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-warn-500/20 text-warn-700">
+                <Target className="h-5 w-5" />
               </div>
-              <div className="text-sm text-ink-600">
-                Retry the questions you got wrong.
+              <div>
+                <div className="text-base font-semibold text-ink-900">
+                  Practice weak spots
+                </div>
+                <div className="text-sm text-ink-600">
+                  {weakParts.length > 0
+                    ? weakParts.join(' · ')
+                    : 'Drill the questions you find hardest.'}
+                </div>
               </div>
             </div>
-          </div>
-          <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-500" />
-        </Link>
+            <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-500" />
+          </Link>
+          {mistakeCount > 0 ? (
+            <Link
+              href="/practice/review/"
+              className="tap-feedback self-end rounded-full px-2 py-1 text-xs font-medium text-ink-500 hover:text-ink-800"
+            >
+              or fix just my {mistakeCount}{' '}
+              {mistakeCount === 1 ? 'mistake' : 'mistakes'} →
+            </Link>
+          ) : null}
+        </section>
       ) : null}
 
       {packLevels.length > 0 ? (

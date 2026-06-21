@@ -87,8 +87,10 @@ export function StarredPage() {
           Starred
         </h1>
         <p className="mt-1 text-ink-500">
-          Questions you saved to review and refine. Study the material
-          around them, then practise follow-up questions on the same topics.
+          Questions you saved to go deeper on. Read the material around each
+          one, then branch into follow-up questions on the same topics.
+          (Your missed questions live in <em>weak spots</em>, on the home
+          screen.)
         </p>
       </div>
 
