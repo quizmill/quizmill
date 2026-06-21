@@ -589,3 +589,41 @@ describe('service worker', () => {
     expect(state).toBe('activated');
   }, 30_000);
 });
+
+describe('reward mini-games', () => {
+  it('keeps games OFF the Home page (no nav icon, no banner)', async () => {
+    await waitForText(page, 'Solar System Practice');
+    // Games are a hidden easter egg — nothing on Home advertises them.
+    expect(await page.$('a[aria-label="Games"]')).toBeNull();
+    expect(await page.$('[data-testid="games-unlocked-banner"]')).toBeNull();
+  });
+
+  it('reveals games via the version-pill easter egg and plays one (free)', async () => {
+    await page.goto(baseUrl() + '/settings/');
+    await page.waitForSelector('[data-testid="app-version"]');
+    // Not revealed until you tap the version pill enough times.
+    expect(await page.$('[data-testid="games-easter-egg"]')).toBeNull();
+
+    for (let i = 0; i < 7; i++) {
+      await page.click('[data-testid="app-version"]');
+    }
+    await page.waitForSelector('[data-testid="games-easter-egg"]');
+
+    // Follow the revealed link into the arcade — playable straight away,
+    // no gate (finding the secret is the unlock).
+    await page.click('[data-testid="games-easter-egg"] a[href="/games/"]');
+    await page.waitForSelector('[data-testid="games-grid"]');
+
+    // Open the sliding puzzle; the game shell + board should appear.
+    await page.click('[data-testid="game-card-tile-puzzle"]');
+    await page.waitForSelector('[data-testid="game-shell"]');
+    await page.waitForSelector('[data-testid="tile-puzzle-board"]');
+
+    // Close it; the grid is still there to play another.
+    await page.click('button[aria-label="Close game"]');
+    await page.waitForFunction(
+      () => !document.querySelector('[data-testid="game-shell"]'),
+    );
+    await page.waitForSelector('[data-testid="games-grid"]');
+  });
+});

@@ -36,8 +36,22 @@ webmanifest are generated from the manifest by `scripts/pack-assets.ts`
   runner.ts (pure session logic), data.ts (typed pack loader),
   StickersPage + achievements{,-engine}.ts (sticker cabinet; mastery
   stickers generated per pack category), ProgressPage (CSS-only charts
-  over `src/lib/stats.ts`), DownvoteBrowser (Settings extra).
+  over `src/lib/stats.ts`), DownvoteBrowser (Settings extra),
+  GamesPage + games/ (reward mini-games — see below).
   InstallPrompt (`src/components/`) covers Add-to-Home-Screen.
+- Reward mini-games (opt-in): a pack adds a `games` block to its manifest
+  (`{ include? }`, mirrors the optional `exam` block — presence enables;
+  `include` narrows the set). Registry `src/lib/games/registry.ts` (id ↔
+  `GAME_IDS` in schema.ts), pure logic `src/lib/games/{snake,tilePuzzle,
+  pong}.ts`, components `src/pack/games/` (GameShell/HowToPlay/GameModal +
+  6 games), route `/games`. The heavy game components are
+  `next/dynamic`-imported in GamesPage (loaded only when a game is opened)
+  and live only in the /games route chunk — packs without games 404 the
+  route and pay nothing. Games are ephemeral (don't touch stats/stickers),
+  free to play, and a deliberately HIDDEN easter egg — nothing on Home;
+  reached by tapping the version pill in Settings 7× (`GAMES_REVEAL_TAPS`),
+  which reveals a panel linking to `/games`. Ported from
+  `~/code/personal/learning` (original engine code, not exam content).
 - Engine never imports question *shapes* — it sees only the
   denormalised `Attempt`/`Session` fields (`src/data/types.ts`).
 
@@ -163,7 +177,17 @@ are detected on every commit regardless.
 - Tests accompany behaviour changes; E2E asserts against the demo pack
   (if a different pack is active locally, `rm -rf content/pack` and
   re-run to reseed before E2E).
+- **Bug fixes are red→green**: first write a failing test that
+  reproduces the bug (confirm it's red), then fix until it's green —
+  don't fix first and add a test after. React component bugs (effects,
+  state) can be exercised with happy-dom render tests under
+  `tests/*.test.tsx`; pure logic stays in node `tests/*.test.ts`.
+- **Always open a PR** for a finished change (`gh`/GitHub MCP), even
+  when not explicitly asked — push the branch, then create the PR.
 - Question ids are immutable once published — attempt history points
   at them.
 - Pack schema changes bump `schemaVersion` and must stay
   backward-readable.
+- Always open a PR and push the branch up (so a preview env is
+  created) when finishing a session's work, unless the user explicitly
+  says not to.

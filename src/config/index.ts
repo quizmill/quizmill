@@ -18,6 +18,9 @@ export interface CategoryDef {
   label: string;
   /** Shorter chip-friendly label. Falls back to `label`. */
   shortLabel?: string;
+  /** Optional bespoke emoji icon for the category card / mastery sticker.
+   *  Falls back to a deterministic emoji by declaration order. */
+  icon?: string;
   /** Optional selection weight (e.g. an exam blueprint percentage). */
   weight?: number;
 }
@@ -31,6 +34,13 @@ export interface ExamConfig {
   questionCount?: number;
   /** Restrict readiness to questions in this level band. */
   scope?: { level: string };
+}
+
+/** Optional reward mini-games, mirrored from the manifest `games` block.
+ *  Absent → no games anywhere. */
+export interface GamesConfig {
+  /** Restrict to a subset of the built-in games (by id). Omit → all. */
+  include?: string[];
 }
 
 export interface AppConfig {
@@ -47,6 +57,8 @@ export interface AppConfig {
   categories: CategoryDef[];
   /** Exam-readiness goal, when the pack declares one. */
   exam?: ExamConfig;
+  /** Reward mini-games, when the pack switches them on. */
+  games?: GamesConfig;
 }
 
 export const APP_CONFIG: AppConfig = {
@@ -57,4 +69,5 @@ export const APP_CONFIG: AppConfig = {
   themeColor: manifest.themeColor,
   categories: manifest.categories as CategoryDef[],
   exam: (manifest as { exam?: ExamConfig }).exam,
+  games: (manifest as { games?: GamesConfig }).games,
 };
