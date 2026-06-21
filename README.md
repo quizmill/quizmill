@@ -162,8 +162,9 @@ of the deployed app*.
 
 ## Cloud sync (optional)
 
-Set two env vars at build time and run the migration in
-`supabase/migrations/` against your own (free-tier) Supabase project:
+Set two env vars at build time and run the migrations in
+`supabase/migrations/` (in filename order) against your own
+(free-tier) Supabase project:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=...

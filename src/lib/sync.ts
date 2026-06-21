@@ -39,6 +39,8 @@ type QueueOp =
   | { t: 'achievements'; op: 'upsert'; row: storage.EarnedAchievement }
   | { t: 'votes'; op: 'upsert'; row: storage.QuestionVote }
   | { t: 'votes'; op: 'delete'; questionId: string }
+  | { t: 'stars'; op: 'upsert'; row: storage.StarredQuestion }
+  | { t: 'stars'; op: 'delete'; questionId: string }
   | { t: 'clear-all'; op: 'delete' }
   | { t: 'clear-sessions'; op: 'delete'; sessionIds: string[] };
 
@@ -265,6 +267,20 @@ function rowToVote(r: Record<string, unknown>): storage.QuestionVote {
   };
 }
 
+function starToRow(s: storage.StarredQuestion, user_id: string) {
+  return {
+    user_id,
+    question_id: s.questionId,
+    starred_at: new Date(s.starredAt).toISOString(),
+  };
+}
+function rowToStar(r: Record<string, unknown>): storage.StarredQuestion {
+  return {
+    questionId: r.question_id as string,
+    starredAt: Date.parse(r.starred_at as string),
+  };
+}
+
 // ── Local mutation → queue ───────────────────────────────────────────────
 
 function handleMutation(m: Mutation): void {
@@ -280,6 +296,10 @@ function handleMutation(m: Mutation): void {
       return 'op' in m
         ? enqueue({ t: 'votes', op: 'delete', questionId: m.questionId })
         : enqueue({ t: 'votes', op: 'upsert', row: m.row });
+    case 'stars':
+      return 'op' in m
+        ? enqueue({ t: 'stars', op: 'delete', questionId: m.questionId })
+        : enqueue({ t: 'stars', op: 'upsert', row: m.row });
     case 'clear-all':
       return enqueue({ t: 'clear-all', op: 'delete' });
     case 'clear-sessions':
@@ -336,8 +356,30 @@ async function runOp(op: PendingOp, user_id: string): Promise<void> {
       if (error) throw error;
       return;
     }
+    case 'stars': {
+      if (op.op === 'delete') {
+        const { error } = await sb
+          .from('stars')
+          .delete()
+          .eq('user_id', user_id)
+          .eq('question_id', op.questionId);
+        if (error) throw error;
+        return;
+      }
+      // Star is write-once existence (starred_at preserved on the client),
+      // so ignore conflicts rather than update — no UPDATE policy needed,
+      // same reasoning as achievements.
+      const { error } = await sb
+        .from('stars')
+        .upsert(starToRow(op.row, user_id), {
+          onConflict: 'user_id,question_id',
+          ignoreDuplicates: true,
+        });
+      if (error) throw error;
+      return;
+    }
     case 'clear-all': {
-      for (const table of ['sessions', 'attempts', 'achievements', 'votes']) {
+      for (const table of ['sessions', 'attempts', 'achievements', 'votes', 'stars']) {
         const { error } = await sb.from(table).delete().eq('user_id', user_id);
         if (error) throw error;
       }
@@ -428,11 +470,12 @@ function scheduleDrain(): void {
 async function pullAll(user_id: string): Promise<void> {
   const sb = getSupabase();
   if (!sb) return;
-  const [sessions, attempts, achievements, votes] = await Promise.all([
+  const [sessions, attempts, achievements, votes, stars] = await Promise.all([
     sb.from('sessions').select('*').eq('user_id', user_id),
     sb.from('attempts').select('*').eq('user_id', user_id),
     sb.from('achievements').select('*').eq('user_id', user_id),
     sb.from('votes').select('*').eq('user_id', user_id),
+    sb.from('stars').select('*').eq('user_id', user_id),
   ]);
 
   const changed = storage.mergeRemote({
@@ -440,6 +483,7 @@ async function pullAll(user_id: string): Promise<void> {
     attempts: (attempts.data ?? []).map(rowToAttempt),
     achievements: (achievements.data ?? []).map(rowToAchievement),
     votes: (votes.data ?? []).map(rowToVote),
+    stars: (stars.data ?? []).map(rowToStar),
   });
 
   if (changed && typeof window !== 'undefined') {
@@ -457,6 +501,7 @@ function pushAllLocal(): void {
       .loadAchievements()
       .map((row) => ({ t: 'achievements', op: 'upsert', row }) as QueueOp),
     ...storage.loadVotes().map((row) => ({ t: 'votes', op: 'upsert', row }) as QueueOp),
+    ...storage.loadStars().map((row) => ({ t: 'stars', op: 'upsert', row }) as QueueOp),
   ];
   enqueue(...ops);
 }

@@ -5,18 +5,21 @@ import Link from 'next/link';
 import {
   ArrowRight,
   BarChart3,
-  RefreshCw,
   Settings,
+  Star,
+  Target,
   TrendingDown,
   TrendingUp,
   Trophy,
   X,
+  type LucideIcon,
 } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
 import { StatTile } from '@/components/StatTile';
 import { InstallBanner } from '@/components/InstallPrompt';
-import { useStorageData } from '@/lib/useStorage';
+import { useStorageData, useStarredQuestions } from '@/lib/useStorage';
 import { unresolvedMistakeCount } from '@/lib/mistakes';
+import { buildWeakSpotPool } from '@/lib/weakSpots';
 import {
   loadLevelFilter,
   saveLevelFilter,
@@ -41,6 +44,8 @@ import { ExamReadinessTile } from '@/pack/ExamReadiness';
  *  all driven by the active pack's manifest. */
 export default function PackHome() {
   const { attempts } = useStorageData();
+  const { stars } = useStarredQuestions();
+  const starredCount = stars.size;
   // Active level-band filter (a manifest level key) or null = All. Read
   // from localStorage after mount so SSR/first paint stay stable.
   const [level, setLevelState] = useState<string | null>(null);
@@ -81,6 +86,18 @@ export default function PackHome() {
     totalAnswered === 0 ? 0 : Math.round((totalCorrect / totalAnswered) * 100);
   const mistakeCount = unresolvedMistakeCount(attempts);
 
+  // The unified weak-spot pool: mistakes + starred + shaky topics. Drives
+  // the single "Practice weak spots" entry (the breakdown becomes its
+  // subtitle), with a mistakes-only shortcut kept as a secondary link.
+  const weak = buildWeakSpotPool(packQuestions, attempts, stars);
+  const weakParts = [
+    weak.breakdown.mistakes > 0
+      ? `${weak.breakdown.mistakes} ${weak.breakdown.mistakes === 1 ? 'mistake' : 'mistakes'}`
+      : null,
+    weak.breakdown.starred > 0 ? `${weak.breakdown.starred} saved` : null,
+    weak.breakdown.shaky > 0 ? `${weak.breakdown.shaky} shaky` : null,
+  ].filter((p): p is string => p !== null);
+
   const statsByCategory = new Map<
     string,
     { available: number; answered: number; correct: number }
@@ -102,33 +119,30 @@ export default function PackHome() {
 
   return (
     <main className="flex flex-col gap-6">
-      <header className="flex items-end justify-between gap-2">
-        <div>
-          <h1 className="text-3xl font-bold text-ink-900">{APP_CONFIG.title}</h1>
-          <p className="mt-1 text-ink-500">{APP_CONFIG.homeSubtitle}</p>
-        </div>
-        <nav className="flex items-center gap-2">
-          <Link
-            href="/progress"
-            aria-label="Progress"
-            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm"
-          >
-            <BarChart3 className="h-4 w-4" />
-          </Link>
-          <Link
-            href="/stickers"
-            aria-label="Sticker cabinet"
-            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm"
-          >
-            <Trophy className="h-4 w-4" />
-          </Link>
+      <header className="flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-3xl font-bold text-ink-900">{APP_CONFIG.title}</h1>
+            <p className="mt-1 text-ink-500">{APP_CONFIG.homeSubtitle}</p>
+          </div>
           <Link
             href="/settings"
             aria-label="Settings"
-            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm"
+            className="tap-feedback inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm hover:border-ink-300 hover:text-ink-900"
           >
             <Settings className="h-4 w-4" />
           </Link>
+        </div>
+        <nav className="flex items-center gap-2">
+          <NavIcon href="/progress" icon={BarChart3} label="Progress" />
+          <NavIcon
+            href="/starred"
+            icon={Star}
+            label="Starred"
+            count={starredCount}
+            iconClassName={cn(starredCount > 0 && 'fill-brand-500 text-brand-500')}
+          />
+          <NavIcon href="/stickers" icon={Trophy} label="Sticker cabinet" />
         </nav>
       </header>
 
@@ -162,27 +176,39 @@ export default function PackHome() {
         )}
       </section>
 
-      {mistakeCount > 0 ? (
-        <Link
-          href="/practice/review/"
-          className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-warn-500/40 bg-warn-100/60 p-4 shadow-sm"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-warn-500/20 text-warn-700">
-              <RefreshCw className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="text-base font-semibold text-ink-900">
-                Review {mistakeCount}{' '}
-                {mistakeCount === 1 ? 'mistake' : 'mistakes'}
+      {weak.breakdown.total > 0 ? (
+        <section className="flex flex-col gap-1.5">
+          <Link
+            href="/practice/weak-spots/"
+            className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-warn-500/40 bg-warn-100/60 p-4 shadow-sm"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-warn-500/20 text-warn-700">
+                <Target className="h-5 w-5" />
               </div>
-              <div className="text-sm text-ink-600">
-                Retry the questions you got wrong.
+              <div>
+                <div className="text-base font-semibold text-ink-900">
+                  Practice weak spots
+                </div>
+                <div className="text-sm text-ink-600">
+                  {weakParts.length > 0
+                    ? weakParts.join(' · ')
+                    : 'Drill the questions you find hardest.'}
+                </div>
               </div>
             </div>
-          </div>
-          <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-500" />
-        </Link>
+            <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-500" />
+          </Link>
+          {mistakeCount > 0 ? (
+            <Link
+              href="/practice/review/"
+              className="tap-feedback self-end rounded-full px-2 py-1 text-xs font-medium text-ink-500 hover:text-ink-800"
+            >
+              or fix just my {mistakeCount}{' '}
+              {mistakeCount === 1 ? 'mistake' : 'mistakes'} →
+            </Link>
+          ) : null}
+        </section>
       ) : null}
 
       {packLevels.length > 0 ? (
@@ -332,5 +358,38 @@ export default function PackHome() {
         </div>
       </section>
     </main>
+  );
+}
+
+/** A compact icon-only nav destination — a round button with an optional
+ *  count badge. Icon-only keeps the row to a tight ~136px cluster that never
+ *  wraps on small phones; the aria-label carries the destination name for
+ *  screen readers (and the E2E). */
+function NavIcon({
+  href,
+  icon: Icon,
+  label,
+  count,
+  iconClassName,
+}: {
+  href: string;
+  icon: LucideIcon;
+  label: string;
+  count?: number;
+  iconClassName?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      className="tap-feedback relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm hover:border-ink-300 hover:text-ink-900"
+    >
+      <Icon className={cn('h-4 w-4', iconClassName)} />
+      {count && count > 0 ? (
+        <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-brand-500 px-1 text-[10px] font-bold text-white">
+          {count}
+        </span>
+      ) : null}
+    </Link>
   );
 }

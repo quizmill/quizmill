@@ -195,3 +195,45 @@ export function useQuestionVotes(): {
     setVote,
   };
 }
+
+/**
+ * Questions the learner has starred for later review. Reactive — re-reads
+ * from storage on the quizmill:storage event, so a star tapped in a runner
+ * shows up on the Starred page (and the home banner) immediately.
+ */
+export function useStarredQuestions(): {
+  stars: Set<string>;
+  starsList: storage.StarredQuestion[];
+  setStar: (questionId: string, starred: boolean) => void;
+  toggleStar: (questionId: string) => void;
+} {
+  const [list, setList] = useState<storage.StarredQuestion[]>([]);
+  useEffect(() => {
+    const refresh = () => setList(storage.loadStars());
+    refresh();
+    if (typeof window === 'undefined') return;
+    window.addEventListener(EVENT, refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener(EVENT, refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
+  const setStar = useCallback((questionId: string, starred: boolean) => {
+    storage.setStar(questionId, starred);
+    emit();
+  }, []);
+  const toggleStar = useCallback(
+    (questionId: string) => {
+      storage.setStar(questionId, !storage.isStarred(questionId));
+      emit();
+    },
+    [],
+  );
+  return {
+    stars: new Set(list.map((s) => s.questionId)),
+    starsList: list,
+    setStar,
+    toggleStar,
+  };
+}

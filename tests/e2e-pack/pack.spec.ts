@@ -355,14 +355,18 @@ describe('scratchpad', () => {
 });
 
 describe('home navigation', () => {
-  it('links to progress, sticker cabinet, and settings', async () => {
+  it('links to progress, starred, sticker cabinet, and settings', async () => {
     await waitForText(page, 'Solar System Practice');
+    // The nav is a row of labelled pills (Progress · Starred · Stickers)
+    // plus a Settings gear; match by href since the pills carry their
+    // label as visible text rather than an aria-label.
     for (const [label, href] of [
       ['Progress', '/progress'],
-      ['Sticker cabinet', '/stickers'],
+      ['Starred', '/starred'],
+      ['Stickers', '/stickers'],
       ['Settings', '/settings'],
     ]) {
-      const link = await page.$(`a[aria-label="${label}"]`);
+      const link = await page.$(`a[href^="${href}"]`);
       expect(link, `${label} link`).toBeTruthy();
       const target = await page.evaluate(
         (el) => el.getAttribute('href'),

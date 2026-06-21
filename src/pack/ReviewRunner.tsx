@@ -10,8 +10,10 @@ import {
   useStartSession,
   useEndSession,
   useStorageData,
+  useStarredQuestions,
 } from '@/lib/useStorage';
 import { VoteRow } from '@/components/VoteRow';
+import { StarButton } from '@/components/StarButton';
 import { Scratchpad } from '@/components/Scratchpad';
 import { SourceRef } from '@/components/SourceRef';
 import { McqMarkdown } from '@/components/McqMarkdown';
@@ -23,6 +25,7 @@ import { Celebration } from '@/components/Celebration';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { loadAttempts, loadSessions } from '@/lib/storage';
 import { unresolvedMistakeIds } from '@/lib/mistakes';
+import { buildWeakSpotPool } from '@/lib/weakSpots';
 import {
   packQuestions,
   packScenarios,
@@ -45,18 +48,74 @@ const REVIEW_BATCH_SIZE = 10;
 
 type Stage = 'choosing' | 'feedback';
 
+/** Which drill this runner is: pure mistakes-only, or the unified
+ *  weak-spots pool (mistakes + starred + shaky topics). */
+export type ReviewVariant = 'mistakes' | 'weakspots';
+
+interface VariantCopy {
+  chip: string;
+  emptyTitle: string;
+  emptyBody: string;
+  completeTitle: string;
+  metricLabel: string;
+  completeNote: string;
+  correctFeedback: string;
+  wrongFeedback: string;
+  moreHref: string;
+  moreLabel: string;
+}
+
+const VARIANT_COPY: Record<ReviewVariant, VariantCopy> = {
+  mistakes: {
+    chip: 'Review mistakes',
+    emptyTitle: 'Nothing to review',
+    emptyBody:
+      "You haven't got any unresolved mistakes right now. Keep practising — questions you get wrong show up here so you can retry them.",
+    completeTitle: 'Review complete',
+    metricLabel: 'rescued',
+    completeNote:
+      'Questions you got right have been removed from your mistake queue.',
+    correctFeedback: 'Rescued.',
+    wrongFeedback: "We'll bring this one back later.",
+    moreHref: '/practice/review/',
+    moreLabel: 'Review more',
+  },
+  weakspots: {
+    chip: 'Weak spots',
+    emptyTitle: 'No weak spots right now',
+    emptyBody:
+      'Nothing to drill yet. As you practise, the questions you miss — plus anything you star to revisit — collect here so you can target them in one go.',
+    completeTitle: 'Weak-spots round complete',
+    metricLabel: 'correct',
+    completeNote:
+      'Questions you got right drop off the list; come back to chip away at the rest.',
+    correctFeedback: 'Correct.',
+    wrongFeedback: 'Not quite — this one stays on your list.',
+    moreHref: '/practice/weak-spots/',
+    moreLabel: 'More weak spots',
+  },
+};
+
+interface PackReviewRunnerProps {
+  variant?: ReviewVariant;
+}
+
 /**
- * Review-mode runner for the pack variant: re-asks questions the user
- * got wrong and hasn't since rescued. Same structure as the CCA
- * ReviewRunner (including the mount-race guard — see the comment
- * there) over the pack data source.
+ * Review-mode runner. In the default 'mistakes' variant it re-asks
+ * questions the learner got wrong and hasn't since rescued. In the
+ * 'weakspots' variant it drills the unified weak-spot pool (mistakes +
+ * starred + shaky topics; see lib/weakSpots.ts). Same loop and mount-race
+ * guard as the CCA ReviewRunner over the pack data source.
  */
-export function PackReviewRunner() {
+export function PackReviewRunner({ variant = 'mistakes' }: PackReviewRunnerProps) {
   const { attempts } = useStorageData();
+  const { stars } = useStarredQuestions();
   const recordAttempt = useRecordAttempt();
   const startSession = useStartSession();
   const endSession = useEndSession();
   const { nextUnlock, checkNow, clearNextUnlock } = useAchievementUnlock();
+
+  const copy = VARIANT_COPY[variant];
 
   const [state, setState] = useState<RunnerState | null>(null);
   const [nothingToReview, setNothingToReview] = useState(false);
@@ -69,7 +128,11 @@ export function PackReviewRunner() {
 
   useEffect(() => {
     if (!mounted || state) return;
-    const ids = unresolvedMistakeIds(attempts).slice(0, REVIEW_BATCH_SIZE);
+    const ids = (
+      variant === 'weakspots'
+        ? buildWeakSpotPool(packQuestions, attempts, stars).orderedIds
+        : unresolvedMistakeIds(attempts)
+    ).slice(0, REVIEW_BATCH_SIZE);
     if (ids.length === 0) {
       setNothingToReview(true);
       return;
@@ -101,14 +164,8 @@ export function PackReviewRunner() {
       <main className="flex flex-col gap-5">
         <BackLink />
         <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-sm">
-          <h1 className="text-2xl font-bold text-ink-900">
-            Nothing to review
-          </h1>
-          <p className="mt-2 text-ink-600">
-            You haven&apos;t got any unresolved mistakes right now. Keep
-            practising — questions you get wrong show up here so you can
-            retry them.
-          </p>
+          <h1 className="text-2xl font-bold text-ink-900">{copy.emptyTitle}</h1>
+          <p className="mt-2 text-ink-600">{copy.emptyBody}</p>
           <Link href="/" className="mt-4 inline-block">
             <Button size="lg">Back to home</Button>
           </Link>
@@ -138,23 +195,20 @@ export function PackReviewRunner() {
         <BackLink />
         <div className="rounded-2xl border border-ink-200 bg-white p-8 text-center shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
-            Review complete
+            {copy.completeTitle}
           </div>
           <h1 className="mt-2 text-4xl font-bold text-ink-900">
             {correct}/{total}
           </h1>
           <p className="mt-1 text-lg font-medium text-ink-600">
-            {pct}% rescued
+            {pct}% {copy.metricLabel}
           </p>
-          <p className="mt-4 text-sm text-ink-500">
-            Questions you got right have been removed from your mistake
-            queue.
-          </p>
+          <p className="mt-4 text-sm text-ink-500">{copy.completeNote}</p>
           <div className="mt-6 flex flex-col gap-2">
-            <Link href="/practice/review/" className="block">
+            <Link href={copy.moreHref} className="block">
               <Button size="lg" block>
                 <RefreshCw className="h-4 w-4" />
-                Review more
+                {copy.moreLabel}
               </Button>
             </Link>
             <Link href="/" className="block">
@@ -234,7 +288,7 @@ export function PackReviewRunner() {
 
       <div className="flex flex-wrap items-center gap-1.5 text-sm">
         <span className="rounded-full border border-warn-500/50 bg-warn-100/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-warn-700">
-          Review mistakes
+          {copy.chip}
         </span>
         <QuestionMeta question={current} />
         {scenario ? (
@@ -311,7 +365,7 @@ export function PackReviewRunner() {
               isCorrect ? 'text-success-700' : 'text-warn-700',
             )}
           >
-            {isCorrect ? 'Rescued.' : "We'll bring this one back later."}
+            {isCorrect ? copy.correctFeedback : copy.wrongFeedback}
           </div>
           {!isCorrect ? (
             <div className="text-[15px] text-ink-700">
@@ -329,6 +383,7 @@ export function PackReviewRunner() {
             <ConceptCard concept={concept} defaultOpen={!isCorrect} />
           ) : null}
           <SourceRef sourceRef={current.sourceRef} />
+          <StarButton questionId={current.id} />
           <VoteRow questionId={current.id} />
           <Button size="lg" block onClick={handleNext} className="mt-1">
             {state.currentIndex + 1 === state.questions.length
