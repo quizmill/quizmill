@@ -8,11 +8,14 @@ import manifestJson from '../../content/pack/pack.json';
 import questionsJson from '../../content/pack/questions.json';
 import scenariosJson from '../../content/pack/scenarios.json';
 import conceptsJson from '../../content/pack/concepts.json';
+import { categoryIcon } from './category-icon';
 
 export type PackCategory = {
   key: string;
   label: string;
   shortLabel?: string;
+  /** Bespoke emoji icon; falls back to a deterministic one by order. */
+  icon?: string;
   weight?: number;
 };
 
@@ -194,4 +197,14 @@ const CATEGORY_TONES: CategoryTone[] = [
 ];
 export const PACK_CATEGORY_TONE: Record<string, CategoryTone> = Object.fromEntries(
   packManifest.categories.map((c, i) => [c.key, CATEGORY_TONES[i % CATEGORY_TONES.length]]),
+);
+
+/**
+ * Per-category icon (emoji), keyed by category key — the authored
+ * manifest `icon` or a deterministic fallback by declaration order. The
+ * same value is used for the category's mastery sticker (see
+ * `buildAchievements`), so card and sticker always match.
+ */
+export const PACK_CATEGORY_ICON: Record<string, string> = Object.fromEntries(
+  packManifest.categories.map((c, i) => [c.key, categoryIcon(c, i)]),
 );

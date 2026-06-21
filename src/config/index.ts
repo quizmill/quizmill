@@ -18,6 +18,9 @@ export interface CategoryDef {
   label: string;
   /** Shorter chip-friendly label. Falls back to `label`. */
   shortLabel?: string;
+  /** Optional bespoke emoji icon for the category card / mastery sticker.
+   *  Falls back to a deterministic emoji by declaration order. */
+  icon?: string;
   /** Optional selection weight (e.g. an exam blueprint percentage). */
   weight?: number;
 }

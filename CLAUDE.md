@@ -174,3 +174,6 @@ are detected on every commit regardless.
   at them.
 - Pack schema changes bump `schemaVersion` and must stay
   backward-readable.
+- Always open a PR and push the branch up (so a preview env is
+  created) when finishing a session's work, unless the user explicitly
+  says not to.
