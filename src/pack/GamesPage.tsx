@@ -1,34 +1,54 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Gamepad2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { useStorageData } from '@/lib/useStorage';
 import { enabledGames, type GameId } from '@/lib/games/registry';
-import { packGames, gamesDailyLimit } from '@/pack/data';
-import { GameModal } from '@/pack/games/GameModal';
-import { loadGamePlaysToday, recordGamePlay } from '@/lib/storage';
+import { packGames, gamesEarnEvery } from '@/pack/data';
+import { loadGamesPlayed, recordGamePlay } from '@/lib/storage';
+
+// The game components (six games + their logic) are the heavy part of this
+// feature. Load them ONLY when a game is actually opened — they're never in
+// the games-page chunk, let alone the rest of the app. Packs without games
+// never reach this route at all (it 404s), so they pay nothing.
+const GameModal = dynamic(
+  () => import('@/pack/games/GameModal').then((m) => m.GameModal),
+  { ssr: false },
+);
 
 /**
- * The games arcade — a small set of break-time games. Reached via the
- * hidden version-pill easter egg in Settings. A daily play cap keeps it a
- * treat: by default one game a day (per-pack `games.dailyLimit`; 0 =
- * unlimited), resetting at local midnight. Only mounted for packs that
- * switch games on (the route 404s otherwise).
+ * The games arcade. Games are EARNED by practising — one play per
+ * `gamesEarnEvery` correct answers (default 10; 0 = always free) — and
+ * spent when you play. Reached via the hidden version-pill easter egg in
+ * Settings; only mounted for packs that switch games on (route 404s
+ * otherwise).
  */
 export default function GamesPage() {
+  const { attempts } = useStorageData();
   const games = enabledGames(packGames?.include);
 
-  // The open game (null = the grid / capped screen is showing).
+  const correct = attempts.filter((a) => a.isCorrect).length;
+  const free = gamesEarnEvery <= 0;
+  const earned = free ? Infinity : Math.floor(correct / gamesEarnEvery);
+
+  // Cumulative plays spent — read on the client (null until then, so the
+  // earn/grid states don't flash before we know the real balance).
+  const [spent, setSpent] = useState<number | null>(null);
+  useEffect(() => setSpent(loadGamesPlayed()), []);
+
+  const available = spent === null ? null : Math.max(0, earned - spent);
+  const canPlay = available === null ? null : available > 0;
+
+  // Progress toward the next earned play.
+  const toward = free ? 0 : correct % gamesEarnEvery;
+  const needed = free ? 0 : gamesEarnEvery - toward;
+  const pct = free ? 100 : Math.round((toward / gamesEarnEvery) * 100);
+
   const [active, setActive] = useState<GameId | null>(null);
-  // null until read on the client — avoids a grid→capped flash on first paint.
-  const [playsToday, setPlaysToday] = useState<number | null>(null);
-  useEffect(() => setPlaysToday(loadGamePlaysToday()), []);
-
-  const capped =
-    gamesDailyLimit > 0 && playsToday !== null && playsToday >= gamesDailyLimit;
-
   function play(id: GameId) {
-    setPlaysToday(recordGamePlay());
+    setSpent(recordGamePlay());
     setActive(id);
   }
 
@@ -42,61 +62,26 @@ export default function GamesPage() {
           <ArrowLeft className="h-4 w-4" />
           Home
         </Link>
-        <div className="text-sm font-medium text-ink-500" data-testid="games-count">
-          <span className="font-semibold text-ink-900">{games.length}</span>
-          <span> {games.length === 1 ? 'game' : 'games'}</span>
-        </div>
+        {available !== null && Number.isFinite(available) && available > 0 ? (
+          <div
+            className="rounded-full bg-brand-100 px-3 py-1 text-sm font-semibold text-brand-700"
+            data-testid="games-available"
+          >
+            {available} {available === 1 ? 'play' : 'plays'} ready
+          </div>
+        ) : null}
       </header>
 
       <div>
         <h1 className="text-3xl font-bold text-ink-900">Games</h1>
         <p className="mt-1 text-ink-500">
-          {gamesDailyLimit === 1
-            ? 'One quick game to enjoy between rounds of practice.'
-            : 'A few quick games to enjoy between rounds of practice.'}
+          {free
+            ? 'A few quick games to enjoy between rounds of practice.'
+            : `Earn a game every ${gamesEarnEvery} correct answers, then play.`}
         </p>
       </div>
 
-      {playsToday === null ? null : capped ? (
-        <section
-          data-testid="games-capped"
-          className="flex flex-col items-center gap-4 rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-sm"
-        >
-          <div className="text-5xl leading-none" aria-hidden>
-            🎉
-          </div>
-          <div>
-            <div className="text-lg font-bold text-ink-900">
-              That&apos;s your game for today!
-            </div>
-            <p className="mt-1 text-sm text-ink-600">
-              {gamesDailyLimit === 1
-                ? 'One a day keeps it a treat — come back tomorrow to play again.'
-                : `You've played your ${gamesDailyLimit} games for today — come back tomorrow.`}
-            </p>
-          </div>
-          <Link
-            href="/"
-            className="tap-feedback inline-flex items-center gap-2 rounded-xl bg-ink-900 px-4 py-2.5 text-sm font-semibold text-white"
-          >
-            Back to practice
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-          {/* A muted line-up of what's waiting tomorrow. */}
-          <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
-            {games.map((g) => (
-              <span
-                key={g.id}
-                title={g.name}
-                aria-hidden
-                className="text-2xl leading-none grayscale opacity-30"
-              >
-                {g.emoji}
-              </span>
-            ))}
-          </div>
-        </section>
-      ) : (
+      {available === null ? null : canPlay ? (
         <section className="grid grid-cols-2 gap-3" data-testid="games-grid">
           {games.map((g) => (
             <button
@@ -114,14 +99,70 @@ export default function GamesPage() {
             </button>
           ))}
         </section>
+      ) : (
+        <section
+          data-testid="games-earn"
+          className="flex flex-col items-center gap-4 rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-sm"
+        >
+          <div className="text-5xl leading-none" aria-hidden>
+            🎯
+          </div>
+          <div>
+            <div className="text-lg font-bold text-ink-900">Earn your next game</div>
+            <p className="mt-1 text-sm text-ink-600">
+              Get{' '}
+              <strong className="text-ink-900">
+                {needed} more correct {needed === 1 ? 'answer' : 'answers'}
+              </strong>{' '}
+              to earn a game to play.
+            </p>
+          </div>
+
+          <div className="w-full max-w-xs">
+            <div className="flex items-baseline justify-between text-xs text-ink-500">
+              <span className="font-medium text-ink-700">
+                {toward} / {gamesEarnEvery}
+              </span>
+              <span>toward your next game</span>
+            </div>
+            <div className="mt-1 h-2 overflow-hidden rounded-full bg-ink-200">
+              <div
+                className="h-full rounded-full bg-brand-500 transition-all"
+                style={{ width: `${pct}%` }}
+                data-testid="games-earn-bar"
+              />
+            </div>
+          </div>
+
+          <Link
+            href="/"
+            className="tap-feedback inline-flex items-center gap-2 rounded-xl bg-ink-900 px-4 py-2.5 text-sm font-semibold text-white"
+          >
+            Practise to earn one
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+
+          {/* A muted line-up of what's waiting. */}
+          <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
+            {games.map((g) => (
+              <span
+                key={g.id}
+                title={g.name}
+                aria-hidden
+                className="text-2xl leading-none grayscale opacity-30"
+              >
+                {g.emoji}
+              </span>
+            ))}
+          </div>
+        </section>
       )}
 
       {active ? (
         <GameModal game={active} onClose={() => setActive(null)} />
       ) : null}
 
-      <p className="flex items-center justify-center gap-1.5 text-center text-xs text-ink-400">
-        <Gamepad2 className="h-3.5 w-3.5" />
+      <p className="text-center text-xs text-ink-400">
         Games are just for fun — they don&apos;t affect your stats or stickers.
       </p>
     </main>

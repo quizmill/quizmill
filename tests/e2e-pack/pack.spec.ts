@@ -598,7 +598,7 @@ describe('reward mini-games', () => {
     expect(await page.$('[data-testid="games-unlocked-banner"]')).toBeNull();
   });
 
-  it('reveals games via the version-pill easter egg and plays one', async () => {
+  it('reveals games via the version-pill easter egg; arcade is earn-gated', async () => {
     await page.goto(baseUrl() + '/settings/');
     await page.waitForSelector('[data-testid="app-version"]');
     // Not revealed until you tap the version pill enough times.
@@ -609,29 +609,44 @@ describe('reward mini-games', () => {
     }
     await page.waitForSelector('[data-testid="games-easter-egg"]');
 
-    // Follow the revealed link into the arcade — playable straight away,
-    // no answer-count gate.
+    // Follow the revealed link into the arcade. With no correct answers yet,
+    // there's nothing to play — it shows the "earn a game" state.
     await page.click('[data-testid="games-easter-egg"] a[href="/games/"]');
-    await page.waitForSelector('[data-testid="games-grid"]');
+    await page.waitForSelector('[data-testid="games-earn"]');
+    expect(await page.$('[data-testid="games-grid"]')).toBeNull();
+  });
 
-    // Open the sliding puzzle; the game shell + board should appear.
+  it('earns a game by practising, then spends it on a play', async () => {
+    // Demo earns one game per 10 correct answers — seed exactly 10 correct.
+    await seedAttempts(
+      page,
+      Array.from({ length: 10 }, (_, i) => ({
+        questionId: `seed-q-${i}`,
+        subject: 'planets',
+        topic: `seed-q-${i}`,
+        isCorrect: true,
+        agoMs: 1000 + i,
+      })),
+    );
+    await page.goto(baseUrl() + '/games/');
+    await page.waitForSelector('[data-testid="games-grid"]');
+    // One play earned and ready.
+    await waitForText(page, '1 play ready');
+
+    // Play the sliding puzzle.
     await page.click('[data-testid="game-card-tile-puzzle"]');
     await page.waitForSelector('[data-testid="game-shell"]');
     await page.waitForSelector('[data-testid="tile-puzzle-board"]');
-
-    // Close it again.
     await page.click('button[aria-label="Close game"]');
     await page.waitForFunction(
       () => !document.querySelector('[data-testid="game-shell"]'),
     );
 
-    // The daily play cap (default: 1 game) now blocks a second game until
-    // tomorrow — the grid is replaced by the "come back tomorrow" card.
-    await page.waitForSelector('[data-testid="games-capped"]');
+    // The earned play is now spent — back to the earn state until they
+    // practise another 10 correct. Sticks across a reload (persisted).
+    await page.waitForSelector('[data-testid="games-earn"]');
     expect(await page.$('[data-testid="games-grid"]')).toBeNull();
-
-    // And it sticks across a reload (persisted, not just in-memory).
     await page.reload();
-    await page.waitForSelector('[data-testid="games-capped"]');
+    await page.waitForSelector('[data-testid="games-earn"]');
   });
 });

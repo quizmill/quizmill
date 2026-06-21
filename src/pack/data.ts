@@ -40,7 +40,7 @@ export type PackExam = {
 
 /** Optional reward mini-games declared by the pack. */
 export type PackGames = {
-  dailyLimit?: number;
+  earnEvery?: number;
   include?: string[];
 };
 
@@ -116,10 +116,10 @@ export const packExam = packManifest.exam;
 export const packGames = packManifest.games;
 /** Whether this pack ships the reward mini-games at all. */
 export const gamesEnabled = packGames !== undefined;
-/** Default games a learner may play per day (games are a treat). */
-export const DEFAULT_GAMES_DAILY_LIMIT = 1;
-/** Games per day for this pack; 0 = unlimited. Resets at local midnight. */
-export const gamesDailyLimit = packGames?.dailyLimit ?? DEFAULT_GAMES_DAILY_LIMIT;
+/** Default correct answers needed to earn one game play. */
+export const DEFAULT_GAMES_EARN_EVERY = 10;
+/** Correct answers per earned game play for this pack; 0 = always free. */
+export const gamesEarnEvery = packGames?.earnEvery ?? DEFAULT_GAMES_EARN_EVERY;
 
 export const packQuestions = questionsJson as PackQuestion[];
 
