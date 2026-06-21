@@ -133,16 +133,16 @@ export default function PackHome() {
             <Settings className="h-4 w-4" />
           </Link>
         </div>
-        <nav className="flex flex-wrap gap-2">
-          <NavPill href="/progress" icon={BarChart3} label="Progress" />
-          <NavPill
+        <nav className="flex items-center gap-2">
+          <NavIcon href="/progress" icon={BarChart3} label="Progress" />
+          <NavIcon
             href="/starred"
             icon={Star}
             label="Starred"
             count={starredCount}
             iconClassName={cn(starredCount > 0 && 'fill-brand-500 text-brand-500')}
           />
-          <NavPill href="/stickers" icon={Trophy} label="Stickers" />
+          <NavIcon href="/stickers" icon={Trophy} label="Sticker cabinet" />
         </nav>
       </header>
 
@@ -361,10 +361,11 @@ export default function PackHome() {
   );
 }
 
-/** A labelled nav destination — icon + text, with an optional count badge.
- *  Sits in the wrapping home nav row, so it stays readable and never
- *  overflows the way a tight cluster of icon-only buttons did. */
-function NavPill({
+/** A compact icon-only nav destination — a round button with an optional
+ *  count badge. Icon-only keeps the row to a tight ~136px cluster that never
+ *  wraps on small phones; the aria-label carries the destination name for
+ *  screen readers (and the E2E). */
+function NavIcon({
   href,
   icon: Icon,
   label,
@@ -380,12 +381,12 @@ function NavPill({
   return (
     <Link
       href={href}
-      className="tap-feedback inline-flex h-10 items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3.5 text-sm font-medium text-ink-700 shadow-sm hover:border-ink-300 hover:text-ink-900"
+      aria-label={label}
+      className="tap-feedback relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm hover:border-ink-300 hover:text-ink-900"
     >
       <Icon className={cn('h-4 w-4', iconClassName)} />
-      <span>{label}</span>
       {count && count > 0 ? (
-        <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-brand-500 px-1 text-[10px] font-bold text-white">
+        <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-brand-500 px-1 text-[10px] font-bold text-white">
           {count}
         </span>
       ) : null}
