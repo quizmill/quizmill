@@ -36,8 +36,22 @@ webmanifest are generated from the manifest by `scripts/pack-assets.ts`
   runner.ts (pure session logic), data.ts (typed pack loader),
   StickersPage + achievements{,-engine}.ts (sticker cabinet; mastery
   stickers generated per pack category), ProgressPage (CSS-only charts
-  over `src/lib/stats.ts`), DownvoteBrowser (Settings extra).
+  over `src/lib/stats.ts`), DownvoteBrowser (Settings extra),
+  GamesPage + games/ (reward mini-games — see below).
   InstallPrompt (`src/components/`) covers Add-to-Home-Screen.
+- Reward mini-games (opt-in): a pack adds a `games` block to its manifest
+  (`{ include? }`, mirrors the optional `exam` block — presence enables;
+  `include` narrows the set). Registry `src/lib/games/registry.ts` (id ↔
+  `GAME_IDS` in schema.ts), pure logic `src/lib/games/{snake,tilePuzzle,
+  pong}.ts`, components `src/pack/games/` (GameShell/HowToPlay/GameModal +
+  6 games), route `/games`. The heavy game components are
+  `next/dynamic`-imported in GamesPage (loaded only when a game is opened)
+  and live only in the /games route chunk — packs without games 404 the
+  route and pay nothing. Games are ephemeral (don't touch stats/stickers),
+  free to play, and a deliberately HIDDEN easter egg — nothing on Home;
+  reached by tapping the version pill in Settings 7× (`GAMES_REVEAL_TAPS`),
+  which reveals a panel linking to `/games`. Ported from
+  `~/code/personal/learning` (original engine code, not exam content).
 - Engine never imports question *shapes* — it sees only the
   denormalised `Attempt`/`Session` fields (`src/data/types.ts`).
 

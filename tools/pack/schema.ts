@@ -96,6 +96,33 @@ export const packExamSchema = z.object({
   scope: z.object({ level: z.string().regex(slug).max(40) }).optional(),
 });
 
+/**
+ * The built-in reward mini-games a pack may switch on, by id. Kept in
+ * sync with the engine's game registry (src/lib/games/registry.ts) — this
+ * literal is the validator's source of truth for valid game ids.
+ */
+export const GAME_IDS = [
+  'snake',
+  'tile-puzzle',
+  'memory',
+  'whack',
+  'pong',
+  'dodger',
+] as const;
+export const gameIdSchema = z.enum(GAME_IDS);
+
+/**
+ * Optional reward mini-games (additive; valid for v1 and v2 packs). When
+ * present, the app offers a small arcade of break-time games as a hidden
+ * treat — found via the version-pill easter egg in Settings, then free to
+ * play. Absent → no games anywhere, exactly as today.
+ */
+export const packGamesSchema = z.object({
+  /** Restrict to a subset of the built-in games (by id). Omit → all of
+   *  them. Use to give a serious-exam pack a smaller, calmer set. */
+  include: z.array(gameIdSchema).min(1).max(GAME_IDS.length).optional(),
+});
+
 export const packManifestSchema = z
   .object({
     schemaVersion: z.union([z.literal(1), z.literal(2)]),
@@ -123,6 +150,8 @@ export const packManifestSchema = z
     sources: z.array(packSourceSchema).max(12).optional(),
     /** Optional exam-readiness goal — see packExamSchema. */
     exam: packExamSchema.optional(),
+    /** Optional reward mini-games — see packGamesSchema. */
+    games: packGamesSchema.optional(),
   })
   .superRefine((m, ctx) => {
     const keys = m.categories.map((c) => c.key);
@@ -240,6 +269,8 @@ export const packQuestionSchema = z
 
 export type PackCategory = z.infer<typeof packCategorySchema>;
 export type PackExam = z.infer<typeof packExamSchema>;
+export type PackGames = z.infer<typeof packGamesSchema>;
+export type GameId = z.infer<typeof gameIdSchema>;
 export type PackLevel = z.infer<typeof packLevelSchema>;
 export type PackSource = z.infer<typeof packSourceSchema>;
 export type PackManifest = z.infer<typeof packManifestSchema>;

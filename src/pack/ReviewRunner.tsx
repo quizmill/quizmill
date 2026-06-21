@@ -105,7 +105,7 @@ export function PackReviewRunner() {
             Nothing to review
           </h1>
           <p className="mt-2 text-ink-600">
-            You haven't got any unresolved mistakes right now. Keep
+            You haven&apos;t got any unresolved mistakes right now. Keep
             practising — questions you get wrong show up here so you can
             retry them.
           </p>

@@ -36,6 +36,13 @@ export interface ExamConfig {
   scope?: { level: string };
 }
 
+/** Optional reward mini-games, mirrored from the manifest `games` block.
+ *  Absent → no games anywhere. */
+export interface GamesConfig {
+  /** Restrict to a subset of the built-in games (by id). Omit → all. */
+  include?: string[];
+}
+
 export interface AppConfig {
   /** Pack identifier — also namespaces localStorage. */
   packId: string;
@@ -50,6 +57,8 @@ export interface AppConfig {
   categories: CategoryDef[];
   /** Exam-readiness goal, when the pack declares one. */
   exam?: ExamConfig;
+  /** Reward mini-games, when the pack switches them on. */
+  games?: GamesConfig;
 }
 
 export const APP_CONFIG: AppConfig = {
@@ -60,4 +69,5 @@ export const APP_CONFIG: AppConfig = {
   themeColor: manifest.themeColor,
   categories: manifest.categories as CategoryDef[],
   exam: (manifest as { exam?: ExamConfig }).exam,
+  games: (manifest as { games?: GamesConfig }).games,
 };

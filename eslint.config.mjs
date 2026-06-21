@@ -29,12 +29,13 @@ const config = [
       'react/no-unescaped-entities': 'off',
       // Newer (aggressive) react-hooks rules. They flag legitimate,
       // shipped patterns here — mount guards (`useEffect(() =>
-      // setMounted(true), [])`) and latest-value refs assigned during
-      // render — that aren't bugs. Surface them as warnings to revisit
-      // deliberately instead of blocking CI or forcing risky refactors
-      // in a tooling change.
+      // setMounted(true), [])`), latest-value refs assigned during render,
+      // and the imperative mini-game loops (timers + Math.random outside
+      // render) — that aren't bugs. Surface as warnings to revisit
+      // deliberately instead of blocking CI or forcing risky refactors.
       'react-hooks/set-state-in-effect': 'warn',
       'react-hooks/refs': 'warn',
+      'react-hooks/purity': 'warn',
     },
   },
 ];
