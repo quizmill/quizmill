@@ -24,7 +24,11 @@ const topicKey = (subject: string, topic: string): string =>
 /**
  * Return the IDs of all questions whose most recent wrong attempt has NOT
  * been rescued by a later correct attempt on the same topic. Sorted by the
- * timestamp of the wrong attempt, most-recent first.
+ * timestamp of the wrong attempt, OLDEST first — so the review queue
+ * (which takes the first N) resurfaces mistakes made longer ago before
+ * recent ones, the spaced-repetition intuition: a stale mistake should not
+ * stay buried under today's slip-ups. (The mistakes browser uses
+ * `unresolvedMistakes`, which keeps newest-first for list display.)
  */
 export function unresolvedMistakeIds(attempts: readonly Attempt[]): string[] {
   // Walk chronologically so we can read off the latest "correct on topic"
@@ -50,7 +54,7 @@ export function unresolvedMistakeIds(attempts: readonly Attempt[]): string[] {
     if (lastOk < t) unresolved.push({ id: qid, t });
   }
 
-  unresolved.sort((a, b) => b.t - a.t);
+  unresolved.sort((a, b) => a.t - b.t);
   return unresolved.map((x) => x.id);
 }
 
