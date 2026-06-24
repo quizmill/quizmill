@@ -124,10 +124,14 @@ describe('evaluateAchievements — thresholds', () => {
 
   it('daily stickers follow consecutive practice days', () => {
     const day = 24 * 3600_000;
-    const sessions = [0, 1, 2].map((d) =>
-      session({ endedAt: NOW.getTime() - d * day }),
+    // Any practice activity on a day keeps the streak alive — a day counts
+    // even if the user never clicked through to finish the session. So a
+    // single answered question per day across three consecutive days is a
+    // 3-day streak, regardless of whether those sessions were completed.
+    const attempts = [0, 1, 2].map((d) =>
+      attempt({ answeredAt: NOW.getTime() - d * day }),
     );
-    const earned = evaluate(sessions, []);
+    const earned = evaluate([], attempts);
     expect(earned.has('daily-3')).toBe(true);
     expect(earned.has('daily-7')).toBe(false);
   });

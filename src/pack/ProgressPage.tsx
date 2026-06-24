@@ -7,7 +7,7 @@ import { APP_CONFIG } from '@/config';
 import { useStorageData } from '@/lib/useStorage';
 import {
   accuracyByDay,
-  completedSessionDates,
+  practiceDates,
   sessionsByWeekday,
   sessionSummary,
   weakestQuestions,
@@ -34,7 +34,7 @@ const DAILY_POINT_LIMIT = 30;
 export default function ProgressPage() {
   const { sessions, attempts } = useStorageData();
 
-  const streak = currentStreak(completedSessionDates(sessions));
+  const streak = currentStreak(practiceDates(attempts));
   const summary = sessionSummary(sessions);
   const byWeekday = sessionsByWeekday(sessions);
   const maxWeekday = Math.max(...byWeekday.map((d) => d.sessions), 1);

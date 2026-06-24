@@ -5,6 +5,7 @@ import {
   accuracyByDay,
   completedSessionDates,
   levelNudge,
+  practiceDates,
   sessionsByWeekday,
   sessionSummary,
   weakestQuestions,
@@ -149,6 +150,46 @@ describe('completedSessionDates', () => {
     const dates = completedSessionDates(sessions);
     expect(dates).toHaveLength(1);
     expect(dates[0].getTime()).toBe(NOON + 60_000);
+  });
+});
+
+describe('practiceDates', () => {
+  const DAY = 24 * 3600_000;
+  const today = new Date('2026-06-10T20:00:00');
+
+  it('records a date for every answered question', () => {
+    const attempts: Attempt[] = [
+      attempt({ answeredAt: NOON }),
+      attempt({ answeredAt: NOON + 1000 }),
+    ];
+    expect(practiceDates(attempts).map((d) => d.getTime())).toEqual([
+      NOON,
+      NOON + 1000,
+    ]);
+  });
+
+  it('keeps the streak alive on days the user practised but never finished a session', () => {
+    // Practised three days running. Only TODAY did the user click through to
+    // the final question (writing the session end record); the previous two
+    // days they answered some questions and left mid-session. A daily-practice
+    // streak should still count those days.
+    const sessions: Session[] = [
+      // only today's session was completed
+      session({ id: 'today', startedAt: today.getTime(), endedAt: today.getTime() + 60_000 }),
+      // two prior days: started, never finished (endedAt null)
+      session({ id: 'd1', startedAt: today.getTime() - DAY, endedAt: null }),
+      session({ id: 'd2', startedAt: today.getTime() - 2 * DAY, endedAt: null }),
+    ];
+    const attempts: Attempt[] = [
+      attempt({ answeredAt: today.getTime() - 2 * DAY }),
+      attempt({ answeredAt: today.getTime() - DAY }),
+      attempt({ answeredAt: today.getTime() }),
+    ];
+
+    // The old, session-only signal collapses to 1 (only today completed)...
+    expect(currentStreak(completedSessionDates(sessions), today)).toBe(1);
+    // ...while practice activity correctly shows the 3-day streak.
+    expect(currentStreak(practiceDates(attempts), today)).toBe(3);
   });
 });
 

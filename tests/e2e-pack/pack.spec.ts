@@ -436,7 +436,8 @@ describe('progress page', () => {
   });
 
   it('renders sessions, the daily streak, and weak spots from history', async () => {
-    // Seeded session completed ~24h ago → a 1-day streak; the twice-wrong
+    // Seeded attempts are from today → a 1-day streak (the streak follows
+    // practice activity, not whether a session was finished); the twice-wrong
     // question should surface as the top weak spot.
     await seedAttempts(page, [
       { questionId: 'demo-planets-001', subject: 'planets', topic: 'demo-planets-001', isCorrect: false, agoMs: 60_000 },

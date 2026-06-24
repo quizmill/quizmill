@@ -128,6 +128,18 @@ export function completedSessionDates(sessions: readonly Session[]): Date[] {
     .map((s) => new Date(s.endedAt));
 }
 
+/**
+ * One date per answered question — the signal behind the daily-practice
+ * streak. Unlike {@link completedSessionDates}, this counts any day the user
+ * actually practised, not only days where they clicked all the way through a
+ * session's final question (which writes `endedAt`). A user who answers a few
+ * questions and leaves mid-session still kept their streak alive, so attempts —
+ * recorded per answer and immutable — are the reliable signal.
+ */
+export function practiceDates(attempts: readonly Attempt[]): Date[] {
+  return attempts.map((a) => new Date(a.answeredAt));
+}
+
 export interface SessionSummary {
   /** Completed sessions (endedAt set); abandoned ones aren't counted. */
   sessions: number;
