@@ -124,10 +124,15 @@ describe('evaluateAchievements — thresholds', () => {
 
   it('daily stickers follow consecutive practice days', () => {
     const day = 24 * 3600_000;
-    const sessions = [0, 1, 2].map((d) =>
-      session({ endedAt: NOW.getTime() - d * day }),
+    // A day counts toward the streak once a full round (10 questions) is
+    // answered — finishing the session isn't required. Ten questions on each
+    // of three consecutive days is a 3-day streak.
+    const attempts = [0, 1, 2].flatMap((d) =>
+      Array.from({ length: 10 }, () =>
+        attempt({ answeredAt: NOW.getTime() - d * day }),
+      ),
     );
-    const earned = evaluate(sessions, []);
+    const earned = evaluate([], attempts);
     expect(earned.has('daily-3')).toBe(true);
     expect(earned.has('daily-7')).toBe(false);
   });
@@ -231,7 +236,7 @@ describe('achievementProgress', () => {
       label: 'questions answered',
     });
     expect(achievementProgress(byId('daily-3'), ctx)).toMatchObject({
-      current: 1, // one completed session today
+      current: 0, // only 3 questions answered today — under the 10/day goal
       target: 3,
     });
   });

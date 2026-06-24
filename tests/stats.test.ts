@@ -5,6 +5,8 @@ import {
   accuracyByDay,
   completedSessionDates,
   levelNudge,
+  practiceDates,
+  streakProgress,
   sessionsByWeekday,
   sessionSummary,
   weakestQuestions,
@@ -149,6 +151,76 @@ describe('completedSessionDates', () => {
     const dates = completedSessionDates(sessions);
     expect(dates).toHaveLength(1);
     expect(dates[0].getTime()).toBe(NOON + 60_000);
+  });
+});
+
+describe('practiceDates', () => {
+  const DAY = 24 * 3600_000;
+  const today = new Date('2026-06-10T20:00:00');
+  const onDay = (offset: number, n: number): Attempt[] =>
+    Array.from({ length: n }, () =>
+      attempt({ answeredAt: today.getTime() - offset * DAY }),
+    );
+
+  it('counts a day only once the question threshold is met', () => {
+    // 10 today → qualifies; 9 yesterday → falls short.
+    const attempts = [...onDay(0, 10), ...onDay(1, 9)];
+    expect(practiceDates(attempts)).toHaveLength(1);
+  });
+
+  it('a light tap-and-leave day does not keep the streak alive', () => {
+    // Full rounds two and three days ago, but only a couple of questions
+    // today → today doesn't count, so the streak reads 0 (the run before
+    // today is already broken by the gap at "yesterday").
+    const attempts = [...onDay(0, 2), ...onDay(2, 10), ...onDay(3, 10)];
+    expect(currentStreak(practiceDates(attempts), today)).toBe(0);
+  });
+
+  it('keeps the streak alive on days the user practised but never finished a session', () => {
+    // Practised three days running — a full round each day — but never clicked
+    // through the final question (so no session has an end record). The
+    // session-only signal reads 0; practice activity shows the real 3-day run.
+    const sessions: Session[] = [
+      session({ id: 'd0', startedAt: today.getTime(), endedAt: null }),
+      session({ id: 'd1', startedAt: today.getTime() - DAY, endedAt: null }),
+      session({ id: 'd2', startedAt: today.getTime() - 2 * DAY, endedAt: null }),
+    ];
+    const attempts = [...onDay(0, 10), ...onDay(1, 10), ...onDay(2, 10)];
+
+    expect(currentStreak(completedSessionDates(sessions), today)).toBe(0);
+    expect(currentStreak(practiceDates(attempts), today)).toBe(3);
+  });
+});
+
+describe('streakProgress', () => {
+  const DAY = 24 * 3600_000;
+  const today = new Date('2026-06-10T20:00:00');
+  const onDay = (offset: number, n: number): Attempt[] =>
+    Array.from({ length: n }, () =>
+      attempt({ answeredAt: today.getTime() - offset * DAY }),
+    );
+
+  it('reports questions remaining toward today’s goal', () => {
+    const p = streakProgress([...onDay(1, 10), ...onDay(0, 3)], today);
+    expect(p.goal).toBe(10);
+    expect(p.answeredToday).toBe(3);
+    expect(p.remaining).toBe(7);
+    expect(p.goalMet).toBe(false);
+    // Yesterday was a full round, so the streak is alive at 1 even though
+    // today's goal isn't met yet.
+    expect(p.streak).toBe(1);
+  });
+
+  it('marks the goal met and folds today into the streak once reached', () => {
+    const p = streakProgress([...onDay(1, 10), ...onDay(0, 10)], today);
+    expect(p.goalMet).toBe(true);
+    expect(p.remaining).toBe(0);
+    expect(p.streak).toBe(2);
+  });
+
+  it('is empty for a learner who hasn’t practised', () => {
+    const p = streakProgress([], today);
+    expect(p).toMatchObject({ streak: 0, answeredToday: 0, remaining: 10, goalMet: false });
   });
 });
 

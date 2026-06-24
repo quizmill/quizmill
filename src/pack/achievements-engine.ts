@@ -11,7 +11,7 @@
  */
 import type { Attempt, Session } from '@/data/types';
 import { ACHIEVEMENTS, type Achievement } from '@/pack/achievements';
-import { completedSessionDates } from '@/lib/stats';
+import { practiceDates } from '@/lib/stats';
 import { currentStreak } from '@/lib/streak';
 
 /** Mastery: this accuracy on at least this many attempts in a category. */
@@ -56,7 +56,7 @@ export function evaluateAchievements(
   // Shared aggregates, computed once.
   const bestRun = maxConsecutiveCorrect(attempts);
   const totalAnswered = attempts.length;
-  const dailyStreak = currentStreak(completedSessionDates(sessions), now);
+  const dailyStreak = currentStreak(practiceDates(attempts), now);
 
   for (const a of achievements) {
     switch (a.category) {
@@ -138,7 +138,7 @@ export function buildProgressContext(
   return {
     bestRun: maxConsecutiveCorrect(attempts),
     totalAnswered: attempts.length,
-    dailyStreak: currentStreak(completedSessionDates(sessions), now),
+    dailyStreak: currentStreak(practiceDates(attempts), now),
     mastery,
   };
 }

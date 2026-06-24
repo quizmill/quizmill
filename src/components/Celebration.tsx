@@ -13,6 +13,9 @@ interface CelebrationAchievement {
 interface CelebrationProps {
   achievement: CelebrationAchievement;
   onDone: () => void;
+  /** Kicker above the title. Defaults to the sticker-unlock wording; the
+   *  streak toast passes its own (it isn't a sticker). */
+  label?: string;
 }
 
 /** Matches the `animate-celebration` keyframes in globals.css — the
@@ -24,7 +27,11 @@ const DISMISS_MS = 2_000;
  * beneath, and it auto-dismisses — it can never block the practice
  * flow, only decorate it.
  */
-export function Celebration({ achievement, onDone }: CelebrationProps) {
+export function Celebration({
+  achievement,
+  onDone,
+  label = 'Sticker unlocked',
+}: CelebrationProps) {
   useEffect(() => {
     const t = setTimeout(onDone, DISMISS_MS);
     return () => clearTimeout(t);
@@ -42,7 +49,7 @@ export function Celebration({ achievement, onDone }: CelebrationProps) {
           {achievement.emoji}
         </div>
         <div className="mt-2 text-sm font-semibold uppercase tracking-wider text-white/85">
-          Sticker unlocked
+          {label}
         </div>
         <div className="mt-1 text-2xl font-bold">{achievement.name}</div>
         <div className="mt-1 text-sm text-white/90">
