@@ -258,13 +258,14 @@ export function PackPracticeRunner({ categoryKey }: Props) {
         <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
       ) : streakDone !== null ? (
         <Celebration
+          label={streakDone === 1 ? 'Streak started' : 'Streak kept'}
           achievement={{
             emoji: '🔥',
             name: `${streakDone}-day streak!`,
             description:
               streakDone === 1
                 ? 'Day one done — come back tomorrow to build on it.'
-                : 'Streak kept — see you tomorrow to extend it.',
+                : 'Nice run — see you tomorrow to extend it.',
           }}
           onDone={() => setStreakDone(null)}
         />
