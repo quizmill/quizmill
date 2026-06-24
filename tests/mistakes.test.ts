@@ -102,7 +102,9 @@ describe('unresolvedMistakeIds (topic-based rescue)', () => {
     ).toEqual(['q2']);
   });
 
-  it('returns IDs sorted most-recent-mistake first', () => {
+  it('returns IDs sorted oldest-mistake first (spaced-repetition order)', () => {
+    // The review queue surfaces mistakes made longer ago before recent
+    // ones, so a stale mistake is not buried under today's slip-ups.
     // Use different topics so no rescue interference.
     expect(
       unresolvedMistakeIds([
@@ -110,7 +112,7 @@ describe('unresolvedMistakeIds (topic-based rescue)', () => {
         att('q2', false, 100, { topic: 't2' }),
         att('q3', false, 200, { topic: 't3' }),
       ]),
-    ).toEqual(['q1', 'q3', 'q2']);
+    ).toEqual(['q2', 'q3', 'q1']);
   });
 
   it('handles a mixed log across multiple topics + subjects', () => {

@@ -182,8 +182,9 @@ are detected on every commit regardless.
   don't fix first and add a test after. React component bugs (effects,
   state) can be exercised with happy-dom render tests under
   `tests/*.test.tsx`; pure logic stays in node `tests/*.test.ts`.
-- **Always open a PR** for a finished change (`gh`/GitHub MCP), even
-  when not explicitly asked — push the branch, then create the PR.
+- **Always open a PR** for a finished change (`gh`/GitHub MCP) —
+  unconditionally, without being asked: push the branch, then create the
+  PR.
 - **New user-facing features ship with visuals.** Any change that adds or
   alters UI must include screenshots in the PR (and surfaced in chat).
   Capture them from the real static build against the demo pack: `npm run
