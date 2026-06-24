@@ -33,6 +33,8 @@ supabase/.temp/
 # authoring workspace for your own packs.
 /content/pack/
 /packs/
+# generated on demand by scripts/gen-stress-pack.ts (loading-state review aid)
+/content/pack-stress/
 # generated from the active pack's manifest by scripts/pack-assets.ts
 /public/manifest.webmanifest
 /public/icon.svg

@@ -22,14 +22,37 @@
   a {
     -webkit-tap-highlight-color: transparent;
   }
+  /* `manipulation` tells the browser these targets aren't double-tap-to-
+     zoom, so it dispatches the click immediately instead of holding it
+     ~300ms to wait for a second tap — the main reason a tap can feel
+     "dropped" and need a second press on touch devices. */
+  button,
+  a,
+  [role='button'],
+  [role='radio'] {
+    touch-action: manipulation;
+  }
 }
 
 @layer utilities {
   .tap-feedback {
-    transition: transform 80ms ease, background-color 120ms ease;
+    transition:
+      transform 80ms ease,
+      filter 80ms ease,
+      background-color 120ms ease;
   }
+  /* A firmer, instantly-applied press state (CSS :active fires on
+     pointerdown, before any JS/main-thread work) so every tap is
+     acknowledged the moment a finger lands, even if the resulting
+     state update is a frame behind. */
   .tap-feedback:active {
-    transform: scale(0.98);
+    transform: scale(0.96);
+    filter: brightness(0.97);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tap-feedback:active {
+      transform: none;
+    }
   }
 
   .animate-celebration {

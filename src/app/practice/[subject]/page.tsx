@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { APP_CONFIG } from '@/config';
 import { PackPracticeRunner } from '@/pack/PracticeRunner';
+import { QuizSkeleton } from '@/components/QuizSkeleton';
 
 /**
  * One practice route per pack category, generated statically from the
@@ -24,18 +25,8 @@ export default async function PracticePage({
   if (!valid) notFound();
 
   return (
-    <Suspense fallback={<LoadingShell />}>
+    <Suspense fallback={<QuizSkeleton />}>
       <PackPracticeRunner categoryKey={subject} />
     </Suspense>
-  );
-}
-
-function LoadingShell() {
-  return (
-    <main className="flex flex-col gap-5">
-      <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center text-ink-500 shadow-sm">
-        Loading…
-      </div>
-    </main>
   );
 }

@@ -20,8 +20,12 @@ import { PackImage } from '@/pack/PackImage';
 import { ConceptCard } from '@/pack/ConceptCard';
 import { QuestionMeta } from '@/pack/QuestionMeta';
 import { Celebration } from '@/components/Celebration';
+import { QuizSkeleton } from '@/components/QuizSkeleton';
+import { QuizShell } from '@/components/QuizShell';
+import { scrollToTop } from '@/lib/scrollToTop';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { loadAttempts, loadSessions, loadLevelFilter } from '@/lib/storage';
+import { useCommitAfterPaint } from '@/lib/useCommitAfterPaint';
 import {
   packQuestions,
   packScenarios,
@@ -62,6 +66,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   const startSession = useStartSession();
   const endSession = useEndSession();
   const { nextUnlock, checkNow, clearNextUnlock } = useAchievementUnlock();
+  const { schedule: commitAfterPaint } = useCommitAfterPaint();
 
   const [state, setState] = useState<RunnerState | null>(null);
   const [outOfQuestions, setOutOfQuestions] = useState(false);
@@ -130,14 +135,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   }
 
   if (!state) {
-    return (
-      <main className="flex flex-col gap-5">
-        <BackLink />
-        <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center text-ink-500 shadow-sm">
-          Loading…
-        </div>
-      </main>
-    );
+    return <QuizSkeleton />;
   }
 
   if (finished) {
@@ -211,45 +209,78 @@ export function PackPracticeRunner({ categoryKey }: Props) {
       now: Date.now(),
       attemptId: crypto.randomUUID(),
     });
-    recordAttempt(attempt);
-    // Achievements evaluate against what's now persisted — re-read so
-    // this can't race the useStorageData snapshot.
-    checkNow(loadSessions(), loadAttempts());
+    // Show the result immediately. Persisting the attempt and evaluating
+    // achievements both walk the whole history — defer them past the
+    // paint so they can't make the tap feel dropped. (Flushed on unmount,
+    // so navigating away can't lose the write.)
     setState(advanceAfterAnswer(state, attempt.isCorrect));
     setStage('feedback');
+    commitAfterPaint(() => {
+      recordAttempt(attempt);
+      // Achievements evaluate against what's now persisted — re-read so
+      // this can't race the useStorageData snapshot.
+      checkNow(loadSessions(), loadAttempts());
+    });
   }
 
   function handleNext() {
     if (!state) return;
     if (isLastQuestion(state)) {
-      endSession(buildSessionEnd(state, categoryKey, Date.now()));
-      // Session-shaped stickers (first session, flawless round, daily
-      // streak) can only unlock once the end record is written.
-      checkNow(loadSessions(), loadAttempts());
       setFinished(true);
+      const ended = state;
+      commitAfterPaint(() => {
+        endSession(buildSessionEnd(ended, categoryKey, Date.now()));
+        // Session-shaped stickers (first session, flawless round, daily
+        // streak) can only unlock once the end record is written.
+        checkNow(loadSessions(), loadAttempts());
+      });
       return;
     }
     setState(moveToNext(state));
     setStage('choosing');
     setSelected(null);
+    // The action bar is pinned to the bottom, so a tap leaves the view
+    // scrolled down — bring the next question's prompt back into view.
+    scrollToTop();
   }
 
   const isCorrect = stage === 'feedback' && selected === current.correctKey;
   const concept = current.conceptId ? PACK_CONCEPT_BY_ID[current.conceptId] : undefined;
 
   return (
-    <main className="flex flex-col gap-5">
+    <>
       {nextUnlock ? (
         <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
       ) : null}
-      <header className="flex items-center justify-between">
-        <BackLink />
-        <ProgressBar
-          current={state.currentIndex + 1}
-          total={state.questions.length}
-        />
-      </header>
-
+      <QuizShell
+        header={
+          <header className="flex items-center justify-between">
+            <BackLink />
+            <ProgressBar
+              current={state.currentIndex + 1}
+              total={state.questions.length}
+            />
+          </header>
+        }
+        action={
+          stage === 'choosing' ? (
+            <Button
+              size="lg"
+              block
+              onClick={handleCheck}
+              disabled={selected === null}
+            >
+              Check answer
+            </Button>
+          ) : (
+            <Button size="lg" block onClick={handleNext}>
+              {state.currentIndex + 1 === state.questions.length
+                ? 'See results'
+                : 'Next question'}
+            </Button>
+          )
+        }
+      >
       <div className="flex flex-wrap items-center gap-1.5 text-sm">
         <QuestionMeta question={current} />
         {scenario ? (
@@ -302,16 +333,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
         onSelect={handleSelect}
       />
 
-      {stage === 'choosing' ? (
-        <Button
-          size="lg"
-          block
-          onClick={handleCheck}
-          disabled={selected === null}
-        >
-          Check answer
-        </Button>
-      ) : (
+      {stage === 'feedback' ? (
         <div
           className={cn(
             'flex flex-col gap-3 rounded-2xl border p-4',
@@ -345,14 +367,10 @@ export function PackPracticeRunner({ categoryKey }: Props) {
           ) : null}
           <SourceRef sourceRef={current.sourceRef} />
           <VoteRow questionId={current.id} />
-          <Button size="lg" block onClick={handleNext} className="mt-1">
-            {state.currentIndex + 1 === state.questions.length
-              ? 'See results'
-              : 'Next question'}
-          </Button>
         </div>
-      )}
-    </main>
+      ) : null}
+      </QuizShell>
+    </>
   );
 }
 

@@ -14,6 +14,10 @@ name: PR preview
 on:
   pull_request:
     branches: [main]
+    # Include label events so toggling `preview:stress-pack` rebuilds the
+    # preview on (or off) the large stress pack. `types` replaces the
+    # default set, so the usual three must be listed too.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -43,7 +47,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build static export (demo pack)
+      # Opt-in: label the PR `preview:stress-pack` to deploy the preview on a
+      # large synthetic pack instead of the demo, so loading states (tap
+      # spinner + quiz skeleton) are actually perceptible. Generated +
+      # activated here; prebuild's ensure-pack leaves an active pack alone.
+      - name: Activate stress pack (labelled PRs only)
+        if: contains(github.event.pull_request.labels.*.name, 'preview:stress-pack')
+        run: npm run pack:stress
+
+      - name: Build static export
         run: npm run build
         env:
           NEXT_PUBLIC_BASE_PATH: ''
@@ -62,7 +74,12 @@ jobs:
           script: |
             const url = '${{ steps.deploy.outputs.deployment-url }}';
             const marker = '<!-- pr-preview -->';
-            const body = `${marker}\n### 🚀 Preview — demo pack app\n\n**${url}**\n\nBuilt from this PR on the bundled solar-system demo pack. Refreshes on every push.`;
+            const stress = context.payload.pull_request.labels
+              .some((l) => l.name === 'preview:stress-pack');
+            const packLine = stress
+              ? 'Built on the large synthetic **stress pack** (~2000 questions) so loading states are perceptible — open a category and watch for the tap spinner and quiz skeleton.'
+              : 'Built from this PR on the bundled solar-system demo pack.';
+            const body = `${marker}\n### 🚀 Preview — pack app\n\n**${url}**\n\n${packLine} Refreshes on every push.`;
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;
             const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number });

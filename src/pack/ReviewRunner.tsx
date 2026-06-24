@@ -20,8 +20,12 @@ import { PackImage } from '@/pack/PackImage';
 import { ConceptCard } from '@/pack/ConceptCard';
 import { QuestionMeta } from '@/pack/QuestionMeta';
 import { Celebration } from '@/components/Celebration';
+import { QuizSkeleton } from '@/components/QuizSkeleton';
+import { QuizShell } from '@/components/QuizShell';
+import { scrollToTop } from '@/lib/scrollToTop';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { loadAttempts, loadSessions } from '@/lib/storage';
+import { useCommitAfterPaint } from '@/lib/useCommitAfterPaint';
 import { unresolvedMistakeIds } from '@/lib/mistakes';
 import {
   packQuestions,
@@ -57,6 +61,7 @@ export function PackReviewRunner() {
   const startSession = useStartSession();
   const endSession = useEndSession();
   const { nextUnlock, checkNow, clearNextUnlock } = useAchievementUnlock();
+  const { schedule: commitAfterPaint } = useCommitAfterPaint();
 
   const [state, setState] = useState<RunnerState | null>(null);
   const [nothingToReview, setNothingToReview] = useState(false);
@@ -118,14 +123,7 @@ export function PackReviewRunner() {
   }
 
   if (!state) {
-    return (
-      <main className="flex flex-col gap-5">
-        <BackLink />
-        <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center text-ink-500 shadow-sm">
-          Loading…
-        </div>
-      </main>
-    );
+    return <QuizSkeleton />;
   }
 
   if (finished) {
@@ -193,45 +191,76 @@ export function PackReviewRunner() {
       now: Date.now(),
       attemptId: crypto.randomUUID(),
     });
-    recordAttempt(attempt);
-    // Same re-read rationale as the practice runner — see there.
-    checkNow(loadSessions(), loadAttempts());
+    // Render feedback immediately; defer the history-walking work past
+    // the paint so the tap stays responsive (see the practice runner).
     setState(advanceAfterAnswer(state, attempt.isCorrect));
     setStage('feedback');
+    commitAfterPaint(() => {
+      recordAttempt(attempt);
+      // Same re-read rationale as the practice runner — see there.
+      checkNow(loadSessions(), loadAttempts());
+    });
   }
 
   function handleNext() {
     if (!state) return;
     if (isLastQuestion(state)) {
-      endSession(
-        buildSessionEnd(state, state.questions[0].categoryKey, Date.now(), 'review'),
-      );
-      // The 'comeback' sticker unlocks on the review-session end record.
-      checkNow(loadSessions(), loadAttempts());
       setFinished(true);
+      const ended = state;
+      commitAfterPaint(() => {
+        endSession(
+          buildSessionEnd(ended, ended.questions[0].categoryKey, Date.now(), 'review'),
+        );
+        // The 'comeback' sticker unlocks on the review-session end record.
+        checkNow(loadSessions(), loadAttempts());
+      });
       return;
     }
     setState(moveToNext(state));
     setStage('choosing');
     setSelected(null);
+    // Sticky action bar leaves the view scrolled down — show the next
+    // question from the top.
+    scrollToTop();
   }
 
   const isCorrect = stage === 'feedback' && selected === current.correctKey;
   const concept = current.conceptId ? PACK_CONCEPT_BY_ID[current.conceptId] : undefined;
 
   return (
-    <main className="flex flex-col gap-5">
+    <>
       {nextUnlock ? (
         <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
       ) : null}
-      <header className="flex items-center justify-between">
-        <BackLink />
-        <ProgressBar
-          current={state.currentIndex + 1}
-          total={state.questions.length}
-        />
-      </header>
-
+      <QuizShell
+        header={
+          <header className="flex items-center justify-between">
+            <BackLink />
+            <ProgressBar
+              current={state.currentIndex + 1}
+              total={state.questions.length}
+            />
+          </header>
+        }
+        action={
+          stage === 'choosing' ? (
+            <Button
+              size="lg"
+              block
+              onClick={handleCheck}
+              disabled={selected === null}
+            >
+              Check answer
+            </Button>
+          ) : (
+            <Button size="lg" block onClick={handleNext}>
+              {state.currentIndex + 1 === state.questions.length
+                ? 'See results'
+                : 'Next question'}
+            </Button>
+          )
+        }
+      >
       <div className="flex flex-wrap items-center gap-1.5 text-sm">
         <span className="rounded-full border border-warn-500/50 bg-warn-100/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-warn-700">
           Review mistakes
@@ -287,16 +316,7 @@ export function PackReviewRunner() {
         onSelect={handleSelect}
       />
 
-      {stage === 'choosing' ? (
-        <Button
-          size="lg"
-          block
-          onClick={handleCheck}
-          disabled={selected === null}
-        >
-          Check answer
-        </Button>
-      ) : (
+      {stage === 'feedback' ? (
         <div
           className={cn(
             'flex flex-col gap-3 rounded-2xl border p-4',
@@ -330,14 +350,10 @@ export function PackReviewRunner() {
           ) : null}
           <SourceRef sourceRef={current.sourceRef} />
           <VoteRow questionId={current.id} />
-          <Button size="lg" block onClick={handleNext} className="mt-1">
-            {state.currentIndex + 1 === state.questions.length
-              ? 'See results'
-              : 'Next question'}
-          </Button>
         </div>
-      )}
-    </main>
+      ) : null}
+      </QuizShell>
+    </>
   );
 }
 

@@ -2,6 +2,12 @@ import type { Config } from 'tailwindcss';
 
 const config: Config = {
   content: ['./src/**/*.{ts,tsx}'],
+  // Compile `hover:` utilities under `@media (hover: hover)` so they only
+  // apply on devices with a real pointer. On touch (esp. iOS standalone
+  // PWAs) a `:hover` style otherwise makes the FIRST tap apply the hover
+  // and the click only fire on the SECOND tap — the classic "needs a
+  // double tap" bug. Touch has no hover, so dropping these there is correct.
+  future: { hoverOnlyWhenSupported: true },
   theme: {
     extend: {
       colors: {
