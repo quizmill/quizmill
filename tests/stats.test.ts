@@ -6,6 +6,7 @@ import {
   completedSessionDates,
   levelNudge,
   practiceDates,
+  streakProgress,
   sessionsByWeekday,
   sessionSummary,
   weakestQuestions,
@@ -156,40 +157,70 @@ describe('completedSessionDates', () => {
 describe('practiceDates', () => {
   const DAY = 24 * 3600_000;
   const today = new Date('2026-06-10T20:00:00');
+  const onDay = (offset: number, n: number): Attempt[] =>
+    Array.from({ length: n }, () =>
+      attempt({ answeredAt: today.getTime() - offset * DAY }),
+    );
 
-  it('records a date for every answered question', () => {
-    const attempts: Attempt[] = [
-      attempt({ answeredAt: NOON }),
-      attempt({ answeredAt: NOON + 1000 }),
-    ];
-    expect(practiceDates(attempts).map((d) => d.getTime())).toEqual([
-      NOON,
-      NOON + 1000,
-    ]);
+  it('counts a day only once the question threshold is met', () => {
+    // 10 today → qualifies; 9 yesterday → falls short.
+    const attempts = [...onDay(0, 10), ...onDay(1, 9)];
+    expect(practiceDates(attempts)).toHaveLength(1);
+  });
+
+  it('a light tap-and-leave day does not keep the streak alive', () => {
+    // Full rounds two and three days ago, but only a couple of questions
+    // today → today doesn't count, so the streak reads 0 (the run before
+    // today is already broken by the gap at "yesterday").
+    const attempts = [...onDay(0, 2), ...onDay(2, 10), ...onDay(3, 10)];
+    expect(currentStreak(practiceDates(attempts), today)).toBe(0);
   });
 
   it('keeps the streak alive on days the user practised but never finished a session', () => {
-    // Practised three days running. Only TODAY did the user click through to
-    // the final question (writing the session end record); the previous two
-    // days they answered some questions and left mid-session. A daily-practice
-    // streak should still count those days.
+    // Practised three days running — a full round each day — but never clicked
+    // through the final question (so no session has an end record). The
+    // session-only signal reads 0; practice activity shows the real 3-day run.
     const sessions: Session[] = [
-      // only today's session was completed
-      session({ id: 'today', startedAt: today.getTime(), endedAt: today.getTime() + 60_000 }),
-      // two prior days: started, never finished (endedAt null)
+      session({ id: 'd0', startedAt: today.getTime(), endedAt: null }),
       session({ id: 'd1', startedAt: today.getTime() - DAY, endedAt: null }),
       session({ id: 'd2', startedAt: today.getTime() - 2 * DAY, endedAt: null }),
     ];
-    const attempts: Attempt[] = [
-      attempt({ answeredAt: today.getTime() - 2 * DAY }),
-      attempt({ answeredAt: today.getTime() - DAY }),
-      attempt({ answeredAt: today.getTime() }),
-    ];
+    const attempts = [...onDay(0, 10), ...onDay(1, 10), ...onDay(2, 10)];
 
-    // The old, session-only signal collapses to 1 (only today completed)...
-    expect(currentStreak(completedSessionDates(sessions), today)).toBe(1);
-    // ...while practice activity correctly shows the 3-day streak.
+    expect(currentStreak(completedSessionDates(sessions), today)).toBe(0);
     expect(currentStreak(practiceDates(attempts), today)).toBe(3);
+  });
+});
+
+describe('streakProgress', () => {
+  const DAY = 24 * 3600_000;
+  const today = new Date('2026-06-10T20:00:00');
+  const onDay = (offset: number, n: number): Attempt[] =>
+    Array.from({ length: n }, () =>
+      attempt({ answeredAt: today.getTime() - offset * DAY }),
+    );
+
+  it('reports questions remaining toward today’s goal', () => {
+    const p = streakProgress([...onDay(1, 10), ...onDay(0, 3)], today);
+    expect(p.goal).toBe(10);
+    expect(p.answeredToday).toBe(3);
+    expect(p.remaining).toBe(7);
+    expect(p.goalMet).toBe(false);
+    // Yesterday was a full round, so the streak is alive at 1 even though
+    // today's goal isn't met yet.
+    expect(p.streak).toBe(1);
+  });
+
+  it('marks the goal met and folds today into the streak once reached', () => {
+    const p = streakProgress([...onDay(1, 10), ...onDay(0, 10)], today);
+    expect(p.goalMet).toBe(true);
+    expect(p.remaining).toBe(0);
+    expect(p.streak).toBe(2);
+  });
+
+  it('is empty for a learner who hasn’t practised', () => {
+    const p = streakProgress([], today);
+    expect(p).toMatchObject({ streak: 0, answeredToday: 0, remaining: 10, goalMet: false });
   });
 });
 

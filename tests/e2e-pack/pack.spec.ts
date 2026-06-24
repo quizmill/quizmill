@@ -436,20 +436,26 @@ describe('progress page', () => {
   });
 
   it('renders sessions, the daily streak, and weak spots from history', async () => {
-    // Seeded attempts are from today → a 1-day streak (the streak follows
+    // A full round (10 questions) today → a 1-day streak (the streak follows
     // practice activity, not whether a session was finished); the twice-wrong
-    // question should surface as the top weak spot.
+    // demo-planets-001 should surface as the top weak spot (the only question
+    // with the 2-attempt minimum).
     await seedAttempts(page, [
       { questionId: 'demo-planets-001', subject: 'planets', topic: 'demo-planets-001', isCorrect: false, agoMs: 60_000 },
-      { questionId: 'demo-planets-001', subject: 'planets', topic: 'demo-planets-001', isCorrect: false, agoMs: 50_000 },
-      { questionId: 'demo-planets-002', subject: 'planets', topic: 'demo-planets-002', isCorrect: true, agoMs: 40_000 },
-      { questionId: 'demo-planets-003', subject: 'planets', topic: 'demo-planets-003', isCorrect: true, agoMs: 30_000 },
+      { questionId: 'demo-planets-001', subject: 'planets', topic: 'demo-planets-001', isCorrect: false, agoMs: 59_000 },
+      ...Array.from({ length: 8 }, (_, i) => ({
+        questionId: `demo-planets-00${i + 2}`,
+        subject: 'planets',
+        topic: `demo-planets-00${i + 2}`,
+        isCorrect: true,
+        agoMs: 50_000 - i * 100,
+      })),
     ]);
     await page.goto(baseUrl() + '/progress/');
     await page.waitForSelector('[data-testid="session-summary"]');
 
-    // Session dashboard: the seed wrote one completed 60s session of 4
-    // questions, so the tiles read 1 / 1m / 4 and exactly one weekday
+    // Session dashboard: the seed wrote one completed 60s session of 10
+    // questions, so the tiles read 1 / 1m / 10 and exactly one weekday
     // bar is non-zero.
     const summary = await page.$eval(
       '[data-testid="session-summary"]',
@@ -457,7 +463,7 @@ describe('progress page', () => {
     );
     expect(summary).toContain('1sessions');
     expect(summary).toContain('1mtypical length');
-    expect(summary).toContain('4questions / session');
+    expect(summary).toContain('10questions / session');
 
     const weekdayCounts = await page.$$eval(
       '[data-testid="weekday-chart"] [data-count]',

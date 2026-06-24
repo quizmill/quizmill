@@ -22,6 +22,7 @@ import { QuestionMeta } from '@/pack/QuestionMeta';
 import { Celebration } from '@/components/Celebration';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { loadAttempts, loadSessions, loadLevelFilter } from '@/lib/storage';
+import { streakProgress } from '@/lib/stats';
 import {
   packQuestions,
   packScenarios,
@@ -69,6 +70,10 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   const [stage, setStage] = useState<Stage>('choosing');
   const [selected, setSelected] = useState<OptionKey | null>(null);
   const [finished, setFinished] = useState(false);
+  // When today's practice goal is reached, the streak length to celebrate
+  // (null when there's nothing to show). Distinct from sticker unlocks so a
+  // plain day (1-day, 2-day…) still gets a nod, not only milestone days.
+  const [streakDone, setStreakDone] = useState<number | null>(null);
   // The active level-band filter (a manifest level key) or null = All.
   // Read from localStorage after mount, so SSR/first paint stay stable.
   const [levelFilter, setLevelFilter] = useState<string | null>(null);
@@ -214,7 +219,17 @@ export function PackPracticeRunner({ categoryKey }: Props) {
     recordAttempt(attempt);
     // Achievements evaluate against what's now persisted — re-read so
     // this can't race the useStorageData snapshot.
-    checkNow(loadSessions(), loadAttempts());
+    const freshAttempts = loadAttempts();
+    const unlocked = checkNow(loadSessions(), freshAttempts);
+    // Celebrate keeping the streak the moment today's goal is met — but only
+    // on the exact crossing, and not when a sticker already fired this turn
+    // (that's celebration enough; avoids two toasts stacking).
+    if (unlocked === 0) {
+      const prog = streakProgress(freshAttempts);
+      if (prog.goalMet && prog.answeredToday === prog.goal) {
+        setStreakDone(prog.streak);
+      }
+    }
     setState(advanceAfterAnswer(state, attempt.isCorrect));
     setStage('feedback');
   }
@@ -241,6 +256,18 @@ export function PackPracticeRunner({ categoryKey }: Props) {
     <main className="flex flex-col gap-5">
       {nextUnlock ? (
         <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
+      ) : streakDone !== null ? (
+        <Celebration
+          achievement={{
+            emoji: '🔥',
+            name: `${streakDone}-day streak!`,
+            description:
+              streakDone === 1
+                ? 'Day one done — come back tomorrow to build on it.'
+                : 'Streak kept — see you tomorrow to extend it.',
+          }}
+          onDone={() => setStreakDone(null)}
+        />
       ) : null}
       <header className="flex items-center justify-between">
         <BackLink />

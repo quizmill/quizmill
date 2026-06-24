@@ -5,6 +5,7 @@
  * are passed in (not imported from APP_CONFIG) for the same reason.
  */
 import type { Attempt, Session } from '@/data/types';
+import { currentStreak, toDayKey } from './streak';
 
 export interface CategoryAccuracy {
   key: string;
@@ -129,15 +130,76 @@ export function completedSessionDates(sessions: readonly Session[]): Date[] {
 }
 
 /**
- * One date per answered question — the signal behind the daily-practice
- * streak. Unlike {@link completedSessionDates}, this counts any day the user
- * actually practised, not only days where they clicked all the way through a
- * session's final question (which writes `endedAt`). A user who answers a few
- * questions and leaves mid-session still kept their streak alive, so attempts —
- * recorded per answer and immutable — are the reliable signal.
+ * How many questions must be answered in a day for it to count toward the
+ * daily-practice streak — one full round (QUESTION_COUNT). The questions don't
+ * have to come from a single finished session (the bug this fixes: tapping
+ * through the final question is what writes `endedAt`), they just have to add
+ * up to a round across the day.
  */
-export function practiceDates(attempts: readonly Attempt[]): Date[] {
-  return attempts.map((a) => new Date(a.answeredAt));
+export const STREAK_MIN_QUESTIONS_PER_DAY = 10;
+
+/**
+ * Days on which the user answered at least {@link STREAK_MIN_QUESTIONS_PER_DAY}
+ * questions — the signal behind the daily-practice streak. Unlike
+ * {@link completedSessionDates}, this doesn't require clicking all the way
+ * through a session's final question (which is what writes `endedAt`): a day of
+ * real practice that was left mid-session still counts. Attempts are recorded
+ * per answer and are immutable, so they're also the reliable cross-device
+ * signal. A representative Date is returned per qualifying local day.
+ */
+export function practiceDates(
+  attempts: readonly Attempt[],
+  minPerDay: number = STREAK_MIN_QUESTIONS_PER_DAY,
+): Date[] {
+  // Tally answered questions per local calendar day.
+  const perDay = new Map<string, { date: Date; count: number }>();
+  for (const a of attempts) {
+    const date = new Date(a.answeredAt);
+    const key = toDayKey(date);
+    const entry = perDay.get(key);
+    if (entry) entry.count += 1;
+    else perDay.set(key, { date, count: 1 });
+  }
+  return [...perDay.values()].filter((e) => e.count >= minPerDay).map((e) => e.date);
+}
+
+export interface StreakProgress {
+  /** Current streak length in days (includes today once the goal is met,
+   *  otherwise the live run counting back from yesterday). */
+  streak: number;
+  /** Questions needed in a day to keep the streak (the daily goal). */
+  goal: number;
+  /** Questions answered so far today (local). */
+  answeredToday: number;
+  /** Questions still needed today to secure the streak; 0 once met. */
+  remaining: number;
+  /** True once today clears the goal. */
+  goalMet: boolean;
+}
+
+/**
+ * Today's standing against the daily-practice goal — drives the "X to keep your
+ * streak" nudge on Home and the streak-kept celebration in the runner. Counting
+ * `remaining` toward a visible goal is the bit that stops people giving up
+ * after a few questions.
+ */
+export function streakProgress(
+  attempts: readonly Attempt[],
+  today: Date = new Date(),
+  goal: number = STREAK_MIN_QUESTIONS_PER_DAY,
+): StreakProgress {
+  const todayKey = toDayKey(today);
+  let answeredToday = 0;
+  for (const a of attempts) {
+    if (toDayKey(new Date(a.answeredAt)) === todayKey) answeredToday += 1;
+  }
+  return {
+    streak: currentStreak(practiceDates(attempts, goal), today),
+    goal,
+    answeredToday,
+    remaining: Math.max(0, goal - answeredToday),
+    goalMet: answeredToday >= goal,
+  };
 }
 
 export interface SessionSummary {
