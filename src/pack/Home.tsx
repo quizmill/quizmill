@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   ArrowRight,
   BarChart3,
+  Flame,
   RefreshCw,
   Settings,
   TrendingDown,
@@ -12,6 +13,7 @@ import {
   Trophy,
   X,
 } from 'lucide-react';
+import type { Attempt } from '@/data/types';
 import { APP_CONFIG } from '@/config';
 import { StatTile } from '@/components/StatTile';
 import { InstallBanner } from '@/components/InstallPrompt';
@@ -23,7 +25,7 @@ import {
   loadDismissedNudge,
   saveDismissedNudge,
 } from '@/lib/storage';
-import { levelNudge } from '@/lib/stats';
+import { levelNudge, streakProgress } from '@/lib/stats';
 import { cn } from '@/lib/cn';
 import {
   packQuestions,
@@ -36,6 +38,67 @@ import {
   PACK_LEVEL_BY_QUESTION_ID,
 } from '@/pack/data';
 import { ExamReadinessTile } from '@/pack/ExamReadiness';
+
+/**
+ * Daily-streak status with progress toward today's goal. Surfaced on Home so
+ * the goal — and how many questions are left to secure it — is visible before
+ * you start, which is what stops people giving up mid-round. Reuses the
+ * banner + progress-bar visuals from the rest of the app. Hidden for users
+ * with no live streak and no practice today (nothing to nudge).
+ */
+function StreakCard({ attempts }: { attempts: readonly Attempt[] }) {
+  const { streak, goal, answeredToday, remaining, goalMet } =
+    streakProgress(attempts);
+  if (streak === 0 && answeredToday === 0) return null;
+
+  const pct = Math.min(100, Math.round((answeredToday / goal) * 100));
+  return (
+    <div
+      data-testid="streak-card"
+      className={cn(
+        'flex items-center gap-3 rounded-2xl border p-4 shadow-sm',
+        goalMet
+          ? 'border-brand-500/30 bg-brand-50'
+          : 'border-warn-500/40 bg-warn-100/60',
+      )}
+    >
+      <div
+        className={cn(
+          'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full',
+          goalMet ? 'bg-brand-500/20 text-brand-700' : 'bg-warn-500/20 text-warn-700',
+        )}
+      >
+        <Flame className="h-5 w-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-base font-semibold text-ink-900">
+          {streak > 0 ? `${streak}-day streak` : 'Start a streak'}
+        </div>
+        <div className="mt-0.5 text-sm text-ink-600">
+          {goalMet
+            ? "Today's in the bag — come back tomorrow to keep it going."
+            : `${remaining} more ${remaining === 1 ? 'question' : 'questions'} today to ${
+                streak > 0 ? 'keep it alive' : 'lock in day one'
+              }.`}
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/70">
+            <div
+              className={cn(
+                'h-full transition-all',
+                goalMet ? 'bg-brand-500' : 'bg-warn-500',
+              )}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <span className="text-xs font-medium text-ink-500">
+            {Math.min(answeredToday, goal)}/{goal}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /** Home screen for the generic pack variant — category cards + stats,
  *  all driven by the active pack's manifest. */
@@ -133,6 +196,8 @@ export default function PackHome() {
       </header>
 
       <InstallBanner />
+
+      <StreakCard attempts={attempts} />
 
       <section className="grid grid-cols-2 gap-3">
         <StatTile

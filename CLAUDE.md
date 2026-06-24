@@ -184,6 +184,15 @@ are detected on every commit regardless.
   `tests/*.test.tsx`; pure logic stays in node `tests/*.test.ts`.
 - **Always open a PR** for a finished change (`gh`/GitHub MCP), even
   when not explicitly asked — push the branch, then create the PR.
+- **New user-facing features ship with visuals.** Any change that adds or
+  alters UI must include screenshots in the PR (and surfaced in chat).
+  Capture them from the real static build against the demo pack: `npm run
+  build`, serve `out/` (`npx http-server out -p <port> -s -c-1`), then drive
+  Puppeteer at a phone viewport (414×896, `deviceScaleFactor: 2`) seeding
+  `localStorage` for the state you want — same harness as `tests/e2e/`.
+  Commit the PNGs under `docs/screenshots/<feature>/` and embed them in the
+  PR via `raw.githubusercontent.com/<owner>/<repo>/<sha>/<path>`. Show each
+  meaningful state (e.g. empty / in-progress / complete), not just one.
 - Question ids are immutable once published — attempt history points
   at them.
 - Pack schema changes bump `schemaVersion` and must stay

@@ -33,7 +33,7 @@ function startOfDay(d: Date): Date {
   return x;
 }
 
-function toDayKey(d: Date): string {
+export function toDayKey(d: Date): string {
   const x = startOfDay(d);
   return `${x.getFullYear()}-${x.getMonth() + 1}-${x.getDate()}`;
 }
