@@ -26,6 +26,12 @@ export default function StickersPage() {
   const { sessions, attempts } = useStorageData();
   const earnedAtById = new Map(earnedList.map((e) => [e.id, e.earnedAt]));
 
+  // Count only stickers that still exist in this pack's cabinet. Stored
+  // ids can outlive their definitions (a category renamed/removed, an old
+  // pack's stickers lingering in shared storage) — those don't render a
+  // tile, so counting the raw stored list would show more than the bag holds.
+  const earnedCount = ACHIEVEMENTS.filter((a) => earned.has(a.id)).length;
+
   // Aggregates for "how am I doing" — computed once, not per tile.
   const ctx = useMemo(
     () => buildProgressContext(sessions, attempts),
@@ -46,7 +52,7 @@ export default function StickersPage() {
           Home
         </Link>
         <div className="text-sm font-medium text-ink-500" data-testid="sticker-count">
-          <span className="font-semibold text-ink-900">{earnedList.length}</span>
+          <span className="font-semibold text-ink-900">{earnedCount}</span>
           <span> / {ACHIEVEMENTS.length} stickers</span>
         </div>
       </header>
