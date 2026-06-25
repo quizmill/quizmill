@@ -1,13 +1,17 @@
 // Typed access to the ACTIVE learning pack's content.
-// Source of truth: content/pack/{pack,questions,scenarios}.json —
-// gitignored; seeded from content/pack-demo/ by scripts/ensure-pack.ts
-// and replaced by `npm run pack:use <dir>`. Validated against
-// tools/pack/schema.ts before activation.
+// The raw content comes from `src/pack/source.ts`: by default the build-time
+// pack at content/pack/{pack,questions,scenarios,concepts}.json (gitignored;
+// seeded from content/pack-demo/ by scripts/ensure-pack.ts, swapped by
+// `npm run pack:use <dir>`), or a pack injected at runtime via
+// `src/pack/runtime.ts`. Validated against tools/pack/schema.ts before
+// activation, so by the time it's here we trust the shape.
 
-import manifestJson from '../../content/pack/pack.json';
-import questionsJson from '../../content/pack/questions.json';
-import scenariosJson from '../../content/pack/scenarios.json';
-import conceptsJson from '../../content/pack/concepts.json';
+import {
+  activeManifest,
+  activeQuestions,
+  activeScenarios,
+  activeConcepts,
+} from './source';
 import { categoryIcon } from './category-icon';
 
 export type PackCategory = {
@@ -105,7 +109,7 @@ export type PackQuestion = {
   tags?: string[];
 };
 
-export const packManifest = manifestJson as PackManifest;
+export const packManifest = activeManifest;
 export const packLevels = packManifest.levels ?? [];
 export const packSources = packManifest.sources ?? [];
 /** The pack's exam-readiness goal, if it declares one. */
@@ -116,7 +120,7 @@ export const packGames = packManifest.games;
 /** Whether this pack ships the reward mini-games at all. */
 export const gamesEnabled = packGames !== undefined;
 
-export const packQuestions = questionsJson as PackQuestion[];
+export const packQuestions = activeQuestions;
 
 /** Manifest level keys in ladder order (used by the adaptive level nudge). */
 export const packLevelKeys = packLevels.map((l) => l.key);
@@ -142,8 +146,8 @@ const LEVEL_TONES = [
 export const PACK_LEVEL_TONE: Record<string, string> = Object.fromEntries(
   packLevels.map((l, i) => [l.key, LEVEL_TONES[i % LEVEL_TONES.length]]),
 );
-export const packScenarios = scenariosJson as PackScenario[];
-export const packConcepts = conceptsJson as PackConcept[];
+export const packScenarios = activeScenarios;
+export const packConcepts = activeConcepts;
 
 /** Concept lookup by id, for the post-answer "Learn" card. */
 export const PACK_CONCEPT_BY_ID: Record<string, PackConcept> = Object.fromEntries(

@@ -1,11 +1,13 @@
-import manifest from '../../content/pack/pack.json';
+import { activeManifest as manifest } from '@/pack/source';
 
 /**
- * App config — built entirely from the ACTIVE PACK's manifest at
- * `content/pack/pack.json`. That directory is gitignored (packs are
- * private); `scripts/ensure-pack.ts` seeds it from the committed demo
- * pack and `npm run pack:use <dir>` swaps in a real one. Next inlines
- * the JSON at build time, so every pack build is fully static.
+ * App config — built entirely from the ACTIVE PACK's manifest. The default
+ * source is the build-time pack at `content/pack/pack.json` (gitignored;
+ * `scripts/ensure-pack.ts` seeds it from the committed demo pack and
+ * `npm run pack:use <dir>` swaps in a real one), inlined by Next so every
+ * pack build is fully static. A host may inject a pack at runtime instead —
+ * see `src/pack/runtime.ts`. Either way the manifest reaches us via
+ * `src/pack/source.ts`.
  *
  * The manifest is validated by tools/pack/schema.ts before activation;
  * by the time it's here we trust the shape.
