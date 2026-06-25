@@ -611,8 +611,13 @@ describe('reward mini-games', () => {
     // Not revealed until you tap the version pill enough times.
     expect(await page.$('[data-testid="games-easter-egg"]')).toBeNull();
 
-    for (let i = 0; i < 7; i++) {
+    // Tap until it reveals (needs 7, stays revealed). Synthetic clicks can
+    // outrun hydration — the handler isn't attached yet, so early taps are
+    // lost — which made a blind 7-tap loop flaky. Tap-and-poll instead, with a
+    // small gap so React processes each click.
+    for (let i = 0; i < 25 && !(await page.$('[data-testid="games-easter-egg"]')); i++) {
       await page.click('[data-testid="app-version"]');
+      await new Promise((r) => setTimeout(r, 100));
     }
     await page.waitForSelector('[data-testid="games-easter-egg"]');
 

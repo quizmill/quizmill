@@ -100,6 +100,31 @@ function StreakCard({ attempts }: { attempts: readonly Attempt[] }) {
   );
 }
 
+/** Runtime-pack mode (quizmill-cloud's served engine): the pack is injected at
+ *  boot from the browser, so it differs from the build-time pack baked into the
+ *  prerendered HTML. Hold the first paint until mount so the server HTML and the
+ *  client's first render agree — no hydration mismatch, no flash of the
+ *  build-time pack — then render the injected pack. Off for normal one-pack
+ *  deploys, which prerender their own pack exactly as before. */
+const RUNTIME_PACK_MODE = process.env.NEXT_PUBLIC_RUNTIME_PACK === '1';
+
+function HomeSkeleton() {
+  return (
+    <main className="flex animate-pulse flex-col gap-6" aria-hidden>
+      <div className="h-9 w-2/3 rounded-lg bg-ink-100" />
+      <div className="grid grid-cols-2 gap-3">
+        <div className="h-20 rounded-2xl bg-ink-100" />
+        <div className="h-20 rounded-2xl bg-ink-100" />
+      </div>
+      <div className="flex flex-col gap-3">
+        <div className="h-16 rounded-2xl bg-ink-100" />
+        <div className="h-16 rounded-2xl bg-ink-100" />
+        <div className="h-16 rounded-2xl bg-ink-100" />
+      </div>
+    </main>
+  );
+}
+
 /** Home screen for the generic pack variant — category cards + stats,
  *  all driven by the active pack's manifest. */
 export default function PackHome() {
@@ -108,7 +133,11 @@ export default function PackHome() {
   // from localStorage after mount so SSR/first paint stay stable.
   const [level, setLevelState] = useState<string | null>(null);
   const [dismissedNudge, setDismissedNudge] = useState<string | null>(null);
+  // In runtime-pack mode, hold the first paint until mount (see RUNTIME_PACK_MODE).
+  const [mounted, setMounted] = useState(!RUNTIME_PACK_MODE);
   useEffect(() => {
+    setMounted(true);
+    if (RUNTIME_PACK_MODE) document.title = APP_CONFIG.title;
     setLevelState(loadLevelFilter());
     setDismissedNudge(loadDismissedNudge());
   }, []);
@@ -162,6 +191,8 @@ export default function PackHome() {
     slot.answered++;
     if (a.isCorrect) slot.correct++;
   }
+
+  if (!mounted) return <HomeSkeleton />;
 
   return (
     <main className="flex flex-col gap-6">
