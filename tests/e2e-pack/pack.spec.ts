@@ -84,7 +84,7 @@ describe('pack home page', () => {
 
 describe('pack practice flow', () => {
   it('runs a complete session and lands on the results screen', async () => {
-    await page.goto(baseUrl() + '/practice/planets/');
+    await page.goto(baseUrl() + '/practice/?subject=planets');
     await waitForText(page, /Q\s*1\s*\/\s*\d+/, 20_000);
 
     const total = await page.evaluate(() => {
@@ -130,7 +130,7 @@ describe('pack practice flow', () => {
   }, 60_000);
 
   it('answered count persists to the home page and the vote row shows in feedback', async () => {
-    await page.goto(baseUrl() + '/practice/planets/');
+    await page.goto(baseUrl() + '/practice/?subject=planets');
     await waitForText(page, /Q\s*1\s*\/\s*\d+/, 20_000);
 
     // Answer one question and check the feedback panel carries the
@@ -157,7 +157,7 @@ describe('pack practice flow', () => {
 
 describe('scratchpad', () => {
   it('keeps working notes across questions and clears on demand', async () => {
-    await page.goto(baseUrl() + '/practice/planets/');
+    await page.goto(baseUrl() + '/practice/?subject=planets');
     await waitForText(page, /Q\s*1\s*\/\s*\d+/, 20_000);
 
     // Collapsed by default — the textarea isn't mounted until opened.
@@ -211,7 +211,7 @@ describe('scratchpad', () => {
   }, 60_000);
 
   it('draws strokes on the canvas, persists them, and undo/clear work', async () => {
-    await page.goto(baseUrl() + '/practice/planets/');
+    await page.goto(baseUrl() + '/practice/?subject=planets');
     await waitForText(page, /Q\s*1\s*\/\s*\d+/, 20_000);
 
     await page.click('[data-testid="scratchpad-toggle"]');
@@ -289,7 +289,7 @@ describe('scratchpad', () => {
         JSON.stringify({ text: 'legacy note', open: true }),
       );
     });
-    await page.goto(baseUrl() + '/practice/planets/');
+    await page.goto(baseUrl() + '/practice/?subject=planets');
     await waitForText(page, /Q\s*1\s*\/\s*\d+/, 20_000);
 
     // Opens straight onto the Write tab with the old note intact, no crash.
@@ -311,7 +311,7 @@ describe('scratchpad', () => {
   }, 60_000);
 
   it('expands to full screen for more space, and collapses back', async () => {
-    await page.goto(baseUrl() + '/practice/planets/');
+    await page.goto(baseUrl() + '/practice/?subject=planets');
     await waitForText(page, /Q\s*1\s*\/\s*\d+/, 20_000);
 
     await page.click('[data-testid="scratchpad-toggle"]');
