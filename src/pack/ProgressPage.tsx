@@ -220,7 +220,7 @@ export default function ProgressPage() {
                 {weakest.map((w) => (
                   <Link
                     key={w.questionId}
-                    href={`/practice/${w.categoryKey}/`}
+                    href={`/practice/?subject=${w.categoryKey}`}
                     className="tap-feedback group flex items-center justify-between gap-3 rounded-2xl border border-ink-200 bg-white p-4 shadow-sm transition hover:border-brand-300 hover:shadow-md"
                   >
                     <div className="min-w-0 flex-1">

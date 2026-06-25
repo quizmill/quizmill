@@ -350,7 +350,7 @@ export default function PackHome() {
             return (
               <Link
                 key={cat.key}
-                href={`/practice/${cat.key}/`}
+                href={`/practice/?subject=${cat.key}`}
                 className={cn(
                   'tap-feedback group flex items-center justify-between gap-3 rounded-2xl border p-4 shadow-sm transition hover:shadow-md',
                   tone.card,
