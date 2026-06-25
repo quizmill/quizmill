@@ -58,7 +58,7 @@ export default function StickersPage() {
       </header>
 
       <div>
-        <h1 className="text-3xl font-bold text-ink-900">Sticker cabinet</h1>
+        <h1 className="text-3xl font-bold text-ink-900">Stickers</h1>
         <p className="mt-1 text-ink-500">
           Earn stickers by practising. Tap a locked one to see how.
         </p>

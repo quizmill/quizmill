@@ -121,7 +121,7 @@ describe('pack practice flow', () => {
 
     // ...and the cabinet now shows it as earned.
     await page.goto(baseUrl() + '/stickers/');
-    await waitForText(page, 'Sticker cabinet');
+    await waitForText(page, 'Stickers');
     const earned = await page.$eval(
       '[data-testid="sticker-first-session"]',
       (el) => el.getAttribute('data-earned'),
@@ -355,11 +355,11 @@ describe('scratchpad', () => {
 });
 
 describe('home navigation', () => {
-  it('links to progress, sticker cabinet, and settings', async () => {
+  it('links to progress, stickers, and settings', async () => {
     await waitForText(page, 'Solar System Practice');
     for (const [label, href] of [
       ['Progress', '/progress'],
-      ['Sticker cabinet', '/stickers'],
+      ['Stickers', '/stickers'],
       ['Settings', '/settings'],
     ]) {
       const link = await page.$(`a[aria-label="${label}"]`);
@@ -373,10 +373,10 @@ describe('home navigation', () => {
   });
 });
 
-describe('sticker cabinet page', () => {
+describe('stickers page', () => {
   it('starts with every sticker locked, including per-category mastery', async () => {
     await page.goto(baseUrl() + '/stickers/');
-    await waitForText(page, 'Sticker cabinet');
+    await waitForText(page, 'Stickers');
 
     const count = await page.$eval(
       '[data-testid="sticker-count"]',
@@ -401,7 +401,7 @@ describe('sticker cabinet page', () => {
 
   it('taps a locked sticker to reveal how to unlock it, with progress', async () => {
     await page.goto(baseUrl() + '/stickers/');
-    await waitForText(page, 'Sticker cabinet');
+    await waitForText(page, 'Stickers');
 
     // No detail open initially; the locked tile is a button.
     expect(await page.$('[data-testid="sticker-detail"]')).toBeNull();
