@@ -58,6 +58,10 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_BASE_PATH: effectiveBasePath,
     NEXT_PUBLIC_APP_VERSION: semver,
     NEXT_PUBLIC_APP_BUILD: buildTag(),
+    // '1' when this build serves runtime-injected packs (quizmill-cloud's
+    // engine) rather than one baked-in pack — defers Home's first paint to
+    // the client so the injected pack doesn't clash with the prerender.
+    NEXT_PUBLIC_RUNTIME_PACK: process.env.NEXT_PUBLIC_RUNTIME_PACK ?? '',
     // Cloud sync (optional). Empty when no Supabase project is configured —
     // the sync layer stays dormant and the app runs pure-local.
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',

@@ -108,7 +108,7 @@ export default function ExamReadiness({ attempts }: { attempts: readonly Attempt
             {report.nudges.map((n) => (
               <Link
                 key={n.key}
-                href={`/practice/${n.key}/`}
+                href={`/practice/?subject=${n.key}`}
                 className="tap-feedback group flex items-center justify-between gap-3 rounded-xl border border-ink-200 bg-ink-50 p-3 transition hover:border-brand-300 hover:bg-white"
               >
                 <div className="min-w-0">
