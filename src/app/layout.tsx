@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import './globals.css';
 import { APP_CONFIG } from '@/config';
 import { UpdateNotifier } from '@/components/UpdateNotifier';
@@ -6,6 +7,22 @@ import { SyncBootstrap } from '@/components/SyncBootstrap';
 import { SyncIndicator } from '@/components/SyncIndicator';
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+
+// Runtime pack bootstrap. The seam (src/pack/runtime.ts + source.ts) lets a
+// host inject the pack to render via `globalThis.__QUIZMILL_PACK__`. For a
+// single engine deployment that serves many packs (e.g. quizmill-cloud's
+// practice surface), there's no host module to call setActivePack — so set the
+// global here, BEFORE the engine bundle evaluates, from the browser:
+//   - a `#pack=<base64-json>` hash (cross-origin handoff), else
+//   - localStorage['quizmill.activePack'] (same-origin handoff).
+// No stored pack → global stays unset → the build-time pack renders, exactly
+// as before. `beforeInteractive` guarantees this runs ahead of source.ts.
+const PACK_BOOTSTRAP = `(function(){try{
+var r=null,m=location.hash.match(/[#&]pack=([^&]+)/);
+if(m){r=decodeURIComponent(escape(atob(decodeURIComponent(m[1]))))}
+else if(window.localStorage){r=localStorage.getItem('quizmill.activePack')}
+if(r){window.__QUIZMILL_PACK__=JSON.parse(r)}
+}catch(e){}})();`;
 
 // PWA assets — generated from the active pack's manifest by
 // scripts/pack-assets.ts, so the installed shortcut's title, icon, and
@@ -58,6 +75,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <Script id="quizmill-pack-bootstrap" strategy="beforeInteractive">
+        {PACK_BOOTSTRAP}
+      </Script>
       <body className="min-h-dvh bg-ink-50 text-ink-800 antialiased">
         <div className="mx-auto w-full max-w-screen-sm px-4 pb-24 pt-4 sm:max-w-screen-md sm:pt-8">
           {children}
