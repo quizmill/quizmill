@@ -6,6 +6,7 @@ import { ArrowLeft, Gamepad2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { InstallCard } from '@/components/InstallPrompt';
 import { SyncSettings } from '@/components/SyncSettings';
+import { ReminderSettings } from '@/components/ReminderSettings';
 import {
   useResetAll,
   useResetToday,
@@ -110,6 +111,8 @@ export function SettingsPage({ extras }: SettingsPageProps) {
 
       <section className="flex flex-col gap-3">
         <InstallCard />
+
+        <ReminderSettings />
 
         <SyncSettings />
 
