@@ -5,6 +5,7 @@ import { APP_CONFIG } from '@/config';
 import { UpdateNotifier } from '@/components/UpdateNotifier';
 import { SyncBootstrap } from '@/components/SyncBootstrap';
 import { SyncIndicator } from '@/components/SyncIndicator';
+import { ReminderSync } from '@/components/ReminderSync';
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
@@ -101,6 +102,7 @@ export default function RootLayout({
         <UpdateNotifier />
         <SyncBootstrap />
         <SyncIndicator />
+        <ReminderSync />
       </body>
     </html>
   );

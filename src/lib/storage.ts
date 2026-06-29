@@ -101,6 +101,9 @@ export interface PackPrefs {
   /** The last adaptive level nudge the user dismissed, as "from>to", so the
    *  same suggestion doesn't keep re-appearing. */
   dismissedNudge?: string;
+  /** Whether the user opted into daily streak reminder notifications. Drives
+   *  re-registration of periodic background sync on each app open. */
+  remindersOptIn?: boolean;
 }
 
 export function loadPrefs(): PackPrefs {
@@ -128,6 +131,18 @@ export function saveDismissedNudge(key: string | null): void {
   const prefs = loadPrefs();
   if (key) prefs.dismissedNudge = key;
   else delete prefs.dismissedNudge;
+  writeJson(PREFS_KEY, prefs);
+}
+
+/** Whether the user has opted into daily streak reminder notifications. */
+export function loadRemindersOptIn(): boolean {
+  return loadPrefs().remindersOptIn === true;
+}
+
+export function saveRemindersOptIn(optIn: boolean): void {
+  const prefs = loadPrefs();
+  if (optIn) prefs.remindersOptIn = true;
+  else delete prefs.remindersOptIn;
   writeJson(PREFS_KEY, prefs);
 }
 
