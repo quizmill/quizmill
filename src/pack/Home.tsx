@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   ArrowRight,
   BarChart3,
+  Car,
   Flame,
   RefreshCw,
   Settings,
@@ -257,6 +258,25 @@ export default function PackHome() {
           />
         )}
       </section>
+
+      <Link
+        href="/drive/"
+        data-testid="drive-card"
+        className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-ink-700 bg-ink-800 p-4 shadow-sm"
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-brand-300">
+            <Car className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="text-base font-semibold text-white">Drive mode</div>
+            <div className="text-sm text-ink-300">
+              Hands-free voice quiz for the car — eyes on the road.
+            </div>
+          </div>
+        </div>
+        <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-400" />
+      </Link>
 
       {mistakeCount > 0 ? (
         <Link

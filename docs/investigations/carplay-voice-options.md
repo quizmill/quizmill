@@ -141,6 +141,9 @@ naturally.
 
 ## Recommendation
 
+> **Status:** option A shipped as Drive Mode (`/drive`,
+> `src/pack/DriveRunner.tsx`) in the PR that added this doc's branch.
+
 Do **A** and **B** now — both are pure web/static work inside this repo,
 a few days each, and A settles the voice-UX design that everything later
 inherits. Treat **C** as the real product milestone (first native code in

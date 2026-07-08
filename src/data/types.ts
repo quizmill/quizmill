@@ -24,7 +24,8 @@ export interface Attempt {
 
 export interface Session {
   id: string; // crypto.randomUUID()
-  /** Pack category key (see Attempt.subject). */
+  /** Pack category key (see Attempt.subject), or 'drive' for Drive Mode
+   *  sessions (which mix categories; their attempts keep real keys). */
   subject: string;
   startedAt: number;
   endedAt: number | null;
