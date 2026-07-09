@@ -101,6 +101,9 @@ export interface PackPrefs {
   /** The last adaptive level nudge the user dismissed, as "from>to", so the
    *  same suggestion doesn't keep re-appearing. */
   dismissedNudge?: string;
+  /** Drive Mode opt-in — shows the hands-free voice quiz entry on Home.
+   *  Absent = off: it's a niche mode, so Home stays uncluttered by default. */
+  driveMode?: boolean;
 }
 
 export function loadPrefs(): PackPrefs {
@@ -128,6 +131,18 @@ export function saveDismissedNudge(key: string | null): void {
   const prefs = loadPrefs();
   if (key) prefs.dismissedNudge = key;
   else delete prefs.dismissedNudge;
+  writeJson(PREFS_KEY, prefs);
+}
+
+/** Whether Drive Mode is switched on (Settings toggle). Default off. */
+export function loadDriveModeEnabled(): boolean {
+  return loadPrefs().driveMode === true;
+}
+
+export function saveDriveModeEnabled(on: boolean): void {
+  const prefs = loadPrefs();
+  if (on) prefs.driveMode = true;
+  else delete prefs.driveMode;
   writeJson(PREFS_KEY, prefs);
 }
 
