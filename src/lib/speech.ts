@@ -49,6 +49,93 @@ export function sttSupported(): boolean {
   return recognitionCtor() !== null;
 }
 
+// ── Voice selection ──────────────────────────────────────────────────
+
+/**
+ * Resolve the available TTS voices. getVoices() is empty until the
+ * browser has loaded its list (Safari and Chrome both populate it
+ * lazily), so wait for one voiceschanged — with a timeout, because
+ * Safari sometimes never fires it.
+ */
+export function listVoices(): Promise<SpeechSynthesisVoice[]> {
+  if (!ttsSupported()) return Promise.resolve([]);
+  const synth = window.speechSynthesis;
+  const now = synth.getVoices();
+  if (now.length > 0) return Promise.resolve(now);
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      resolve(synth.getVoices());
+    };
+    synth.addEventListener?.('voiceschanged', done, { once: true });
+    setTimeout(done, 1_500);
+  });
+}
+
+/** Voices matching a BCP-47 language's primary subtag ("en-GB" → en-*),
+ *  falling back to the full list when nothing matches. */
+export function voicesForLang(
+  voices: SpeechSynthesisVoice[],
+  lang: string,
+): SpeechSynthesisVoice[] {
+  const primary = lang.split('-')[0].toLowerCase();
+  const inLang = voices.filter((v) =>
+    (v.lang ?? '').toLowerCase().startsWith(primary),
+  );
+  return inLang.length > 0 ? inLang : voices;
+}
+
+// Platforms hint voice quality only through the NAME: iOS "Enhanced"/
+// "Premium" (downloadable under Settings → Accessibility → Spoken
+// Content), Chrome "Natural"/"Neural"/"Google". The bare default (iOS
+// "compact") is the robotic one.
+const QUALITY_HINT = /enhanced|premium|natural|neural|google/i;
+
+/** Best-guess voice when the user hasn't picked one: a quality-hinted
+ *  voice in the app's language, else the platform default, else first. */
+export function pickDefaultVoice(
+  voices: SpeechSynthesisVoice[],
+  lang: string,
+): SpeechSynthesisVoice | null {
+  const pool = voicesForLang(voices, lang);
+  return (
+    pool.find((v) => QUALITY_HINT.test(v.name) && v.localService) ??
+    pool.find((v) => QUALITY_HINT.test(v.name)) ??
+    pool.find((v) => v.default) ??
+    pool[0] ??
+    null
+  );
+}
+
+// Voices resolve async; cache them so speak() can look up a voice
+// synchronously once they've arrived (first utterances may go out on
+// the platform default — acceptable, and unavoidable).
+let voiceCache: SpeechSynthesisVoice[] = [];
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  listVoices().then((v) => {
+    voiceCache = v;
+  });
+}
+
+function resolveVoice(voiceURI: string | null | undefined): SpeechSynthesisVoice | null {
+  if (voiceCache.length === 0) return null;
+  if (voiceURI) {
+    const chosen = voiceCache.find((v) => v.voiceURI === voiceURI);
+    if (chosen) return chosen;
+  }
+  const lang = typeof navigator !== 'undefined' ? navigator.language : 'en';
+  return pickDefaultVoice(voiceCache, lang);
+}
+
+export interface SpeakOptions {
+  /** Speaking-rate multiplier (0.5–1.5 sensible; 1 = normal). */
+  rate?: number;
+  /** Preferred voice (SpeechSynthesisVoice.voiceURI); null/absent = auto. */
+  voiceURI?: string | null;
+}
+
 // Monotonic token so a newer speak()/cancelSpeech() invalidates the
 // utterance chain of an older one (the chain checks it between chunks).
 let speakToken = 0;
@@ -65,7 +152,7 @@ export function cancelSpeech(): void {
  * single utterances longer than ~15s, and chunking also makes
  * cancellation snappy.
  */
-export function speak(text: string, rate = 1): Promise<boolean> {
+export function speak(text: string, opts: SpeakOptions = {}): Promise<boolean> {
   if (!ttsSupported()) return Promise.resolve(true);
   cancelSpeech();
   const token = speakToken;
@@ -75,7 +162,11 @@ export function speak(text: string, rate = 1): Promise<boolean> {
       if (token !== speakToken) return resolve(false);
       if (i >= chunks.length) return resolve(true);
       const u = new SpeechSynthesisUtterance(chunks[i]);
-      u.rate = rate;
+      u.rate = opts.rate ?? 1;
+      // Voice resolves per-chunk so a late-arriving voice list still
+      // upgrades mid-question.
+      const voice = resolveVoice(opts.voiceURI);
+      if (voice) u.voice = voice;
       u.onend = () => next(i + 1);
       // Cancellation surfaces as an error event in most browsers.
       u.onerror = () => resolve(false);

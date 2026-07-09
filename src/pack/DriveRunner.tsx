@@ -26,6 +26,7 @@ import {
 import {
   loadAchievements,
   loadAttempts,
+  loadDriveVoicePrefs,
   loadLevelFilter,
   loadSessions,
   recordEarnedAchievements,
@@ -117,6 +118,11 @@ export function DriveRunner() {
   const [voiceBroken, setVoiceBroken] = useState(false);
   const voiceOn = stt && !voiceBroken;
 
+  // Voice/speed prefs (Settings → Drive mode). Read at mount and again
+  // at each session start, so tweaks apply from the next round.
+  const voicePrefs = useRef(loadDriveVoicePrefs());
+  const say = (text: string) => speak(text, voicePrefs.current);
+
   // Only questions that work with no screen: text prompt, text options.
   const bank = useMemo(
     () =>
@@ -139,6 +145,7 @@ export function DriveRunner() {
 
   function handleStart() {
     warmUpTts(); // unlock TTS inside the tap gesture (iOS)
+    voicePrefs.current = loadDriveVoicePrefs();
     const voiceBank = filterByLevel(bank, loadLevelFilter());
     const historical = new Set(attempts.map((a) => a.questionId));
     const picked = pickSessionFromBank(voiceBank, historical);
@@ -220,7 +227,7 @@ export function DriveRunner() {
     const stem = q.scenarioId
       ? packScenarios.find((s) => s.id === q.scenarioId)?.stem
       : undefined;
-    speak(
+    say(
       speechForQuestion(q, state.currentIndex, state.questions.length, stem),
     ).then((completed) => {
       if (!cancelled && completed) setPhase('listening');
@@ -247,7 +254,7 @@ export function DriveRunner() {
         if (error) {
           errorRounds++;
           if (errorRounds >= 2) {
-            await speak(
+            await say(
               'Voice input is not working here, so tap your answer instead.',
             );
             if (!cancelled) setVoiceBroken(true);
@@ -278,7 +285,7 @@ export function DriveRunner() {
         if (transcripts.length === 0) {
           silentRounds++;
           if (silentRounds >= MAX_SILENT_ROUNDS) {
-            await speak('Pausing here. Tap resume when you are ready.');
+            await say('Pausing here. Tap resume when you are ready.');
             if (!cancelled) doPause();
             return;
           }
@@ -288,7 +295,7 @@ export function DriveRunner() {
         silentRounds = 0;
         if (reprompts < MAX_REPROMPTS) {
           reprompts++;
-          await speak(repromptForOptions(q.options));
+          await say(repromptForOptions(q.options));
           if (cancelled) return;
         }
       }
@@ -307,7 +314,7 @@ export function DriveRunner() {
     let cancelled = false;
     const q = state.questions[state.currentIndex];
     const snapshot = state;
-    speak(speechForFeedback(q, selected)).then((completed) => {
+    say(speechForFeedback(q, selected)).then((completed) => {
       if (!cancelled && completed) advance(snapshot);
     });
     return () => {
@@ -320,7 +327,7 @@ export function DriveRunner() {
   useEffect(() => {
     if (phase !== 'done' || !state) return;
     const { correct, total } = scoreSummary(state);
-    speak(speechForResults(correct, total));
+    say(speechForResults(correct, total));
     return () => cancelSpeech();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
