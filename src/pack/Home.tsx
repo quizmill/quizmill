@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   ArrowRight,
   BarChart3,
+  Car,
   Flame,
   RefreshCw,
   Settings,
@@ -24,6 +25,7 @@ import {
   saveLevelFilter,
   loadDismissedNudge,
   saveDismissedNudge,
+  loadDriveModeEnabled,
 } from '@/lib/storage';
 import { levelNudge, streakProgress } from '@/lib/stats';
 import { cn } from '@/lib/cn';
@@ -133,6 +135,9 @@ export default function PackHome() {
   // from localStorage after mount so SSR/first paint stay stable.
   const [level, setLevelState] = useState<string | null>(null);
   const [dismissedNudge, setDismissedNudge] = useState<string | null>(null);
+  // Drive Mode is opt-in (Settings toggle) — the Home card only shows
+  // once it's switched on. Read after mount like the other prefs.
+  const [driveMode, setDriveMode] = useState(false);
   // In runtime-pack mode, hold the first paint until mount (see RUNTIME_PACK_MODE).
   const [mounted, setMounted] = useState(!RUNTIME_PACK_MODE);
   useEffect(() => {
@@ -140,6 +145,7 @@ export default function PackHome() {
     if (RUNTIME_PACK_MODE) document.title = APP_CONFIG.title;
     setLevelState(loadLevelFilter());
     setDismissedNudge(loadDismissedNudge());
+    setDriveMode(loadDriveModeEnabled());
   }, []);
   const setLevel = (next: string | null) => {
     setLevelState(next);
@@ -257,6 +263,27 @@ export default function PackHome() {
           />
         )}
       </section>
+
+      {driveMode ? (
+        <Link
+          href="/drive/"
+          data-testid="drive-card"
+          className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-ink-700 bg-ink-800 p-4 shadow-sm"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-brand-300">
+              <Car className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="text-base font-semibold text-white">Drive mode</div>
+              <div className="text-sm text-ink-300">
+                Hands-free voice quiz for the car — eyes on the road.
+              </div>
+            </div>
+          </div>
+          <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-400" />
+        </Link>
+      ) : null}
 
       {mistakeCount > 0 ? (
         <Link

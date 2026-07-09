@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, type ReactNode } from 'react';
-import { ArrowLeft, Gamepad2, Trash2 } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { ArrowLeft, Car, Gamepad2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { InstallCard } from '@/components/InstallPrompt';
 import { SyncSettings } from '@/components/SyncSettings';
@@ -11,6 +11,11 @@ import {
   useResetToday,
   useStorageData,
 } from '@/lib/useStorage';
+import { cn } from '@/lib/cn';
+import {
+  loadDriveModeEnabled,
+  saveDriveModeEnabled,
+} from '@/lib/storage';
 import {
   packSources,
   packGames,
@@ -42,6 +47,15 @@ export function SettingsPage({ extras }: SettingsPageProps) {
 
   const [pending, setPending] = useState<'today' | 'all' | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  // Drive Mode opt-in — read after mount so SSR/first paint stay stable.
+  const [driveMode, setDriveMode] = useState(false);
+  useEffect(() => setDriveMode(loadDriveModeEnabled()), []);
+  const toggleDriveMode = () => {
+    const next = !driveMode;
+    setDriveMode(next);
+    saveDriveModeEnabled(next);
+  };
 
   // Hidden games easter egg — revealed by tapping the version pill.
   const [versionTaps, setVersionTaps] = useState(0);
@@ -112,6 +126,49 @@ export function SettingsPage({ extras }: SettingsPageProps) {
         <InstallCard />
 
         <SyncSettings />
+
+        <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
+                <Car className="h-5 w-5 text-ink-500" />
+                Drive mode
+              </h2>
+              <p className="mt-1 text-sm text-ink-600">
+                Hands-free voice quiz for the car — questions read aloud,
+                answers by voice. Adds a card to the home screen.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={driveMode}
+              aria-label="Drive mode"
+              data-testid="drive-mode-toggle"
+              onClick={toggleDriveMode}
+              className={cn(
+                'tap-feedback relative mt-1 inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors',
+                driveMode ? 'bg-brand-500' : 'bg-ink-200',
+              )}
+            >
+              <span
+                className={cn(
+                  'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
+                  driveMode ? 'translate-x-6' : 'translate-x-1',
+                )}
+              />
+            </button>
+          </div>
+          {driveMode ? (
+            <Link
+              href="/drive/"
+              className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50"
+            >
+              <Car className="h-4 w-4" />
+              Open drive mode
+            </Link>
+          ) : null}
+        </div>
 
         {packSources.length > 0 ? (
           <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
