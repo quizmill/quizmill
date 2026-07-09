@@ -21,6 +21,7 @@ if (!globalThis.crypto?.randomUUID) {
 const speech = vi.hoisted(() => ({
   stt: true,
   spoken: [] as string[],
+  spokenOpts: [] as unknown[],
   listenQueue: [] as (string[] | 'ERROR')[],
 }));
 vi.mock('@/lib/speech', () => ({
@@ -29,8 +30,9 @@ vi.mock('@/lib/speech', () => ({
   warmUpTts: () => {},
   cancelSpeech: () => {},
   cancelListening: () => {},
-  speak: async (text: string) => {
+  speak: async (text: string, opts?: unknown) => {
     speech.spoken.push(text);
+    speech.spokenOpts.push(opts);
     return true;
   },
   listenOnce: async () => {
@@ -42,7 +44,12 @@ vi.mock('@/lib/speech', () => ({
 }));
 
 import { DriveRunner } from '@/pack/DriveRunner';
-import { loadAttempts, loadSessions } from '@/lib/storage';
+import {
+  loadAttempts,
+  loadSessions,
+  saveDriveRate,
+  saveDriveVoice,
+} from '@/lib/storage';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -51,6 +58,7 @@ beforeEach(() => {
   localStorage.clear();
   speech.stt = true;
   speech.spoken = [];
+  speech.spokenOpts = [];
   speech.listenQueue = [];
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -195,6 +203,20 @@ describe('DriveRunner', () => {
       option!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
     expect(loadAttempts()).toHaveLength(1);
+  });
+
+  it('speaks with the voice/rate prefs from Settings', async () => {
+    saveDriveVoice('uri:ava');
+    saveDriveRate(1.15);
+    speech.listenQueue = [['a']];
+    await render();
+    await clickText('Start driving session');
+
+    await settleUntil(() => speech.spoken.length > 0, 'first spoken line');
+    // Every utterance carries the tuned voice and speed.
+    for (const opts of speech.spokenOpts) {
+      expect(opts).toEqual({ voiceURI: 'uri:ava', rate: 1.15 });
+    }
   });
 
   it('auto-pauses after sustained silence', async () => {

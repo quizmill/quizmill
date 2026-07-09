@@ -104,6 +104,11 @@ export interface PackPrefs {
   /** Drive Mode opt-in — shows the hands-free voice quiz entry on Home.
    *  Absent = off: it's a niche mode, so Home stays uncluttered by default. */
   driveMode?: boolean;
+  /** Preferred TTS voice for Drive Mode (a SpeechSynthesisVoice.voiceURI).
+   *  Absent = auto-pick (quality-hinted, see pickDefaultVoice). */
+  driveVoice?: string;
+  /** Drive Mode speaking rate multiplier. Absent = 1 (normal). */
+  driveRate?: number;
 }
 
 export function loadPrefs(): PackPrefs {
@@ -143,6 +148,30 @@ export function saveDriveModeEnabled(on: boolean): void {
   const prefs = loadPrefs();
   if (on) prefs.driveMode = true;
   else delete prefs.driveMode;
+  writeJson(PREFS_KEY, prefs);
+}
+
+/** Drive Mode voice/speed prefs, rate clamped to the sane speaking band. */
+export function loadDriveVoicePrefs(): { voiceURI: string | null; rate: number } {
+  const prefs = loadPrefs();
+  const rawRate = typeof prefs.driveRate === 'number' ? prefs.driveRate : 1;
+  return {
+    voiceURI: prefs.driveVoice ?? null,
+    rate: Math.min(1.5, Math.max(0.5, rawRate)),
+  };
+}
+
+export function saveDriveVoice(voiceURI: string | null): void {
+  const prefs = loadPrefs();
+  if (voiceURI) prefs.driveVoice = voiceURI;
+  else delete prefs.driveVoice;
+  writeJson(PREFS_KEY, prefs);
+}
+
+export function saveDriveRate(rate: number): void {
+  const prefs = loadPrefs();
+  if (rate !== 1) prefs.driveRate = rate;
+  else delete prefs.driveRate;
   writeJson(PREFS_KEY, prefs);
 }
 

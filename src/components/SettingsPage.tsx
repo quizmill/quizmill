@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowLeft, Car, Gamepad2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Car, Gamepad2, Trash2, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { InstallCard } from '@/components/InstallPrompt';
 import { SyncSettings } from '@/components/SyncSettings';
@@ -14,8 +14,12 @@ import {
 import { cn } from '@/lib/cn';
 import {
   loadDriveModeEnabled,
+  loadDriveVoicePrefs,
   saveDriveModeEnabled,
+  saveDriveRate,
+  saveDriveVoice,
 } from '@/lib/storage';
+import { listVoices, speak, ttsSupported, voicesForLang } from '@/lib/speech';
 import {
   packSources,
   packGames,
@@ -55,6 +59,46 @@ export function SettingsPage({ extras }: SettingsPageProps) {
     const next = !driveMode;
     setDriveMode(next);
     saveDriveModeEnabled(next);
+  };
+
+  // Drive Mode voice tuning. Voices resolve async (voiceschanged), and
+  // only voices in the browser's language are offered — a full list is
+  // hundreds of entries on iOS.
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [driveVoice, setDriveVoice] = useState<string | null>(null);
+  const [driveRate, setDriveRate] = useState(1);
+  useEffect(() => {
+    const prefs = loadDriveVoicePrefs();
+    setDriveVoice(prefs.voiceURI);
+    setDriveRate(prefs.rate);
+  }, []);
+  useEffect(() => {
+    if (!driveMode) return;
+    let cancelled = false;
+    listVoices().then((all) => {
+      if (cancelled) return;
+      const lang =
+        typeof navigator !== 'undefined' ? navigator.language : 'en';
+      setVoices(voicesForLang(all, lang));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [driveMode]);
+  const pickVoice = (voiceURI: string) => {
+    const next = voiceURI === '' ? null : voiceURI;
+    setDriveVoice(next);
+    saveDriveVoice(next);
+  };
+  const pickRate = (rate: number) => {
+    setDriveRate(rate);
+    saveDriveRate(rate);
+  };
+  const previewVoice = () => {
+    speak(
+      'Question 1 of 10. Which planet is closest to the sun? A. Mercury. B. Venus.',
+      { voiceURI: driveVoice, rate: driveRate },
+    );
   };
 
   // Hidden games easter egg — revealed by tapping the version pill.
@@ -160,13 +204,72 @@ export function SettingsPage({ extras }: SettingsPageProps) {
             </button>
           </div>
           {driveMode ? (
-            <Link
-              href="/drive/"
-              className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50"
-            >
-              <Car className="h-4 w-4" />
-              Open drive mode
-            </Link>
+            <div className="mt-4 flex flex-col gap-4 border-t border-ink-100 pt-4">
+              <div className="flex flex-col gap-1.5">
+                <label
+                  htmlFor="drive-voice"
+                  className="text-sm font-semibold text-ink-800"
+                >
+                  Voice
+                </label>
+                <select
+                  id="drive-voice"
+                  data-testid="drive-voice-select"
+                  value={driveVoice ?? ''}
+                  onChange={(e) => pickVoice(e.target.value)}
+                  className="rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm text-ink-800 shadow-sm"
+                >
+                  <option value="">Auto — best available</option>
+                  {voices.map((v) => (
+                    <option key={v.voiceURI} value={v.voiceURI}>
+                      {v.name} ({v.lang})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-ink-500">
+                  {ttsSupported()
+                    ? 'On iPhone, nicer voices appear here after you download them: Settings → Accessibility → Spoken Content → Voices (pick an “Enhanced” or “Premium” one).'
+                    : 'Speech isn’t available in this browser.'}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label
+                  htmlFor="drive-rate"
+                  className="flex items-center justify-between text-sm font-semibold text-ink-800"
+                >
+                  <span>Speed</span>
+                  <span className="font-mono text-xs text-ink-500">
+                    ×{driveRate.toFixed(2)}
+                  </span>
+                </label>
+                <input
+                  id="drive-rate"
+                  data-testid="drive-rate-slider"
+                  type="range"
+                  min={0.7}
+                  max={1.3}
+                  step={0.05}
+                  value={driveRate}
+                  onChange={(e) => pickRate(Number(e.target.value))}
+                  className="accent-brand-500"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="secondary" onClick={previewVoice}>
+                  <Volume2 className="h-4 w-4" />
+                  Preview voice
+                </Button>
+                <Link
+                  href="/drive/"
+                  className="tap-feedback inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50"
+                >
+                  <Car className="h-4 w-4" />
+                  Open drive mode
+                </Link>
+              </div>
+            </div>
           ) : null}
         </div>
 
