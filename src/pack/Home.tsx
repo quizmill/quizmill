@@ -28,6 +28,7 @@ import {
   loadDriveModeEnabled,
 } from '@/lib/storage';
 import { levelNudge, streakProgress } from '@/lib/stats';
+import { latestColdLook } from '@/lib/readiness';
 import { cn } from '@/lib/cn';
 import {
   packQuestions,
@@ -173,8 +174,12 @@ export default function PackHome() {
     setLevel(nudge.to);
   };
 
-  const totalAnswered = attempts.length;
-  const totalCorrect = attempts.filter((a) => a.isCorrect).length;
+  // Count DISTINCT questions (via the latest cold look), not raw attempts —
+  // a re-answered question is one answered question, so the numerator can
+  // never exceed the available denominator, and accuracy never tops 100%.
+  const answeredLooks = latestColdLook(attempts);
+  const totalAnswered = answeredLooks.length;
+  const totalCorrect = answeredLooks.filter((a) => a.isCorrect).length;
   const overallAccuracy =
     totalAnswered === 0 ? 0 : Math.round((totalCorrect / totalAnswered) * 100);
   const mistakeCount = unresolvedMistakeCount(attempts);
@@ -191,10 +196,14 @@ export default function PackHome() {
     const slot = statsByCategory.get(q.categoryKey);
     if (slot) slot.available++;
   }
-  for (const a of attempts) {
-    // Attempts only store the category; join back to the question's level so
-    // the answered numerator matches the filtered available denominator.
-    if (level && PACK_LEVEL_BY_QUESTION_ID[a.questionId] !== level) continue;
+  // One row per distinct question (latest cold look), joined back to the
+  // question's level so the answered numerator matches the filtered
+  // available denominator — and a re-answered question counts once.
+  const categoryLooks = latestColdLook(
+    attempts,
+    (id) => !level || PACK_LEVEL_BY_QUESTION_ID[id] === level,
+  );
+  for (const a of categoryLooks) {
     const slot = statsByCategory.get(a.subject);
     if (!slot) continue;
     slot.answered++;

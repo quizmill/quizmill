@@ -92,4 +92,25 @@ describe('PackHome category stats', () => {
 
     expect(categoryStatLine('Planets & Moons')).toContain('2/11 answered');
   });
+
+  it('counts a re-answered question once, not per attempt (regression: "8/4")', async () => {
+    // The same question answered in two sessions (wrong, then rescued).
+    // The numerator must be distinct questions — never more than available.
+    localStorage.setItem(
+      ATTEMPTS_KEY,
+      JSON.stringify([
+        { ...attempt('demo-planets-001', 'planets', false), id: 'a1', sessionId: 's1', answeredAt: 1000 },
+        { ...attempt('demo-planets-001', 'planets', true), id: 'a2', sessionId: 's2', answeredAt: 2000 },
+      ]),
+    );
+
+    await render();
+
+    const line = categoryStatLine('Planets & Moons');
+    // One distinct question answered, not two attempts.
+    expect(line).toContain('1/11 answered');
+    // Accuracy reflects the latest cold look (rescued → correct), and can
+    // never read above 100%.
+    expect(line).toContain('100% accuracy');
+  });
 });
