@@ -34,6 +34,7 @@ import {
 } from '@/pack/data';
 import {
   advanceAfterAnswer,
+  attemptHistory,
   bankForCategory,
   buildAttempt,
   buildSessionEnd,
@@ -41,7 +42,7 @@ import {
   filterByLevel,
   formatKeyList,
   gradeSelection,
-  historicalIdsForCategory,
+  isBankFullySeen,
   isLastQuestion,
   moveToNext,
   nextSelection,
@@ -71,6 +72,10 @@ export function PackPracticeRunner({ categoryKey }: Props) {
 
   const [state, setState] = useState<RunnerState | null>(null);
   const [outOfQuestions, setOutOfQuestions] = useState(false);
+  // Whether the dealt round is repeats by necessity (every question in the
+  // set already attempted) — surfaced once so re-served questions read as
+  // deliberate revision, not a broken picker.
+  const [repeatRound, setRepeatRound] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [stage, setStage] = useState<Stage>('choosing');
   // The chosen option key(s). Single-answer questions hold one entry;
@@ -102,12 +107,13 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   // hangs on the "Loading…" placeholder forever.
   useEffect(() => {
     if (!mounted || state) return;
-    const historical = historicalIdsForCategory(attempts, categoryKey);
-    const picked = pickSessionFromBank(bank, historical);
+    const history = attemptHistory(attempts, categoryKey);
+    const picked = pickSessionFromBank(bank, history);
     if (picked === null) {
       setOutOfQuestions(true);
       return;
     }
+    setRepeatRound(isBankFullySeen(bank, history));
     const sessionId = crypto.randomUUID();
     const now = Date.now();
     const initial: RunnerState = {
@@ -287,6 +293,20 @@ export function PackPracticeRunner({ categoryKey }: Props) {
           total={state.questions.length}
         />
       </header>
+
+      {repeatRound && state.currentIndex === 0 ? (
+        <div
+          data-testid="repeat-round-banner"
+          className="flex items-center gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-3 shadow-sm"
+        >
+          <RefreshCw className="h-4 w-4 flex-shrink-0 text-brand-600" />
+          <p className="text-sm text-ink-700">
+            You&apos;ve answered every question in this set — this round
+            revisits your mistakes and the ones you&apos;ve not seen for
+            longest.
+          </p>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-1.5 text-sm">
         <QuestionMeta question={current} />

@@ -13,6 +13,12 @@ export interface SelectableQuestion {
 
 export type Rng = () => number; // returns [0, 1)
 
+/** Latest-attempt summary per question, for ranking repeat picks. */
+export interface AttemptSummary {
+  lastAnsweredAt: number;
+  lastCorrect: boolean;
+}
+
 export function pickSessionQuestions<Q extends SelectableQuestion>(
   bank: Q[],
   options: {
@@ -21,10 +27,14 @@ export function pickSessionQuestions<Q extends SelectableQuestion>(
     historicalAttemptedIds: Set<Q['id']>;
     /** Question IDs already used in the current session — never repeat. */
     currentSessionIds: Set<Q['id']>;
+    /** Latest attempt per question. When present, repeats are ranked
+     *  (wrong-last first, then least recently attempted) instead of
+     *  drawn uniformly at random. */
+    history?: ReadonlyMap<Q['id'], AttemptSummary>;
     rng?: Rng;
   },
 ): Q[] {
-  const { count, historicalAttemptedIds, currentSessionIds } = options;
+  const { count, historicalAttemptedIds, currentSessionIds, history } = options;
   const rng = options.rng ?? Math.random;
 
   const available = bank.filter((q) => !currentSessionIds.has(q.id));
@@ -35,11 +45,36 @@ export function pickSessionQuestions<Q extends SelectableQuestion>(
 
   // Shuffle each pool deterministically with the rng.
   const shuffledUnseen = shuffle(unseen, rng);
-  const shuffledSeen = shuffle(seen, rng);
+  const shuffledSeen = orderSeen(seen, history, rng);
 
   // Prefer unseen; fall back to seen if we run out.
   const picked = [...shuffledUnseen, ...shuffledSeen].slice(0, count);
   return picked;
+}
+
+/**
+ * Order the already-attempted pool for re-serving. Without history it's a
+ * plain shuffle (legacy behaviour). With history, repeats become useful
+ * instead of random: questions whose latest attempt was wrong come first
+ * (unmastered material), then everything else least-recently-attempted
+ * first — so the freshest questions are re-served last and the set rotates
+ * with maximal spacing. Shuffle-then-stable-sort keeps ties random.
+ */
+function orderSeen<Q extends SelectableQuestion>(
+  seen: Q[],
+  history: ReadonlyMap<Q['id'], AttemptSummary> | undefined,
+  rng: Rng,
+): Q[] {
+  const shuffled = shuffle(seen, rng);
+  if (!history) return shuffled;
+  const info = (q: Q): AttemptSummary =>
+    history.get(q.id) ?? { lastAnsweredAt: 0, lastCorrect: true };
+  return shuffled.sort((a, b) => {
+    const ia = info(a);
+    const ib = info(b);
+    if (ia.lastCorrect !== ib.lastCorrect) return ia.lastCorrect ? 1 : -1;
+    return ia.lastAnsweredAt - ib.lastAnsweredAt;
+  });
 }
 
 /**
@@ -51,6 +86,7 @@ export function pickNextQuestion<Q extends SelectableQuestion>(
   options: {
     historicalAttemptedIds: Set<Q['id']>;
     currentSessionIds: Set<Q['id']>;
+    history?: ReadonlyMap<Q['id'], AttemptSummary>;
     rng?: Rng;
   },
 ): Q | null {
@@ -58,6 +94,7 @@ export function pickNextQuestion<Q extends SelectableQuestion>(
     count: 1,
     historicalAttemptedIds: options.historicalAttemptedIds,
     currentSessionIds: options.currentSessionIds,
+    history: options.history,
     rng: options.rng,
   });
   return picked ?? null;
