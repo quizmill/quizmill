@@ -4,6 +4,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { webcrypto } from 'node:crypto';
 import { PackPracticeRunner } from '@/pack/PracticeRunner';
+import { ATTEMPTS_KEY } from '@/lib/storage';
+import type { Attempt } from '@/data/types';
 
 // React needs this flag to allow act() outside @testing-library.
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -81,7 +83,44 @@ async function finishRound() {
   throw new Error('round never reached the results screen');
 }
 
+function seedAttempts(questionIds: string[]) {
+  const attempts: Attempt[] = questionIds.map((questionId, i) => ({
+    id: `seed-${questionId}`,
+    sessionId: 'seed-session',
+    questionId,
+    answeredAt: 1000 + i,
+    selectedAnswer: 'A',
+    isCorrect: i % 2 === 0,
+    timeTakenSeconds: 5,
+    subject: 'space-exploration',
+    topic: questionId,
+    difficulty: 1,
+  }));
+  localStorage.setItem(ATTEMPTS_KEY, JSON.stringify(attempts));
+}
+
 describe('PackPracticeRunner', () => {
+  it('explains repeat rounds once the whole set has been answered', async () => {
+    // All 5 space-exploration questions already attempted — the dealt round
+    // is repeats by necessity, and the runner must say so instead of
+    // silently re-serving answered questions.
+    seedAttempts([
+      'demo-explore-001',
+      'demo-explore-002',
+      'demo-explore-003',
+      'demo-explore-004',
+      'demo-explore-005',
+    ]);
+    await render();
+    expect(container.textContent).toContain('answered every question');
+  });
+
+  it('shows no repeat-round notice while unseen questions remain', async () => {
+    seedAttempts(['demo-explore-001']);
+    await render();
+    expect(container.textContent).not.toContain('answered every question');
+  });
+
   it('starts a fresh round when "Another round" is clicked', async () => {
     await render();
     await finishRound();

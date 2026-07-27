@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  attemptHistory,
   buildAttempt,
   filterByLevel,
   formatKeyList,
   gradeSelection,
+  isBankFullySeen,
   nextSelection,
   type RunnerState,
 } from '@/pack/runner';
@@ -146,5 +148,45 @@ describe('buildAttempt', () => {
 
   it('marks an incomplete multi-answer selection incorrect', () => {
     expect(attemptFor(multiQ(), ['A']).isCorrect).toBe(false);
+  });
+});
+
+describe('attemptHistory', () => {
+  const attempts = [
+    { questionId: 'a', subject: 'c', answeredAt: 100, isCorrect: false },
+    { questionId: 'a', subject: 'c', answeredAt: 200, isCorrect: true },
+    { questionId: 'b', subject: 'other', answeredAt: 150, isCorrect: false },
+  ];
+
+  it('keeps only the latest attempt per question', () => {
+    const history = attemptHistory(attempts);
+    expect(history.get('a')).toEqual({ lastAnsweredAt: 200, lastCorrect: true });
+    expect(history.get('b')).toEqual({ lastAnsweredAt: 150, lastCorrect: false });
+  });
+
+  it('filters to one category when a key is given', () => {
+    const history = attemptHistory(attempts, 'c');
+    expect(history.has('a')).toBe(true);
+    expect(history.has('b')).toBe(false);
+  });
+});
+
+describe('isBankFullySeen', () => {
+  const bank = [q('a'), q('b')];
+
+  it('is true only when every bank question has been attempted', () => {
+    const full = attemptHistory([
+      { questionId: 'a', subject: 'c', answeredAt: 1, isCorrect: true },
+      { questionId: 'b', subject: 'c', answeredAt: 2, isCorrect: false },
+    ]);
+    const partial = attemptHistory([
+      { questionId: 'a', subject: 'c', answeredAt: 1, isCorrect: true },
+    ]);
+    expect(isBankFullySeen(bank, full)).toBe(true);
+    expect(isBankFullySeen(bank, partial)).toBe(false);
+  });
+
+  it('is false for an empty bank', () => {
+    expect(isBankFullySeen([], new Map())).toBe(false);
   });
 });

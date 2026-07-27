@@ -5,7 +5,7 @@
  * everything that can be a function of plain inputs lives here.
  */
 import type { Attempt, Session } from '@/data/types';
-import { pickSessionQuestions } from '@/lib/selection';
+import { pickSessionQuestions, type AttemptSummary } from '@/lib/selection';
 import { correctKeysOf, type OptionKey, type PackQuestion } from '@/pack/data';
 
 export const QUESTION_COUNT = 10;
@@ -72,14 +72,40 @@ export function filterByLevel(
   return bank.filter((q) => q.level === level);
 }
 
-/** Past-attempt IDs on the same category — used to bias toward unseen. */
-export function historicalIdsForCategory(
-  attempts: { questionId: string; subject: string }[],
-  categoryKey: string,
-): Set<string> {
-  return new Set(
-    attempts.filter((a) => a.subject === categoryKey).map((a) => a.questionId),
-  );
+/**
+ * Latest attempt per question (optionally restricted to one category) —
+ * feeds the unseen bias and the repeat ranking in the selection engine.
+ */
+export function attemptHistory(
+  attempts: {
+    questionId: string;
+    subject: string;
+    answeredAt: number;
+    isCorrect: boolean;
+  }[],
+  categoryKey?: string,
+): Map<string, AttemptSummary> {
+  const history = new Map<string, AttemptSummary>();
+  for (const a of attempts) {
+    if (categoryKey && a.subject !== categoryKey) continue;
+    const prev = history.get(a.questionId);
+    if (!prev || a.answeredAt >= prev.lastAnsweredAt) {
+      history.set(a.questionId, {
+        lastAnsweredAt: a.answeredAt,
+        lastCorrect: a.isCorrect,
+      });
+    }
+  }
+  return history;
+}
+
+/** True when every question in the bank has been attempted — the dealt
+ *  round can only be repeats, which the UI should say out loud. */
+export function isBankFullySeen(
+  bank: PackQuestion[],
+  history: ReadonlyMap<string, AttemptSummary>,
+): boolean {
+  return bank.length > 0 && bank.every((q) => history.has(q.id));
 }
 
 /**
@@ -90,15 +116,16 @@ export function historicalIdsForCategory(
  */
 export function pickSessionFromBank(
   bank: PackQuestion[],
-  historicalIds: Set<string>,
+  history: ReadonlyMap<string, AttemptSummary>,
   rng?: () => number,
 ): PackQuestion[] | null {
   if (bank.length === 0) return null;
   const selectable = bank.map((q) => ({ ...q, topic: q.categoryKey }));
   const picked = pickSessionQuestions(selectable, {
     count: Math.min(QUESTION_COUNT, bank.length),
-    historicalAttemptedIds: historicalIds,
+    historicalAttemptedIds: new Set(history.keys()),
     currentSessionIds: new Set(),
+    history,
     rng,
   });
   if (picked.length === 0) return null;

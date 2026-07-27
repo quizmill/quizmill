@@ -91,6 +91,57 @@ describe('pickSessionQuestions', () => {
   });
 });
 
+describe('exhausted-bank fallback with attempt history', () => {
+  // ids 1..5, all previously attempted. Latest outcomes:
+  //   1 correct @100, 2 correct @200, 5 correct @300, 4 WRONG @400, 3 WRONG @500
+  const smallBank = bank.slice(0, 5);
+  const allSeen = new Set(smallBank.map((q) => q.id));
+  const history = new Map<number, { lastAnsweredAt: number; lastCorrect: boolean }>([
+    [1, { lastAnsweredAt: 100, lastCorrect: true }],
+    [2, { lastAnsweredAt: 200, lastCorrect: true }],
+    [3, { lastAnsweredAt: 500, lastCorrect: false }],
+    [4, { lastAnsweredAt: 400, lastCorrect: false }],
+    [5, { lastAnsweredAt: 300, lastCorrect: true }],
+  ]);
+
+  it('serves questions last answered wrong first, oldest attempt first', () => {
+    const picked = pickSessionQuestions(smallBank, {
+      count: 3,
+      historicalAttemptedIds: allSeen,
+      currentSessionIds: new Set(),
+      history,
+      rng: seededRng(42),
+    });
+    // Wrong-last first (4 before 3 — older attempt), then the stalest correct.
+    expect(picked.map((q) => q.id)).toEqual([4, 3, 1]);
+  });
+
+  it('leaves the most recently answered question for last', () => {
+    const picked = pickSessionQuestions(smallBank, {
+      count: 4,
+      historicalAttemptedIds: allSeen,
+      currentSessionIds: new Set(),
+      history,
+      rng: seededRng(7),
+    });
+    // 5 was answered (correctly) most recently among the corrects — it must
+    // not reappear while staler questions remain.
+    expect(picked.map((q) => q.id)).toEqual([4, 3, 1, 2]);
+  });
+
+  it('still prefers unseen questions over any seen ones', () => {
+    const seenButOne = new Set([1, 2, 3, 4]); // 5 never attempted
+    const picked = pickSessionQuestions(smallBank, {
+      count: 1,
+      historicalAttemptedIds: seenButOne,
+      currentSessionIds: new Set(),
+      history,
+      rng: seededRng(3),
+    });
+    expect(picked.map((q) => q.id)).toEqual([5]);
+  });
+});
+
 describe('pickNextQuestion', () => {
   it('returns null when nothing is available', () => {
     const next = pickNextQuestion([], {

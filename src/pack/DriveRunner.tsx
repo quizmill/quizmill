@@ -56,6 +56,7 @@ import {
 } from '@/pack/data';
 import {
   advanceAfterAnswer,
+  attemptHistory,
   buildAttempt,
   buildSessionEnd,
   buildSessionStart,
@@ -143,8 +144,7 @@ export function DriveRunner() {
   function handleStart() {
     warmUpTts(); // unlock TTS inside the tap gesture (iOS)
     const voiceBank = filterByLevel(bank, loadLevelFilter());
-    const historical = new Set(attempts.map((a) => a.questionId));
-    const picked = pickSessionFromBank(voiceBank, historical);
+    const picked = pickSessionFromBank(voiceBank, attemptHistory(attempts));
     if (picked === null) {
       setPhase('empty');
       return;
