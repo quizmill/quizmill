@@ -48,6 +48,7 @@ import {
   speechForResults,
 } from '@/lib/voice';
 import {
+  isMultiAnswer,
   packQuestions,
   packScenarios,
   type OptionKey,
@@ -117,11 +118,13 @@ export function DriveRunner() {
   const [voiceBroken, setVoiceBroken] = useState(false);
   const voiceOn = stt && !voiceBroken;
 
-  // Only questions that work with no screen: text prompt, text options.
+  // Only questions that work with no screen: text prompt, text options,
+  // and a single spoken answer. Multi-answer ("select all that apply")
+  // can't be voiced hands-free — excluded like image questions are.
   const bank = useMemo(
     () =>
       packQuestions.filter(
-        (q) => !q.image && q.options.every((o) => !o.image),
+        (q) => !q.image && q.options.every((o) => !o.image) && !isMultiAnswer(q),
       ),
     [],
   );
@@ -168,7 +171,7 @@ export function DriveRunner() {
     const attempt = buildAttempt({
       state,
       question: current,
-      selected: key,
+      selected: [key],
       categoryKey: current.categoryKey,
       now: Date.now(),
       attemptId: crypto.randomUUID(),

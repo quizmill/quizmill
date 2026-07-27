@@ -146,9 +146,15 @@ export function wilsonInterval(
  * take the MOST RECENT session's result (so genuine re-learning later counts).
  * Optionally restricted to in-scope questions.
  */
-function latestColdLook(
+/**
+ * One attempt per distinct question — that question's most recent "cold
+ * look" (the first answer in each session, then the latest session's).
+ * The engine's canonical de-duplication of a re-answered question: use it
+ * anywhere a count or accuracy must be per-question, not per-attempt.
+ */
+export function latestColdLook(
   attempts: readonly Attempt[],
-  inScope: (questionId: string) => boolean,
+  inScope: (questionId: string) => boolean = () => true,
 ): Attempt[] {
   // First attempt per (question, session) = that session's cold look.
   const perSession = new Map<string, Attempt>();

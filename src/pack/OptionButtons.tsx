@@ -6,9 +6,15 @@ import type { OptionKey, PackOption } from '@/pack/data';
 
 interface OptionButtonsProps {
   options: PackOption[];
-  selected: OptionKey | null;
+  /** The chosen option key(s). One entry for single-answer questions;
+   *  several while a multi-answer ("select all") question is in progress. */
+  selected: OptionKey[];
   stage: 'choosing' | 'feedback';
-  correctKey: OptionKey;
+  /** Every correct key — one for single-answer, two+ for multi-answer. */
+  correctKeys: OptionKey[];
+  /** Multi-answer question — options toggle and the key bubbles are
+   *  rounded squares to signal "pick more than one". */
+  multi?: boolean;
   onSelect: (key: OptionKey) => void;
 }
 
@@ -16,22 +22,26 @@ interface OptionButtonsProps {
  * The MCQ answer buttons, shared by the Practice and Review runners.
  * Renders a text list, or — when every option carries an `image`
  * (image-answer questions, e.g. Non-Verbal Reasoning) — a 2-column grid
- * of image tiles. Selection/feedback styling is identical to both.
+ * of image tiles. Handles both single-answer (radio-style, one choice)
+ * and multi-answer (checkbox-style, several) questions; feedback flags
+ * every correct key.
  */
 export function OptionButtons({
   options,
   selected,
   stage,
-  correctKey,
+  correctKeys,
+  multi = false,
   onSelect,
 }: OptionButtonsProps) {
   const imageOptions = options.length > 0 && options.every((o) => o.image);
+  const bubbleShape = multi ? 'rounded-md' : 'rounded-full';
 
   return (
     <div className={imageOptions ? 'grid grid-cols-2 gap-2.5' : 'flex flex-col gap-2.5'}>
       {options.map((opt) => {
-        const isThis = selected === opt.key;
-        const isAnswer = opt.key === correctKey;
+        const isThis = selected.includes(opt.key);
+        const isAnswer = correctKeys.includes(opt.key);
 
         let visual = 'border-ink-200 bg-white hover:bg-ink-50';
         if (stage === 'choosing' && isThis) {
@@ -53,7 +63,8 @@ export function OptionButtons({
         const keyBubble = (extra?: string) => (
           <span
             className={cn(
-              'inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border text-xs font-bold',
+              'inline-flex h-6 w-6 flex-shrink-0 items-center justify-center border text-xs font-bold',
+              bubbleShape,
               extra,
               bubbleState,
             )}

@@ -20,6 +20,10 @@ import { z } from 'zod';
  * v1 packs (4 options A–D) remain valid unchanged; the validator stays
  * backward-readable.
  *
+ * Multi-answer questions ("select all that apply") are additive and valid
+ * for both v1 and v2 packs: a question carries either `correctKey` (one
+ * answer, as before) or `correctKeys` (two or more), never both.
+ *
  * Packs are PRIVATE by default: the active pack lives at gitignored
  * `content/pack/`, authored packs under gitignored `packs/`. Only the
  * demo pack (`content/pack-demo/`) is committed.
@@ -232,7 +236,15 @@ export const packQuestionSchema = z
     image: packImagePathSchema.optional(),
     /** 2–6 options keyed A–F in order (v2). True/false → 2; GL papers → 5. */
     options: z.array(packOptionSchema).min(2).max(6),
-    correctKey: packOptionKeySchema,
+    /** Single-answer key. Exactly one of `correctKey` / `correctKeys` must
+     *  be present — see superRefine. */
+    correctKey: packOptionKeySchema.optional(),
+    /** Multi-answer key ("select all that apply") — 2–6 distinct option
+     *  keys, all correct (additive; valid for v1 and v2 packs). Grading is
+     *  set-equality: every listed key must be chosen and no other. Use
+     *  `correctKey` for a single-answer question, `correctKeys` for two or
+     *  more correct answers — never both. */
+    correctKeys: z.array(packOptionKeySchema).min(2).max(6).optional(),
     /** Teaches WHY the answer is right (and ideally why distractors are
      *  wrong) — this is the pedagogical payload, don't skimp. */
     explanation: z.string().min(40),
@@ -253,8 +265,32 @@ export const packQuestionSchema = z
         message: `options must be keyed exactly ${expected.join(',')} (one each)`,
       });
     }
-    if (!keys.includes(q.correctKey)) {
+    // Exactly one answer key must be supplied: `correctKey` (single) or
+    // `correctKeys` (multi). Both, or neither, is an authoring error.
+    const hasSingle = q.correctKey !== undefined;
+    const hasMulti = q.correctKeys !== undefined;
+    if (hasSingle === hasMulti) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'a question needs exactly one of correctKey or correctKeys',
+      });
+    }
+    if (hasSingle && !keys.includes(q.correctKey!)) {
       ctx.addIssue({ code: 'custom', message: 'correctKey must reference one of the options' });
+    }
+    if (hasMulti) {
+      const ck = q.correctKeys!;
+      if (new Set(ck).size !== ck.length) {
+        ctx.addIssue({ code: 'custom', message: 'correctKeys must not contain duplicates' });
+      }
+      for (const k of ck) {
+        if (!keys.includes(k)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `correctKeys entry "${k}" must reference one of the options`,
+          });
+        }
+      }
     }
     // Image options are all-or-nothing: a mix of image and text answers
     // renders inconsistently, and usually signals an authoring slip.

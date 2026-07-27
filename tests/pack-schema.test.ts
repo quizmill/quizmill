@@ -181,6 +181,70 @@ describe('validatePack', () => {
     expect(result.errors.some((e) => e.includes('keyed exactly'))).toBe(true);
   });
 
+  // ——— multi-answer questions (correctKeys) ———
+
+  it('accepts a question with correctKeys and no correctKey', () => {
+    const input = loadDemo();
+    const q = (input.questions as Record<string, unknown>[])[0];
+    q.options = makeOptions(4);
+    delete q.correctKey;
+    q.correctKeys = ['A', 'C'];
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('rejects a question with both correctKey and correctKeys', () => {
+    const input = loadDemo();
+    const q = (input.questions as Record<string, unknown>[])[0];
+    q.options = makeOptions(4);
+    q.correctKey = 'A';
+    q.correctKeys = ['A', 'C'];
+    const result = validatePack(input);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.includes('correctKey'))).toBe(true);
+  });
+
+  it('rejects a question with neither correctKey nor correctKeys', () => {
+    const input = loadDemo();
+    const q = (input.questions as Record<string, unknown>[])[0];
+    q.options = makeOptions(4);
+    delete q.correctKey;
+    const result = validatePack(input);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.includes('correctKey'))).toBe(true);
+  });
+
+  it('rejects correctKeys that reference an option not present', () => {
+    const input = loadDemo();
+    const q = (input.questions as Record<string, unknown>[])[0];
+    q.options = makeOptions(3); // A,B,C
+    delete q.correctKey;
+    q.correctKeys = ['A', 'D']; // D is not an option
+    const result = validatePack(input);
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects a duplicate key in correctKeys', () => {
+    const input = loadDemo();
+    const q = (input.questions as Record<string, unknown>[])[0];
+    q.options = makeOptions(4);
+    delete q.correctKey;
+    q.correctKeys = ['A', 'A'];
+    const result = validatePack(input);
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects correctKeys with fewer than 2 entries (use correctKey instead)', () => {
+    const input = loadDemo();
+    const q = (input.questions as Record<string, unknown>[])[0];
+    q.options = makeOptions(4);
+    delete q.correctKey;
+    q.correctKeys = ['A'];
+    const result = validatePack(input);
+    expect(result.ok).toBe(false);
+  });
+
   it('accepts schemaVersion 2 in the manifest', () => {
     const input = loadDemo();
     (input.manifest as { schemaVersion: number }).schemaVersion = 2;

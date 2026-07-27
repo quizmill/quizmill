@@ -61,7 +61,7 @@ function categoryStatLine(label: string): string {
 
 describe('PackHome category stats', () => {
   it('counts only attempts within the active level filter', async () => {
-    // Demo pack: planets has 4 basics + 6 advanced questions. One attempt in
+    // Demo pack: planets has 4 basics + 7 advanced questions. One attempt in
     // each band; with the Basics filter on, only the basics attempt counts —
     // the answered numerator must use the same filter as the available
     // denominator (regression: it showed e.g. "74/16 answered").
@@ -90,6 +90,27 @@ describe('PackHome category stats', () => {
 
     await render();
 
-    expect(categoryStatLine('Planets & Moons')).toContain('2/10 answered');
+    expect(categoryStatLine('Planets & Moons')).toContain('2/11 answered');
+  });
+
+  it('counts a re-answered question once, not per attempt (regression: "8/4")', async () => {
+    // The same question answered in two sessions (wrong, then rescued).
+    // The numerator must be distinct questions — never more than available.
+    localStorage.setItem(
+      ATTEMPTS_KEY,
+      JSON.stringify([
+        { ...attempt('demo-planets-001', 'planets', false), id: 'a1', sessionId: 's1', answeredAt: 1000 },
+        { ...attempt('demo-planets-001', 'planets', true), id: 'a2', sessionId: 's2', answeredAt: 2000 },
+      ]),
+    );
+
+    await render();
+
+    const line = categoryStatLine('Planets & Moons');
+    // One distinct question answered, not two attempts.
+    expect(line).toContain('1/11 answered');
+    // Accuracy reflects the latest cold look (rescued → correct), and can
+    // never read above 100%.
+    expect(line).toContain('100% accuracy');
   });
 });

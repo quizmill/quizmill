@@ -101,13 +101,35 @@ export type PackQuestion = {
   prompt: string;
   image?: string;
   options: PackOption[];
-  correctKey: OptionKey;
+  /** Single-answer key. Present unless the question is multi-answer. */
+  correctKey?: OptionKey;
+  /** Multi-answer keys ("select all that apply") — mutually exclusive with
+   *  correctKey. Present only on multi-answer questions. */
+  correctKeys?: OptionKey[];
   explanation: string;
   source: 'original' | 'generated' | 'curated';
   sourceRef?: string;
   reviewStatus: 'draft' | 'reviewed' | 'approved';
   tags?: string[];
 };
+
+/** True when a question has two or more correct answers (select-all). */
+export function isMultiAnswer(q: Pick<PackQuestion, 'correctKeys'>): boolean {
+  return Array.isArray(q.correctKeys) && q.correctKeys.length > 0;
+}
+
+/**
+ * The question's correct answer key(s), normalised to an array so the
+ * runner and UI can treat single- and multi-answer questions uniformly.
+ * A single-answer question yields `[correctKey]`; a multi-answer question
+ * yields `correctKeys`.
+ */
+export function correctKeysOf(
+  q: Pick<PackQuestion, 'correctKey' | 'correctKeys'>,
+): OptionKey[] {
+  if (q.correctKeys && q.correctKeys.length > 0) return q.correctKeys;
+  return q.correctKey ? [q.correctKey] : [];
+}
 
 export const packManifest = activeManifest;
 export const packLevels = packManifest.levels ?? [];

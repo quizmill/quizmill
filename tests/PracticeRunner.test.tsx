@@ -61,7 +61,7 @@ async function render() {
 
 /** Answer every question in the round until the results screen appears. */
 async function finishRound() {
-  // The space-exploration bank has 4 questions; cap the loop well above
+  // The space-exploration bank has 5 questions; cap the loop well above
   // that so a stuck runner fails fast instead of looping forever.
   for (let i = 0; i < 20; i++) {
     if (control('Another round')) return;

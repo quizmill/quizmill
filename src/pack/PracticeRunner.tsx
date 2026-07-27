@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, RefreshCw, Home } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Home, ListChecks } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 import {
@@ -24,6 +24,8 @@ import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { loadAttempts, loadSessions, loadLevelFilter } from '@/lib/storage';
 import { streakProgress } from '@/lib/stats';
 import {
+  correctKeysOf,
+  isMultiAnswer,
   packQuestions,
   packScenarios,
   PACK_CATEGORY_LABEL,
@@ -37,9 +39,12 @@ import {
   buildSessionEnd,
   buildSessionStart,
   filterByLevel,
+  formatKeyList,
+  gradeSelection,
   historicalIdsForCategory,
   isLastQuestion,
   moveToNext,
+  nextSelection,
   pickSessionFromBank,
   scoreSummary,
   type RunnerState,
@@ -68,7 +73,9 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   const [outOfQuestions, setOutOfQuestions] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [stage, setStage] = useState<Stage>('choosing');
-  const [selected, setSelected] = useState<OptionKey | null>(null);
+  // The chosen option key(s). Single-answer questions hold one entry;
+  // multi-answer ("select all") questions accumulate several.
+  const [selected, setSelected] = useState<OptionKey[]>([]);
   const [finished, setFinished] = useState(false);
   // When today's practice goal is reached, the streak length to celebrate
   // (null when there's nothing to show). Distinct from sticker unlocks so a
@@ -174,7 +181,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
                 setState(null);
                 setFinished(false);
                 setStage('choosing');
-                setSelected(null);
+                setSelected([]);
               }}
             >
               <RefreshCw className="h-4 w-4" />
@@ -201,13 +208,15 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   const scenarioWithStem =
     scenario && scenario.stem ? { ...scenario, stem: scenario.stem } : null;
 
+  const multi = isMultiAnswer(current);
+
   function handleSelect(key: OptionKey) {
     if (stage !== 'choosing') return;
-    setSelected(key);
+    setSelected((prev) => nextSelection(prev, key, multi));
   }
 
   function handleCheck() {
-    if (!state || selected === null) return;
+    if (!state || selected.length === 0) return;
     const attempt = buildAttempt({
       state,
       question: current,
@@ -246,10 +255,11 @@ export function PackPracticeRunner({ categoryKey }: Props) {
     }
     setState(moveToNext(state));
     setStage('choosing');
-    setSelected(null);
+    setSelected([]);
   }
 
-  const isCorrect = stage === 'feedback' && selected === current.correctKey;
+  const isCorrect = stage === 'feedback' && gradeSelection(current, selected);
+  const answerKeys = correctKeysOf(current);
   const concept = current.conceptId ? PACK_CONCEPT_BY_ID[current.conceptId] : undefined;
 
   return (
@@ -322,11 +332,19 @@ export function PackPracticeRunner({ categoryKey }: Props) {
 
       <Scratchpad />
 
+      {multi ? (
+        <div className="-mb-1 flex items-center gap-1.5 text-xs font-semibold text-brand-700">
+          <ListChecks className="h-4 w-4" />
+          Select all that apply
+        </div>
+      ) : null}
+
       <OptionButtons
         options={current.options}
         selected={selected}
         stage={stage}
-        correctKey={current.correctKey}
+        correctKeys={answerKeys}
+        multi={multi}
         onSelect={handleSelect}
       />
 
@@ -335,7 +353,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
           size="lg"
           block
           onClick={handleCheck}
-          disabled={selected === null}
+          disabled={selected.length === 0}
         >
           Check answer
         </Button>
@@ -358,9 +376,9 @@ export function PackPracticeRunner({ categoryKey }: Props) {
           </div>
           {!isCorrect ? (
             <div className="text-[15px] text-ink-700">
-              The answer is{' '}
+              {answerKeys.length > 1 ? 'The answers are ' : 'The answer is '}
               <span className="font-semibold text-ink-900">
-                {current.correctKey}
+                {formatKeyList(answerKeys)}
               </span>
               .
             </div>

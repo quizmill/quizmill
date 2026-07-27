@@ -6,9 +6,45 @@
  */
 import type { Attempt, Session } from '@/data/types';
 import { pickSessionQuestions } from '@/lib/selection';
-import type { OptionKey, PackQuestion } from '@/pack/data';
+import { correctKeysOf, type OptionKey, type PackQuestion } from '@/pack/data';
 
 export const QUESTION_COUNT = 10;
+
+/**
+ * Grade a selection against a question. Both single- and multi-answer
+ * questions grade by set-equality — every correct key must be chosen and
+ * no incorrect one — so multi-answer is all-or-nothing (no partial
+ * credit). An empty selection is never correct.
+ */
+export function gradeSelection(
+  question: Pick<PackQuestion, 'correctKey' | 'correctKeys'>,
+  selected: OptionKey[],
+): boolean {
+  const correct = correctKeysOf(question);
+  if (selected.length !== correct.length) return false;
+  const chosen = new Set(selected);
+  return correct.every((k) => chosen.has(k));
+}
+
+/**
+ * Compute the next selection when an option is tapped. Single-answer mode
+ * replaces the selection; multi-answer mode toggles the key in/out.
+ */
+export function nextSelection(
+  prev: OptionKey[],
+  key: OptionKey,
+  multi: boolean,
+): OptionKey[] {
+  if (!multi) return [key];
+  return prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
+}
+
+/** Render option keys as a natural list: "A", "A and B", "A, B and C". */
+export function formatKeyList(keys: OptionKey[]): string {
+  if (keys.length <= 1) return keys.join('');
+  if (keys.length === 2) return `${keys[0]} and ${keys[1]}`;
+  return `${keys.slice(0, -1).join(', ')} and ${keys[keys.length - 1]}`;
+}
 
 export interface RunnerState {
   sessionId: string;
@@ -75,7 +111,8 @@ export function pickSessionFromBank(
 export interface BuildAttemptArgs {
   state: RunnerState;
   question: PackQuestion;
-  selected: OptionKey;
+  /** The chosen option key(s) — length 1 for single-answer questions. */
+  selected: OptionKey[];
   categoryKey: string;
   now: number;
   attemptId: string;
@@ -89,8 +126,10 @@ export function buildAttempt(args: BuildAttemptArgs): Attempt {
     sessionId: state.sessionId,
     questionId: question.id,
     answeredAt: now,
-    selectedAnswer: selected,
-    isCorrect: selected === question.correctKey,
+    // Persist as a sorted, comma-joined string ("A" or "A,C") — stays a
+    // plain string so storage/sync/stats read it unchanged.
+    selectedAnswer: [...selected].sort().join(','),
+    isCorrect: gradeSelection(question, selected),
     timeTakenSeconds: args.timeTakenSeconds ?? 1,
     // Subject is the engine type — packs store the category key here.
     subject: categoryKey,

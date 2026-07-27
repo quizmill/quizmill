@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, RefreshCw, Home } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Home, ListChecks } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 import {
@@ -24,6 +24,8 @@ import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { loadAttempts, loadSessions } from '@/lib/storage';
 import { unresolvedMistakeIds } from '@/lib/mistakes';
 import {
+  correctKeysOf,
+  isMultiAnswer,
   packQuestions,
   packScenarios,
   PACK_CONCEPT_BY_ID,
@@ -35,8 +37,11 @@ import {
   buildAttempt,
   buildSessionEnd,
   buildSessionStart,
+  formatKeyList,
+  gradeSelection,
   isLastQuestion,
   moveToNext,
+  nextSelection,
   scoreSummary,
   type RunnerState,
 } from './runner';
@@ -62,7 +67,9 @@ export function PackReviewRunner() {
   const [nothingToReview, setNothingToReview] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [stage, setStage] = useState<Stage>('choosing');
-  const [selected, setSelected] = useState<OptionKey | null>(null);
+  // The chosen option key(s) — one for single-answer, several for
+  // multi-answer ("select all") questions.
+  const [selected, setSelected] = useState<OptionKey[]>([]);
   const [finished, setFinished] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -176,13 +183,15 @@ export function PackReviewRunner() {
   const scenarioWithStem =
     scenario && scenario.stem ? { ...scenario, stem: scenario.stem } : null;
 
+  const multi = isMultiAnswer(current);
+
   function handleSelect(key: OptionKey) {
     if (stage !== 'choosing') return;
-    setSelected(key);
+    setSelected((prev) => nextSelection(prev, key, multi));
   }
 
   function handleCheck() {
-    if (!state || selected === null) return;
+    if (!state || selected.length === 0) return;
     const attempt = buildAttempt({
       state,
       question: current,
@@ -213,10 +222,11 @@ export function PackReviewRunner() {
     }
     setState(moveToNext(state));
     setStage('choosing');
-    setSelected(null);
+    setSelected([]);
   }
 
-  const isCorrect = stage === 'feedback' && selected === current.correctKey;
+  const isCorrect = stage === 'feedback' && gradeSelection(current, selected);
+  const answerKeys = correctKeysOf(current);
   const concept = current.conceptId ? PACK_CONCEPT_BY_ID[current.conceptId] : undefined;
 
   return (
@@ -279,11 +289,19 @@ export function PackReviewRunner() {
 
       <Scratchpad />
 
+      {multi ? (
+        <div className="-mb-1 flex items-center gap-1.5 text-xs font-semibold text-brand-700">
+          <ListChecks className="h-4 w-4" />
+          Select all that apply
+        </div>
+      ) : null}
+
       <OptionButtons
         options={current.options}
         selected={selected}
         stage={stage}
-        correctKey={current.correctKey}
+        correctKeys={answerKeys}
+        multi={multi}
         onSelect={handleSelect}
       />
 
@@ -292,7 +310,7 @@ export function PackReviewRunner() {
           size="lg"
           block
           onClick={handleCheck}
-          disabled={selected === null}
+          disabled={selected.length === 0}
         >
           Check answer
         </Button>
@@ -315,9 +333,9 @@ export function PackReviewRunner() {
           </div>
           {!isCorrect ? (
             <div className="text-[15px] text-ink-700">
-              The answer is{' '}
+              {answerKeys.length > 1 ? 'The answers are ' : 'The answer is '}
               <span className="font-semibold text-ink-900">
-                {current.correctKey}
+                {formatKeyList(answerKeys)}
               </span>
               .
             </div>

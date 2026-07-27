@@ -37,19 +37,30 @@ example.
      falls back to a generic emoji by order.
    - `questions.json` — array of questions: slug `id` (unique,
      prefix with the pack id), `categoryKey` (must match a manifest
-     category), `difficulty` 1–5, `prompt` (≥20 chars), exactly 4
-     `options` keyed A–D, `correctKey`, `explanation` (≥40 chars),
+     category), `difficulty` 1–5, `prompt` (≥20 chars), 2–6
+     `options` keyed A–F, an answer key, `explanation` (≥40 chars),
      `source` (`"generated"` for LLM-authored), optional `sourceRef`,
      `reviewStatus` (`"draft"` until a human has checked it), optional
-     `tags`.
+     `tags`. The answer key is either `correctKey` (a single letter,
+     the usual case) **or** `correctKeys` (an array of 2+ letters for
+     a "select all that apply" question) — never both. Multi-answer
+     questions are graded all-or-nothing (every correct option must be
+     chosen and no other), so add `Select all that apply.` (or `Select
+     TWO.`) to the prompt; the app shows a matching hint and checkbox
+     options. Note `prompt`/`options`/`explanation` render minimal
+     markdown — backticks/code blocks and bare URLs only, **no** `**bold**`
+     or `*italic*` (the asterisks show literally).
    - `scenarios.json` — optional; only when several questions genuinely
      share a narrative setup (give them a `scenarioId`). Otherwise `[]`
      or omit.
 
 3. **Quality bar** (this is the point — don't skimp):
-   - Every question must have exactly one defensibly correct answer.
-     If you are not certain an answer is correct, verify it (search,
-     read the source doc) or drop the question.
+   - Every answer must be defensibly correct — the one `correctKey`, or
+     *each* of the `correctKeys`. If you are not certain an answer is
+     correct, verify it (search, read the source doc) or drop the
+     question. For multi-answer questions, be just as sure about which
+     options are *wrong* — a single misjudged distractor makes the whole
+     question ungradeable.
    - Distractors must be *plausible* — common misconceptions,
      near-misses, true-but-irrelevant statements. Never joke options.
    - The explanation teaches: why the answer is right AND why the
