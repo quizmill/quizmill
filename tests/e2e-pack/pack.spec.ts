@@ -491,14 +491,16 @@ describe('progress page', () => {
 
   it('estimates exam readiness once enough of the blueprint is covered', async () => {
     // The demo manifest declares an exam goal (70% pass). Cover both
-    // domains with first attempts: planets 8/10, exploration 3/4. The
-    // blueprint-weighted estimate is 78% — above the line, but the band's
-    // low end dips below → a deterministic "likely" (on track) verdict.
-    const planets = Array.from({ length: 10 }, (_, i) => ({
+    // domains fully with first attempts (the "judged" gate is
+    // min(12, bank size), so a domain must be answered end-to-end):
+    // planets 9/11, exploration 3/5. Blueprint weights are 0.6/0.4, so
+    // the estimate is 0.6·82% + 0.4·60% ≈ 73% — above the line, but the
+    // band's low end dips below → a deterministic "likely" verdict.
+    const planets = Array.from({ length: 11 }, (_, i) => ({
       questionId: `rp-${i}`, subject: 'planets', topic: `rp-${i}`,
-      isCorrect: i < 8, agoMs: 60_000 - i * 100,
+      isCorrect: i < 9, agoMs: 60_000 - i * 100,
     }));
-    const exploration = Array.from({ length: 4 }, (_, i) => ({
+    const exploration = Array.from({ length: 5 }, (_, i) => ({
       questionId: `re-${i}`, subject: 'space-exploration', topic: `re-${i}`,
       isCorrect: i < 3, agoMs: 50_000 - i * 100,
     }));
@@ -522,7 +524,7 @@ describe('progress page', () => {
       (el) => el.textContent ?? '',
     );
     expect(section).toContain('Exam readiness');
-    expect(section).toContain('78%'); // blueprint-weighted estimate
+    expect(section).toContain('73%'); // blueprint-weighted estimate
     expect(section).toContain('pass 70%'); // gauge pass-line label
 
     // The Home screen surfaces readiness as a third stat tile.
@@ -533,7 +535,7 @@ describe('progress page', () => {
       (el) => el.textContent ?? '',
     );
     expect(tile).toContain('Readiness');
-    expect(tile).toContain('78%'); // blueprint-weighted estimate
+    expect(tile).toContain('73%'); // blueprint-weighted estimate
   });
 });
 

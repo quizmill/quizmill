@@ -172,6 +172,24 @@
     "reviewStatus": "reviewed"
   },
   {
+    "id": "demo-planets-011",
+    "categoryKey": "planets",
+    "level": "advanced",
+    "tags": ["gas-giants", "select-all"],
+    "difficulty": 3,
+    "prompt": "Which of these are gas giants? Select all that apply.",
+    "options": [
+      { "key": "A", "text": "Jupiter" },
+      { "key": "B", "text": "Saturn" },
+      { "key": "C", "text": "Neptune" },
+      { "key": "D", "text": "Mars" }
+    ],
+    "correctKeys": ["A", "B"],
+    "explanation": "The gas giants are Jupiter and Saturn — worlds made overwhelmingly of hydrogen and helium with no solid surface. Neptune is a giant planet too, but it and Uranus are classed as ice giants (much more water, ammonia and methane), so Neptune is a deliberate near-miss here. Mars is a small rocky (terrestrial) planet.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
     "id": "demo-explore-001",
     "categoryKey": "space-exploration",
     "level": "basics",
@@ -236,6 +254,24 @@
     ],
     "correctKey": "A",
     "explanation": "At L2, all three bright/warm bodies — Sun, Earth, Moon — stay in roughly the same direction, so one fixed sunshield can block them while the cold side observes deep space. L2 is 1.5 million km away (no servicing), halo orbits still need station-keeping burns, and Webb sits in full sunlight, which is exactly why the sunshield exists.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-explore-005",
+    "categoryKey": "space-exploration",
+    "level": "basics",
+    "tags": ["agencies", "select-all"],
+    "difficulty": 2,
+    "prompt": "Which of the following are government space agencies? Select all that apply.",
+    "options": [
+      { "key": "A", "text": "NASA (United States)" },
+      { "key": "B", "text": "ESA (Europe)" },
+      { "key": "C", "text": "SpaceX" },
+      { "key": "D", "text": "JAXA (Japan)" }
+    ],
+    "correctKeys": ["A", "B", "D"],
+    "explanation": "NASA, ESA and JAXA are public space agencies funded by governments (the United States, a consortium of European states, and Japan). SpaceX is the common trap: it launches astronauts and cargo under contract, but it is a private company, not a government agency.",
     "source": "original",
     "reviewStatus": "approved"
   }

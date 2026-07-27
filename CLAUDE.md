@@ -26,6 +26,13 @@ webmanifest are generated from the manifest by `scripts/pack-assets.ts`
 - `tools/pack/schema.ts` — Zod pack format (schemaVersion 1) +
   `validatePack` cross-file checks (unique ids, category/scenario refs,
   weights). The validator CLI is the agent contract: loop until clean.
+  A question carries either `correctKey` (single answer) **or**
+  `correctKeys` (2+ answers, "select all that apply" — additive, valid
+  for v1 and v2 packs; graded by set-equality, all-or-nothing). The
+  runner/UI normalise via `correctKeysOf`/`isMultiAnswer` (data.ts) and
+  `gradeSelection`/`nextSelection` (runner.ts); attempts persist the
+  choice as a sorted comma-joined string (`"A,C"`), so storage/sync/stats
+  are unchanged.
 - `src/lib/` — engine: `selection.ts` (unseen-biased pick, seedable),
   `mistakes.ts` (re-ask until rescued; packs use per-question rescue —
   topic = question id), `storage.ts` (localStorage, namespaced
