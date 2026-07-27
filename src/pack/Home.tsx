@@ -192,6 +192,9 @@ export default function PackHome() {
     if (slot) slot.available++;
   }
   for (const a of attempts) {
+    // Attempts only store the category; join back to the question's level so
+    // the answered numerator matches the filtered available denominator.
+    if (level && PACK_LEVEL_BY_QUESTION_ID[a.questionId] !== level) continue;
     const slot = statsByCategory.get(a.subject);
     if (!slot) continue;
     slot.answered++;
