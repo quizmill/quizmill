@@ -61,7 +61,7 @@ function categoryStatLine(label: string): string {
 
 describe('PackHome category stats', () => {
   it('counts only attempts within the active level filter', async () => {
-    // Demo pack: planets has 4 basics + 6 advanced questions. One attempt in
+    // Demo pack: planets has 4 basics + 7 advanced questions. One attempt in
     // each band; with the Basics filter on, only the basics attempt counts —
     // the answered numerator must use the same filter as the available
     // denominator (regression: it showed e.g. "74/16 answered").
@@ -90,6 +90,6 @@ describe('PackHome category stats', () => {
 
     await render();
 
-    expect(categoryStatLine('Planets & Moons')).toContain('2/10 answered');
+    expect(categoryStatLine('Planets & Moons')).toContain('2/11 answered');
   });
 });
