@@ -17,8 +17,14 @@ import { getSupabase } from './supabase';
 import * as storage from './storage';
 import type { Mutation } from './storage';
 import type { Attempt, Session } from '@/data/types';
+import { APP_CONFIG } from '@/config';
 
 import { KEY_PREFIX } from './storage';
+
+// All packs share one Supabase project, so every row is partitioned by the
+// pack that wrote it. Reads filter by it and writes stamp it; without this a
+// user signed in to two packs would see their histories commingled.
+const PACK_ID = APP_CONFIG.packId;
 
 const QUEUE_KEY = `${KEY_PREFIX}syncQueue.v1`;
 const MIGRATED_PREFIX = `${KEY_PREFIX}sync.migrated.`; // + uid
@@ -183,6 +189,7 @@ function sessionToRow(s: Session, user_id: string) {
   return {
     id: s.id,
     user_id,
+    pack_id: PACK_ID,
     subject: s.subject,
     started_at: new Date(s.startedAt).toISOString(),
     ended_at: s.endedAt != null ? new Date(s.endedAt).toISOString() : null,
@@ -207,6 +214,7 @@ function attemptToRow(a: Attempt, user_id: string) {
   return {
     id: a.id,
     user_id,
+    pack_id: PACK_ID,
     session_id: a.sessionId,
     question_id: a.questionId,
     answered_at: new Date(a.answeredAt).toISOString(),
@@ -236,6 +244,7 @@ function rowToAttempt(r: Record<string, unknown>): Attempt {
 function achievementToRow(a: storage.EarnedAchievement, user_id: string) {
   return {
     user_id,
+    pack_id: PACK_ID,
     achievement_id: a.id,
     earned_at: new Date(a.earnedAt).toISOString(),
   };
@@ -250,6 +259,7 @@ function rowToAchievement(r: Record<string, unknown>): storage.EarnedAchievement
 function voteToRow(v: storage.QuestionVote, user_id: string) {
   return {
     user_id,
+    pack_id: PACK_ID,
     question_id: v.questionId,
     vote: v.vote,
     comment: v.comment ?? null,
@@ -314,7 +324,7 @@ async function runOp(op: PendingOp, user_id: string): Promise<void> {
       const { error } = await sb
         .from('achievements')
         .upsert(achievementToRow(op.row, user_id), {
-          onConflict: 'user_id,achievement_id',
+          onConflict: 'user_id,pack_id,achievement_id',
           ignoreDuplicates: true,
         });
       if (error) throw error;
@@ -326,19 +336,26 @@ async function runOp(op: PendingOp, user_id: string): Promise<void> {
           .from('votes')
           .delete()
           .eq('user_id', user_id)
+          .eq('pack_id', PACK_ID)
           .eq('question_id', op.questionId);
         if (error) throw error;
         return;
       }
       const { error } = await sb
         .from('votes')
-        .upsert(voteToRow(op.row, user_id), { onConflict: 'user_id,question_id' });
+        .upsert(voteToRow(op.row, user_id), { onConflict: 'user_id,pack_id,question_id' });
       if (error) throw error;
       return;
     }
     case 'clear-all': {
+      // Pack-scoped: clearing history in one pack must not wipe the user's
+      // rows for the other packs sharing this project.
       for (const table of ['sessions', 'attempts', 'achievements', 'votes']) {
-        const { error } = await sb.from(table).delete().eq('user_id', user_id);
+        const { error } = await sb
+          .from(table)
+          .delete()
+          .eq('user_id', user_id)
+          .eq('pack_id', PACK_ID);
         if (error) throw error;
       }
       return;
@@ -348,12 +365,14 @@ async function runOp(op: PendingOp, user_id: string): Promise<void> {
         .from('attempts')
         .delete()
         .eq('user_id', user_id)
+        .eq('pack_id', PACK_ID)
         .in('session_id', op.sessionIds);
       if (aErr) throw aErr;
       const { error: sErr } = await sb
         .from('sessions')
         .delete()
         .eq('user_id', user_id)
+        .eq('pack_id', PACK_ID)
         .in('id', op.sessionIds);
       if (sErr) throw sErr;
       return;
@@ -429,10 +448,10 @@ async function pullAll(user_id: string): Promise<void> {
   const sb = getSupabase();
   if (!sb) return;
   const [sessions, attempts, achievements, votes] = await Promise.all([
-    sb.from('sessions').select('*').eq('user_id', user_id),
-    sb.from('attempts').select('*').eq('user_id', user_id),
-    sb.from('achievements').select('*').eq('user_id', user_id),
-    sb.from('votes').select('*').eq('user_id', user_id),
+    sb.from('sessions').select('*').eq('user_id', user_id).eq('pack_id', PACK_ID),
+    sb.from('attempts').select('*').eq('user_id', user_id).eq('pack_id', PACK_ID),
+    sb.from('achievements').select('*').eq('user_id', user_id).eq('pack_id', PACK_ID),
+    sb.from('votes').select('*').eq('user_id', user_id).eq('pack_id', PACK_ID),
   ]);
 
   const changed = storage.mergeRemote({
