@@ -139,7 +139,7 @@ jobs:
             echo "::notice::PACK_DISPATCH_TOKEN not set — skipping fan-out (packs will rebuild on their daily cron)."
             exit 0
           fi
-          for repo in quizmill/pack-claude-cert quizmill/pack-eleven-plus; do
+          for repo in quizmill/pack-claude-cert quizmill/pack-claude-cert-pro quizmill/pack-eleven-plus; do
             echo "Dispatching engine-update (${VERSION#v}) to $repo"
             jq -nc --arg v "${VERSION#v}" \
               '{event_type:"engine-update",client_payload:{version:$v}}' \
