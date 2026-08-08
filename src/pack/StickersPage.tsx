@@ -114,7 +114,7 @@ function StickerTile({
   const tileClass = cn(
     'flex flex-col items-center gap-1.5 rounded-2xl border-2 p-3 text-center shadow-sm',
     isEarned
-      ? `bg-white ${TIER_BORDER[achievement.tier]}`
+      ? `bg-surface ${TIER_BORDER[achievement.tier]}`
       : 'border-ink-200 bg-ink-100/40',
   );
 
@@ -213,7 +213,7 @@ function StickerDetail({ achievement, progress, onClose }: StickerDetailProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-ink-900/40 p-4 sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-night-900/40 p-4 sm:items-center"
       role="dialog"
       aria-modal="true"
       aria-label={`How to unlock ${achievement.name}`}
@@ -221,7 +221,7 @@ function StickerDetail({ achievement, progress, onClose }: StickerDetailProps) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl"
+        className="w-full max-w-sm rounded-3xl bg-surface p-6 text-center shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-end">

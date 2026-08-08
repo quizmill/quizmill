@@ -75,7 +75,7 @@ export function UpdateNotifier() {
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="tap-feedback rounded-full bg-white px-4 py-1.5 text-sm font-semibold text-brand-700 shadow-sm hover:bg-brand-50"
+          className="tap-feedback rounded-full bg-surface px-4 py-1.5 text-sm font-semibold text-brand-700 shadow-sm hover:bg-brand-50"
         >
           Update
         </button>

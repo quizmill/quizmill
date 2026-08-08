@@ -2,7 +2,15 @@
 
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowLeft, Car, Gamepad2, Trash2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Car,
+  Gamepad2,
+  Monitor,
+  Moon,
+  Sun,
+  Trash2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { InstallCard } from '@/components/InstallPrompt';
 import { SyncSettings } from '@/components/SyncSettings';
@@ -16,6 +24,8 @@ import {
   loadDriveModeEnabled,
   saveDriveModeEnabled,
 } from '@/lib/storage';
+import { useTheme } from '@/lib/useTheme';
+import type { ThemePref } from '@/lib/theme';
 import {
   packSources,
   packGames,
@@ -27,6 +37,16 @@ import { enabledGames } from '@/lib/games/registry';
  *  Android-style "tap the build number" easter egg. Games are a treat, so
  *  they're discovered, not advertised in the chrome. */
 const GAMES_REVEAL_TAPS = 7;
+
+const THEME_CHOICES: {
+  value: ThemePref;
+  label: string;
+  Icon: typeof Sun;
+}[] = [
+  { value: 'system', label: 'Auto', Icon: Monitor },
+  { value: 'light', label: 'Light', Icon: Sun },
+  { value: 'dark', label: 'Dark', Icon: Moon },
+];
 
 /**
  * Settings page:
@@ -44,6 +64,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
   const { sessions, attempts } = useStorageData();
   const resetAll = useResetAll();
   const resetToday = useResetToday();
+  const [theme, setTheme] = useTheme();
 
   const [pending, setPending] = useState<'today' | 'all' | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -127,7 +148,39 @@ export function SettingsPage({ extras }: SettingsPageProps) {
 
         <SyncSettings />
 
-        <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-ink-900">Appearance</h2>
+          <p className="mt-1 text-sm text-ink-600">
+            Auto follows your device&apos;s light/dark setting.
+          </p>
+          <div
+            role="radiogroup"
+            aria-label="Colour theme"
+            className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-ink-100 p-1"
+          >
+            {THEME_CHOICES.map(({ value, label, Icon }) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={theme === value}
+                data-testid={`theme-${value}`}
+                onClick={() => setTheme(value)}
+                className={cn(
+                  'tap-feedback flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold',
+                  theme === value
+                    ? 'bg-surface text-ink-900 shadow-sm'
+                    : 'text-ink-500 hover:text-ink-700',
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
@@ -162,7 +215,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
           {driveMode ? (
             <Link
               href="/drive/"
-              className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50"
+              className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50 dark:hover:bg-ink-100"
             >
               <Car className="h-4 w-4" />
               Open drive mode
@@ -171,7 +224,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
         </div>
 
         {packSources.length > 0 ? (
-          <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
+          <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-ink-900">Question sources</h2>
             <p className="mt-1 text-sm text-ink-600">
               Where this pack&apos;s questions come from.
@@ -180,7 +233,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
               {packSources.map((src) => (
                 <div key={src.label} className="flex gap-3">
                   <dt>
-                    <span className="rounded-full border border-ink-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-500">
+                    <span className="rounded-full border border-ink-200 bg-surface px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-500">
                       {src.label}
                     </span>
                   </dt>
@@ -205,7 +258,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
           </div>
         ) : null}
 
-        <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-ink-900">
             Reset today&apos;s progress
           </h2>
@@ -227,7 +280,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
           </Button>
         </div>
 
-        <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-ink-900">
             Reset all local progress
           </h2>
@@ -255,7 +308,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
           </Button>
         </div>
 
-        <div className="rounded-2xl border border-ink-200 bg-white p-5 text-sm text-ink-600 shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5 text-sm text-ink-600 shadow-sm">
           <div className="flex items-center justify-between">
             <span>App version</span>
             <button
@@ -300,7 +353,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
             </p>
             <Link
               href="/games/"
-              className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50"
+              className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50 dark:hover:bg-ink-100"
             >
               <Gamepad2 className="h-4 w-4" />
               Open the arcade

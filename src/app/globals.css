@@ -3,6 +3,96 @@
 @tailwind utilities;
 
 @layer base {
+  /* Theme palettes as RGB triplets (see tailwind.config.ts). Light is the
+     default; the `.dark` class on <html> (set pre-paint by the bootstrap
+     script in layout.tsx) re-maps every shade. Shade roles are stable
+     across themes: low = backgrounds/tints, high = text. */
+  :root {
+    color-scheme: light;
+
+    --surface: 255 255 255; /* card background (was bg-white) */
+
+    --ink-50: 246 247 249; /* page background */
+    --ink-100: 236 238 242;
+    --ink-200: 212 216 224;
+    --ink-300: 170 177 191;
+    --ink-400: 124 132 151;
+    --ink-500: 83 91 112;
+    --ink-600: 59 66 85;
+    --ink-700: 42 47 61;
+    --ink-800: 28 32 41;
+    --ink-900: 17 20 26;
+
+    --brand-50: 238 246 255;
+    --brand-100: 217 234 255;
+    --brand-200: 183 212 255;
+    --brand-300: 139 184 255;
+    --brand-400: 94 149 245;
+    --brand-500: 59 120 224;
+    --brand-600: 42 95 191;
+    --brand-700: 35 77 153;
+    --brand-800: 29 63 122;
+    --brand-900: 21 48 92;
+
+    --success-50: 238 249 243;
+    --success-100: 220 245 231;
+    --success-200: 184 235 208;
+    --success-500: 47 158 110;
+    --success-600: 38 138 94;
+    --success-700: 29 107 74;
+
+    --warn-50: 253 245 233;
+    --warn-100: 253 236 213;
+    --warn-200: 251 220 174;
+    --warn-500: 201 123 26;
+    --warn-600: 168 100 20;
+    --warn-700: 140 84 16;
+  }
+
+  :root.dark {
+    color-scheme: dark;
+
+    --surface: 29 34 45; /* raised card on the near-black page */
+
+    --ink-50: 20 23 31; /* page background */
+    --ink-100: 38 44 58;
+    --ink-200: 51 58 75;
+    --ink-300: 75 84 104;
+    --ink-400: 138 146 165;
+    --ink-500: 166 173 190;
+    --ink-600: 194 199 212;
+    --ink-700: 216 220 229;
+    --ink-800: 232 234 240;
+    --ink-900: 243 244 248;
+
+    /* Tints (50–300) darken, mid blues (400–600) stay vivid enough to
+       carry white text, text shades (700–900) lighten. */
+    --brand-50: 22 35 58;
+    --brand-100: 28 47 79;
+    --brand-200: 42 69 115;
+    --brand-300: 58 92 158;
+    --brand-400: 94 149 245;
+    --brand-500: 74 134 235;
+    --brand-600: 82 141 240;
+    --brand-700: 139 184 255;
+    --brand-800: 168 202 255;
+    --brand-900: 217 231 255;
+
+    --success-50: 18 40 29;
+    --success-100: 24 58 42;
+    --success-200: 32 80 56;
+    --success-500: 52 173 121;
+    --success-600: 69 189 138;
+    --success-700: 124 214 171;
+
+    --warn-50: 51 35 13;
+    --warn-100: 70 48 15;
+    --warn-200: 92 64 15;
+    --warn-500: 217 139 40;
+    --warn-600: 226 160 78;
+    --warn-700: 238 189 122;
+  }
+
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;

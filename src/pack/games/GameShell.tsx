@@ -39,9 +39,9 @@ export function GameShell({
       aria-modal="true"
       aria-label={title}
       data-testid="game-shell"
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-ink-900/60 p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-night-900/60 p-4"
     >
-      <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl">
+      <div className="w-full max-w-sm rounded-2xl bg-surface shadow-2xl">
         <header className="flex items-center justify-between border-b border-ink-200 px-4 py-3">
           <div className="flex items-center gap-2">
             <span className="text-xl" aria-hidden>

@@ -47,7 +47,7 @@ export function SyncIndicator() {
         status.pending > 0
           ? `Offline · ${status.pending} saved here`
           : 'Offline',
-      tone: 'border-ink-200 bg-white/90 text-ink-500',
+      tone: 'border-ink-200 bg-surface/90 text-ink-500',
     };
   } else if (status.state === 'syncing') {
     content = {

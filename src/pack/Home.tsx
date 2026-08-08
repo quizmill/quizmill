@@ -85,7 +85,7 @@ function StreakCard({ attempts }: { attempts: readonly Attempt[] }) {
               }.`}
         </div>
         <div className="mt-2 flex items-center gap-2">
-          <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/70">
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface/70">
             <div
               className={cn(
                 'h-full transition-all',
@@ -223,21 +223,21 @@ export default function PackHome() {
           <Link
             href="/progress"
             aria-label="Progress"
-            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm"
+            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-surface text-ink-700 shadow-sm"
           >
             <BarChart3 className="h-4 w-4" />
           </Link>
           <Link
             href="/stickers"
             aria-label="Sticker cabinet"
-            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm"
+            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-surface text-ink-700 shadow-sm"
           >
             <Trophy className="h-4 w-4" />
           </Link>
           <Link
             href="/settings"
             aria-label="Settings"
-            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-700 shadow-sm"
+            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-surface text-ink-700 shadow-sm"
           >
             <Settings className="h-4 w-4" />
           </Link>
@@ -280,20 +280,20 @@ export default function PackHome() {
         <Link
           href="/drive/"
           data-testid="drive-card"
-          className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-ink-700 bg-ink-800 p-4 shadow-sm"
+          className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-night-700 bg-night-800 p-4 shadow-sm"
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-brand-300">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-[#8bb8ff]">
               <Car className="h-5 w-5" />
             </div>
             <div>
               <div className="text-base font-semibold text-white">Drive mode</div>
-              <div className="text-sm text-ink-300">
+              <div className="text-sm text-night-300">
                 Hands-free voice quiz for the car — eyes on the road.
               </div>
             </div>
           </div>
-          <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-400" />
+          <ArrowRight className="h-5 w-5 flex-shrink-0 text-night-400" />
         </Link>
       ) : null}
 
@@ -340,7 +340,7 @@ export default function PackHome() {
                   className={cn(
                     'tap-feedback flex-1 rounded-full px-2.5 py-1.5 text-sm font-semibold transition-colors',
                     active
-                      ? 'bg-white text-ink-900 shadow-sm'
+                      ? 'bg-surface text-ink-900 shadow-sm'
                       : 'text-ink-600 hover:text-ink-900',
                   )}
                 >
@@ -387,7 +387,7 @@ export default function PackHome() {
                 <button
                   type="button"
                   onClick={acceptNudge}
-                  className="tap-feedback whitespace-nowrap rounded-full bg-ink-900 px-3 py-1.5 text-xs font-semibold text-white"
+                  className="tap-feedback whitespace-nowrap rounded-full bg-night-900 px-3 py-1.5 text-xs font-semibold text-white"
                 >
                   Try {PACK_LEVEL_LABEL[nudge.to]}
                 </button>

@@ -43,7 +43,7 @@ export function OptionButtons({
         const isThis = selected.includes(opt.key);
         const isAnswer = correctKeys.includes(opt.key);
 
-        let visual = 'border-ink-200 bg-white hover:bg-ink-50';
+        let visual = 'border-ink-200 bg-surface hover:bg-ink-50 dark:hover:bg-ink-100';
         if (stage === 'choosing' && isThis) {
           visual = 'border-brand-500 bg-brand-50 text-ink-900 ring-2 ring-brand-500/30';
         } else if (stage === 'feedback') {
@@ -59,7 +59,7 @@ export function OptionButtons({
               ? 'border-warn-500 bg-warn-500 text-white'
               : isThis
                 ? 'border-brand-500 bg-brand-500 text-white'
-                : 'border-ink-300 bg-white text-ink-600';
+                : 'border-ink-300 bg-surface text-ink-600';
         const keyBubble = (extra?: string) => (
           <span
             className={cn(

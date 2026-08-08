@@ -85,7 +85,7 @@ export function VoteRow({ questionId }: VoteRowProps) {
               'tap-feedback inline-flex items-center justify-center rounded-full border-2 p-2 transition',
               existing?.vote === 'up'
                 ? 'border-success-500 bg-success-100 text-success-700'
-                : 'border-ink-200 bg-white text-ink-500 hover:border-success-500/40',
+                : 'border-ink-200 bg-surface text-ink-500 hover:border-success-500/40',
             )}
           >
             <ThumbsUp className="h-4 w-4" />
@@ -100,7 +100,7 @@ export function VoteRow({ questionId }: VoteRowProps) {
               'tap-feedback inline-flex items-center justify-center rounded-full border-2 p-2 transition',
               existing?.vote === 'down'
                 ? 'border-warn-500 bg-warn-100 text-warn-700'
-                : 'border-ink-200 bg-white text-ink-500 hover:border-warn-500/40',
+                : 'border-ink-200 bg-surface text-ink-500 hover:border-warn-500/40',
             )}
           >
             <ThumbsDown className="h-4 w-4" />
@@ -116,7 +116,7 @@ export function VoteRow({ questionId }: VoteRowProps) {
             value={comment}
             onChange={(e) => handleCommentChange(e.target.value)}
             rows={2}
-            className="w-full resize-y rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-800 placeholder:text-ink-400 focus:border-warn-500 focus:outline-none"
+            className="w-full resize-y rounded-lg border border-ink-200 bg-surface px-3 py-2 text-sm text-ink-800 placeholder:text-ink-400 focus:border-warn-500 focus:outline-none"
           />
           {savedFlash ? (
             <span className="text-right text-xs text-success-700">Saved ✓</span>

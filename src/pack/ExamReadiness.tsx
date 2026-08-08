@@ -53,7 +53,7 @@ export default function ExamReadiness({ attempts }: { attempts: readonly Attempt
         <span className="text-xs text-ink-400">{examName}</span>
       </div>
 
-      <div className="flex flex-col gap-4 rounded-2xl border border-ink-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-4 rounded-2xl border border-ink-200 bg-surface p-4 shadow-sm">
         {/* Verdict + headline number */}
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -109,7 +109,7 @@ export default function ExamReadiness({ attempts }: { attempts: readonly Attempt
               <Link
                 key={n.key}
                 href={`/practice/?subject=${n.key}`}
-                className="tap-feedback group flex items-center justify-between gap-3 rounded-xl border border-ink-200 bg-ink-50 p-3 transition hover:border-brand-300 hover:bg-white"
+                className="tap-feedback group flex items-center justify-between gap-3 rounded-xl border border-ink-200 bg-ink-50 p-3 transition hover:border-brand-300 hover:bg-surface"
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 text-sm font-semibold text-ink-900">

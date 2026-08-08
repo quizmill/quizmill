@@ -107,7 +107,7 @@ export function PackReviewRunner() {
     return (
       <main className="flex flex-col gap-5">
         <BackLink />
-        <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-6 text-center shadow-sm">
           <h1 className="text-2xl font-bold text-ink-900">
             Nothing to review
           </h1>
@@ -128,7 +128,7 @@ export function PackReviewRunner() {
     return (
       <main className="flex flex-col gap-5">
         <BackLink />
-        <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center text-ink-500 shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-6 text-center text-ink-500 shadow-sm">
           Loading…
         </div>
       </main>
@@ -143,7 +143,7 @@ export function PackReviewRunner() {
           <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
         ) : null}
         <BackLink />
-        <div className="rounded-2xl border border-ink-200 bg-white p-8 text-center shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-8 text-center shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
             Review complete
           </div>
@@ -248,7 +248,7 @@ export function PackReviewRunner() {
         </span>
         <QuestionMeta question={current} />
         {scenario ? (
-          <span className="rounded-full border border-ink-300 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-700">
+          <span className="rounded-full border border-ink-300 bg-surface px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-700">
             {scenario.title}
           </span>
         ) : null}
@@ -271,14 +271,14 @@ export function PackReviewRunner() {
         </section>
       ) : null}
 
-      <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
+      <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
         <div className="text-[15px] leading-relaxed text-ink-900">
           <McqMarkdown text={current.prompt} />
         </div>
       </div>
 
       {current.image ? (
-        <div className="flex justify-center rounded-2xl border border-ink-200 bg-white p-4 shadow-sm">
+        <div className="flex justify-center rounded-2xl border border-ink-200 bg-surface p-4 shadow-sm">
           <PackImage
             src={current.image}
             alt=""
