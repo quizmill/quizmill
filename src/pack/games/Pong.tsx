@@ -111,7 +111,7 @@ export function Pong({ onClose }: PongProps) {
           handlePointer(e.touches[0].clientY);
         }}
         onMouseMove={(e) => handlePointer(e.clientY)}
-        className="relative w-full touch-none select-none overflow-hidden rounded-xl border border-ink-200 bg-ink-900"
+        className="relative w-full touch-none select-none overflow-hidden rounded-xl border border-ink-200 bg-night-900"
         style={{ aspectRatio: `${BOARD_W} / ${BOARD_H}` }}
       >
         <svg

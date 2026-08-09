@@ -5,6 +5,8 @@ import { APP_CONFIG } from '@/config';
 import { UpdateNotifier } from '@/components/UpdateNotifier';
 import { SyncBootstrap } from '@/components/SyncBootstrap';
 import { SyncIndicator } from '@/components/SyncIndicator';
+import { ThemeWatcher } from '@/components/ThemeWatcher';
+import { THEME_KEY } from '@/lib/theme';
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
@@ -22,6 +24,16 @@ var r=null,m=location.hash.match(/[#&]pack=([^&]+)/);
 if(m){r=decodeURIComponent(escape(atob(decodeURIComponent(m[1]))))}
 else if(window.localStorage){r=localStorage.getItem('quizmill.activePack')}
 if(r){window.__QUIZMILL_PACK__=JSON.parse(r)}
+}catch(e){}})();`;
+
+// Apply the stored colour-scheme preference before first paint so a dark
+// visitor never sees a light flash. Mirrors src/lib/theme.ts: bare-string
+// key, absent/anything-else = follow the OS. Kept inline (beforeInteractive)
+// for the same reason as the pack bootstrap.
+const THEME_BOOTSTRAP = `(function(){try{
+var t=localStorage.getItem(${JSON.stringify(THEME_KEY)});
+if(t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches)){
+document.documentElement.classList.add('dark')}
 }catch(e){}})();`;
 
 // PWA assets — generated from the active pack's manifest by
@@ -74,7 +86,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    // suppressHydrationWarning: the theme bootstrap adds `class="dark"` to
+    // <html> before React hydrates; that attribute diff is intentional.
+    <html lang="en" suppressHydrationWarning>
+      <Script id="quizmill-theme-bootstrap" strategy="beforeInteractive">
+        {THEME_BOOTSTRAP}
+      </Script>
       <Script id="quizmill-pack-bootstrap" strategy="beforeInteractive">
         {PACK_BOOTSTRAP}
       </Script>
@@ -98,6 +115,7 @@ export default function RootLayout({
             </a>
           </footer>
         </div>
+        <ThemeWatcher />
         <UpdateNotifier />
         <SyncBootstrap />
         <SyncIndicator />

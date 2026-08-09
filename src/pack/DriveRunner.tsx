@@ -369,25 +369,25 @@ export function DriveRunner() {
       <main className="flex flex-col gap-5">
         <DrivePanel>
           <div className="flex flex-col items-center gap-4 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-500/20 text-brand-300">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-500/20 text-[#8bb8ff]">
               <Car className="h-8 w-8" />
             </div>
             <div>
               <h1 className="text-3xl font-bold">Drive mode</h1>
-              <p className="mt-1 text-ink-300">
+              <p className="mt-1 text-night-300">
                 A hands-free, voice-only quiz for the road.
               </p>
             </div>
           </div>
 
           {phase === 'empty' ? (
-            <div className="rounded-2xl border border-warn-500/40 bg-warn-500/10 p-4 text-sm text-warn-100">
+            <div className="rounded-2xl border border-warn-500/40 bg-warn-500/10 p-4 text-sm text-[#fdecd5]">
               Nothing to practise out loud — this pack&apos;s questions rely
               on images, which can&apos;t be voiced.
             </div>
           ) : (
             <>
-              <ul className="flex flex-col gap-3 text-[15px] text-ink-200">
+              <ul className="flex flex-col gap-3 text-[15px] text-night-200">
                 <IntroItem icon={<Volume2 className="h-5 w-5" />}>
                   Questions and answers are read aloud through your car&apos;s
                   speakers.
@@ -422,8 +422,8 @@ export function DriveRunner() {
                   as regular practice.
                 </IntroItem>
               </ul>
-              <p className="rounded-2xl border border-ink-600 bg-ink-800 p-4 text-sm text-ink-300">
-                <strong className="text-ink-100">Eyes on the road.</strong>{' '}
+              <p className="rounded-2xl border border-night-600 bg-night-800 p-4 text-sm text-night-300">
+                <strong className="text-night-100">Eyes on the road.</strong>{' '}
                 Start before you set off, keep the phone docked, and let the
                 voice do the work. This screen is for passengers.
               </p>
@@ -435,7 +435,7 @@ export function DriveRunner() {
           )}
           <Link
             href="/"
-            className="tap-feedback mx-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-ink-400 hover:bg-ink-800 hover:text-ink-200"
+            className="tap-feedback mx-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-night-400 hover:bg-night-800 hover:text-night-200"
           >
             <Home className="h-4 w-4" />
             Back to home
@@ -451,13 +451,13 @@ export function DriveRunner() {
       <main className="flex flex-col gap-5">
         <DrivePanel>
           <div className="flex flex-col items-center gap-2 py-6 text-center">
-            <div className="text-xs font-semibold uppercase tracking-wider text-ink-400">
+            <div className="text-xs font-semibold uppercase tracking-wider text-night-400">
               Drive session complete
             </div>
             <div className="text-6xl font-bold">
               {correct}/{total}
             </div>
-            <div className="text-lg text-ink-300">{pct}% correct</div>
+            <div className="text-lg text-night-300">{pct}% correct</div>
           </div>
           <Button size="lg" block onClick={handleStart}>
             <RefreshCw className="h-4 w-4" />
@@ -482,14 +482,14 @@ export function DriveRunner() {
   return (
     <main className="flex flex-col gap-5">
       <DrivePanel>
-        <header className="flex items-center justify-between text-sm text-ink-400">
+        <header className="flex items-center justify-between text-sm text-night-400">
           <Link
             href="/"
-            className="tap-feedback rounded-full px-2 py-1 font-medium hover:bg-ink-800 hover:text-ink-200"
+            className="tap-feedback rounded-full px-2 py-1 font-medium hover:bg-night-800 hover:text-night-200"
           >
             End
           </Link>
-          <span className="font-semibold text-ink-200">
+          <span className="font-semibold text-night-200">
             {state.currentIndex + 1} / {state.questions.length}
           </span>
           <span>
@@ -521,10 +521,10 @@ export function DriveRunner() {
                 className={cn(
                   'tap-feedback flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition disabled:cursor-default',
                   showFeedback && isAnswer
-                    ? 'border-success-500 bg-success-500/20 text-success-100'
+                    ? 'border-success-500 bg-success-500/20 text-[#dcf5e7]'
                     : showFeedback && isThis
-                      ? 'border-warn-500 bg-warn-500/20 text-warn-100'
-                      : 'border-ink-600 bg-ink-800 text-ink-100 hover:border-ink-400',
+                      ? 'border-warn-500 bg-warn-500/20 text-[#fdecd5]'
+                      : 'border-night-600 bg-night-800 text-night-100 hover:border-night-400',
                 )}
               >
                 <span
@@ -534,7 +534,7 @@ export function DriveRunner() {
                       ? 'bg-success-500 text-white'
                       : showFeedback && isThis
                         ? 'bg-warn-500 text-white'
-                        : 'bg-ink-600 text-white',
+                        : 'bg-night-600 text-white',
                   )}
                 >
                   {opt.key}
@@ -548,7 +548,7 @@ export function DriveRunner() {
         </div>
 
         {showFeedback ? (
-          <div className="rounded-2xl border border-ink-600 bg-ink-800 p-4 text-sm leading-relaxed text-ink-200">
+          <div className="rounded-2xl border border-night-600 bg-night-800 p-4 text-sm leading-relaxed text-night-200">
             {current.explanation}
           </div>
         ) : null}
@@ -583,7 +583,7 @@ export function DriveRunner() {
 
 function DrivePanel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-[82dvh] flex-col gap-5 rounded-3xl bg-ink-900 p-5 text-white shadow-lg">
+    <div className="flex min-h-[82dvh] flex-col gap-5 rounded-3xl bg-night-900 p-5 text-white shadow-lg">
       {children}
     </div>
   );
@@ -598,7 +598,7 @@ function IntroItem({
 }) {
   return (
     <li className="flex items-start gap-3">
-      <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-ink-800 text-brand-300">
+      <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-night-800 text-[#8bb8ff]">
         {icon}
       </span>
       <span className="leading-relaxed">{children}</span>
@@ -619,25 +619,25 @@ function DriveStatus({
 }) {
   let icon: React.ReactNode;
   let label: string;
-  let tone = 'bg-ink-800 text-brand-300';
+  let tone = 'bg-night-800 text-[#8bb8ff]';
   if (phase === 'asking') {
     icon = <Volume2 className="h-8 w-8 animate-pulse" />;
     label = 'Reading question…';
   } else if (phase === 'listening') {
     icon = stt ? <Mic className="h-8 w-8" /> : <MicOff className="h-8 w-8" />;
     label = stt ? 'Listening…' : 'Tap an answer';
-    tone = stt ? 'bg-brand-500/20 text-brand-300' : tone;
+    tone = stt ? 'bg-brand-500/20 text-[#8bb8ff]' : tone;
   } else if (phase === 'paused') {
     icon = <Pause className="h-8 w-8" />;
     label = 'Paused';
   } else if (isCorrect) {
     icon = <Check className="h-8 w-8" />;
     label = 'Correct!';
-    tone = 'bg-success-500/20 text-success-100';
+    tone = 'bg-success-500/20 text-[#dcf5e7]';
   } else {
     icon = <X className="h-8 w-8" />;
     label = 'Not quite';
-    tone = 'bg-warn-500/20 text-warn-100';
+    tone = 'bg-warn-500/20 text-[#fdecd5]';
   }
   return (
     <div
@@ -657,9 +657,9 @@ function DriveStatus({
           {icon}
         </div>
       </div>
-      <div className="text-sm font-semibold text-ink-200">{label}</div>
+      <div className="text-sm font-semibold text-night-200">{label}</div>
       {phase === 'listening' && lastHeard ? (
-        <div className="rounded-full bg-ink-800 px-3 py-1 text-xs text-ink-400">
+        <div className="rounded-full bg-night-800 px-3 py-1 text-xs text-night-400">
           Heard: “{lastHeard}”
         </div>
       ) : null}
@@ -687,7 +687,7 @@ function DriveControl({
         'tap-feedback flex flex-col items-center gap-1 rounded-2xl px-6 py-3',
         primary
           ? 'bg-brand-500 text-white hover:bg-brand-400'
-          : 'bg-ink-800 text-ink-200 hover:bg-ink-700',
+          : 'bg-night-800 text-night-200 hover:bg-night-700',
       )}
     >
       {children}

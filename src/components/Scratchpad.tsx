@@ -278,7 +278,9 @@ export function Scratchpad() {
           onPointerLeave={handlePointerUp}
           onPointerCancel={handlePointerUp}
           className={cn(
-            'w-full touch-none rounded-lg border border-ink-200 bg-ink-50/40',
+            // Static paper background: saved strokes carry fixed pen
+            // colours (incl. near-black ink), so the canvas can't go dark.
+            'w-full touch-none rounded-lg border border-ink-200 bg-night-50',
             full ? 'min-h-0 flex-1' : 'h-48',
           )}
           style={{ touchAction: 'none' }}
@@ -299,7 +301,7 @@ export function Scratchpad() {
                   'h-6 w-6 rounded-full border-2 transition',
                   data.color === c
                     ? 'scale-110 border-ink-500'
-                    : 'border-white shadow-sm',
+                    : 'border-surface shadow-sm',
                 )}
                 style={{ backgroundColor: c }}
               />
@@ -344,7 +346,7 @@ export function Scratchpad() {
         data-testid="scratchpad-toggle"
         aria-expanded={data.open}
         onClick={toggleOpen}
-        className="tap-feedback inline-flex w-fit items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3 py-1.5 text-sm font-medium text-ink-600 shadow-sm transition hover:border-brand-300"
+        className="tap-feedback inline-flex w-fit items-center gap-1.5 rounded-full border border-ink-200 bg-surface px-3 py-1.5 text-sm font-medium text-ink-600 shadow-sm transition hover:border-brand-300"
       >
         <NotebookPen className="h-4 w-4" />
         Scratchpad
@@ -361,7 +363,7 @@ export function Scratchpad() {
       </button>
 
       {data.open && !expanded ? (
-        <div className="mt-2 flex flex-col gap-2 rounded-2xl border border-ink-200 bg-white p-3 shadow-sm">
+        <div className="mt-2 flex flex-col gap-2 rounded-2xl border border-ink-200 bg-surface p-3 shadow-sm">
           <div className="flex items-center gap-2">
             <div className="flex-1">{tabs}</div>
             <button
@@ -384,7 +386,7 @@ export function Scratchpad() {
           aria-modal="true"
           aria-label="Scratchpad"
           data-testid="scratchpad-fullscreen"
-          className="fixed inset-0 z-50 flex flex-col gap-2 bg-white p-4"
+          className="fixed inset-0 z-50 flex flex-col gap-2 bg-surface p-4"
         >
           <div className="flex items-center justify-between">
             <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-800">
@@ -461,7 +463,7 @@ function TabButton({
       className={cn(
         'tap-feedback inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
         active
-          ? 'bg-white text-ink-900 shadow-sm'
+          ? 'bg-surface text-ink-900 shadow-sm'
           : 'text-ink-500 hover:text-ink-700',
       )}
     >

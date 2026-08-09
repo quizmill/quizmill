@@ -1,12 +1,35 @@
 import type { Config } from 'tailwindcss';
 
+/**
+ * Palette shades resolve through CSS variables (declared in globals.css) so
+ * dark mode can re-map every colour in one place — components keep using
+ * `bg-ink-50` / `text-brand-700` and the variables decide what that means.
+ * The `<alpha-value>` slot keeps opacity modifiers (`bg-warn-100/60`) working.
+ */
+function themed(name: string, shades: number[]): Record<string, string> {
+  return Object.fromEntries(
+    shades.map((s) => [s, `rgb(var(--${name}-${s}) / <alpha-value>)`]),
+  );
+}
+
 const config: Config = {
   content: ['./src/**/*.{ts,tsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
         // Calm palette: muted blues / greens / warm greys. No neon.
-        ink: {
+        // Semantic in both themes: low shades = backgrounds, high = text.
+        ink: themed('ink', [50, 100, 200, 300, 400, 500, 600, 700, 800, 900]),
+        brand: themed('brand', [50, 100, 200, 300, 400, 500, 600, 700, 800, 900]),
+        success: themed('success', [50, 100, 200, 500, 600, 700]),
+        warn: themed('warn', [50, 100, 200, 500, 600, 700]),
+        // Card background: white in light mode, raised panel in dark.
+        surface: 'rgb(var(--surface) / <alpha-value>)',
+        // Static greys for surfaces that are dark in BOTH themes (drive
+        // mode, game canvases, modal scrims, code blocks). Values mirror
+        // the light-mode ink ramp and never flip.
+        night: {
           50: '#f6f7f9',
           100: '#eceef2',
           200: '#d4d8e0',
@@ -17,30 +40,6 @@ const config: Config = {
           700: '#2a2f3d',
           800: '#1c2029',
           900: '#11141a',
-        },
-        brand: {
-          50: '#eef6ff',
-          100: '#d9eaff',
-          200: '#b7d4ff',
-          300: '#8bb8ff',
-          400: '#5e95f5',
-          500: '#3b78e0',
-          600: '#2a5fbf',
-          700: '#234d99',
-          800: '#1d3f7a',
-          900: '#15305c',
-        },
-        success: {
-          50: '#eef9f3',
-          100: '#dcf5e7',
-          500: '#2f9e6e',
-          700: '#1d6b4a',
-        },
-        warn: {
-          50: '#fdf5e9',
-          100: '#fdecd5',
-          500: '#c97b1a',
-          700: '#8c5410',
         },
       },
       fontSize: {

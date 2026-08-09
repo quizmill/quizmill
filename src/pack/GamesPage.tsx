@@ -58,7 +58,7 @@ export default function GamesPage() {
             type="button"
             data-testid={`game-card-${g.id}`}
             onClick={() => setActive(g.id)}
-            className="tap-feedback group flex flex-col items-center gap-1.5 rounded-2xl border border-ink-200 bg-white p-4 text-center shadow-sm transition hover:border-brand-500/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            className="tap-feedback group flex flex-col items-center gap-1.5 rounded-2xl border border-ink-200 bg-surface p-4 text-center shadow-sm transition hover:border-brand-500/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <span className="text-4xl leading-none" aria-hidden>
               {g.emoji}

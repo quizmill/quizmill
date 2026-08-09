@@ -3,15 +3,19 @@ import * as React from 'react';
 import { cn } from '@/lib/cn';
 
 const buttonStyles = cva(
-  'tap-feedback inline-flex items-center justify-center gap-2 rounded-xl font-semibold ring-offset-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-60',
+  'tap-feedback inline-flex items-center justify-center gap-2 rounded-xl font-semibold ring-offset-2 ring-offset-ink-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-60',
   {
     variants: {
       variant: {
-        primary: 'bg-brand-600 text-white hover:bg-brand-700 shadow-sm',
+        // Dark hovers brighten instead: shades 700+ re-map to light text
+        // tones there, so "darken on hover" would flip to a pale button.
+        primary:
+          'bg-brand-600 text-white hover:bg-brand-700 dark:hover:bg-brand-400 shadow-sm',
         secondary:
-          'bg-white text-ink-800 border border-ink-200 hover:bg-ink-50 shadow-sm',
+          'bg-surface text-ink-800 border border-ink-200 hover:bg-ink-50 dark:hover:bg-ink-100 shadow-sm',
         ghost: 'text-ink-700 hover:bg-ink-100',
-        danger: 'bg-warn-500 text-white hover:bg-warn-700',
+        danger:
+          'bg-warn-500 text-white hover:bg-warn-700 dark:hover:bg-[#e39a3b]',
       },
       size: {
         sm: 'min-h-9 px-3.5 text-sm',

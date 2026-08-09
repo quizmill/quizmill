@@ -16,7 +16,7 @@ export function ConceptCard({
   return (
     <details
       open={defaultOpen}
-      className="rounded-xl border border-ink-200 bg-white/70 px-3.5 py-2.5"
+      className="rounded-xl border border-ink-200 bg-surface/70 px-3.5 py-2.5"
     >
       <summary className="cursor-pointer list-none text-sm font-semibold text-ink-800">
         📖 Learn: {concept.title}

@@ -139,7 +139,7 @@ export function Dodger({ onClose }: DodgerProps) {
           setPlayerX(pointerToX(e.touches[0].clientX));
         }}
         onMouseMove={(e) => running && setPlayerX(pointerToX(e.clientX))}
-        className="relative w-full touch-none select-none overflow-hidden rounded-xl border border-ink-200 bg-gradient-to-b from-ink-900 to-ink-800"
+        className="relative w-full touch-none select-none overflow-hidden rounded-xl border border-ink-200 bg-gradient-to-b from-night-900 to-night-800"
         style={{ aspectRatio: `${BOARD_W} / ${BOARD_H}` }}
       >
         <svg

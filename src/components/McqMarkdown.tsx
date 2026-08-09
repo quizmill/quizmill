@@ -19,7 +19,7 @@ export function McqMarkdown({ text }: { text: string }) {
       {segments.map((seg, i) => (
         <Fragment key={i}>
           {seg.kind === 'code-block' ? (
-            <pre className="my-2 overflow-x-auto rounded-lg bg-ink-900 px-3 py-2 text-[12px] leading-relaxed text-white">
+            <pre className="my-2 overflow-x-auto rounded-lg bg-night-900 px-3 py-2 text-[12px] leading-relaxed text-white">
               <code>{seg.text}</code>
             </pre>
           ) : (

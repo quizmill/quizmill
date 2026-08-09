@@ -69,7 +69,7 @@ export function InstallCard() {
   return (
     <div
       data-testid="install-card"
-      className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm"
+      className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm"
     >
       <h2 className="text-lg font-semibold text-ink-900">Add to Home Screen</h2>
       <p className="mt-1 text-sm text-ink-600">

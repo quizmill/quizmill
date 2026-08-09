@@ -83,7 +83,7 @@ export default function ProgressPage() {
       </div>
 
       {attempts.length === 0 ? (
-        <div className="rounded-2xl border border-ink-200 bg-white p-6 text-center shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-6 text-center shadow-sm">
           <p className="text-ink-600">
             No practice yet — answer some questions and your progress
             shows up here.
@@ -113,7 +113,7 @@ export default function ProgressPage() {
             </div>
             <div
               data-testid="weekday-chart"
-              className="rounded-2xl border border-ink-200 bg-white p-4 shadow-sm"
+              className="rounded-2xl border border-ink-200 bg-surface p-4 shadow-sm"
             >
               <div className="flex h-20 items-end gap-1.5">
                 {byWeekday.map((d) => (
@@ -155,7 +155,7 @@ export default function ProgressPage() {
               <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
                 By category
               </h2>
-              <div className="flex flex-col gap-3 rounded-2xl border border-ink-200 bg-white p-4 shadow-sm">
+              <div className="flex flex-col gap-3 rounded-2xl border border-ink-200 bg-surface p-4 shadow-sm">
                 {byCategory.map((row) => (
                   <div key={row.key} data-testid={`category-accuracy-${row.key}`}>
                     <div className="flex items-baseline justify-between text-sm">
@@ -182,7 +182,7 @@ export default function ProgressPage() {
             <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
               Accuracy over time
             </h2>
-            <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-sm">
+            <div className="rounded-2xl border border-ink-200 bg-surface p-4 shadow-sm">
               <div className="flex h-28 items-end gap-1">
                 {byDay.map((p) => (
                   <div
@@ -211,7 +211,7 @@ export default function ProgressPage() {
               Weak spots
             </h2>
             {weakest.length === 0 ? (
-              <div className="rounded-2xl border border-ink-200 bg-white p-4 text-sm text-ink-600 shadow-sm">
+              <div className="rounded-2xl border border-ink-200 bg-surface p-4 text-sm text-ink-600 shadow-sm">
                 Weak spots appear once questions have been tried more than
                 once — keep practising.
               </div>
@@ -221,7 +221,7 @@ export default function ProgressPage() {
                   <Link
                     key={w.questionId}
                     href={`/practice/?subject=${w.categoryKey}`}
-                    className="tap-feedback group flex items-center justify-between gap-3 rounded-2xl border border-ink-200 bg-white p-4 shadow-sm transition hover:border-brand-300 hover:shadow-md"
+                    className="tap-feedback group flex items-center justify-between gap-3 rounded-2xl border border-ink-200 bg-surface p-4 shadow-sm transition hover:border-brand-300 hover:shadow-md"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium text-ink-900">
@@ -248,7 +248,7 @@ export default function ProgressPage() {
 
 function SummaryTile({ value, label }: { value: string; label: string }) {
   return (
-    <div className="rounded-2xl border border-ink-200 bg-white p-3 text-center shadow-sm">
+    <div className="rounded-2xl border border-ink-200 bg-surface p-3 text-center shadow-sm">
       <div className="text-xl font-bold text-ink-900">{value}</div>
       <div className="mt-0.5 text-xs text-ink-500">{label}</div>
     </div>

@@ -19,7 +19,7 @@ export function DownvoteBrowser() {
   );
 
   return (
-    <div className="mt-4 rounded-lg border border-brand-200 bg-white p-3 text-sm">
+    <div className="mt-4 rounded-lg border border-brand-200 bg-surface p-3 text-sm">
       <div className="flex items-center justify-between">
         <span className="font-semibold text-ink-800">Question feedback</span>
         <span className="text-xs text-ink-500">

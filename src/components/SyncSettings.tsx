@@ -113,7 +113,7 @@ export function SyncSettings() {
   }
 
   return (
-    <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
       <div className="flex items-center gap-2">
         {signedInAs ? (
           <Cloud className="h-5 w-5 text-brand-600" />
