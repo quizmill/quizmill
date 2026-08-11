@@ -14,23 +14,41 @@ export interface Server {
  * the asset URLs are root-relative (http-server doesn't add a basePath).
  */
 export async function startStaticServer(port: number): Promise<Server> {
+  // detached → own process group, so stop() can signal the WHOLE group.
+  // npx is a wrapper that spawns the real http-server as a child; killing
+  // just the wrapper leaves an orphaned server squatting on the port (and
+  // "offline" tests quietly testing nothing).
   const proc = spawn(
     'npx',
     ['--yes', 'http-server', 'out', '-p', String(port), '-s', '-c-1'],
-    { stdio: 'pipe' },
+    { stdio: 'pipe', detached: true },
   );
   proc.stderr?.on('data', (d) => process.stderr.write(`[http-server] ${d}`));
 
   const url = `http://127.0.0.1:${port}`;
   await waitForServer(`${url}/`, 15_000);
 
+  const killGroup = (signal: NodeJS.Signals) => {
+    try {
+      if (proc.pid) process.kill(-proc.pid, signal); // negative pid = group
+      else proc.kill(signal);
+    } catch {
+      // group already gone — fall back to the wrapper just in case
+      try {
+        proc.kill(signal);
+      } catch {
+        /* already dead */
+      }
+    }
+  };
+
   return {
     url,
     stop: () =>
       new Promise<void>((resolve) => {
         proc.once('exit', () => resolve());
-        proc.kill('SIGTERM');
-        setTimeout(() => proc.kill('SIGKILL'), 2_000);
+        killGroup('SIGTERM');
+        setTimeout(() => killGroup('SIGKILL'), 2_000);
       }),
   };
 }
