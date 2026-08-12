@@ -79,6 +79,9 @@ export interface SyncBackendProvider {
   isConfigured(): boolean;
   /** Build the backend. Called at most once; the instance is cached. */
   create(): SyncBackend;
+  /** Short human label for the Settings card footer, e.g.
+   *  "Sync server · example.workers.dev". Falls back to the kind. */
+  describe?(): string;
 }
 
 const providers: (SyncBackendProvider & { instance?: SyncBackend })[] = [];
@@ -126,12 +129,36 @@ export function getSyncBackend(): SyncBackend | null {
   return p.instance;
 }
 
+export interface SyncBackendInfo {
+  kind: string;
+  /** Human-readable label incl. the target host — shown in Settings so a
+   *  deployed app always answers "where does my data sync to?". */
+  label: string;
+}
+
+/** Identity of the active backend, or null when sync isn't configured. */
+export function syncBackendInfo(): SyncBackendInfo | null {
+  const p = activeProvider();
+  if (!p) return null;
+  return { kind: p.kind, label: p.describe?.() ?? p.kind };
+}
+
+/** The hostname of a URL, or the raw string when it doesn't parse. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
 // ── Built-ins ───────────────────────────────────────────────────────────
 
 registerSyncBackendProvider({
   kind: 'http',
   isConfigured: () => Boolean(process.env.NEXT_PUBLIC_SYNC_URL),
   create: () => httpBackend,
+  describe: () => `Sync server · ${hostOf(process.env.NEXT_PUBLIC_SYNC_URL ?? '')}`,
 });
 
 registerSyncBackendProvider({
@@ -142,4 +169,5 @@ registerSyncBackendProvider({
         process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     ),
   create: () => supabaseBackend,
+  describe: () => `Supabase · ${hostOf(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '')}`,
 });

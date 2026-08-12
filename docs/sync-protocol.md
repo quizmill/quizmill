@@ -121,6 +121,39 @@ into the queue. Emit `onAuthChange(userId)` whenever sign-in state
 changes; the engine pulls + (first time per user) bulk-pushes on
 sign-in.
 
+## Which backend is an app using? Swapping backends
+
+**Seeing it:** every sync-settings card carries a muted footer naming the
+active backend and its target host — e.g. `Backend: Sync server ·
+quizmill-sync.acme.workers.dev` or `Backend: Supabase · abcd.supabase.co`
+— so any deployed app answers "where does my data go?" from Settings. No
+sync card at all means the build has no backend configured (pure-local).
+At build time, the env vars are the source of truth
+(`syncBackendInfo()`/`syncBackendKind()` in code).
+
+**Swapping:** the backend is a build-time choice, so a swap is: change
+the env vars, rebuild, redeploy. The local-first design makes this safe
+and automatic for data:
+
+1. Each device keeps its full history in localStorage — the cloud is
+   only a mirror, so nothing is lost by switching.
+2. Sign-in state does not carry across backends: users sign in once on
+   the new backend (create/enter a sync key, or the email code for
+   Supabase).
+3. On that first sign-in the engine pulls (empty on a fresh backend),
+   then bulk-pushes the device's entire local history — the
+   once-per-user migration flag is keyed by backend-specific user id, so
+   the re-upload happens automatically per device. Multi-device users
+   sign each device in with the same key/email and the merge unions
+   their histories, exactly like a normal new-device link.
+4. The old backend's rows just go stale (delete them whenever). Any
+   queued-but-unsent writes drain to the new backend — ops are
+   idempotent upserts of local rows, and the bulk push covers them
+   regardless.
+
+For retiring a device at the same time, Settings → Backup & transfer
+bridges with a file instead.
+
 ## File export/import
 
 `src/lib/transfer.ts` + the Settings "Backup & transfer" card write the

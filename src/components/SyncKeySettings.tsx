@@ -14,7 +14,7 @@ import {
   Share2,
 } from 'lucide-react';
 import { Button, buttonStyles } from '@/components/ui/Button';
-import { SyncStatusLine } from '@/components/SyncStatusLine';
+import { SyncBackendFooter, SyncStatusLine } from '@/components/SyncStatusLine';
 import { APP_CONFIG } from '@/config';
 import { useSyncStatus } from '@/lib/useStorage';
 import {
@@ -236,6 +236,7 @@ export function SyncKeySettings() {
           {error}
         </p>
       )}
+      <SyncBackendFooter />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   getSyncBackend,
   registerSyncBackendProvider,
+  syncBackendInfo,
   syncBackendKind,
   type SyncBackend,
 } from '../src/lib/syncBackend';
@@ -73,6 +74,25 @@ describe('sync backend registry', () => {
     expect(getSyncBackend()).toBeNull();
   });
 
+  it('names the active backend with its target host (syncBackendInfo)', () => {
+    expect(syncBackendInfo()).toBeNull(); // nothing configured
+    process.env.NEXT_PUBLIC_SYNC_URL = 'https://quizmill-sync.acme.workers.dev';
+    expect(syncBackendInfo()).toEqual({
+      kind: 'http',
+      label: 'Sync server · quizmill-sync.acme.workers.dev',
+    });
+    delete process.env.NEXT_PUBLIC_SYNC_URL;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://abcd.supabase.co';
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'pk';
+    expect(syncBackendInfo()).toEqual({
+      kind: 'supabase',
+      label: 'Supabase · abcd.supabase.co',
+    });
+  });
+
+  // NOTE: keep this after the info test — the custom provider registered
+  // here is always-configured and prepended, so it shadows the built-ins
+  // for the rest of the file.
   it('lets a custom provider register, win via prepend, and caches its instance', () => {
     let created = 0;
     registerSyncBackendProvider(
@@ -88,6 +108,8 @@ describe('sync backend registry', () => {
     );
     process.env.NEXT_PUBLIC_SYNC_URL = 'https://sync.example.dev';
     expect(syncBackendKind()).toBe('custom-test'); // prepended → beats http
+    // No describe() on the provider → the info label falls back to the kind.
+    expect(syncBackendInfo()).toEqual({ kind: 'custom-test', label: 'custom-test' });
     const a = getSyncBackend();
     const b = getSyncBackend();
     expect(a).toBe(b);

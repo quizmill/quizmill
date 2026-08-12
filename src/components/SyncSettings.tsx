@@ -13,7 +13,7 @@ import { type ComponentType } from 'react';
 import { SYNC_CONFIGURED, authRedirectUrl, getSupabase } from '@/lib/supabase';
 import { syncBackendKind } from '@/lib/syncBackend';
 import { SyncKeySettings } from '@/components/SyncKeySettings';
-import { SyncStatusLine } from '@/components/SyncStatusLine';
+import { SyncBackendFooter, SyncStatusLine } from '@/components/SyncStatusLine';
 
 // Each backend brings its own sign-in UI, registered by kind. Custom
 // backend providers (see registerSyncBackendProvider in
@@ -230,6 +230,7 @@ function SupabaseSyncSettings() {
           {error}
         </p>
       )}
+      <SyncBackendFooter />
     </div>
   );
 }
