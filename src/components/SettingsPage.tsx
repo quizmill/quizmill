@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { InstallCard } from '@/components/InstallPrompt';
 import { SyncSettings } from '@/components/SyncSettings';
+import { TransferSettings } from '@/components/TransferSettings';
 import {
   useResetAll,
   useResetToday,
@@ -51,6 +52,7 @@ const THEME_CHOICES: {
 /**
  * Settings page:
  *  - SyncSettings   — cloud sync sign-in (dormant unless configured)
+ *  - TransferSettings — export/import progress as a file (device moves)
  *  - Reset today    — remove just today's sessions
  *  - Reset all      — wipe local progress for the active pack
  *  - App version    — semver + build tag (tap it to reveal games)
@@ -147,6 +149,8 @@ export function SettingsPage({ extras }: SettingsPageProps) {
         <InstallCard />
 
         <SyncSettings />
+
+        <TransferSettings />
 
         <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-ink-900">Appearance</h2>
