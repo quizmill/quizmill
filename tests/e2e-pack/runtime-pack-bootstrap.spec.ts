@@ -65,6 +65,27 @@ afterEach(async () => {
 });
 
 describe('runtime pack bootstrap', () => {
+  it('ships the bootstrap as a parser-executed inline script, not a queued one', async () => {
+    // REGRESSION GUARD. `next/script strategy="beforeInteractive"` does NOT
+    // inline the code — it serialises it into the `self.__next_s` queue,
+    // which the framework runtime flushes at its leisure. That flush RACES
+    // the engine chunks' module evaluation, and when a chunk wins,
+    // source.ts reads `__QUIZMILL_PACK__` before the bootstrap has set it:
+    // the injected pack is silently ignored (no error, no hydration
+    // mismatch — the build-time pack just renders). The bootstrap must be a
+    // real inline <script> so the HTML parser executes it before any
+    // deferred bundle can run.
+    const res = await fetch(baseUrl() + '/');
+    const html = await res.text();
+    const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(
+      (m) => m[1],
+    );
+    const bootstrap = inlineScripts.find((s) => s.includes('quizmill.activePack'));
+    expect(bootstrap, 'pack bootstrap inline script present').toBeDefined();
+    expect(bootstrap).toContain('__QUIZMILL_PACK__');
+    expect(bootstrap).not.toContain('__next_s'); // queued = the race is back
+  });
+
   it('renders the build-time pack when nothing is injected', async () => {
     // The committed demo pack is the solar system. Assert the visible heading
     // (body text also contains the RSC flight payload, so check the H1).

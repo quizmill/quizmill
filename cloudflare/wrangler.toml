@@ -1,0 +1,18 @@
+# quizmill sync worker — deploy config.
+#
+# Setup (once, ~2 minutes — see README.md in this directory):
+#   1. npx wrangler d1 create quizmill-sync
+#      → paste the printed database_id below
+#   2. npx wrangler d1 execute quizmill-sync --remote --file=schema.sql
+#   3. npx wrangler deploy
+#      → build the app with NEXT_PUBLIC_SYNC_URL=<printed workers.dev URL>
+
+name = "quizmill-sync"
+main = "src/worker.ts"
+compatibility_date = "2026-06-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "quizmill-sync"
+# Replace with the id printed by `npx wrangler d1 create quizmill-sync`:
+database_id = "REPLACE_WITH_YOUR_DATABASE_ID"

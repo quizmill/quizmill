@@ -38,3 +38,6 @@ supabase/.temp/
 /public/icon.svg
 # mirrored from the active pack's assets/ by scripts/pack-assets.ts
 /public/pack-assets/
+
+# wrangler local dev state (cloudflare/ worker)
+.wrangler/

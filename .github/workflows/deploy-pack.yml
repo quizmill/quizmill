@@ -20,7 +20,9 @@ name: Deploy pack (reusable)
 # Caller passes its secrets with `secrets: inherit`. Expected secrets:
 #   CLOUDFLARE_API_TOKEN                    token with "Cloudflare Pages — Edit"
 #   CLOUDFLARE_ACCOUNT_ID                   70b494550992cda97e893fab035f7e9a
-#   NEXT_PUBLIC_SUPABASE_URL                (optional) enables cloud sync
+#   NEXT_PUBLIC_SYNC_URL                    (optional) enables cloud sync via the
+#                                           Cloudflare Worker (cloudflare/); wins over Supabase
+#   NEXT_PUBLIC_SUPABASE_URL                (optional) enables cloud sync via Supabase
 #   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY    (optional) public-safe; RLS is the guard
 
 on:
@@ -87,6 +89,7 @@ jobs:
 
       - name: Build "${{ inputs.pack }}" on quizmill@${{ steps.engine.outputs.spec }}
         env:
+          NEXT_PUBLIC_SYNC_URL: ${{ secrets.NEXT_PUBLIC_SYNC_URL }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
         run: |

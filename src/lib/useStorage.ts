@@ -6,6 +6,7 @@ import { SESSIONS_KEY, ATTEMPTS_KEY } from './storage';
 import { applySnapshot, parseSnapshot } from './transfer';
 import {
   getSyncStatus,
+  pushAllToCloud,
   subscribeSyncStatus,
   type SyncStatus,
 } from './sync';
@@ -123,7 +124,14 @@ export function useImportProgress() {
     // parseSnapshot throws TransferError with a user-facing message.
     const snapshot = parseSnapshot(text);
     const result = applySnapshot(snapshot);
-    if (result.changed) emit();
+    if (result.changed) {
+      emit();
+      // An import lands via mergeRemote, which deliberately doesn't feed
+      // the sync queue — but from the cloud's perspective these ARE new
+      // local writes. Re-push so a signed-in backend gets them too
+      // (no-op when signed out; idempotent upserts otherwise).
+      pushAllToCloud();
+    }
     return result;
   }, []);
 }
