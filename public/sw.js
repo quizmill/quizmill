@@ -1,24 +1,53 @@
 /**
  * Service worker for offline practice.
  *
- * Strategy: cache-first on a single named cache. On the kid's first online
- * visit everything they touch (HTML, JS, CSS, SVG question images) gets
- * cached, so subsequent visits work fully offline. Navigation responses are
- * also revalidated in the background when online, so a deploy starts
- * rolling out the moment the iPad reconnects.
+ * Strategy: precache the ENTIRE static export at install (it's a small,
+ * fully-static app), then serve cache-first with a runtime cache-as-you-go
+ * top-up for anything the manifest missed. Precaching matters because a
+ * route is otherwise only cached once visited online: Home would load
+ * offline but tapping a category dead-ended on the uncached practice
+ * route. Navigation responses are also revalidated in the background when
+ * online, so a deploy starts rolling out the moment the iPad reconnects.
  *
- * `__BUILD_VERSION__` is replaced at build time (see
- * `scripts/finalise-build.ts`) with the short git SHA, giving every deploy
- * a fresh cache name. The activate handler purges old versions so we don't
- * keep stale chunks around across deploys.
+ * `__BUILD_VERSION__` and `__PRECACHE_MANIFEST__` are replaced at build
+ * time (see `scripts/finalise-build.ts`) with the short git SHA and the
+ * full file list of `out/`. A fresh cache name per deploy + the activate
+ * purge keep stale chunks from surviving across deploys. In dev the
+ * placeholders are unstamped: JSON.parse throws, the manifest stays empty,
+ * and the worker degrades to pure cache-as-you-go.
  */
 const CACHE_VERSION = '__BUILD_VERSION__';
 const CACHE_NAME = `quizmill-${CACHE_VERSION}`;
 
-self.addEventListener('install', () => {
+let PRECACHE_MANIFEST = [];
+try {
+  PRECACHE_MANIFEST = JSON.parse('__PRECACHE_MANIFEST__');
+} catch {
+  // unstamped (dev) — no precache, runtime caching still applies
+}
+
+self.addEventListener('install', (event) => {
   // Take control on first install without waiting for old tabs to close.
   self.skipWaiting();
+  event.waitUntil(precache());
 });
+
+async function precache() {
+  const cache = await caches.open(CACHE_NAME);
+  // Deliberately not cache.addAll: one flaky asset must not abort the
+  // whole install — anything missed here is picked up by the runtime
+  // cache-as-you-go path on first use.
+  await Promise.allSettled(
+    PRECACHE_MANIFEST.map(async (path) => {
+      // Manifest paths are relative to the SW location, so this works
+      // under any base path.
+      const url = new URL(path, self.location.href).toString();
+      if (await cache.match(url)) return;
+      const res = await fetch(url, { cache: 'no-cache' });
+      if (res.ok) await cache.put(url, res);
+    }),
+  );
+}
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
@@ -46,7 +75,19 @@ self.addEventListener('fetch', (event) => {
 
 async function handleFetch(req) {
   const cache = await caches.open(CACHE_NAME);
-  const cached = await cache.match(req);
+  // Query strings must not defeat the cache for route requests:
+  //  - navigations carry app state (/practice/?subject=planets) but are
+  //    served by the same cached route shell;
+  //  - the client router's payload fetches carry a ?_rsc= cache-buster.
+  // Exact match first (keeps genuinely query-distinct entries working),
+  // then retry ignoring the search for those two shapes.
+  const ignorableSearch =
+    req.mode === 'navigate' || new URL(req.url).searchParams.has('_rsc');
+  const cached =
+    (await cache.match(req)) ||
+    (ignorableSearch
+      ? await cache.match(req, { ignoreSearch: true })
+      : undefined);
 
   if (cached) {
     // For navigation requests, kick off a background revalidation so the
