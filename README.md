@@ -202,7 +202,7 @@ explicitly).
 two-endpoint protocol any server can implement — the Cloudflare Worker
 is just the reference implementation — and entirely custom client
 backends register in code via `registerSyncBackendProvider`. Without
-any backend, Settings → "Backup & transfer" exports/imports progress
+any backend, Settings → "Move progress" exports/imports progress
 as a JSON file for device moves and offline backups.
 
 ## Upgrading

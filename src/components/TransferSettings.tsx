@@ -1,85 +1,124 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { FileDown, FileUp, HardDrive } from 'lucide-react';
+import { Download, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { APP_CONFIG } from '@/config';
-import { pushAllToCloud } from '@/lib/sync';
-import {
-  applyTransferPayload,
-  buildExportPayload,
-  exportFileName,
-  parseTransferPayload,
-} from '@/lib/transfer';
+import { useImportProgress, useStorageData } from '@/lib/useStorage';
+import { exportProgressFile, TransferError } from '@/lib/transfer';
 
 /**
- * "Backup & transfer" card — file export/import of the active pack's
- * progress. Works with NO backend configured (it's the serverless way to
- * move to a new device or keep an offline backup), and composes with any
- * sync backend: an import re-pushes to the cloud when signed in.
+ * Settings card: move progress between devices as a file.
+ *
+ * Export shares/downloads a JSON snapshot of everything stored for this
+ * pack; Import merges a snapshot from another device (same last-write-wins
+ * rules as a cloud pull, so it's safe to import twice or into a device
+ * that already has progress).
  */
 export function TransferSettings() {
+  const { sessions, attempts } = useStorageData();
+  const importProgress = useImportProgress();
   const fileInput = useRef<HTMLInputElement>(null);
-  const [status, setStatus] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  function handleExport() {
-    setError(null);
-    const payload = buildExportPayload();
-    const counts = payload.data;
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-      type: 'application/json',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = exportFileName(payload.packId, payload.exportedAt);
-    a.click();
-    URL.revokeObjectURL(url);
-    setStatus(
-      `Exported ${counts.sessions.length} session(s), ${counts.attempts.length} answer(s), ` +
-        `${counts.achievements.length} sticker(s), and ${counts.votes.length} vote(s).`,
-    );
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<{
+    kind: 'ok' | 'error';
+    text: string;
+  } | null>(null);
+
+  async function handleExport() {
+    if (busy) return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      const outcome = await exportProgressFile();
+      if (outcome === 'shared') {
+        setNotice({ kind: 'ok', text: 'Progress file shared.' });
+      } else if (outcome === 'downloaded') {
+        setNotice({ kind: 'ok', text: 'Progress file downloaded.' });
+      }
+      // 'cancelled' — the user closed the share sheet; say nothing.
+    } catch {
+      setNotice({ kind: 'error', text: 'Export failed — please try again.' });
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function handleImportFile(file: File) {
-    setError(null);
-    setStatus(null);
-    const parsed = parseTransferPayload(await file.text(), APP_CONFIG.packId);
-    if (!parsed.ok) {
-      setError(parsed.error);
-      return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      const result = importProgress(await file.text());
+      if (!result.changed) {
+        setNotice({
+          kind: 'ok',
+          text: 'Nothing new to import — this device already has all of that progress.',
+        });
+      } else {
+        const { added } = result;
+        const parts = [
+          added.sessions > 0 ? `${added.sessions} session(s)` : null,
+          added.attempts > 0 ? `${added.attempts} answer(s)` : null,
+          added.achievements > 0 ? `${added.achievements} sticker(s)` : null,
+          added.votes > 0 ? `${added.votes} vote(s)` : null,
+        ].filter(Boolean);
+        setNotice({
+          kind: 'ok',
+          text: parts.length > 0
+            ? `Imported ${parts.join(', ')}.`
+            : 'Import merged updates into existing progress.',
+        });
+      }
+    } catch (err) {
+      setNotice({
+        kind: 'error',
+        text:
+          err instanceof TransferError
+            ? err.message
+            : "Couldn't read that file — please try again.",
+      });
+    } finally {
+      setBusy(false);
     }
-    const { data } = parsed.payload;
-    const changed = applyTransferPayload(parsed.payload);
-    // If a sync backend is signed in, the imported rows are new local
-    // writes from the cloud's perspective — send them up too.
-    if (changed) pushAllToCloud();
-    setStatus(
-      changed
-        ? `Imported ${data.sessions.length} session(s) and ${data.attempts.length} answer(s). ` +
-            'Existing progress was kept; duplicates were merged.'
-        : 'Nothing new in that file — this device already has all of it.',
-    );
   }
 
   return (
     <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
-      <div className="flex items-center gap-2">
-        <HardDrive className="h-5 w-5 text-ink-400" />
-        <h2 className="text-lg font-semibold text-ink-900">Backup & transfer</h2>
-      </div>
+      <h2 className="text-lg font-semibold text-ink-900">Move progress</h2>
       <p className="mt-1 text-sm text-ink-600">
-        Save your progress to a file, or restore one exported on another
-        device. Importing adds to what's here — it never deletes anything.
+        Export saves all sessions, answers, stickers and votes to a file you
+        can send to another device. Import merges a file exported from this
+        pack — nothing on this device is lost.
       </p>
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-        <Button variant="secondary" onClick={handleExport}>
-          <FileDown className="h-4 w-4" />
-          Export progress
+      {notice ? (
+        <p
+          data-testid="transfer-notice"
+          className={
+            notice.kind === 'error'
+              ? 'mt-3 rounded-xl border border-warn-500/40 bg-warn-500/10 px-3 py-2 text-sm text-ink-800'
+              : 'mt-3 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-800'
+          }
+        >
+          {notice.text}
+        </p>
+      ) : null}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button
+          variant="secondary"
+          data-testid="export-progress"
+          onClick={handleExport}
+          disabled={busy || sessions.length + attempts.length === 0}
+        >
+          <Download className="h-4 w-4" />
+          Export to file
         </Button>
-        <Button variant="secondary" onClick={() => fileInput.current?.click()}>
-          <FileUp className="h-4 w-4" />
+        <Button
+          variant="secondary"
+          data-testid="import-progress"
+          onClick={() => fileInput.current?.click()}
+          disabled={busy}
+        >
+          <Upload className="h-4 w-4" />
           Import from file
         </Button>
         <input
@@ -87,25 +126,15 @@ export function TransferSettings() {
           type="file"
           accept="application/json,.json"
           className="hidden"
-          data-testid="transfer-import-input"
+          data-testid="import-progress-file"
           onChange={(e) => {
             const file = e.target.files?.[0];
-            e.target.value = ''; // allow re-importing the same file
+            // Allow re-picking the same file after a failed/repeat import.
+            e.target.value = '';
             if (file) void handleImportFile(file);
           }}
         />
       </div>
-
-      {status && (
-        <p className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-800">
-          {status}
-        </p>
-      )}
-      {error && (
-        <p className="mt-3 rounded-lg bg-warn-100/60 px-3 py-2 text-sm text-warn-700">
-          {error}
-        </p>
-      )}
     </div>
   );
 }

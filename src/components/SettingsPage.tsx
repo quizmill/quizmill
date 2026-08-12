@@ -52,7 +52,7 @@ const THEME_CHOICES: {
 /**
  * Settings page:
  *  - SyncSettings   — cloud sync sign-in (dormant unless configured)
- *  - TransferSettings — file export/import of progress (always available)
+ *  - TransferSettings — export/import progress as a file (device moves)
  *  - Reset today    — remove just today's sessions
  *  - Reset all      — wipe local progress for the active pack
  *  - App version    — semver + build tag (tap it to reveal games)

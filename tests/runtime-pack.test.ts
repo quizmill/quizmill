@@ -35,8 +35,23 @@ const INJECTED: ActivePack = {
 
 afterEach(() => {
   globalThis.__QUIZMILL_PACK__ = undefined;
+  vi.unstubAllGlobals();
   vi.resetModules();
 });
+
+/** Minimal browser stub: a window with localStorage and a location hash. */
+function stubBrowser({ hash = '', stored = null }: { hash?: string; stored?: string | null }) {
+  const map = new Map<string, string>();
+  if (stored !== null) map.set('quizmill.activePack', stored);
+  vi.stubGlobal('window', {
+    location: { hash },
+    localStorage: {
+      getItem: (k: string) => map.get(k) ?? null,
+      setItem: (k: string, v: string) => void map.set(k, v),
+      removeItem: (k: string) => void map.delete(k),
+    },
+  });
+}
 
 describe('runtime pack source', () => {
   it('falls back to the build-time pack when nothing is injected', async () => {
@@ -62,6 +77,47 @@ describe('runtime pack source', () => {
     // never the build-time pack's.
     expect(activeScenarios).toEqual([]);
     expect(activeConcepts).toEqual([]);
+  });
+
+  // The layout's inline bootstrap script sets the global, but Next loads the
+  // engine chunks as async scripts — when the service worker serves them from
+  // cache they can execute BEFORE the inline script, so source.ts must be able
+  // to find the handed-off pack itself. Regression test for the SW-cached-load
+  // race where an injected pack lost to the build-time one.
+  it('reads the pack from localStorage when the bootstrap script has not run yet', async () => {
+    vi.resetModules();
+    stubBrowser({ stored: JSON.stringify(INJECTED) });
+
+    const { activeManifest, activeQuestions } = await import('@/pack/source');
+
+    expect(activeManifest.id).toBe('injected-pack');
+    expect(activeQuestions).toHaveLength(1);
+  });
+
+  it('reads the pack from a #pack= hash when the bootstrap script has not run yet', async () => {
+    vi.resetModules();
+    const encoded = encodeURIComponent(
+      Buffer.from(JSON.stringify(INJECTED), 'utf8').toString('base64'),
+    );
+    // Hash wins over a (different) stored pack, mirroring the bootstrap.
+    stubBrowser({
+      hash: `#pack=${encoded}`,
+      stored: JSON.stringify({ ...INJECTED, manifest: { ...INJECTED.manifest, id: 'stored-pack' } }),
+    });
+
+    const { activeManifest } = await import('@/pack/source');
+
+    expect(activeManifest.id).toBe('injected-pack');
+  });
+
+  it('ignores junk in localStorage and falls back to the build-time pack', async () => {
+    vi.resetModules();
+    stubBrowser({ stored: 'not json {' });
+
+    const { activeManifest, activeQuestions } = await import('@/pack/source');
+
+    expect(activeManifest.id).not.toBe('injected-pack');
+    expect(activeQuestions.length).toBeGreaterThan(0);
   });
 
   it('flows the injected pack through the derived data layer', async () => {

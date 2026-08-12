@@ -151,15 +151,17 @@ and automatic for data:
    idempotent upserts of local rows, and the bulk push covers them
    regardless.
 
-For retiring a device at the same time, Settings → Backup & transfer
+For retiring a device at the same time, Settings → Move progress
 bridges with a file instead.
 
 ## File export/import
 
-`src/lib/transfer.ts` + the Settings "Backup & transfer" card write the
-same `RemoteData` snapshot to a versioned JSON file
-(`{ format: 'quizmill-progress', version, packId, exportedAt, data }`)
-and import it through the same merge the cloud pull uses — additive,
-idempotent, refuses files from a different pack. Importing while signed
-in to a backend re-pushes everything so the file's rows reach the cloud
-too. No backend required.
+`src/lib/transfer.ts` + the Settings "Move progress" card write the same
+four synced tables to a versioned JSON snapshot
+(`{ format: 'quizmill-progress', version, packId, sessions, attempts,
+achievements, votes, … }` — `buildSnapshot`/`parseSnapshot`/
+`applySnapshot`) and import it through the same last-write-wins merge a
+cloud pull uses — additive, idempotent, refuses files from a different
+pack. Importing while signed in to a backend re-pushes everything so the
+file's rows reach the cloud too (`useImportProgress` → `pushAllToCloud`).
+No backend required.

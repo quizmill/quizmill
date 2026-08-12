@@ -34,7 +34,41 @@ export function setActivePack(pack: ActivePack): void {
   globalThis.__QUIZMILL_PACK__ = pack;
 }
 
+/**
+ * The handed-off pack read straight from the browser, for when the layout's
+ * inline bootstrap hasn't run yet. Next loads the engine chunks as async
+ * scripts, and async scripts don't respect document order — when the service
+ * worker serves them from cache they can execute BEFORE the inline bootstrap
+ * at the end of <head>, so relying on the global alone made an injected pack
+ * lose the race and render the build-time one. Mirrors the bootstrap's
+ * sources and precedence: `#pack=<base64-json>` hash, then
+ * localStorage['quizmill.activePack'].
+ */
+function readHandedOffPack(): ActivePack | undefined {
+  if (typeof window === 'undefined') return undefined; // SSG build
+  try {
+    let raw: string | null = null;
+    const m = window.location.hash.match(/[#&]pack=([^&]+)/);
+    if (m) {
+      // Inverse of the encoder: URI-component → base64 → UTF-8 JSON.
+      raw = decodeURIComponent(escape(atob(decodeURIComponent(m[1]))));
+    } else if (window.localStorage) {
+      raw = window.localStorage.getItem('quizmill.activePack');
+    }
+    if (!raw) return undefined;
+    const pack = JSON.parse(raw) as ActivePack;
+    // Cache on the global so bootstrap and engine agree on one object.
+    globalThis.__QUIZMILL_PACK__ = pack;
+    return pack;
+  } catch {
+    return undefined; // junk hash/storage → build-time pack
+  }
+}
+
 /** The injected pack, if any. `source.ts` reads this once at module load. */
 export function getActivePackOverride(): ActivePack | undefined {
-  return typeof globalThis !== 'undefined' ? globalThis.__QUIZMILL_PACK__ : undefined;
+  if (typeof globalThis !== 'undefined' && globalThis.__QUIZMILL_PACK__) {
+    return globalThis.__QUIZMILL_PACK__;
+  }
+  return readHandedOffPack();
 }
