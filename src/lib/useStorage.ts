@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import * as storage from './storage';
 import { SESSIONS_KEY, ATTEMPTS_KEY } from './storage';
+import { applySnapshot, parseSnapshot } from './transfer';
 import {
   getSyncStatus,
   subscribeSyncStatus,
@@ -114,6 +115,16 @@ export function useEndSession() {
   return useCallback((session: Session) => {
     storage.saveSession(session);
     emit();
+  }, []);
+}
+
+export function useImportProgress() {
+  return useCallback((text: string) => {
+    // parseSnapshot throws TransferError with a user-facing message.
+    const snapshot = parseSnapshot(text);
+    const result = applySnapshot(snapshot);
+    if (result.changed) emit();
+    return result;
   }, []);
 }
 
