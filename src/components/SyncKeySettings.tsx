@@ -1,16 +1,33 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Check, Cloud, CloudOff, Copy, Eye, EyeOff, KeyRound, LogOut } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import {
+  Check,
+  Cloud,
+  CloudOff,
+  Copy,
+  Eye,
+  EyeOff,
+  KeyRound,
+  LogOut,
+  Mail,
+  Share2,
+} from 'lucide-react';
+import { Button, buttonStyles } from '@/components/ui/Button';
 import { SyncStatusLine } from '@/components/SyncStatusLine';
+import { APP_CONFIG } from '@/config';
 import { useSyncStatus } from '@/lib/useStorage';
 import {
   clearSyncKey,
   getStoredSyncKey,
   setSyncKey,
 } from '@/lib/backends/httpBackend';
-import { generateSyncKey, isValidSyncKey, maskSyncKey } from '@/lib/syncKey';
+import {
+  generateSyncKey,
+  isValidSyncKey,
+  maskSyncKey,
+  syncKeyMailto,
+} from '@/lib/syncKey';
 
 /**
  * "Sync across devices" card for the HTTP sync backend (Cloudflare Worker
@@ -32,10 +49,13 @@ export function SyncKeySettings() {
   const [entering, setEntering] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  // Web Share API availability — read after mount (SSR renders without it).
+  const [canShare, setCanShare] = useState(false);
   const sync = useSyncStatus();
 
   useEffect(() => {
     setKey(getStoredSyncKey());
+    setCanShare(typeof navigator !== 'undefined' && Boolean(navigator.share));
     setReady(true);
   }, []);
 
@@ -80,6 +100,18 @@ export function SyncKeySettings() {
     }
   }
 
+  async function shareKey() {
+    if (!key) return;
+    try {
+      await navigator.share({
+        title: `${APP_CONFIG.title} — sync key`,
+        text: `Sync key for ${APP_CONFIG.title}: ${key}\nEnter it in Settings → Sync across devices.`,
+      });
+    } catch {
+      // user dismissed the share sheet — nothing to do
+    }
+  }
+
   async function stopSyncing() {
     await clearSyncKey();
     setKey(null);
@@ -109,9 +141,9 @@ export function SyncKeySettings() {
           </p>
           {justCreated && (
             <p className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-800">
-              Save this key somewhere safe (a password manager is perfect) —
-              it exists only on this device and is the only way to link
-              another one.
+              Save this key now — it exists only on this device and is the
+              only way to link another one. Easiest: email it to yourself
+              below, or pop it in a password manager.
             </p>
           )}
           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -131,6 +163,24 @@ export function SyncKeySettings() {
                 {copied ? 'Copied' : 'Copy'}
               </Button>
             </div>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {/* Recovery without infrastructure: opens the user's OWN mail
+                app with the key pre-filled — no server ever sees it.
+                Losing every device then just means searching your inbox. */}
+            <a
+              href={syncKeyMailto(key, APP_CONFIG.title)}
+              className={buttonStyles({ variant: 'secondary', size: 'md' })}
+            >
+              <Mail className="h-4 w-4" />
+              Email me this key
+            </a>
+            {canShare && (
+              <Button variant="secondary" onClick={shareKey}>
+                <Share2 className="h-4 w-4" />
+                Share
+              </Button>
+            )}
           </div>
           <SyncStatusLine state={sync.state} pending={sync.pending} />
           <Button variant="secondary" className="mt-6" onClick={stopSyncing}>

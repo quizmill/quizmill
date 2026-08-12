@@ -2,7 +2,9 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { cn } from '@/lib/cn';
 
-const buttonStyles = cva(
+// Exported so link-shaped actions (e.g. a mailto: that must be a real <a>)
+// can wear the same clothes as a Button.
+export const buttonStyles = cva(
   'tap-feedback inline-flex items-center justify-center gap-2 rounded-xl font-semibold ring-offset-2 ring-offset-ink-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-60',
   {
     variants: {

@@ -94,6 +94,25 @@ export async function hashSyncKey(key: string): Promise<string> {
     .join('');
 }
 
+/**
+ * A mailto: URL that opens the user's own mail app with the key pre-filled,
+ * addressed to nobody — they send it to themselves. This is the recovery
+ * story for lost keys with zero infrastructure: the email goes out through
+ * the user's mail client, so no server (ours included) ever sees the key
+ * or the address. Recovery = search your inbox for the app's name.
+ */
+export function syncKeyMailto(key: string, appTitle: string): string {
+  const canonical = normalizeSyncKey(key) ?? key;
+  const subject = `${appTitle} — sync key`;
+  const body =
+    `Your sync key for ${appTitle}:\n\n` +
+    `${canonical}\n\n` +
+    `To link a new device (or recover your progress), open the app, go to ` +
+    `Settings → Sync across devices, and enter this key.\n\n` +
+    `Keep this email — anyone with the key can access this practice history.`;
+  return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
 /** Masked rendering for the Settings card, e.g. `QM-H3KDA-•••••-•••••-•••••`. */
 export function maskSyncKey(key: string): string {
   const canonical = normalizeSyncKey(key);

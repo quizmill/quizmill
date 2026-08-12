@@ -7,6 +7,7 @@ import {
   isValidSyncKey,
   maskSyncKey,
   normalizeSyncKey,
+  syncKeyMailto,
 } from '../src/lib/syncKey';
 
 const CANONICAL = /^QM(-[A-Z2-9]{5}){4}$/;
@@ -94,5 +95,18 @@ describe('maskSyncKey', () => {
   it('keeps the first group readable and hides the rest', () => {
     const masked = maskSyncKey('QM-ABCDE-FGHJK-MNPQR-STVWX');
     expect(masked).toBe('QM-ABCDE-•••••-•••••-•••••');
+  });
+});
+
+describe('syncKeyMailto (self-email recovery)', () => {
+  it('builds a mailto: with no recipient, the app name, and the canonical key', () => {
+    const key = 'QM-ABCDE-FGHJK-MNPQR-STVWX';
+    const url = syncKeyMailto(key.toLowerCase(), 'Solar System Practice');
+    expect(url.startsWith('mailto:?')).toBe(true); // user picks the recipient
+    const params = new URLSearchParams(url.slice('mailto:?'.length));
+    expect(params.get('subject')).toContain('Solar System Practice');
+    const body = params.get('body') ?? '';
+    expect(body).toContain(key); // canonicalised, despite lowercase input
+    expect(body).toContain('Settings');
   });
 });

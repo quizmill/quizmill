@@ -80,8 +80,14 @@ it like a password. That capability-URL trust model is a deliberate fit
 for the data mirrored here (quiz attempts, stickers, question votes) —
 don't reuse this worker for anything sensitive.
 
-Losing every device with the key means the cloud copy is orphaned (the
-data is still on the devices; creating a new key re-uploads it).
+**Losing the key.** The card offers "Email me this key" — it opens the
+user's OWN mail app with the key pre-filled, addressed to themselves, so
+recovery is just searching your inbox (no server, ours included, ever
+sees the email or the key). On phones there's also the system share
+sheet (Notes, a password manager, a self-chat). If every copy is truly
+gone, the cloud rows are orphaned but the data still lives on the
+devices — Settings → Backup & transfer exports it, and creating a new
+key re-uploads it.
 
 ## API
 
