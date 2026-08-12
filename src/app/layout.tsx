@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next';
-import Script from 'next/script';
 import './globals.css';
 import { APP_CONFIG } from '@/config';
 import { UpdateNotifier } from '@/components/UpdateNotifier';
@@ -18,7 +17,16 @@ const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 //   - a `#pack=<base64-json>` hash (cross-origin handoff), else
 //   - localStorage['quizmill.activePack'] (same-origin handoff).
 // No stored pack → global stays unset → the build-time pack renders, exactly
-// as before. `beforeInteractive` guarantees this runs ahead of source.ts.
+// as before.
+//
+// ORDERING IS LOAD-BEARING — this must be a real inline <script>
+// (dangerouslySetInnerHTML), NOT `next/script strategy="beforeInteractive"`.
+// next/script serialises "beforeInteractive" code into the `self.__next_s`
+// queue and the framework runtime flushes it asynchronously — racing the
+// engine chunks' module evaluation. When a chunk wins, source.ts reads
+// `__QUIZMILL_PACK__` before it's set and the injected pack is silently
+// ignored. A parser-executed inline script always runs before any
+// deferred/module bundle (guarded by tests/e2e-pack/runtime-pack-bootstrap).
 const PACK_BOOTSTRAP = `(function(){try{
 var r=null,m=location.hash.match(/[#&]pack=([^&]+)/);
 if(m){r=decodeURIComponent(escape(atob(decodeURIComponent(m[1]))))}
@@ -28,8 +36,9 @@ if(r){window.__QUIZMILL_PACK__=JSON.parse(r)}
 
 // Apply the stored colour-scheme preference before first paint so a dark
 // visitor never sees a light flash. Mirrors src/lib/theme.ts: bare-string
-// key, absent/anything-else = follow the OS. Kept inline (beforeInteractive)
-// for the same reason as the pack bootstrap.
+// key, absent/anything-else = follow the OS. A real inline script for the
+// same ordering reason as the pack bootstrap (a queued script can lose the
+// race against first paint and flash light at a dark visitor).
 const THEME_BOOTSTRAP = `(function(){try{
 var t=localStorage.getItem(${JSON.stringify(THEME_KEY)});
 if(t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches)){
@@ -89,13 +98,11 @@ export default function RootLayout({
     // suppressHydrationWarning: the theme bootstrap adds `class="dark"` to
     // <html> before React hydrates; that attribute diff is intentional.
     <html lang="en" suppressHydrationWarning>
-      <Script id="quizmill-theme-bootstrap" strategy="beforeInteractive">
-        {THEME_BOOTSTRAP}
-      </Script>
-      <Script id="quizmill-pack-bootstrap" strategy="beforeInteractive">
-        {PACK_BOOTSTRAP}
-      </Script>
       <body className="min-h-dvh bg-ink-50 text-ink-800 antialiased">
+        {/* Parser-executed bootstraps — see the ordering notes above. First
+            in <body> so they run before any deferred engine bundle. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+        <script dangerouslySetInnerHTML={{ __html: PACK_BOOTSTRAP }} />
         <div className="mx-auto w-full max-w-screen-sm px-4 pb-24 pt-4 sm:max-w-screen-md sm:pt-8">
           {children}
           {/* Every pack app declares its engine — packs differ, the
