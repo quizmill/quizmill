@@ -37,6 +37,30 @@ When `NEXT_PUBLIC_SYNC_URL` is set it takes precedence over the Supabase
 env vars; when neither is set the sync layer stays dormant and the app is
 pure-local.
 
+## Try it locally first (no Cloudflare account needed)
+
+`wrangler dev` runs the real worker against a local SQLite-backed D1 —
+nothing leaves your machine and no account is required:
+
+```sh
+cd cloudflare
+# any placeholder database_id works for local dev
+npx wrangler d1 execute quizmill-sync --local --file=schema.sql
+npx wrangler dev --port 8787          # → http://127.0.0.1:8787
+```
+
+Then build the app against it and click around for real:
+
+```sh
+NEXT_PUBLIC_SYNC_URL=http://127.0.0.1:8787 npm run build
+npx http-server out -p 3000 -s -c-1   # Settings → create a sync key
+```
+
+Peek at what synced with
+`npx wrangler d1 execute quizmill-sync --local --command "SELECT tbl, id FROM rows"`.
+When it looks right, the three deploy commands above take the same worker
+to production.
+
 ## How sign-in works (sync keys)
 
 There are no accounts and no email flow. In **Settings → Sync across
