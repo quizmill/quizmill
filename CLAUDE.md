@@ -36,8 +36,12 @@ webmanifest are generated from the manifest by `scripts/pack-assets.ts`
 - `src/lib/` — engine: `selection.ts` (unseen-biased pick, seedable),
   `mistakes.ts` (re-ask until rescued; packs use per-question rescue —
   topic = question id), `storage.ts` (localStorage, namespaced
-  `quizmill.<packId>.*`), `sync.ts` (optional Supabase mirror, dormant
-  without `NEXT_PUBLIC_SUPABASE_URL`/`_PUBLISHABLE_KEY`), `useStorage.ts`
+  `quizmill.<packId>.*`), `sync.ts` (backend-agnostic mirror engine;
+  backends in `src/lib/backends/` — Cloudflare Worker+D1 with sync-key
+  auth via `NEXT_PUBLIC_SYNC_URL` (worker source in `cloudflare/`,
+  wins when both are set), or Supabase via
+  `NEXT_PUBLIC_SUPABASE_URL`/`_PUBLISHABLE_KEY`; dormant without
+  either), `useStorage.ts`
   (React hooks, event bus `quizmill:storage`).
 - `src/pack/` — the app UI: Home, PracticeRunner, ReviewRunner,
   runner.ts (pure session logic), data.ts (typed pack loader),

@@ -139,8 +139,9 @@ it until the pack is clean, so malformed content can't reach the app.
   Settings so pack authors can curate
 - **Local-first storage** — everything in localStorage, namespaced per
   pack; works fully offline (PWA with a versioned service worker)
-- **Optional cloud sync** — magic-link auth + Supabase mirroring with a
-  retry-on-reconnect queue; dormant unless configured (see below)
+- **Optional cloud sync** — a retry-on-reconnect queue mirroring to a
+  Cloudflare Worker + D1 (sync-key auth) or Supabase (email OTP);
+  dormant unless configured (see below)
 - **Static export** — `npx quizmill build` produces a plain static site,
   deployable to any static host (Cloudflare Pages, GitHub Pages,
   Netlify…)
@@ -162,18 +163,38 @@ of the deployed app*.
 
 ## Cloud sync (optional)
 
-Set two env vars at build time and run the migration in
-`supabase/migrations/` against your own (free-tier) Supabase project:
+Two interchangeable backends; with neither configured, the sync layer
+stays dormant and the app is pure-local. (Set env vars for an `npx`
+build by exporting them in the same shell — the CLI passes your
+environment through to the engine.)
+
+**Cloudflare Worker + D1 (recommended).** Deploy the tiny worker in
+`cloudflare/` to a free Cloudflare account (~2 minutes, see
+`cloudflare/README.md`) and build with:
+
+```
+NEXT_PUBLIC_SYNC_URL=https://quizmill-sync.<account>.workers.dev
+```
+
+No accounts or email: devices link by sharing a locally-generated
+**sync key** (Settings → Sync across devices). Cloudflare's free tier
+never pauses or deletes inactive Workers/D1 databases, so a practice
+app you return to months later still syncs. One worker serves every
+pack — rows are partitioned per pack and per key.
+
+**Supabase.** The original backend (email-OTP sign-in, Row Level
+Security). Run the migration in `supabase/migrations/` against your
+own free-tier project and build with:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 ```
 
-Absent these, the sync layer stays dormant and the app is pure-local.
-Row Level Security scopes every row to the signed-in user. (Set env
-vars for an `npx` build by exporting them in the same shell — the CLI
-passes your environment through to the engine.)
+Note that Supabase pauses free-tier projects after ~a week of
+inactivity (and eventually deletes them) — fine for daily-driver apps,
+frustrating for occasional ones. If both backends are configured,
+`NEXT_PUBLIC_SYNC_URL` wins.
 
 ## Upgrading
 

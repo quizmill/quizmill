@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Check, Cloud, CloudOff, LogOut, Mail, RefreshCw } from 'lucide-react';
+import { Cloud, CloudOff, LogOut, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useSyncStatus } from '@/lib/useStorage';
 import {
@@ -10,11 +10,31 @@ import {
   sanitiseOtpInput,
 } from '@/lib/otp';
 import { SYNC_CONFIGURED, authRedirectUrl, getSupabase } from '@/lib/supabase';
+import { syncBackendKind } from '@/lib/syncBackend';
+import { SyncKeySettings } from '@/components/SyncKeySettings';
+import { SyncStatusLine } from '@/components/SyncStatusLine';
 
 /**
- * "Sync across devices" card for the Settings page. Optional passwordless
- * sign-in — purely to turn on cloud sync. The app stays fully usable signed
- * out; nothing here gates the rest of the experience.
+ * "Sync across devices" card for the Settings page — dispatches to the card
+ * matching the backend this build is wired to (see src/lib/syncBackend.ts):
+ * sync-key auth for the Cloudflare Worker, email OTP for Supabase, nothing
+ * when sync isn't configured.
+ */
+export function SyncSettings() {
+  switch (syncBackendKind()) {
+    case 'worker':
+      return <SyncKeySettings />;
+    case 'supabase':
+      return <SupabaseSyncSettings />;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Supabase card: optional passwordless sign-in — purely to turn on cloud
+ * sync. The app stays fully usable signed out; nothing here gates the rest
+ * of the experience.
  *
  * Sign-in is a one-time **code** (alphanumeric, configurable length) typed
  * back into the app, not a tapped link. On iOS an email link opens in
@@ -23,7 +43,7 @@ import { SYNC_CONFIGURED, authRedirectUrl, getSupabase } from '@/lib/supabase';
  * the code authenticates *this* app directly. The same email still carries
  * a link, which is convenient on desktop.
  */
-export function SyncSettings() {
+function SupabaseSyncSettings() {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
@@ -205,34 +225,3 @@ export function SyncSettings() {
   );
 }
 
-/** Live one-liner describing where cloud sync is right now: offline (with a
- *  count of work held locally), actively syncing, or fully caught up. */
-function SyncStatusLine({ state, pending }: { state: string; pending: number }) {
-  if (state === 'offline') {
-    return (
-      <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-ink-500">
-        <CloudOff className="h-4 w-4" />
-        {pending > 0
-          ? `Offline — ${pending} ${pending === 1 ? 'change' : 'changes'} saved here, will sync when you're back online.`
-          : 'Offline — changes are saved here and will sync when you reconnect.'}
-      </p>
-    );
-  }
-  if (state === 'syncing') {
-    return (
-      <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-brand-700">
-        <RefreshCw className="h-4 w-4 animate-spin" />
-        {pending > 0 ? `Syncing ${pending}…` : 'Syncing…'}
-      </p>
-    );
-  }
-  if (state === 'synced') {
-    return (
-      <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-brand-700">
-        <Check className="h-4 w-4" />
-        Up to date
-      </p>
-    );
-  }
-  return null;
-}
