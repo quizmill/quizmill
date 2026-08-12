@@ -66,6 +66,9 @@ const nextConfig: NextConfig = {
     // when both are set; with neither, the sync layer stays dormant and the
     // app runs pure-local. See src/lib/syncBackend.ts + cloudflare/README.md.
     NEXT_PUBLIC_SYNC_URL: process.env.NEXT_PUBLIC_SYNC_URL ?? '',
+    // Optional explicit backend pick ('http' | 'supabase' | a custom kind)
+    // for builds where several are configured.
+    NEXT_PUBLIC_SYNC_BACKEND: process.env.NEXT_PUBLIC_SYNC_BACKEND ?? '',
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? '',

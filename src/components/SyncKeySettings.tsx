@@ -9,11 +9,12 @@ import {
   clearSyncKey,
   getStoredSyncKey,
   setSyncKey,
-} from '@/lib/backends/workerBackend';
+} from '@/lib/backends/httpBackend';
 import { generateSyncKey, isValidSyncKey, maskSyncKey } from '@/lib/syncKey';
 
 /**
- * "Sync across devices" card for the Cloudflare Worker backend. No email,
+ * "Sync across devices" card for the HTTP sync backend (Cloudflare Worker
+ * or any server speaking the protocol — docs/sync-protocol.md). No email,
  * no accounts: the device holds a random sync key, and entering the same
  * key on another device links the two. The app stays fully usable without
  * a key; nothing here gates the rest of the experience.

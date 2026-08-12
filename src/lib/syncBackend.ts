@@ -1,22 +1,42 @@
 /**
- * Pluggable cloud-sync backend contract.
+ * Pluggable cloud-sync backend contract + provider registry.
  *
  * The sync engine (src/lib/sync.ts) owns the queue/drain/merge machinery
- * and speaks to the cloud only through this interface. Two backends exist:
+ * and speaks to the cloud only through the SyncBackend interface. Which
+ * backend a build uses is decided by walking the provider registry —
+ * first configured provider wins, or `NEXT_PUBLIC_SYNC_BACKEND` names one
+ * explicitly when several are configured.
  *
- *   • "worker"   — a tiny Cloudflare Worker + D1 database (cloudflare/),
- *                  authenticated by a locally-stored sync key. Free tier,
- *                  and Cloudflare never pauses or deletes inactive
- *                  Workers/D1 databases. Selected when
- *                  NEXT_PUBLIC_SYNC_URL is set at build time.
+ * Built-in providers (registered below, in priority order):
+ *
+ *   • "http"     — any server speaking the quizmill sync protocol
+ *                  (docs/sync-protocol.md): two endpoints + bearer
+ *                  sync-key auth. The Cloudflare Worker in cloudflare/
+ *                  is the reference implementation (free tier, never
+ *                  paused/deleted for inactivity), but anything that
+ *                  implements the protocol works — roll your own in
+ *                  express/Deno/PHP/… Selected by NEXT_PUBLIC_SYNC_URL.
  *   • "supabase" — the original Supabase mirror (email-OTP auth, RLS).
- *                  Selected when the NEXT_PUBLIC_SUPABASE_* vars are set.
+ *                  Selected by the NEXT_PUBLIC_SUPABASE_* pair.
  *
- * When both are configured the worker wins (it's the recommended path);
- * when neither is, sync stays dormant and the app is pure-local.
+ * Rolling your own CLIENT backend (different transport, e2e encryption,
+ * WebDAV, …): implement SyncBackend, call registerSyncBackendProvider()
+ * from module scope before the app mounts (e.g. in a module imported by
+ * SyncBootstrap), and register a Settings card for its sign-in UI with
+ * registerSyncSettingsCard (src/components/SyncSettings.tsx). For
+ * one-off, serverless transfer between devices there's also the file
+ * export/import path (src/lib/transfer.ts) — same data contract, no
+ * backend needed.
+ *
+ * With no provider configured, sync stays dormant and the app is
+ * pure-local.
  */
 import type { Attempt, Session } from '@/data/types';
 import type { EarnedAchievement, QuestionVote } from './storage';
+// The impl modules import only *types* from this file, so these imports
+// don't create a runtime cycle.
+import { httpBackend } from './backends/httpBackend';
+import { supabaseBackend } from './backends/supabaseBackend';
 
 // ── Queue ops (produced by the engine, executed by a backend) ───────────
 
@@ -44,41 +64,82 @@ export interface SyncBackend {
   getUserId(): Promise<string | null>;
   /** Subscribe to sign-in/sign-out. May fire immediately on subscribe. */
   onAuthChange(cb: (userId: string | null) => void): void;
-  /** Execute one queued op. Throws on (retryable) failure. */
+  /** Execute one queued op. Throws on a (retryable) failure. */
   runOp(op: QueueOp, userId: string): Promise<void>;
   /** Fetch every remote row for this user + pack. */
   pullAll(userId: string): Promise<RemoteData>;
 }
 
-// ── Backend selection (decided at build time by env vars) ───────────────
+// ── Provider registry ───────────────────────────────────────────────────
 
-export type SyncBackendKind = 'worker' | 'supabase' | null;
-
-/** Which backend this build is wired to, if any. */
-export function syncBackendKind(): SyncBackendKind {
-  if (process.env.NEXT_PUBLIC_SYNC_URL) return 'worker';
-  if (
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-  ) {
-    return 'supabase';
-  }
-  return null;
+export interface SyncBackendProvider {
+  /** Registry key — also what NEXT_PUBLIC_SYNC_BACKEND matches against. */
+  kind: string;
+  /** Whether this build's environment configures the backend. */
+  isConfigured(): boolean;
+  /** Build the backend. Called at most once; the instance is cached. */
+  create(): SyncBackend;
 }
 
-// The impl modules import only *types* from this file, so these imports
-// don't create a runtime cycle.
-import { supabaseBackend } from './backends/supabaseBackend';
-import { workerBackend } from './backends/workerBackend';
+const providers: (SyncBackendProvider & { instance?: SyncBackend })[] = [];
 
-/** The configured backend, or null when sync isn't configured. */
+/**
+ * Register a provider. Later registrations lose to earlier ones when
+ * several are configured, so custom providers pass `prepend: true` (or
+ * name themselves in NEXT_PUBLIC_SYNC_BACKEND) to beat the built-ins.
+ * Call from module scope, before the app mounts/startSync runs.
+ */
+export function registerSyncBackendProvider(
+  provider: SyncBackendProvider,
+  opts?: { prepend?: boolean },
+): void {
+  if (providers.some((p) => p.kind === provider.kind)) {
+    throw new Error(`sync backend "${provider.kind}" is already registered`);
+  }
+  if (opts?.prepend) providers.unshift(provider);
+  else providers.push(provider);
+}
+
+function activeProvider(): (SyncBackendProvider & { instance?: SyncBackend }) | null {
+  // Explicit pick — for builds with several backends configured, or a
+  // custom provider that shouldn't rely on registration order.
+  const forced = process.env.NEXT_PUBLIC_SYNC_BACKEND;
+  if (forced) {
+    const p = providers.find((x) => x.kind === forced);
+    // A forced-but-unconfigured backend stays dormant (misconfiguration
+    // shows up as "sync off", never as a silent fallback to another store).
+    return p && p.isConfigured() ? p : null;
+  }
+  return providers.find((p) => p.isConfigured()) ?? null;
+}
+
+/** The kind of backend this build is wired to, or null when sync is off. */
+export function syncBackendKind(): string | null {
+  return activeProvider()?.kind ?? null;
+}
+
+/** The configured backend (cached instance), or null when sync is off. */
 export function getSyncBackend(): SyncBackend | null {
-  switch (syncBackendKind()) {
-    case 'worker':
-      return workerBackend;
-    case 'supabase':
-      return supabaseBackend;
-    default:
-      return null;
-  }
+  const p = activeProvider();
+  if (!p) return null;
+  p.instance ??= p.create();
+  return p.instance;
 }
+
+// ── Built-ins ───────────────────────────────────────────────────────────
+
+registerSyncBackendProvider({
+  kind: 'http',
+  isConfigured: () => Boolean(process.env.NEXT_PUBLIC_SYNC_URL),
+  create: () => httpBackend,
+});
+
+registerSyncBackendProvider({
+  kind: 'supabase',
+  isConfigured: () =>
+    Boolean(
+      process.env.NEXT_PUBLIC_SUPABASE_URL &&
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    ),
+  create: () => supabaseBackend,
+});

@@ -5,7 +5,7 @@
  * engine's vitest suite (tests/worker-sync.test.ts). The worker entry
  * (worker.ts) binds the statements produced here to the D1 database.
  *
- * Wire protocol — mirrored by src/lib/backends/workerBackend.ts:
+ * Wire protocol — mirrored by src/lib/backends/httpBackend.ts:
  *   POST /v1/ops   { pack, ops: WireOp[] }   apply idempotent mutations
  *   GET  /v1/rows?pack=…                     pull every row for user+pack
  *

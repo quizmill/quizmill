@@ -9,26 +9,35 @@ import {
   isOtpLongEnough,
   sanitiseOtpInput,
 } from '@/lib/otp';
+import { type ComponentType } from 'react';
 import { SYNC_CONFIGURED, authRedirectUrl, getSupabase } from '@/lib/supabase';
 import { syncBackendKind } from '@/lib/syncBackend';
 import { SyncKeySettings } from '@/components/SyncKeySettings';
 import { SyncStatusLine } from '@/components/SyncStatusLine';
 
+// Each backend brings its own sign-in UI, registered by kind. Custom
+// backend providers (see registerSyncBackendProvider in
+// src/lib/syncBackend.ts) register their card here the same way.
+const settingsCards: Record<string, ComponentType> = {
+  http: SyncKeySettings,
+  supabase: SupabaseSyncSettings,
+};
+
+/** Register the Settings card for a custom sync backend kind. Call from
+ *  module scope alongside registerSyncBackendProvider. */
+export function registerSyncSettingsCard(kind: string, card: ComponentType): void {
+  settingsCards[kind] = card;
+}
+
 /**
- * "Sync across devices" card for the Settings page — dispatches to the card
- * matching the backend this build is wired to (see src/lib/syncBackend.ts):
- * sync-key auth for the Cloudflare Worker, email OTP for Supabase, nothing
- * when sync isn't configured.
+ * "Sync across devices" card for the Settings page — renders the card
+ * registered for whichever backend this build is wired to (see
+ * src/lib/syncBackend.ts), or nothing when sync isn't configured.
  */
 export function SyncSettings() {
-  switch (syncBackendKind()) {
-    case 'worker':
-      return <SyncKeySettings />;
-    case 'supabase':
-      return <SupabaseSyncSettings />;
-    default:
-      return null;
-  }
+  const kind = syncBackendKind();
+  const Card = kind ? settingsCards[kind] : undefined;
+  return Card ? <Card /> : null;
 }
 
 /**

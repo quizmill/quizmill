@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Attempt, Session } from '../src/data/types';
-import { toWireOp } from '../src/lib/backends/workerBackend';
+import { toWireOp } from '../src/lib/backends/httpBackend';
 import { hashSyncKey, generateSyncKey } from '../src/lib/syncKey';
 import {
   parseOp,

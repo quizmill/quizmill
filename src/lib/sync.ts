@@ -300,6 +300,18 @@ async function handleSignedIn(user_id: string): Promise<void> {
   void drain();
 }
 
+/**
+ * Re-enqueue everything local as idempotent upserts and drain. No-op when
+ * signed out. Used after a file import (src/lib/transfer.ts): imported rows
+ * arrive via mergeRemote, which deliberately doesn't emit mutations — but
+ * from the cloud's perspective they ARE new local writes and must go up.
+ */
+export function pushAllToCloud(): void {
+  if (!uid) return;
+  pushAllLocal();
+  void drain();
+}
+
 // ── Public entry point ───────────────────────────────────────────────────
 
 /** Start the sync engine. Idempotent; no-op when sync isn't configured or

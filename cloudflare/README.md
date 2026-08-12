@@ -61,6 +61,10 @@ data is still on the devices; creating a new key re-uploads it).
 
 ## API
 
+This worker is the **reference implementation** of the quizmill HTTP
+sync protocol — the full wire spec (for implementing your own server in
+any language) lives in `docs/sync-protocol.md`.
+
 | Route | Auth | Purpose |
 | --- | --- | --- |
 | `GET /` | none | liveness probe |
@@ -70,5 +74,5 @@ data is still on the devices; creating a new key re-uploads it).
 Rows are opaque JSON keyed by `(user_id, pack_id, tbl, id)` — the worker
 never interprets them; merge semantics live in the client
 (`src/lib/storage.ts` `mergeRemote`). The client half of the protocol is
-`src/lib/backends/workerBackend.ts`; the validation/SQL rules are pure and
+`src/lib/backends/httpBackend.ts`; the validation/SQL rules are pure and
 unit-tested (`tests/worker-sync.test.ts`).

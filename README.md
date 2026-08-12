@@ -194,7 +194,16 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 Note that Supabase pauses free-tier projects after ~a week of
 inactivity (and eventually deletes them) — fine for daily-driver apps,
 frustrating for occasional ones. If both backends are configured,
-`NEXT_PUBLIC_SYNC_URL` wins.
+`NEXT_PUBLIC_SYNC_URL` wins (or set `NEXT_PUBLIC_SYNC_BACKEND` to pick
+explicitly).
+
+**Roll your own, or no server at all.** The backend layer is pluggable
+(`docs/sync-protocol.md`): `NEXT_PUBLIC_SYNC_URL` speaks a tiny
+two-endpoint protocol any server can implement — the Cloudflare Worker
+is just the reference implementation — and entirely custom client
+backends register in code via `registerSyncBackendProvider`. Without
+any backend, Settings → "Backup & transfer" exports/imports progress
+as a JSON file for device moves and offline backups.
 
 ## Upgrading
 
