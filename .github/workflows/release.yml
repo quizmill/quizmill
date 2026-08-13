@@ -129,6 +129,14 @@ jobs:
       # pack repos. The exact version rides in the payload so each pack pins
       # it and waits out npm propagation (see deploy-pack.yml). Missing token
       # → skip with a notice; the packs' daily cron still picks it up.
+      #
+      # Per-repo failures are WARNINGS, not errors. This step runs after the
+      # release is fully made (npm published, tag pushed), and Deploy apps
+      # only fires when this job SUCCEEDS — so letting one unreachable repo
+      # fail the job used to cancel the demo/showcase rollout for a release
+      # that had already shipped (v0.3.13/v0.3.14: the PAT hadn't been
+      # granted the newer pack-claude-cert-pro repo, 403 → whole job red).
+      # A repo that misses its dispatch still rebuilds on its daily cron.
       - name: Fan out engine-update to pack repos
         if: steps.version.outputs.version != ''
         env:
@@ -139,9 +147,14 @@ jobs:
             echo "::notice::PACK_DISPATCH_TOKEN not set — skipping fan-out (packs will rebuild on their daily cron)."
             exit 0
           fi
+          failed=0
           for repo in quizmill/pack-claude-cert quizmill/pack-claude-cert-pro quizmill/pack-eleven-plus; do
             echo "Dispatching engine-update (${VERSION#v}) to $repo"
-            jq -nc --arg v "${VERSION#v}" \
+            if ! jq -nc --arg v "${VERSION#v}" \
               '{event_type:"engine-update",client_payload:{version:$v}}' \
-              | gh api -X POST "/repos/$repo/dispatches" --input -
+              | gh api -X POST "/repos/$repo/dispatches" --input -; then
+              echo "::warning::Dispatch to $repo failed (is PACK_DISPATCH_TOKEN granted access to it?) — it will rebuild on its daily cron instead."
+              failed=$((failed + 1))
+            fi
           done
+          echo "Fan-out done ($failed failure(s) tolerated)."
