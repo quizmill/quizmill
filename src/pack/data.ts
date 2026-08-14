@@ -111,6 +111,10 @@ export type PackQuestion = {
   sourceRef?: string;
   reviewStatus: 'draft' | 'reviewed' | 'approved';
   tags?: string[];
+  /** Set on questions generated from a learner's note — the question the
+   *  note was left on + the note text. Soft reference; the original may
+   *  have left the pack. */
+  generatedFrom?: { questionId: string; note: string };
 };
 
 /** True when a question has two or more correct answers (select-all). */

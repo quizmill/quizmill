@@ -439,4 +439,32 @@ describe('validatePack', () => {
     (input.manifest as { games?: unknown }).games = { include: [] };
     expect(validatePack(input).ok).toBe(false);
   });
+
+  // The demo pack itself carries generatedFrom examples (demo-planets-012/013),
+  // so the "accepts the committed demo pack" test covers the happy path.
+  it('accepts a dangling generatedFrom reference (soft — original may be culled)', () => {
+    const input = loadDemo();
+    (input.questions as { generatedFrom?: unknown }[])[0].generatedFrom = {
+      questionId: 'question-that-left-the-pack',
+      note: 'more like this please',
+    };
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('rejects a malformed generatedFrom (empty note / missing questionId)', () => {
+    const empty = loadDemo();
+    (empty.questions as { generatedFrom?: unknown }[])[0].generatedFrom = {
+      questionId: 'demo-planets-001',
+      note: '',
+    };
+    expect(validatePack(empty).ok).toBe(false);
+
+    const missing = loadDemo();
+    (missing.questions as { generatedFrom?: unknown }[])[0].generatedFrom = {
+      note: 'no origin id',
+    };
+    expect(validatePack(missing).ok).toBe(false);
+  });
 });

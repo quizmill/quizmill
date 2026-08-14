@@ -252,6 +252,19 @@ export const packQuestionSchema = z
     sourceRef: z.string().optional(),
     reviewStatus: z.enum(['draft', 'reviewed', 'approved']),
     tags: z.array(z.string()).optional(),
+    /** Provenance for a question generated from a learner's study note
+     *  (the generate-questions-from-notes skill): the question the note
+     *  was left on plus the note text at generation time. The app shows
+     *  it in the answer panel and counts follow-ups on the Notes page.
+     *  Deliberately a SOFT reference — the original question may later
+     *  leave the pack, so it is not cross-validated (additive; valid for
+     *  v1 and v2 packs). */
+    generatedFrom: z
+      .object({
+        questionId: z.string().min(1),
+        note: z.string().min(1),
+      })
+      .optional(),
   })
   .superRefine((q, ctx) => {
     const keys = q.options.map((o) => o.key);

@@ -185,6 +185,10 @@ function handleMutation(m: Mutation): void {
       return 'op' in m
         ? enqueue({ t: 'votes', op: 'delete', questionId: m.questionId })
         : enqueue({ t: 'votes', op: 'upsert', row: m.row });
+    case 'notes':
+      return 'op' in m
+        ? enqueue({ t: 'notes', op: 'delete', questionId: m.questionId })
+        : enqueue({ t: 'notes', op: 'upsert', row: m.row });
     case 'clear-all':
       return enqueue({ t: 'clear-all', op: 'delete' });
     case 'clear-sessions':
@@ -277,6 +281,7 @@ function pushAllLocal(): void {
       .loadAchievements()
       .map((row) => ({ t: 'achievements', op: 'upsert', row }) as QueueOp),
     ...storage.loadVotes().map((row) => ({ t: 'votes', op: 'upsert', row }) as QueueOp),
+    ...storage.loadNotes().map((row) => ({ t: 'notes', op: 'upsert', row }) as QueueOp),
   ];
   enqueue(...ops);
 }

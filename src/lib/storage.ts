@@ -21,6 +21,7 @@ export const SESSIONS_KEY = `${KEY_PREFIX}sessions.v1`;
 export const ATTEMPTS_KEY = `${KEY_PREFIX}attempts.v1`;
 const ACHIEVEMENTS_KEY = `${KEY_PREFIX}achievements.v1`;
 const VOTES_KEY = `${KEY_PREFIX}votes.v1`;
+const NOTES_KEY = `${KEY_PREFIX}notes.v1`;
 const PREFS_KEY = `${KEY_PREFIX}prefs.v1`;
 const SCRATCHPAD_KEY = `${KEY_PREFIX}scratchpad.v1`;
 
@@ -32,6 +33,18 @@ export interface QuestionVote {
   /** Optional reason — only ever set for downvotes. */
   comment?: string;
   votedAt: number; // unix ms
+}
+
+/**
+ * A free-text note the learner attached to a question — "review this
+ * later", "I want to go deeper on X". Unlike a downvote comment (feedback
+ * about question *quality*), a note is about the learner's own study plan,
+ * and it feeds the "generate more questions from my notes" workflow.
+ */
+export interface QuestionNote {
+  questionId: string;
+  text: string;
+  updatedAt: number; // unix ms — last edit, used for last-write-wins merge
 }
 
 export interface EarnedAchievement {
@@ -56,6 +69,8 @@ export type Mutation =
   | { table: 'achievements'; row: EarnedAchievement }
   | { table: 'votes'; row: QuestionVote }
   | { table: 'votes'; op: 'delete'; questionId: string }
+  | { table: 'notes'; row: QuestionNote }
+  | { table: 'notes'; op: 'delete'; questionId: string }
   | { table: 'clear-all' }
   | { table: 'clear-sessions'; op: 'delete'; sessionIds: string[] };
 
@@ -347,11 +362,53 @@ export function getVote(questionId: string): QuestionVote | undefined {
   return loadVotes().find((v) => v.questionId === questionId);
 }
 
+// ---- question notes ----
+
+export function loadNotes(): QuestionNote[] {
+  return readJson<QuestionNote[]>(NOTES_KEY, []);
+}
+
+export function saveNotes(notes: QuestionNote[]): void {
+  writeJson(NOTES_KEY, notes);
+}
+
+/**
+ * Upsert the note on a question (one note per question — editing replaces
+ * it and refreshes `updatedAt`). Pass empty/whitespace text (or null) to
+ * delete the note.
+ */
+export function recordNote(
+  questionId: string,
+  text: string | null,
+  now: number = Date.now(),
+): void {
+  const all = loadNotes();
+  const idx = all.findIndex((n) => n.questionId === questionId);
+  const trimmed = text?.trim() ?? '';
+  if (trimmed === '') {
+    if (idx >= 0) {
+      all.splice(idx, 1);
+      saveNotes(all);
+      notify({ table: 'notes', op: 'delete', questionId });
+    }
+    return;
+  }
+  const entry: QuestionNote = { questionId, text: trimmed, updatedAt: now };
+  if (idx >= 0) all[idx] = entry;
+  else all.push(entry);
+  saveNotes(all);
+  notify({ table: 'notes', row: entry });
+}
+
+export function getNote(questionId: string): QuestionNote | undefined {
+  return loadNotes().find((n) => n.questionId === questionId);
+}
+
 // ---- bulk ops ----
 
 /**
- * Wipe ALL stored sessions, attempts, achievements, and votes for the
- * active pack. Use with care.
+ * Wipe ALL stored sessions, attempts, achievements, votes, and notes for
+ * the active pack. Use with care.
  */
 export function clearAll(): void {
   if (!browser()) return;
@@ -359,6 +416,7 @@ export function clearAll(): void {
   window.localStorage.removeItem(ATTEMPTS_KEY);
   window.localStorage.removeItem(ACHIEVEMENTS_KEY);
   window.localStorage.removeItem(VOTES_KEY);
+  window.localStorage.removeItem(NOTES_KEY);
   window.localStorage.removeItem(PREFS_KEY);
   window.localStorage.removeItem(SCRATCHPAD_KEY);
   notify({ table: 'clear-all' });
@@ -409,6 +467,7 @@ export function mergeRemote(remote: {
   attempts?: Attempt[];
   achievements?: EarnedAchievement[];
   votes?: QuestionVote[];
+  notes?: QuestionNote[];
 }): boolean {
   if (!browser()) return false;
   let changed = false;
@@ -471,6 +530,22 @@ export function mergeRemote(remote: {
     }
     if (votesChanged) {
       saveVotes([...byQ.values()]);
+      changed = true;
+    }
+  }
+
+  if (remote.notes?.length) {
+    const byQ = new Map(loadNotes().map((n) => [n.questionId, n]));
+    let notesChanged = false;
+    for (const r of remote.notes) {
+      const local = byQ.get(r.questionId);
+      if (!local || r.updatedAt >= local.updatedAt) {
+        byQ.set(r.questionId, r);
+        notesChanged = true;
+      }
+    }
+    if (notesChanged) {
+      saveNotes([...byQ.values()]);
       changed = true;
     }
   }

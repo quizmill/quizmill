@@ -1,8 +1,8 @@
 /**
  * Progress export/import — move local progress between devices as a file.
  *
- * A snapshot is a single JSON file carrying the four synced tables
- * (sessions, attempts, achievements, votes) for ONE pack, stamped with a
+ * A snapshot is a single JSON file carrying the five synced tables
+ * (sessions, attempts, achievements, votes, notes) for ONE pack, stamped with a
  * format marker + version so future builds can keep reading old files.
  * Import merges via storage.mergeRemote — the same last-write-wins rules
  * as a cloud pull — so importing is idempotent and never loses newer
@@ -16,10 +16,12 @@ import { APP_CONFIG } from '@/config';
 import {
   loadAchievements,
   loadAttempts,
+  loadNotes,
   loadSessions,
   loadVotes,
   mergeRemote,
   type EarnedAchievement,
+  type QuestionNote,
   type QuestionVote,
 } from './storage';
 
@@ -36,6 +38,8 @@ export interface ProgressSnapshot {
   attempts: Attempt[];
   achievements: EarnedAchievement[];
   votes: QuestionVote[];
+  /** Added post-v1; absent in older files, so always optional on read. */
+  notes?: QuestionNote[];
 }
 
 export type TransferErrorCode =
@@ -97,6 +101,15 @@ function isVote(v: unknown): v is QuestionVote {
   );
 }
 
+function isNote(v: unknown): v is QuestionNote {
+  return (
+    isRecord(v) &&
+    typeof v.questionId === 'string' &&
+    typeof v.text === 'string' &&
+    typeof v.updatedAt === 'number'
+  );
+}
+
 function rows<T>(v: unknown, guard: (row: unknown) => row is T): T[] {
   return Array.isArray(v) ? v.filter(guard) : [];
 }
@@ -115,6 +128,7 @@ export function buildSnapshot(now: number = Date.now()): ProgressSnapshot {
     attempts: loadAttempts(),
     achievements: loadAchievements(),
     votes: loadVotes(),
+    notes: loadNotes(),
   };
 }
 
@@ -213,6 +227,7 @@ export function parseSnapshot(
     attempts: rows(raw.attempts, isAttempt),
     achievements: rows(raw.achievements, isAchievement),
     votes: rows(raw.votes, isVote),
+    notes: rows(raw.notes, isNote),
   };
 }
 
@@ -224,6 +239,7 @@ export interface ImportResult {
     attempts: number;
     achievements: number;
     votes: number;
+    notes: number;
   };
 }
 
@@ -237,6 +253,7 @@ export function applySnapshot(snapshot: ProgressSnapshot): ImportResult {
     attempts: loadAttempts(),
     achievements: loadAchievements(),
     votes: loadVotes(),
+    notes: loadNotes(),
   });
   const before = tables();
 
@@ -245,6 +262,7 @@ export function applySnapshot(snapshot: ProgressSnapshot): ImportResult {
     attempts: snapshot.attempts,
     achievements: snapshot.achievements,
     votes: snapshot.votes,
+    notes: snapshot.notes,
   });
 
   const after = tables();
@@ -255,6 +273,7 @@ export function applySnapshot(snapshot: ProgressSnapshot): ImportResult {
       attempts: after.attempts.length - before.attempts.length,
       achievements: after.achievements.length - before.achievements.length,
       votes: after.votes.length - before.votes.length,
+      notes: after.notes.length - before.notes.length,
     },
   };
 }

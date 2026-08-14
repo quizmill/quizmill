@@ -32,7 +32,7 @@
  * pure-local.
  */
 import type { Attempt, Session } from '@/data/types';
-import type { EarnedAchievement, QuestionVote } from './storage';
+import type { EarnedAchievement, QuestionNote, QuestionVote } from './storage';
 // The impl modules import only *types* from this file, so these imports
 // don't create a runtime cycle.
 import { httpBackend } from './backends/httpBackend';
@@ -46,6 +46,8 @@ export type QueueOp =
   | { t: 'achievements'; op: 'upsert'; row: EarnedAchievement }
   | { t: 'votes'; op: 'upsert'; row: QuestionVote }
   | { t: 'votes'; op: 'delete'; questionId: string }
+  | { t: 'notes'; op: 'upsert'; row: QuestionNote }
+  | { t: 'notes'; op: 'delete'; questionId: string }
   | { t: 'clear-all'; op: 'delete' }
   | { t: 'clear-sessions'; op: 'delete'; sessionIds: string[] };
 
@@ -55,6 +57,7 @@ export interface RemoteData {
   attempts: Attempt[];
   achievements: EarnedAchievement[];
   votes: QuestionVote[];
+  notes: QuestionNote[];
 }
 
 export interface SyncBackend {

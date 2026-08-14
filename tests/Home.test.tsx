@@ -61,7 +61,7 @@ function categoryStatLine(label: string): string {
 
 describe('PackHome category stats', () => {
   it('counts only attempts within the active level filter', async () => {
-    // Demo pack: planets has 4 basics + 7 advanced questions. One attempt in
+    // Demo pack: planets has 6 basics + 7 advanced questions. One attempt in
     // each band; with the Basics filter on, only the basics attempt counts —
     // the answered numerator must use the same filter as the available
     // denominator (regression: it showed e.g. "74/16 answered").
@@ -76,7 +76,7 @@ describe('PackHome category stats', () => {
 
     await render();
 
-    expect(categoryStatLine('Planets & Moons')).toContain('1/4 answered');
+    expect(categoryStatLine('Planets & Moons')).toContain('1/6 answered');
   });
 
   it('counts all attempts when no level filter is active', async () => {
@@ -90,7 +90,7 @@ describe('PackHome category stats', () => {
 
     await render();
 
-    expect(categoryStatLine('Planets & Moons')).toContain('2/11 answered');
+    expect(categoryStatLine('Planets & Moons')).toContain('2/13 answered');
   });
 
   it('counts a re-answered question once, not per attempt (regression: "8/4")', async () => {
@@ -108,7 +108,7 @@ describe('PackHome category stats', () => {
 
     const line = categoryStatLine('Planets & Moons');
     // One distinct question answered, not two attempts.
-    expect(line).toContain('1/11 answered');
+    expect(line).toContain('1/13 answered');
     // Accuracy reflects the latest cold look (rescued → correct), and can
     // never read above 100%.
     expect(line).toContain('100% accuracy');

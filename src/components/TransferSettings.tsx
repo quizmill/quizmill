@@ -61,6 +61,7 @@ export function TransferSettings() {
           added.attempts > 0 ? `${added.attempts} answer(s)` : null,
           added.achievements > 0 ? `${added.achievements} sticker(s)` : null,
           added.votes > 0 ? `${added.votes} vote(s)` : null,
+          added.notes > 0 ? `${added.notes} note(s)` : null,
         ].filter(Boolean);
         setNotice({
           kind: 'ok',

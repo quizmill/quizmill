@@ -110,6 +110,23 @@ function rowToVote(r: Record<string, unknown>): storage.QuestionVote {
   };
 }
 
+function noteToRow(n: storage.QuestionNote, user_id: string) {
+  return {
+    user_id,
+    pack_id: PACK_ID,
+    question_id: n.questionId,
+    text: n.text,
+    updated_at: new Date(n.updatedAt).toISOString(),
+  };
+}
+function rowToNote(r: Record<string, unknown>): storage.QuestionNote {
+  return {
+    questionId: r.question_id as string,
+    text: r.text as string,
+    updatedAt: Date.parse(r.updated_at as string),
+  };
+}
+
 // ── SyncBackend impl ────────────────────────────────────────────────────
 
 export const supabaseBackend: SyncBackend = {
@@ -176,10 +193,27 @@ export const supabaseBackend: SyncBackend = {
         if (error) throw error;
         return;
       }
+      case 'notes': {
+        if (op.op === 'delete') {
+          const { error } = await sb
+            .from('notes')
+            .delete()
+            .eq('user_id', user_id)
+            .eq('pack_id', PACK_ID)
+            .eq('question_id', op.questionId);
+          if (error) throw error;
+          return;
+        }
+        const { error } = await sb
+          .from('notes')
+          .upsert(noteToRow(op.row, user_id), { onConflict: 'user_id,pack_id,question_id' });
+        if (error) throw error;
+        return;
+      }
       case 'clear-all': {
         // Pack-scoped: clearing history in one pack must not wipe the user's
         // rows for the other packs sharing this project.
-        for (const table of ['sessions', 'attempts', 'achievements', 'votes']) {
+        for (const table of ['sessions', 'attempts', 'achievements', 'votes', 'notes']) {
           const { error } = await sb
             .from(table)
             .delete()
@@ -212,17 +246,19 @@ export const supabaseBackend: SyncBackend = {
   async pullAll(user_id: string): Promise<RemoteData> {
     const sb = getSupabase();
     if (!sb) throw new Error('supabase client unavailable');
-    const [sessions, attempts, achievements, votes] = await Promise.all([
+    const [sessions, attempts, achievements, votes, notes] = await Promise.all([
       sb.from('sessions').select('*').eq('user_id', user_id).eq('pack_id', PACK_ID),
       sb.from('attempts').select('*').eq('user_id', user_id).eq('pack_id', PACK_ID),
       sb.from('achievements').select('*').eq('user_id', user_id).eq('pack_id', PACK_ID),
       sb.from('votes').select('*').eq('user_id', user_id).eq('pack_id', PACK_ID),
+      sb.from('notes').select('*').eq('user_id', user_id).eq('pack_id', PACK_ID),
     ]);
     return {
       sessions: (sessions.data ?? []).map(rowToSession),
       attempts: (attempts.data ?? []).map(rowToAttempt),
       achievements: (achievements.data ?? []).map(rowToAchievement),
       votes: (votes.data ?? []).map(rowToVote),
+      notes: (notes.data ?? []).map(rowToNote),
     };
   },
 };

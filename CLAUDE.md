@@ -51,6 +51,12 @@ webmanifest are generated from the manifest by `scripts/pack-assets.ts`
   StickersPage + achievements{,-engine}.ts (sticker cabinet; mastery
   stickers generated per pack category), ProgressPage (CSS-only charts
   over `src/lib/stats.ts`), DownvoteBrowser (Settings extra),
+  NotesPage (`/notes`: per-question study notes left via NoteRow in the
+  answer panel; synced like votes and included in the progress export.
+  The `generate-questions-from-notes` skill pulls them from the sync
+  backend and authors follow-up questions stamped with the optional
+  `generatedFrom {questionId, note}` schema field — shown as a NoteOrigin
+  chip in the answer panel, counted as follow-ups on the note cards),
   GamesPage + games/ (reward mini-games — see below).
   InstallPrompt (`src/components/`) covers Add-to-Home-Screen.
 - Reward mini-games (opt-in): a pack adds a `games` block to its manifest
