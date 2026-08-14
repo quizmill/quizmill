@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { NotebookPen } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useQuestionNotes } from '@/lib/useStorage';
@@ -16,48 +16,33 @@ const NOTE_SAVE_DEBOUNCE_MS = 600;
  * questions on this topic". Sits in the answer-feedback panel under the
  * vote row. Collapsed to a small "Add a note" button until tapped (or a
  * note already exists); the textarea saves with a short debounce, and
- * clearing the text deletes the note. Notes are browsable (and exportable
- * for AI question generation) on the /notes page.
+ * clearing the text deletes the note. Notes are browsable on /notes and
+ * feed the generate-questions-from-notes agent skill.
+ *
+ * State model: the stored note is the source of truth; `draft` (null =
+ * not editing) overlays it while typing. Everything else derives at
+ * render, so there's no state-syncing effect. Callers key this row by
+ * question id so drafts reset when the question advances.
  */
 export function NoteRow({ questionId }: NoteRowProps) {
   const { notes, setNote } = useQuestionNotes();
   const existing = notes.get(questionId);
-  const [open, setOpen] = useState(false);
-  const [text, setText] = useState('');
+  const [draft, setDraft] = useState<string | null>(null);
+  const [opened, setOpened] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // The hook's list loads async (after mount) and refreshes on storage
-  // events; only adopt storage state until the user starts editing here.
-  const dirtyRef = useRef(false);
 
-  // Reset when the row is reused for another question (this effect must run
-  // before the adoption effect below, so it can't clobber an adopted note on
-  // the same render pass).
-  useEffect(() => {
-    dirtyRef.current = false;
-    setOpen(false);
-    setText('');
-  }, [questionId]);
-
-  useEffect(() => {
-    if (dirtyRef.current) return;
-    if (existing) {
-      setText(existing.text);
-      setOpen(true);
-    }
-  }, [existing]);
-
-  function flush(value: string) {
-    setNote(questionId, value);
-    setSavedFlash(true);
-    setTimeout(() => setSavedFlash(false), 800);
-  }
+  const open = opened || draft !== null || existing !== undefined;
+  const text = draft ?? existing?.text ?? '';
 
   function handleChange(value: string) {
-    dirtyRef.current = true;
-    setText(value);
+    setDraft(value);
     if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
-    flushTimerRef.current = setTimeout(() => flush(value), NOTE_SAVE_DEBOUNCE_MS);
+    flushTimerRef.current = setTimeout(() => {
+      setNote(questionId, value);
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 800);
+    }, NOTE_SAVE_DEBOUNCE_MS);
   }
 
   if (!open) {
@@ -65,7 +50,7 @@ export function NoteRow({ questionId }: NoteRowProps) {
       <button
         type="button"
         data-testid="note-toggle"
-        onClick={() => setOpen(true)}
+        onClick={() => setOpened(true)}
         className="tap-feedback inline-flex items-center gap-1.5 self-start rounded-full border border-ink-200 bg-surface px-3 py-1.5 text-sm font-medium text-ink-600 hover:border-brand-500/40"
       >
         <NotebookPen className="h-4 w-4" />

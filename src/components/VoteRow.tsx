@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { ThumbsDown, ThumbsUp } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useQuestionVotes } from '@/lib/useStorage';
@@ -20,19 +20,19 @@ const COMMENT_SAVE_DEBOUNCE_MS = 600;
  * Captured locally for now; the Developer panel in Settings surfaces
  * the count so a parent can review the curated list before any teacher
  * review pass.
+ *
+ * State model: the stored vote is the source of truth; `draft` (null =
+ * not editing) overlays the comment while typing, so no state-syncing
+ * effect is needed. Callers key this row by question id.
  */
 export function VoteRow({ questionId }: VoteRowProps) {
   const { votes, setVote } = useQuestionVotes();
   const existing = votes.get(questionId);
-  const [comment, setComment] = useState<string>(existing?.comment ?? '');
+  const [draft, setDraft] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState<boolean>(false);
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Keep local comment in sync if the storage changes from elsewhere
-  // (e.g. another tab clearing votes).
-  useEffect(() => {
-    setComment(existing?.comment ?? '');
-  }, [existing?.comment]);
+  const comment = draft ?? existing?.comment ?? '';
 
   function flushComment(text: string) {
     if (existing?.vote !== 'down') return;
@@ -42,7 +42,7 @@ export function VoteRow({ questionId }: VoteRowProps) {
   }
 
   function handleCommentChange(value: string) {
-    setComment(value);
+    setDraft(value);
     if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
     flushTimerRef.current = setTimeout(
       () => flushComment(value),
@@ -61,7 +61,7 @@ export function VoteRow({ questionId }: VoteRowProps) {
   function tapDown() {
     if (existing?.vote === 'down') {
       setVote(questionId, null);
-      setComment('');
+      setDraft(null);
       return;
     }
     // Preserve any comment we already have in local state.

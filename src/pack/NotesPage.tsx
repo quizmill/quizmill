@@ -2,40 +2,37 @@
 
 import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Copy, Check, Download, NotebookPen, Sparkles, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { ArrowLeft, NotebookPen, Sparkles, Trash2 } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
 import { useQuestionNotes } from '@/lib/useStorage';
 import { cn } from '@/lib/cn';
 import {
-  packManifest,
   packQuestions,
   PACK_CATEGORY_ICON,
   PACK_CATEGORY_LABEL,
 } from '@/pack/data';
-import {
-  buildNotesExport,
-  buildNotesPrompt,
-  notesExportFilename,
-} from '@/pack/notes-export';
 
 const NOTE_SAVE_DEBOUNCE_MS = 600;
 
 /**
  * One note in the list: the question it hangs on (category chip + prompt)
  * with the note text editable in place — same debounce-save behaviour as
- * the NoteRow in the answer panel — and a delete button.
+ * the NoteRow in the answer panel — a delete button, and a count of the
+ * follow-up questions already generated from it (questions whose
+ * `generatedFrom` points back at this note's question).
  */
 function NoteCard({
   questionId,
   initialText,
   updatedAt,
+  followUps,
   onSave,
   onDelete,
 }: {
   questionId: string;
   initialText: string;
   updatedAt: number;
+  followUps: number;
   onSave: (text: string) => void;
   onDelete: () => void;
 }) {
@@ -73,12 +70,23 @@ function NoteCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          {categoryLabel ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-ink-100 px-2 py-0.5 text-xs font-semibold text-ink-600">
-              <span aria-hidden>{icon}</span>
-              {categoryLabel}
-            </span>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {categoryLabel ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-ink-100 px-2 py-0.5 text-xs font-semibold text-ink-600">
+                <span aria-hidden>{icon}</span>
+                {categoryLabel}
+              </span>
+            ) : null}
+            {followUps > 0 ? (
+              <span
+                data-testid="note-followups"
+                className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700"
+              >
+                <Sparkles className="h-3 w-3" />
+                {followUps} follow-up {followUps === 1 ? 'question' : 'questions'} in the pack
+              </span>
+            ) : null}
+          </div>
           <p className="mt-1.5 line-clamp-3 text-sm text-ink-700">
             {question?.prompt ?? '(this question is no longer in the pack)'}
           </p>
@@ -110,52 +118,29 @@ function NoteCard({
 }
 
 /**
- * The learner's question notes in one place: review them, edit or delete,
- * and hand them to an AI to grind out MORE questions on exactly those
- * topics — either as a ready-to-paste prompt or as a JSON file for the
- * `generate-questions-from-notes` agent skill.
+ * The learner's question notes in one place: review, edit, delete — and
+ * the hand-off to an AI agent that turns them into new pack questions.
+ * No manual export: the agent reads notes straight from the sync backend
+ * (they're a synced table) via the generate-questions-from-notes skill,
+ * and every generated question links back to its note (`generatedFrom`),
+ * shown in the answer panel and counted on the note cards here.
  */
 export default function NotesPage() {
   const { notesList, setNote } = useQuestionNotes();
-  const [copied, setCopied] = useState(false);
   const sorted = useMemo(
     () => [...notesList].sort((a, b) => b.updatedAt - a.updatedAt),
     [notesList],
   );
-
-  function exportData() {
-    return buildNotesExport(
-      notesList,
-      packQuestions,
-      packManifest.categories,
-      { id: APP_CONFIG.packId, title: APP_CONFIG.title },
-    );
-  }
-
-  async function copyPrompt() {
-    try {
-      await navigator.clipboard.writeText(buildNotesPrompt(exportData()));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard can be unavailable (permissions, http); the download
-      // button right next to this one is the fallback.
+  // questionId (of the noted question) → how many pack questions were
+  // generated from a note on it.
+  const followUpCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const q of packQuestions) {
+      const from = q.generatedFrom?.questionId;
+      if (from) counts.set(from, (counts.get(from) ?? 0) + 1);
     }
-  }
-
-  function downloadJson() {
-    const data = exportData();
-    const url = URL.createObjectURL(
-      new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }),
-    );
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = notesExportFilename(data.packId, data.exportedAt);
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }
+    return counts;
+  }, []);
 
   return (
     <main className="flex flex-col gap-6">
@@ -197,37 +182,28 @@ export default function NotesPage() {
         <>
           <section
             data-testid="notes-generate-card"
-            className="flex flex-col gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-4"
+            className="flex flex-col gap-2 rounded-2xl border border-brand-500/30 bg-brand-50 p-4"
           >
             <div className="flex items-center gap-2 text-base font-semibold text-ink-900">
               <Sparkles className="h-5 w-5 text-brand-600" />
               Get more questions on these topics
             </div>
             <p className="text-sm leading-relaxed text-ink-600">
-              Hand your notes to an AI and it can write new practice questions
-              that follow up on exactly what you flagged. Copy the ready-made
-              prompt into any chat assistant — or download the notes file and
-              give it to an agent with this app&rsquo;s{' '}
+              Tell your AI agent:{' '}
+              <em>&ldquo;generate questions based on my notes&rdquo;</em>. With
+              this app&rsquo;s{' '}
               <code className="rounded bg-ink-100 px-1 py-0.5 text-xs">
                 generate-questions-from-notes
               </code>{' '}
-              skill to grow the pack itself.
+              skill it reads your notes for{' '}
+              <span className="font-semibold">{APP_CONFIG.title}</span> straight
+              from your sync backend and adds new draft questions to the pack —
+              each one labelled with the note and question that inspired it.
             </p>
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" onClick={copyPrompt} data-testid="notes-copy-prompt">
-                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                {copied ? 'Copied' : 'Copy AI prompt'}
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={downloadJson}
-                data-testid="notes-download"
-              >
-                <Download className="h-4 w-4" />
-                Download notes file
-              </Button>
-            </div>
+            <p className="text-xs text-ink-500">
+              Not syncing? Your notes also travel in the progress file from
+              Settings → Move progress.
+            </p>
           </section>
 
           <ul data-testid="notes-list" className="flex flex-col gap-3">
@@ -237,6 +213,7 @@ export default function NotesPage() {
                 questionId={n.questionId}
                 initialText={n.text}
                 updatedAt={n.updatedAt}
+                followUps={followUpCounts.get(n.questionId) ?? 0}
                 onSave={(text) => setNote(n.questionId, text)}
                 onDelete={() => setNote(n.questionId, null)}
               />

@@ -13,6 +13,7 @@ import {
 } from '@/lib/useStorage';
 import { VoteRow } from '@/components/VoteRow';
 import { NoteRow } from '@/components/NoteRow';
+import { NoteOrigin } from '@/pack/NoteOrigin';
 import { Scratchpad } from '@/components/Scratchpad';
 import { SourceRef } from '@/components/SourceRef';
 import { McqMarkdown } from '@/components/McqMarkdown';
@@ -348,8 +349,10 @@ export function PackReviewRunner() {
             <ConceptCard concept={concept} defaultOpen={!isCorrect} />
           ) : null}
           <SourceRef sourceRef={current.sourceRef} />
-          <VoteRow questionId={current.id} />
-          <NoteRow questionId={current.id} />
+          <NoteOrigin generatedFrom={current.generatedFrom} />
+          {/* keyed so per-question draft state resets when the question advances */}
+          <VoteRow key={`vote-${current.id}`} questionId={current.id} />
+          <NoteRow key={`note-${current.id}`} questionId={current.id} />
           <Button size="lg" block onClick={handleNext} className="mt-1">
             {state.currentIndex + 1 === state.questions.length
               ? 'See results'

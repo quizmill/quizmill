@@ -6,17 +6,8 @@ import {
   mergeRemote,
   onMutation,
   recordNote,
-  saveNotes,
   type Mutation,
 } from '@/lib/storage';
-import {
-  buildNotesExport,
-  buildNotesPrompt,
-  notesExportFilename,
-  NOTES_EXPORT_FORMAT,
-  NOTES_EXPORT_VERSION,
-} from '@/pack/notes-export';
-import type { PackCategory, PackQuestion } from '@/pack/data';
 
 // Minimal localStorage so the storage module (node test env) has a window.
 function fakeLocalStorage() {
@@ -101,114 +92,5 @@ describe('question notes (storage)', () => {
     recordNote('q1', 'note', 100);
     clearAll();
     expect(loadNotes()).toEqual([]);
-  });
-});
-
-// ---- notes export (the AI-generation handoff) ----
-
-const categories: PackCategory[] = [
-  { key: 'cat-a', label: 'Category A' },
-  { key: 'cat-b', label: 'Category B' },
-];
-
-function question(id: string, over: Partial<PackQuestion> = {}): PackQuestion {
-  return {
-    id,
-    categoryKey: 'cat-a',
-    difficulty: 3,
-    prompt: `Prompt for ${id}?`,
-    options: [
-      { key: 'A', text: 'Option A' },
-      { key: 'B', text: 'Option B' },
-      { key: 'C', text: 'Option C' },
-      { key: 'D', text: 'Option D' },
-    ],
-    correctKey: 'B',
-    explanation: 'Because B.',
-    source: 'generated',
-    reviewStatus: 'draft',
-    ...over,
-  };
-}
-
-describe('buildNotesExport', () => {
-  it('joins notes to their questions, newest note first', () => {
-    saveNotes([
-      { questionId: 'q1', text: 'older note', updatedAt: 100 },
-      { questionId: 'q2', text: 'newer note', updatedAt: 200 },
-    ]);
-    const out = buildNotesExport(
-      loadNotes(),
-      [question('q1'), question('q2', { categoryKey: 'cat-b', tags: ['t1'] })],
-      categories,
-      { id: 'demo', title: 'Demo Pack' },
-      999,
-    );
-
-    expect(out.format).toBe(NOTES_EXPORT_FORMAT);
-    expect(out.version).toBe(NOTES_EXPORT_VERSION);
-    expect(out.packId).toBe('demo');
-    expect(out.exportedAt).toBe(999);
-    expect(out.notes.map((n) => n.questionId)).toEqual(['q2', 'q1']);
-    expect(out.notes[0].question).toMatchObject({
-      categoryKey: 'cat-b',
-      categoryLabel: 'Category B',
-      correctKeys: ['B'],
-      tags: ['t1'],
-    });
-    expect(out.notes[1].question?.options).toHaveLength(4);
-  });
-
-  it('normalises multi-answer keys and survives a vanished question', () => {
-    const out = buildNotesExport(
-      [
-        { questionId: 'q-multi', text: 'tricky', updatedAt: 1 },
-        { questionId: 'q-gone', text: 'question was removed', updatedAt: 2 },
-      ],
-      [question('q-multi', { correctKey: undefined, correctKeys: ['A', 'C'] })],
-      categories,
-      { id: 'demo', title: 'Demo Pack' },
-    );
-    const multi = out.notes.find((n) => n.questionId === 'q-multi');
-    const gone = out.notes.find((n) => n.questionId === 'q-gone');
-    expect(multi?.question?.correctKeys).toEqual(['A', 'C']);
-    expect(gone?.question).toBeUndefined();
-    expect(gone?.note).toBe('question was removed');
-  });
-
-  it('names the file with pack id and zero-padded local date', () => {
-    expect(notesExportFilename('demo', new Date(2026, 7, 3).getTime())).toBe(
-      'quizmill-notes-demo-2026-08-03.json',
-    );
-  });
-});
-
-describe('buildNotesPrompt', () => {
-  it('renders instructions, each question with options + answer, and the note', () => {
-    const data = buildNotesExport(
-      [{ questionId: 'q1', text: 'MORE of these please', updatedAt: 1 }],
-      [question('q1')],
-      categories,
-      { id: 'demo', title: 'Demo Pack' },
-    );
-    const md = buildNotesPrompt(data);
-    expect(md).toContain('"Demo Pack"');
-    expect(md).toContain('## 1. Category A (q1)');
-    expect(md).toContain('Question: Prompt for q1?');
-    expect(md).toContain('- B) Option B');
-    expect(md).toContain('Correct: B');
-    expect(md).toContain('MY NOTE: MORE of these please');
-  });
-
-  it('flags questions that left the pack instead of dropping the note', () => {
-    const data = buildNotesExport(
-      [{ questionId: 'q-gone', text: 'still want this topic', updatedAt: 1 }],
-      [],
-      categories,
-      { id: 'demo', title: 'Demo Pack' },
-    );
-    const md = buildNotesPrompt(data);
-    expect(md).toContain('no longer in the pack');
-    expect(md).toContain('MY NOTE: still want this topic');
   });
 });
