@@ -56,7 +56,7 @@ trust, fine for quiz history; don't reuse for anything sensitive.
 Return every row for this user + pack, grouped by table, `200`:
 
 ```json
-{ "sessions": [...], "attempts": [...], "achievements": [...], "votes": [...] }
+{ "sessions": [...], "attempts": [...], "achievements": [...], "votes": [...], "notes": [...] }
 ```
 
 Rows are returned exactly as uploaded (the client's local shapes — see
@@ -72,9 +72,9 @@ backoff-ish pacing (ops are idempotent, so at-least-once is safe).
 
 ```ts
 type WireOp =
-  | { t: 'sessions'|'attempts'|'achievements'|'votes';
+  | { t: 'sessions'|'attempts'|'achievements'|'votes'|'notes';
       op: 'upsert'; id: string; ref?: string; data: object }
-  | { t: 'votes'; op: 'delete'; id: string }              // id = questionId
+  | { t: 'votes'|'notes'; op: 'delete'; id: string }       // id = questionId
   | { t: 'clear-all'; op: 'delete' }                       // wipe user+pack
   | { t: 'clear-sessions'; op: 'delete'; sessionIds: string[] }
 ```
@@ -87,7 +87,7 @@ Required semantics:
 - **`ref`** — attempts carry their `sessionId` here; store it so
   `clear-sessions` can delete both the listed sessions AND every attempt
   whose `ref` is in the list.
-- **`clear-all`** — delete all four tables for this user + pack only.
+- **`clear-all`** — delete all five tables for this user + pack only.
 - **CORS** — the app is a static site on another origin: allow
   `GET, POST, OPTIONS` with `authorization, content-type` headers from
   `*` (bearer auth, no cookies).
@@ -157,7 +157,7 @@ bridges with a file instead.
 ## File export/import
 
 `src/lib/transfer.ts` + the Settings "Move progress" card write the same
-four synced tables to a versioned JSON snapshot
+five synced tables to a versioned JSON snapshot
 (`{ format: 'quizmill-progress', version, packId, sessions, attempts,
 achievements, votes, … }` — `buildSnapshot`/`parseSnapshot`/
 `applySnapshot`) and import it through the same last-write-wins merge a

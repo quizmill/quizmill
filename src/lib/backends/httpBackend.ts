@@ -17,7 +17,7 @@
  */
 import { APP_CONFIG } from '@/config';
 import type { Attempt, Session } from '@/data/types';
-import type { EarnedAchievement, QuestionVote } from '../storage';
+import type { EarnedAchievement, QuestionNote, QuestionVote } from '../storage';
 import { KEY_PREFIX } from '../storage';
 import { hashSyncKey, normalizeSyncKey } from '../syncKey';
 import type { QueueOp, RemoteData, SyncBackend } from '../syncBackend';
@@ -33,15 +33,15 @@ const KEY_STORAGE = `${KEY_PREFIX}syncKey.v1`;
 
 export type WireOp =
   | {
-      t: 'sessions' | 'attempts' | 'achievements' | 'votes';
+      t: 'sessions' | 'attempts' | 'achievements' | 'votes' | 'notes';
       op: 'upsert';
       id: string;
       /** Secondary key used for grouped deletes — attempts carry their
        *  sessionId here so "clear these sessions" can find them. */
       ref?: string;
-      data: Session | Attempt | EarnedAchievement | QuestionVote;
+      data: Session | Attempt | EarnedAchievement | QuestionVote | QuestionNote;
     }
-  | { t: 'votes'; op: 'delete'; id: string }
+  | { t: 'votes' | 'notes'; op: 'delete'; id: string }
   | { t: 'clear-all'; op: 'delete' }
   | { t: 'clear-sessions'; op: 'delete'; sessionIds: string[] };
 
@@ -64,6 +64,10 @@ export function toWireOp(op: QueueOp): WireOp {
       return op.op === 'delete'
         ? { t: 'votes', op: 'delete', id: op.questionId }
         : { t: 'votes', op: 'upsert', id: op.row.questionId, data: op.row };
+    case 'notes':
+      return op.op === 'delete'
+        ? { t: 'notes', op: 'delete', id: op.questionId }
+        : { t: 'notes', op: 'upsert', id: op.row.questionId, data: op.row };
     case 'clear-all':
       return { t: 'clear-all', op: 'delete' };
     case 'clear-sessions':
@@ -156,6 +160,8 @@ export const httpBackend: SyncBackend = {
       attempts: body.attempts ?? [],
       achievements: body.achievements ?? [],
       votes: body.votes ?? [],
+      // Older servers (pre-notes) don't return this key.
+      notes: body.notes ?? [],
     };
   },
 };

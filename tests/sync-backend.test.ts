@@ -13,7 +13,13 @@ function stubBackend(): SyncBackend {
     getUserId: async () => null,
     onAuthChange: () => {},
     runOp: async () => {},
-    pullAll: async () => ({ sessions: [], attempts: [], achievements: [], votes: [] }),
+    pullAll: async () => ({
+      sessions: [],
+      attempts: [],
+      achievements: [],
+      votes: [],
+      notes: [],
+    }),
   };
 }
 

@@ -214,3 +214,36 @@ export function useQuestionVotes(): {
     setVote,
   };
 }
+
+/**
+ * Per-question study notes ("review later" / "go deeper"). Reactive —
+ * re-reads from storage on the quizmill:storage event. `setNote` with
+ * empty/null text deletes the note.
+ */
+export function useQuestionNotes(): {
+  notes: Map<string, storage.QuestionNote>;
+  notesList: storage.QuestionNote[];
+  setNote: (questionId: string, text: string | null) => void;
+} {
+  const [list, setList] = useState<storage.QuestionNote[]>([]);
+  useEffect(() => {
+    const refresh = () => setList(storage.loadNotes());
+    refresh();
+    if (typeof window === 'undefined') return;
+    window.addEventListener(EVENT, refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener(EVENT, refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
+  const setNote = useCallback((questionId: string, text: string | null) => {
+    storage.recordNote(questionId, text);
+    emit();
+  }, []);
+  return {
+    notes: new Map(list.map((n) => [n.questionId, n])),
+    notesList: list,
+    setNote,
+  };
+}

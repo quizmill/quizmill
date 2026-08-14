@@ -17,12 +17,12 @@
  * exactly like the localStorage source of truth it mirrors.
  */
 
-export const TABLES = ['sessions', 'attempts', 'achievements', 'votes'] as const;
+export const TABLES = ['sessions', 'attempts', 'achievements', 'votes', 'notes'] as const;
 export type TableName = (typeof TABLES)[number];
 
 export type WireOp =
   | { t: TableName; op: 'upsert'; id: string; ref?: string; data: unknown }
-  | { t: 'votes'; op: 'delete'; id: string }
+  | { t: 'votes' | 'notes'; op: 'delete'; id: string }
   | { t: 'clear-all'; op: 'delete' }
   | { t: 'clear-sessions'; op: 'delete'; sessionIds: string[] };
 
@@ -69,8 +69,8 @@ export function parseOp(raw: unknown): WireOp | null {
     }
     return { t: 'clear-sessions', op: 'delete', sessionIds: o.sessionIds as string[] };
   }
-  if (o.t === 'votes' && o.op === 'delete') {
-    return isId(o.id) ? { t: 'votes', op: 'delete', id: o.id } : null;
+  if ((o.t === 'votes' || o.t === 'notes') && o.op === 'delete') {
+    return isId(o.id) ? { t: o.t, op: 'delete', id: o.id } : null;
   }
   if (isTable(o.t) && o.op === 'upsert') {
     if (!isId(o.id)) return null;

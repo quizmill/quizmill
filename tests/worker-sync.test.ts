@@ -49,6 +49,18 @@ describe('toWireOp (client → wire)', () => {
       id: 'q1',
       data: { questionId: 'q1', vote: 'up', votedAt: 1 },
     });
+    expect(
+      toWireOp({
+        t: 'notes',
+        op: 'upsert',
+        row: { questionId: 'q1', text: 'go deeper', updatedAt: 1 },
+      }),
+    ).toEqual({
+      t: 'notes',
+      op: 'upsert',
+      id: 'q1',
+      data: { questionId: 'q1', text: 'go deeper', updatedAt: 1 },
+    });
   });
 
   it('marks attempts with their session as ref, for grouped deletes', () => {
@@ -64,6 +76,11 @@ describe('toWireOp (client → wire)', () => {
   it('passes deletes through', () => {
     expect(toWireOp({ t: 'votes', op: 'delete', questionId: 'q9' })).toEqual({
       t: 'votes',
+      op: 'delete',
+      id: 'q9',
+    });
+    expect(toWireOp({ t: 'notes', op: 'delete', questionId: 'q9' })).toEqual({
+      t: 'notes',
       op: 'delete',
       id: 'q9',
     });
@@ -83,7 +100,13 @@ describe('parseOp / parseOpsRequest (worker validation)', () => {
       toWireOp({ t: 'sessions', op: 'upsert', row: session }),
       toWireOp({ t: 'attempts', op: 'upsert', row: attempt }),
       toWireOp({ t: 'achievements', op: 'upsert', row: { id: 'st1', earnedAt: 1 } }),
+      toWireOp({
+        t: 'notes',
+        op: 'upsert',
+        row: { questionId: 'q1', text: 'more like this', updatedAt: 1 },
+      }),
       toWireOp({ t: 'votes', op: 'delete', questionId: 'q1' }),
+      toWireOp({ t: 'notes', op: 'delete', questionId: 'q1' }),
       toWireOp({ t: 'clear-all', op: 'delete' }),
       toWireOp({ t: 'clear-sessions', op: 'delete', sessionIds: ['s1'] }),
     ];
@@ -163,9 +186,22 @@ describe('statementsForOp (worker SQL)', () => {
     expect(stmt.params).toEqual([uid, pack]);
   });
 
-  it('vote deletes target one row', () => {
+  it('vote and note deletes target one row', () => {
     const [stmt] = statementsForOp({ t: 'votes', op: 'delete', id: 'q7' }, uid, pack);
     expect(stmt.params).toEqual([uid, pack, 'votes', 'q7']);
+    const [nStmt] = statementsForOp({ t: 'notes', op: 'delete', id: 'q7' }, uid, pack);
+    expect(nStmt.params).toEqual([uid, pack, 'notes', 'q7']);
+  });
+
+  it('note upserts are last-write-wins like votes', () => {
+    const note = { questionId: 'q1', text: 'go deeper', updatedAt: 9 };
+    const [stmt] = statementsForOp(
+      toWireOp({ t: 'notes', op: 'upsert', row: note }),
+      uid,
+      pack,
+    );
+    expect(stmt.sql).toContain('DO UPDATE');
+    expect(stmt.params).toEqual([uid, pack, 'notes', 'q1', '', JSON.stringify(note)]);
   });
 });
 

@@ -12,6 +12,7 @@ import {
   useStorageData,
 } from '@/lib/useStorage';
 import { VoteRow } from '@/components/VoteRow';
+import { NoteRow } from '@/components/NoteRow';
 import { Scratchpad } from '@/components/Scratchpad';
 import { SourceRef } from '@/components/SourceRef';
 import { McqMarkdown } from '@/components/McqMarkdown';
@@ -348,6 +349,7 @@ export function PackReviewRunner() {
           ) : null}
           <SourceRef sourceRef={current.sourceRef} />
           <VoteRow questionId={current.id} />
+          <NoteRow questionId={current.id} />
           <Button size="lg" block onClick={handleNext} className="mt-1">
             {state.currentIndex + 1 === state.questions.length
               ? 'See results'

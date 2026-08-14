@@ -13,9 +13,11 @@ import {
   SESSIONS_KEY,
   loadAchievements,
   loadAttempts,
+  loadNotes,
   loadSessions,
   loadVotes,
   saveAchievements,
+  saveNotes,
   saveVotes,
 } from '@/lib/storage';
 import { APP_CONFIG } from '@/config';
@@ -77,16 +79,18 @@ function validSnapshotJson(over: Record<string, unknown> = {}): string {
     attempts: [attempt('a1')],
     achievements: [{ id: 'st1', earnedAt: 1600 }],
     votes: [{ questionId: 'q1', vote: 'up', votedAt: 1700 }],
+    notes: [{ questionId: 'q1', text: 'go deeper on this', updatedAt: 1800 }],
     ...over,
   });
 }
 
 describe('buildSnapshot / snapshotFilename', () => {
-  it('captures all four tables with format + pack stamps', () => {
+  it('captures all five tables with format + pack stamps', () => {
     window.localStorage.setItem(SESSIONS_KEY, JSON.stringify([session('s1')]));
     window.localStorage.setItem(ATTEMPTS_KEY, JSON.stringify([attempt('a1')]));
     saveAchievements([{ id: 'st1', earnedAt: 1600 }]);
     saveVotes([{ questionId: 'q1', vote: 'down', comment: 'meh', votedAt: 1700 }]);
+    saveNotes([{ questionId: 'q1', text: 'revisit', updatedAt: 1800 }]);
 
     const snap = buildSnapshot(999);
     expect(snap.format).toBe(SNAPSHOT_FORMAT);
@@ -97,6 +101,7 @@ describe('buildSnapshot / snapshotFilename', () => {
     expect(snap.attempts).toHaveLength(1);
     expect(snap.achievements).toHaveLength(1);
     expect(snap.votes[0].comment).toBe('meh');
+    expect(snap.notes?.[0].text).toBe('revisit');
   });
 
   it('a fresh export round-trips through parseSnapshot', () => {
@@ -165,12 +170,17 @@ describe('parseSnapshot validation', () => {
           { questionId: 'q1', vote: 'up', votedAt: 1 },
           { questionId: 'q2', vote: 'sideways', votedAt: 1 },
         ],
+        notes: [
+          { questionId: 'q1', text: 'ok', updatedAt: 1 },
+          { questionId: 'q2', text: 42, updatedAt: 1 }, // non-string text
+        ],
       }),
     );
     expect(parsed.sessions).toHaveLength(1);
     expect(parsed.attempts).toHaveLength(1);
     expect(parsed.achievements).toHaveLength(1);
     expect(parsed.votes).toHaveLength(1);
+    expect(parsed.notes).toHaveLength(1);
   });
 
   it('tolerates missing tables (treated as empty)', () => {
@@ -185,6 +195,8 @@ describe('parseSnapshot validation', () => {
     expect(parsed.attempts).toEqual([]);
     expect(parsed.achievements).toEqual([]);
     expect(parsed.votes).toEqual([]);
+    // Pre-notes exports (older builds) have no notes key at all.
+    expect(parsed.notes).toEqual([]);
   });
 });
 
@@ -197,11 +209,13 @@ describe('applySnapshot', () => {
       attempts: 1,
       achievements: 1,
       votes: 1,
+      notes: 1,
     });
     expect(loadSessions()).toHaveLength(1);
     expect(loadAttempts()).toHaveLength(1);
     expect(loadAchievements()).toHaveLength(1);
     expect(loadVotes()).toHaveLength(1);
+    expect(loadNotes()).toHaveLength(1);
   });
 
   it('is idempotent — importing the same file twice adds nothing', () => {
@@ -213,6 +227,7 @@ describe('applySnapshot', () => {
       attempts: 0,
       achievements: 0,
       votes: 0,
+      notes: 0,
     });
     expect(loadAttempts()).toHaveLength(1);
   });
