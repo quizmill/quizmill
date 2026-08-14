@@ -2,7 +2,8 @@
 
 import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, NotebookPen, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, NotebookPen, Play, Sparkles, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 import { APP_CONFIG } from '@/config';
 import { useQuestionNotes } from '@/lib/useStorage';
 import { cn } from '@/lib/cn';
@@ -11,6 +12,7 @@ import {
   PACK_CATEGORY_ICON,
   PACK_CATEGORY_LABEL,
 } from '@/pack/data';
+import { notesPracticePool } from '@/pack/notes-practice';
 
 const NOTE_SAVE_DEBOUNCE_MS = 600;
 
@@ -141,6 +143,12 @@ export default function NotesPage() {
     }
     return counts;
   }, []);
+  // Size of a notes-focused practice round (noted questions + their
+  // generated follow-ups) — powers the "Practice these" button.
+  const poolSize = useMemo(
+    () => notesPracticePool(notesList, packQuestions).length,
+    [notesList],
+  );
 
   return (
     <main className="flex flex-col gap-6">
@@ -166,6 +174,16 @@ export default function NotesPage() {
           Questions you flagged to revisit or dig deeper into.
         </p>
       </div>
+
+      {sorted.length > 0 && poolSize > 0 ? (
+        <Link href="/practice/notes/" className="block">
+          <Button size="lg" block data-testid="notes-practice-cta">
+            <Play className="h-4 w-4" />
+            Practice these topics ({poolSize}{' '}
+            {poolSize === 1 ? 'question' : 'questions'})
+          </Button>
+        </Link>
+      ) : null}
 
       {sorted.length === 0 ? (
         <div className="rounded-2xl border border-ink-200 bg-surface p-5 text-sm text-ink-600">
