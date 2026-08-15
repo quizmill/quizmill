@@ -373,9 +373,17 @@ export function saveNotes(notes: QuestionNote[]): void {
 }
 
 /**
+ * Ceiling on note text. The sync wire protocol rejects rows near 32 KB
+ * (see docs/sync-protocol.md); an unclamped paste would become a poison
+ * op that can never sync. 4000 chars stays comfortably under the limit
+ * even when every char JSON-escapes to several bytes.
+ */
+export const MAX_NOTE_TEXT_LENGTH = 4000;
+
+/**
  * Upsert the note on a question (one note per question — editing replaces
  * it and refreshes `updatedAt`). Pass empty/whitespace text (or null) to
- * delete the note.
+ * delete the note. Text is clamped to MAX_NOTE_TEXT_LENGTH.
  */
 export function recordNote(
   questionId: string,
@@ -384,7 +392,7 @@ export function recordNote(
 ): void {
   const all = loadNotes();
   const idx = all.findIndex((n) => n.questionId === questionId);
-  const trimmed = text?.trim() ?? '';
+  const trimmed = (text?.trim() ?? '').slice(0, MAX_NOTE_TEXT_LENGTH);
   if (trimmed === '') {
     if (idx >= 0) {
       all.splice(idx, 1);

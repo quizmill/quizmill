@@ -6,6 +6,7 @@ import { ArrowLeft, NotebookPen, Play, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { APP_CONFIG } from '@/config';
 import { useQuestionNotes } from '@/lib/useStorage';
+import { MAX_NOTE_TEXT_LENGTH } from '@/lib/storage';
 import { cn } from '@/lib/cn';
 import {
   packQuestions,
@@ -106,6 +107,7 @@ function NoteCard({
         aria-label="Note text"
         value={text}
         onChange={(e) => handleChange(e.target.value)}
+        maxLength={MAX_NOTE_TEXT_LENGTH}
         rows={2}
         className="w-full resize-y rounded-lg border border-ink-200 bg-surface px-3 py-2 text-sm text-ink-800 focus:border-brand-500 focus:outline-none"
       />

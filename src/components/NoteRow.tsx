@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { NotebookPen } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useQuestionNotes } from '@/lib/useStorage';
+import { MAX_NOTE_TEXT_LENGTH } from '@/lib/storage';
 
 interface NoteRowProps {
   questionId: string;
@@ -70,6 +71,7 @@ export function NoteRow({ questionId }: NoteRowProps) {
         placeholder="e.g. Review this again — and I'd like more questions on this topic."
         value={text}
         onChange={(e) => handleChange(e.target.value)}
+        maxLength={MAX_NOTE_TEXT_LENGTH}
         rows={2}
         className="w-full resize-y rounded-lg border border-ink-200 bg-surface px-3 py-2 text-sm text-ink-800 placeholder:text-ink-400 focus:border-brand-500 focus:outline-none"
       />
