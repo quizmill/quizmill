@@ -3,6 +3,7 @@ import {
   clearAll,
   getNote,
   loadNotes,
+  MAX_NOTE_TEXT_LENGTH,
   mergeRemote,
   onMutation,
   recordNote,
@@ -48,6 +49,13 @@ describe('question notes (storage)', () => {
     recordNote('q2', 'x', 100);
     recordNote('q2', null, 200);
     expect(loadNotes()).toEqual([]);
+  });
+
+  it('clamps runaway note text so a row can never exceed the sync size limit', () => {
+    // The wire protocol rejects rows near 32 KB; an unclamped paste would
+    // become a poison op that can never sync.
+    recordNote('q1', 'x'.repeat(MAX_NOTE_TEXT_LENGTH + 500), 100);
+    expect(getNote('q1')?.text).toHaveLength(MAX_NOTE_TEXT_LENGTH);
   });
 
   it('deleting a non-existent note is a silent no-op (no mutation emitted)', () => {

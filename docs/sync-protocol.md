@@ -95,6 +95,20 @@ Required semantics:
 Recommended sanity ceilings (the reference server enforces): ≤500 ops
 per request, ≤32 KB per row, ≤200-char ids.
 
+### Adding a table: deploy the server first
+
+When a release adds a synced table (as `notes` did), upgrade the server
+BEFORE shipping the client — redeploy the worker (`npx wrangler deploy`
+from `cloudflare/`; the generic rows schema needs no migration) or run
+the new Supabase migration. A client that races ahead gets its new-table
+ops rejected with `400` ("Couldn't sync N · retry" in the UI) while every
+other table keeps syncing. The engine retries each rejected op a few
+times, then drops it AND clears its once-per-user bulk-push flag — so on
+the first app start after the server is upgraded, the device re-seeds
+the cloud from local storage (idempotent upserts) and no data is lost
+(tested in `tests/sync-recovery.test.ts` /
+`tests/sync-worker-e2e.test.ts`).
+
 ## Rolling your own client backend
 
 For a transport HTTP-plus-sync-keys can't express (end-to-end

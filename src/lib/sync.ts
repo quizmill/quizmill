@@ -225,6 +225,17 @@ async function drain(): Promise<void> {
           // Drop a poison op so it can't wedge the queue forever — but make
           // the loss loud rather than a silent console.warn.
           console.error('[sync] dropping op after repeated failures', op, err);
+          // Self-heal: clear the once-per-user bulk-push flag so the next
+          // app start / sign-in re-seeds the cloud from local storage
+          // (idempotent upserts). Without this a row rejected by a stale
+          // server — e.g. a notes op against a worker deployed before the
+          // notes table existed — would be lost to the cloud forever, even
+          // after the server is upgraded.
+          try {
+            window.localStorage.removeItem(MIGRATED_PREFIX + uid);
+          } catch {
+            // storage unavailable → nothing to heal from anyway
+          }
         } else {
           anyFailed = true;
           kept.push(op); // retry on a later drain (interval / reconnect)
