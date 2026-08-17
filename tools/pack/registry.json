@@ -1,47 +1,92 @@
 {
-  "$comment": "Published learning packs — public repos installable with `npm run pack:use <repo>`. PRs adding community packs welcome: the repo must contain a pack.json/questions.json that passes `npm run pack:validate`.",
+  "$comment": "Published learning packs — public repos installable with `npm run pack:use <repo>`. PRs adding community packs welcome: the repo must contain a pack.json/questions.json that passes `npm run pack:validate`. Entry ids must be unique — `npm run pack:list` and the registry test enforce it. See docs/pack-registry.md for the optional metadata fields.",
   "packs": [
     {
       "id": "claude-cert",
       "title": "Claude Cert Practice",
       "description": "Claude Certified Architect (Foundations) exam practice — agentic architecture, Claude Code, prompt engineering, tools & MCP, context management. Curated from MIT-licensed community question banks, with per-question attribution.",
-      "repo": "quizmill/pack-claude-cert"
+      "repo": "quizmill/pack-claude-cert",
+      "status": "draft",
+      "badges": [
+        "exam-pack",
+        "source-backed",
+        "live-demo"
+      ],
+      "demoUrl": "https://claude-cert.quizmill.dev",
+      "questionCount": 695
     },
     {
       "id": "claude-cert-pro",
       "title": "Claude Architect – Professional",
       "description": "Unofficial Claude Certified Architect – Professional (CCAR-P) practice — multiple-choice and multiple-response questions across the seven exam domains, with rationales.",
-      "repo": "quizmill/pack-claude-cert-pro"
+      "repo": "quizmill/pack-claude-cert-pro",
+      "status": "draft",
+      "badges": [
+        "exam-pack",
+        "source-backed",
+        "live-demo"
+      ],
+      "demoUrl": "https://claude-cert-pro.quizmill.dev",
+      "questionCount": 83
     },
     {
       "id": "aws-arch-pro",
       "title": "AWS Certified Solutions Architect – Professional",
       "description": "Unofficial hard-mode practice for AWS Certified Solutions Architect – Professional (SAP-C02): multi-account governance, hybrid networking, migrations, DR, security, data, and cost trade-offs.",
-      "repo": "quizmill/pack-aws-arch-pro"
+      "repo": "quizmill/pack-aws-arch-pro",
+      "status": "draft",
+      "badges": [
+        "exam-pack",
+        "extreme-mode",
+        "live-demo"
+      ],
+      "demoUrl": "https://aws-arch-pro.quizmill.dev",
+      "questionCount": 40
     },
     {
       "id": "aws-genai",
       "title": "AWS GenAI Developer Pro",
       "description": "Practice for the AWS Certified Generative AI Developer – Professional (AIP-C01) exam — foundation model integration, RAG, agents, prompt management, security, and observability on AWS.",
-      "repo": "quizmill/pack-aws-genai"
+      "repo": "quizmill/pack-aws-genai",
+      "status": "draft",
+      "badges": [
+        "exam-pack",
+        "source-backed",
+        "live-demo"
+      ],
+      "demoUrl": "https://aws-genai.quizmill.dev",
+      "questionCount": 460
     },
     {
       "id": "music-theory",
       "title": "Music Theory Practice",
       "description": "Visual music-theory practice — read staves, key signatures, intervals and chords. 102 questions across five categories and three levels (Beginner → Advanced); 84 carry generated staff and keyboard diagrams, and four answer with images.",
-      "repo": "quizmill/pack-music-theory"
+      "repo": "quizmill/pack-music-theory",
+      "status": "draft",
+      "questionCount": 102
     },
     {
       "id": "running-theory",
       "title": "Ultra Training Theory",
       "description": "Ultrarunning training theory practice — aerobic base, workouts, muscular endurance, periodization, fueling, recovery, and race execution across the frameworks of Johnston, Koop, Magness, and the Roches, including where they disagree. 83 questions across seven domains.",
-      "repo": "quizmill/pack-running"
+      "repo": "quizmill/pack-running",
+      "status": "draft",
+      "badges": [
+        "source-backed"
+      ],
+      "questionCount": 83
     },
     {
       "id": "world-capitals",
       "title": "Capitals of the World",
       "description": "Expert-level practice on the capital cities of the world — moved capitals (Astana, Naypyidaw, Nusantara), multiple-capital countries (South Africa, Bolivia, the Netherlands), and the ones map buffs reliably get wrong. 45 questions across five continents.",
-      "repo": "quizmill/pack-world-capitals"
+      "repo": "quizmill/pack-world-capitals",
+      "status": "draft",
+      "badges": [
+        "live-demo"
+      ],
+      "demoUrl": "https://world-capitals.quizmill.dev",
+      "questionCount": 45
     }
   ]
 }
