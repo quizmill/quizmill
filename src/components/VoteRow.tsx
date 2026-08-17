@@ -1,15 +1,37 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { ThumbsDown, ThumbsUp } from 'lucide-react';
+import { ExternalLink, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useQuestionVotes } from '@/lib/useStorage';
+import { packManifest, packQuestions } from '@/pack/data';
 
 interface VoteRowProps {
   questionId: string;
 }
 
 const COMMENT_SAVE_DEBOUNCE_MS = 600;
+
+function buildFeedbackHref(questionId: string, comment: string): string | null {
+  if (!packManifest.feedbackUrl) return null;
+  const question = packQuestions.find((q) => q.id === questionId);
+  const url = new URL(packManifest.feedbackUrl);
+  const title = `Question feedback: ${questionId}`;
+  const body = [
+    `Pack: ${packManifest.title} (${packManifest.id})`,
+    `Question: ${questionId}`,
+    question ? `Prompt: ${question.prompt}` : null,
+    comment.trim() ? `Learner comment: ${comment.trim()}` : null,
+    '',
+    'What should change?',
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\n');
+  url.searchParams.set('title', title);
+  url.searchParams.set('body', body);
+  url.searchParams.set('question', questionId);
+  return url.toString();
+}
 
 /**
  * Thumbs-up / thumbs-down on a question. Sits in the feedback panel
@@ -69,6 +91,7 @@ export function VoteRow({ questionId }: VoteRowProps) {
   }
 
   const showCommentField = existing?.vote === 'down';
+  const feedbackHref = showCommentField ? buildFeedbackHref(questionId, comment) : null;
 
   return (
     <div data-testid="vote-row" className="flex flex-col gap-2">
@@ -118,13 +141,28 @@ export function VoteRow({ questionId }: VoteRowProps) {
             rows={2}
             className="w-full resize-y rounded-lg border border-ink-200 bg-surface px-3 py-2 text-sm text-ink-800 placeholder:text-ink-400 focus:border-warn-500 focus:outline-none"
           />
-          {savedFlash ? (
-            <span className="text-right text-xs text-success-700">Saved ✓</span>
-          ) : (
-            <span className="text-right text-xs text-ink-400">
-              {comment.length > 0 ? 'Will save when you stop typing.' : ''}
-            </span>
-          )}
+          <div className="flex items-center justify-between gap-3 text-xs">
+            {feedbackHref ? (
+              <a
+                href={feedbackHref}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-warn-700 underline-offset-2 hover:underline"
+              >
+                Report this question
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            ) : (
+              <span />
+            )}
+            {savedFlash ? (
+              <span className="text-success-700">Saved ✓</span>
+            ) : (
+              <span className="text-ink-400">
+                {comment.length > 0 ? 'Will save when you stop typing.' : ''}
+              </span>
+            )}
+          </div>
         </div>
       ) : null}
     </div>

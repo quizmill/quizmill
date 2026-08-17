@@ -62,6 +62,8 @@ export type PackManifest = {
   levelsLabel?: string;
   sources?: PackSource[];
   exam?: PackExam;
+  /** Base URL for learner question reports, e.g. a GitHub new-issue URL. */
+  feedbackUrl?: string;
   games?: PackGames;
 };
 

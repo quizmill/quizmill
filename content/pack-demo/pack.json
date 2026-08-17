@@ -23,8 +23,14 @@
   ],
   "levelsLabel": "Level",
   "levels": [
-    { "key": "basics", "label": "Basics" },
-    { "key": "advanced", "label": "Advanced" }
+    {
+      "key": "basics",
+      "label": "Basics"
+    },
+    {
+      "key": "advanced",
+      "label": "Advanced"
+    }
   ],
   "exam": {
     "label": "Mock exam",
@@ -33,7 +39,17 @@
   },
   "games": {},
   "sources": [
-    { "label": "Original", "name": "Hand-authored", "blurb": "Solar-system facts written for this demo pack." },
-    { "label": "NASA", "name": "NASA Science", "blurb": "Cross-checked against public NASA material.", "url": "https://science.nasa.gov/" }
-  ]
+    {
+      "label": "Original",
+      "name": "Hand-authored",
+      "blurb": "Solar-system facts written for this demo pack."
+    },
+    {
+      "label": "NASA",
+      "name": "NASA Science",
+      "blurb": "Cross-checked against public NASA material.",
+      "url": "https://science.nasa.gov/"
+    }
+  ],
+  "feedbackUrl": "https://github.com/quizmill/quizmill/issues/new"
 }

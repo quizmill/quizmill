@@ -154,6 +154,11 @@ export const packManifestSchema = z
     sources: z.array(packSourceSchema).max(12).optional(),
     /** Optional exam-readiness goal — see packExamSchema. */
     exam: packExamSchema.optional(),
+    /** Optional base URL for learner question reports. When set, the
+     *  feedback UI links downvoted questions to this URL with useful query
+     *  parameters (`question`, `title`, `body`). GitHub's new-issue URL is
+     *  the intended first target, but any issue tracker can accept it. */
+    feedbackUrl: z.string().url().max(300).optional(),
     /** Optional reward mini-games — see packGamesSchema. */
     games: packGamesSchema.optional(),
   })
