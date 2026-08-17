@@ -5,13 +5,41 @@
       "id": "claude-cert",
       "title": "Claude Cert Practice",
       "description": "Claude Certified Architect (Foundations) exam practice — agentic architecture, Claude Code, prompt engineering, tools & MCP, context management. Curated from MIT-licensed community question banks, with per-question attribution.",
-      "repo": "quizmill/pack-claude-cert"
+      "repo": "quizmill/pack-claude-cert",
+      "status": "reviewed",
+      "badges": [
+        "exam-pack",
+        "human-reviewed",
+        "source-backed"
+      ],
+      "demoUrl": "https://claude-cert.quizmill.dev"
     },
     {
       "id": "world-capitals",
       "title": "Capitals of the World",
       "description": "Expert-level practice on the capital cities of the world — moved capitals (Astana, Naypyidaw, Nusantara), multiple-capital countries (South Africa, Bolivia, the Netherlands), and the ones map buffs reliably get wrong. 45 questions across five continents.",
-      "repo": "quizmill/pack-world-capitals"
+      "repo": "quizmill/pack-world-capitals",
+      "status": "reviewed",
+      "badges": [
+        "human-reviewed",
+        "live-demo"
+      ],
+      "demoUrl": "https://world-capitals.quizmill.dev"
+    },
+    {
+      "id": "aws-arch-pro",
+      "title": "AWS Certified Solutions Architect – Professional",
+      "description": "Unofficial hard-mode SAP-C02 practice — multi-account governance, hybrid networking, migrations, DR, security, data, and enterprise cost trade-offs. Includes an Extreme hard mode level.",
+      "repo": "quizmill/pack-aws-arch-pro",
+      "status": "draft",
+      "badges": [
+        "exam-pack",
+        "extreme-mode",
+        "generated",
+        "live-demo"
+      ],
+      "demoUrl": "https://pack-aws-arch-pro.pages.dev",
+      "questionCount": 40
     }
   ]
 }
