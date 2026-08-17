@@ -158,6 +158,11 @@ export const packManifestSchema = z
      *  quizmill.dev campaign style (kids' packs). Device Settings can
      *  override either way; omit for the calm classic UI. */
     look: z.enum(['classic', 'poster']).optional(),
+    /** Optional base URL for learner question reports. When set, the
+     *  feedback UI links downvoted questions to this URL with useful query
+     *  parameters (`question`, `title`, `body`). GitHub's new-issue URL is
+     *  the intended first target, but any issue tracker can accept it. */
+    feedbackUrl: z.string().url().max(300).optional(),
     /** Optional reward mini-games — see packGamesSchema. */
     games: packGamesSchema.optional(),
   })
