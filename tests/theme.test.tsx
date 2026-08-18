@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyTheme,
+  LEGACY_THEME_KEY,
   loadThemePref,
   resolveTheme,
   saveThemePref,
@@ -54,6 +55,22 @@ describe('theme persistence', () => {
   it('treats junk in storage as system', () => {
     window.localStorage.setItem(THEME_KEY, 'blorange');
     expect(loadThemePref()).toBe('system');
+  });
+
+  // The theme key used to be per-pack; it is app-level now (appearance
+  // belongs to the device and must survive pack swaps). Old installs'
+  // per-pack value is promoted on first read.
+  it('migrates the legacy per-pack key to the app-level key', () => {
+    window.localStorage.setItem(LEGACY_THEME_KEY, 'dark');
+    expect(loadThemePref()).toBe('dark');
+    expect(window.localStorage.getItem(THEME_KEY)).toBe('dark');
+    expect(window.localStorage.getItem(LEGACY_THEME_KEY)).toBeNull();
+  });
+
+  it('prefers the app-level key over a lingering legacy value', () => {
+    window.localStorage.setItem(THEME_KEY, 'light');
+    window.localStorage.setItem(LEGACY_THEME_KEY, 'dark');
+    expect(loadThemePref()).toBe('light');
   });
 
   it('notifies listeners on save so mounted hooks re-sync', () => {

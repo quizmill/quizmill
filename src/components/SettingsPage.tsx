@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   ArrowLeft,
+  Boxes,
   Car,
   Gamepad2,
   Monitor,
@@ -12,6 +13,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { APP_CONFIG } from '@/config';
 import { InstallCard } from '@/components/InstallPrompt';
 import { SyncSettings } from '@/components/SyncSettings';
 import { TransferSettings } from '@/components/TransferSettings';
@@ -147,6 +149,26 @@ export function SettingsPage({ extras }: SettingsPageProps) {
 
       <section className="flex flex-col gap-3">
         <InstallCard />
+
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
+            <Boxes className="h-5 w-5 text-ink-500" />
+            Learning packs
+          </h2>
+          <p className="mt-1 text-sm text-ink-600">
+            One app, many packs — insert new packs, swap the active one, and
+            keep each pack&apos;s progress. Practising now:{' '}
+            <strong>{APP_CONFIG.title}</strong>.
+          </p>
+          <Link
+            href="/packs/"
+            data-testid="open-packs"
+            className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50 dark:hover:bg-ink-100"
+          >
+            <Boxes className="h-4 w-4" />
+            Manage packs
+          </Link>
+        </div>
 
         <SyncSettings />
 

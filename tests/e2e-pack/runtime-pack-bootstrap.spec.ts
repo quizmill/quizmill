@@ -107,4 +107,66 @@ describe('runtime pack bootstrap', () => {
     expect(h1).toBe('Photosynthesis Crash Course');
     expect(await bodyText(page)).toContain('Basics'); // injected category card
   });
+
+  it('resolves the pack-library pointer (activePackId → stored pack)', async () => {
+    // The in-app pack library (/packs) stores inserted packs under
+    // quizmill.packLibrary.pack.<id>.v1 and activates one by writing only
+    // the quizmill.activePackId pointer — same bootstrap, no duplicated
+    // JSON blob.
+    await page.evaluate((p) => {
+      localStorage.setItem(
+        `quizmill.packLibrary.pack.${p.manifest.id}.v1`,
+        JSON.stringify(p),
+      );
+      localStorage.setItem('quizmill.activePackId', p.manifest.id);
+    }, INJECTED);
+    await page.reload();
+
+    await waitForText(page, 'Photosynthesis Crash Course');
+    const h1 = await page.$eval('h1', (h) => h.textContent?.trim() ?? '');
+    expect(h1).toBe('Photosynthesis Crash Course');
+  });
+
+  it('switches packs end-to-end from the /packs shelf', async () => {
+    // Insert via the library keys, then drive the UI: /packs shows the
+    // shelf, "Make active" swaps the app, ejecting returns to the built-in
+    // pack — progress keys are left alone throughout.
+    await page.evaluate((p) => {
+      localStorage.setItem(
+        `quizmill.packLibrary.pack.${p.manifest.id}.v1`,
+        JSON.stringify(p),
+      );
+      localStorage.setItem(
+        'quizmill.packLibrary.index.v1',
+        JSON.stringify([
+          {
+            id: p.manifest.id,
+            title: p.manifest.title,
+            description: p.manifest.description,
+            themeColor: p.manifest.themeColor,
+            questionCount: p.questions.length,
+            categoryCount: p.manifest.categories.length,
+            insertedAt: 1,
+          },
+        ]),
+      );
+    }, INJECTED);
+    await page.goto(baseUrl() + '/packs/');
+    await waitForText(page, 'Photosynthesis Crash Course');
+
+    await page.click(`[data-testid="activate-${INJECTED.manifest.id}"]`);
+    await page.waitForNavigation({ waitUntil: 'load' }).catch(() => undefined);
+    await waitForText(page, 'Active');
+    const badges = await page.$$eval('[data-testid="active-pack-badge"]', (els) => els.length);
+    expect(badges).toBe(1);
+    const activeCard = await page.$eval(
+      `[data-testid="pack-card-${INJECTED.manifest.id}"]`,
+      (el) => el.textContent ?? '',
+    );
+    expect(activeCard).toContain('Active');
+
+    // Home now renders the injected pack.
+    await page.goto(baseUrl() + '/');
+    await waitForText(page, 'Photosynthesis Crash Course');
+  });
 });

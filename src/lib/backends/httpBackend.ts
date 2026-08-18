@@ -27,7 +27,12 @@ const PACK_ID = APP_CONFIG.packId;
 /** Sync-server base URL for this build ('' = backend not configured). */
 export const SYNC_URL = (process.env.NEXT_PUBLIC_SYNC_URL ?? '').replace(/\/+$/, '');
 
-const KEY_STORAGE = `${KEY_PREFIX}syncKey.v1`;
+// APP-level (no pack prefix): the sync key identifies the learner, not the
+// pack — the server already partitions rows by (user, pack), so one key
+// serves every pack the library swaps in. Was per-pack before the library
+// existed; the legacy key is migrated on first read.
+const KEY_STORAGE = 'quizmill.syncKey.v1';
+const LEGACY_KEY_STORAGE = `${KEY_PREFIX}syncKey.v1`;
 
 // ── Wire protocol (mirrored by cloudflare/src/ops.ts) ───────────────────
 
@@ -83,7 +88,15 @@ const authListeners = new Set<(userId: string | null) => void>();
 export function getStoredSyncKey(): string | null {
   if (typeof window === 'undefined') return null;
   try {
-    return window.localStorage.getItem(KEY_STORAGE);
+    const key = window.localStorage.getItem(KEY_STORAGE);
+    if (key) return key;
+    const legacy = window.localStorage.getItem(LEGACY_KEY_STORAGE);
+    if (legacy) {
+      window.localStorage.setItem(KEY_STORAGE, legacy);
+      window.localStorage.removeItem(LEGACY_KEY_STORAGE);
+      return legacy;
+    }
+    return null;
   } catch {
     return null;
   }
