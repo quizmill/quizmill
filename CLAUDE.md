@@ -86,7 +86,9 @@ webmanifest are generated from the manifest by `scripts/pack-assets.ts`
   `quizmill.activePack` handoff blob (quizmill-cloud) > library pointer >
   build-time pack. Progress is per pack (`quizmill.<packId>.*`) so
   swapping is free, and EJECT deliberately keeps progress (re-insert to
-  resume). Device-level prefs are app-level keys: theme
+  resume). Pack-scoped pages (Progress, Stickers, Notes) carry a
+  `PackChip` eyebrow naming the active pack, linking to `/packs`.
+  Device-level prefs are app-level keys: theme
   `quizmill.theme.v1`, http sync key `quizmill.syncKey.v1` (one learner
   key serves all packs — the server partitions by (user, pack)); legacy
   per-pack values migrate on first read.
