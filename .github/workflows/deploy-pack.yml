@@ -21,7 +21,9 @@ name: Deploy pack (reusable)
 #   CLOUDFLARE_API_TOKEN                    token with "Cloudflare Pages — Edit"
 #   CLOUDFLARE_ACCOUNT_ID                   70b494550992cda97e893fab035f7e9a
 #   NEXT_PUBLIC_SYNC_URL                    (optional) enables cloud sync via the
-#                                           Cloudflare Worker (cloudflare/); wins over Supabase
+#                                           Cloudflare Worker (cloudflare/); wins over Supabase.
+#                                           Not sensitive (baked into the client bundle), so it
+#                                           can also be passed as the `sync_url` input instead
 #   NEXT_PUBLIC_SUPABASE_URL                (optional) enables cloud sync via Supabase
 #   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY    (optional) public-safe; RLS is the guard
 
@@ -44,6 +46,13 @@ on:
         description: Engine version to build on ('latest', or an exact X.Y.Z)
         type: string
         default: latest
+      sync_url:
+        description: >-
+          Sync server URL baked into the build (NEXT_PUBLIC_SYNC_URL) —
+          public by design, it ships in the client bundle. The
+          NEXT_PUBLIC_SYNC_URL secret wins when both are set.
+        type: string
+        default: ''
 
 # Only `contents: read` (for checkout). A called/reusable workflow cannot
 # request MORE than the calling job was granted, and pack repos default the
@@ -89,7 +98,7 @@ jobs:
 
       - name: Build "${{ inputs.pack }}" on quizmill@${{ steps.engine.outputs.spec }}
         env:
-          NEXT_PUBLIC_SYNC_URL: ${{ secrets.NEXT_PUBLIC_SYNC_URL }}
+          NEXT_PUBLIC_SYNC_URL: ${{ secrets.NEXT_PUBLIC_SYNC_URL || inputs.sync_url }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
         run: |
