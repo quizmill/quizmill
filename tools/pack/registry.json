@@ -8,6 +8,24 @@
       "repo": "quizmill/pack-claude-cert"
     },
     {
+      "id": "claude-cert-pro",
+      "title": "Claude Architect – Professional",
+      "description": "Unofficial Claude Certified Architect – Professional (CCAR-P) practice — multiple-choice and multiple-response questions across the seven exam domains, with rationales.",
+      "repo": "quizmill/pack-claude-cert-pro"
+    },
+    {
+      "id": "aws-arch-pro",
+      "title": "AWS Certified Solutions Architect – Professional",
+      "description": "Unofficial hard-mode practice for AWS Certified Solutions Architect – Professional (SAP-C02): multi-account governance, hybrid networking, migrations, DR, security, data, and cost trade-offs.",
+      "repo": "quizmill/pack-aws-arch-pro"
+    },
+    {
+      "id": "aws-genai",
+      "title": "AWS GenAI Developer Pro",
+      "description": "Practice for the AWS Certified Generative AI Developer – Professional (AIP-C01) exam — foundation model integration, RAG, agents, prompt management, security, and observability on AWS.",
+      "repo": "quizmill/pack-aws-genai"
+    },
+    {
       "id": "world-capitals",
       "title": "Capitals of the World",
       "description": "Expert-level practice on the capital cities of the world — moved capitals (Astana, Naypyidaw, Nusantara), multiple-capital countries (South Africa, Bolivia, the Netherlands), and the ones map buffs reliably get wrong. 45 questions across five continents.",
