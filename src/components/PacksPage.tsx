@@ -5,11 +5,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Boxes,
+  Download,
   FileJson,
   Link as LinkIcon,
   PackagePlus,
   PackageX,
   Play,
+  Store,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { APP_CONFIG } from '@/config';
@@ -25,6 +27,12 @@ import {
   type PackLibraryEntry,
 } from '@/lib/packLibrary';
 import { fetchPackFromUrl, parsePackFiles, type ParseOutcome } from '@/lib/packInsert';
+import {
+  loadRegistry,
+  registryRepoUrl,
+  type PackListing,
+  type RegistryResult,
+} from '@/lib/packRegistry';
 
 /** Cap the validation errors shown for one failed insert — a malformed
  *  600-question bank can produce hundreds. */
@@ -150,12 +158,24 @@ export function PacksPage() {
   const [url, setUrl] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
 
+  // The published-pack registry — loaded once on mount, best source wins
+  // (website API → raw GitHub → the copy baked into this build).
+  const [registry, setRegistry] = useState<RegistryResult | null>(null);
+  const [busyRepo, setBusyRepo] = useState<string | null>(null);
+
   const refresh = useCallback(() => setEntries(listInsertedPacks()), []);
   useEffect(() => {
     refresh();
     setMounted(true);
     window.addEventListener(PACK_LIBRARY_EVENT, refresh);
-    return () => window.removeEventListener(PACK_LIBRARY_EVENT, refresh);
+    let cancelled = false;
+    void loadRegistry().then((r) => {
+      if (!cancelled) setRegistry(r);
+    });
+    return () => {
+      cancelled = true;
+      window.removeEventListener(PACK_LIBRARY_EVENT, refresh);
+    };
   }, [refresh]);
 
   const activeId = APP_CONFIG.packId;
@@ -206,6 +226,17 @@ export function PacksPage() {
       setUrl('');
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleRegistryInsert(listing: PackListing) {
+    if (busyRepo) return;
+    setBusyRepo(listing.repo);
+    setMessage(null);
+    try {
+      finishInsert(await fetchPackFromUrl(registryRepoUrl(listing)), registryRepoUrl(listing));
+    } finally {
+      setBusyRepo(null);
     }
   }
 
@@ -299,6 +330,71 @@ export function PacksPage() {
             onEject={() => handleEject(entry)}
           />
         ))}
+      </section>
+
+      <section
+        data-testid="registry-browser"
+        className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm"
+      >
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
+          <Store className="h-5 w-5 text-ink-500" />
+          Browse published packs
+        </h2>
+        <p className="mt-1 text-sm text-ink-600">
+          The community pack registry — insert one straight onto your shelf.
+          {registry?.source === 'builtin'
+            ? ' Offline: showing the copy bundled with this app.'
+            : null}
+        </p>
+        {!registry ? (
+          <p className="mt-4 text-sm text-ink-400">Loading the registry…</p>
+        ) : (
+          <ul className="mt-2 flex flex-col divide-y divide-ink-100">
+            {registry.listings.map((l) => {
+              const builtIn = l.id === buildId;
+              const onShelf = entries.some((e) => e.id === l.id);
+              return (
+                <li key={l.id} className="flex items-start gap-3 py-3">
+                  <span
+                    aria-hidden
+                    className="mt-1.5 h-3 w-3 flex-shrink-0 rounded-full border border-ink-200"
+                    style={{ backgroundColor: l.themeColor ?? 'transparent' }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-ink-900">{l.title}</p>
+                    {l.questionCount || l.categories?.length ? (
+                      <p className="text-xs text-ink-500">
+                        {l.questionCount ? `${l.questionCount} questions` : null}
+                        {l.questionCount && l.categories?.length ? ' · ' : null}
+                        {l.categories?.length
+                          ? `${l.categories.length} categor${l.categories.length === 1 ? 'y' : 'ies'}`
+                          : null}
+                      </p>
+                    ) : null}
+                    <p className="mt-0.5 line-clamp-2 text-xs text-ink-600">{l.description}</p>
+                  </div>
+                  {builtIn || onShelf ? (
+                    <span className="mt-1 flex-shrink-0 rounded-full border border-ink-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-500">
+                      {builtIn ? 'Built in' : 'On the shelf'}
+                    </span>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="mt-0.5 flex-shrink-0"
+                      data-testid={`registry-insert-${l.id}`}
+                      disabled={busyRepo !== null}
+                      onClick={() => void handleRegistryInsert(l)}
+                    >
+                      <Download className="h-4 w-4" />
+                      {busyRepo === l.repo ? 'Inserting…' : 'Insert'}
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
 
       <section className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
