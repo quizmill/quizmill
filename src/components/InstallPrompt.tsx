@@ -71,7 +71,7 @@ export function InstallCard() {
       data-testid="install-card"
       className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm"
     >
-      <h2 className="text-lg font-semibold text-ink-900">Add to Home Screen</h2>
+      <h3 className="text-lg font-semibold text-ink-900">Add to Home Screen</h3>
       <p className="mt-1 text-sm text-ink-600">
         Install the app for full-screen practice that works offline.
       </p>
