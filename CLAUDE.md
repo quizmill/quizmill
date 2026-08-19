@@ -80,7 +80,10 @@ webmanifest are generated from the manifest by `scripts/pack-assets.ts`
   rewritten to raw; validated client-side by the same `validatePack`),
   stores it wholesale in localStorage (`src/lib/packLibrary.ts`, keys in
   `src/lib/packKeys.ts`), and activates it by writing only the
-  `quizmill.activePackId` pointer + reloading. The inline bootstrap in
+  `quizmill.activePackId` pointer + reloading. `/packs` also browses the
+  published-pack registry in-app (`src/lib/packRegistry.ts` — website API
+  quizmill.dev/api/registry → raw registry.json on GitHub → the copy baked
+  into the build, so it degrades offline). The inline bootstrap in
   `layout.tsx` and `src/pack/runtime.ts` resolve the active pack before
   the engine bundle evaluates — precedence: `#pack=` hash >
   `quizmill.activePack` handoff blob (quizmill-cloud) > library pointer >
