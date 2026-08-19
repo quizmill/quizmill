@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import StickersPage from '@/pack/StickersPage';
 import { ACHIEVEMENTS } from '@/pack/achievements';
+import { APP_CONFIG } from '@/config';
 import * as storage from '@/lib/storage';
 
 // React needs this flag to allow act() outside @testing-library.
@@ -59,5 +60,16 @@ describe('StickersPage sticker count', () => {
     expect(earnedTileCount()).toBe(2);
     // …so the headline numerator must read 2, not 3 (the raw stored count).
     expect(countText()).toContain(`${2} / ${ACHIEVEMENTS.length}`);
+  });
+});
+
+describe('StickersPage pack context', () => {
+  it('names the active pack and links to the shelf — stickers are per pack', async () => {
+    await render();
+
+    const chip = container.querySelector('[data-testid="pack-chip"]');
+    expect(chip).not.toBeNull();
+    expect(chip?.textContent).toContain(APP_CONFIG.title);
+    expect(chip?.getAttribute('href')).toContain('/packs');
   });
 });

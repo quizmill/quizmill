@@ -149,7 +149,7 @@ function SupabaseSyncSettings() {
         ) : (
           <CloudOff className="h-5 w-5 text-ink-400" />
         )}
-        <h2 className="text-lg font-semibold text-ink-900">Sync across devices</h2>
+        <h3 className="text-lg font-semibold text-ink-900">Sync across devices</h3>
       </div>
 
       {!ready ? (

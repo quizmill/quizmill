@@ -74,6 +74,24 @@ webmanifest are generated from the manifest by `scripts/pack-assets.ts`
   `~/code/personal/learning` (original engine code, not exam content).
 - Engine never imports question *shapes* — it sees only the
   denormalised `Attempt`/`Session` fields (`src/data/types.ts`).
+- **Pack library (insert/eject/swap)** — one installed app plays many
+  packs, one active at a time. `/packs` (PacksPage) inserts a pack at
+  runtime from files, a bundle `.json`, or a URL (GitHub repo URLs are
+  rewritten to raw; validated client-side by the same `validatePack`),
+  stores it wholesale in localStorage (`src/lib/packLibrary.ts`, keys in
+  `src/lib/packKeys.ts`), and activates it by writing only the
+  `quizmill.activePackId` pointer + reloading. The inline bootstrap in
+  `layout.tsx` and `src/pack/runtime.ts` resolve the active pack before
+  the engine bundle evaluates — precedence: `#pack=` hash >
+  `quizmill.activePack` handoff blob (quizmill-cloud) > library pointer >
+  build-time pack. Progress is per pack (`quizmill.<packId>.*`) so
+  swapping is free, and EJECT deliberately keeps progress (re-insert to
+  resume). Pack-scoped pages (Progress, Stickers, Notes) carry a
+  `PackChip` eyebrow naming the active pack, linking to `/packs`.
+  Device-level prefs are app-level keys: theme
+  `quizmill.theme.v1`, http sync key `quizmill.syncKey.v1` (one learner
+  key serves all packs — the server partitions by (user, pack)); legacy
+  per-pack values migrate on first read.
 
 ## Commands
 

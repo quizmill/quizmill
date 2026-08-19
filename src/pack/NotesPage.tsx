@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { PackChip } from '@/components/PackChip';
 import { ArrowLeft, NotebookPen, Play, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { APP_CONFIG } from '@/config';
@@ -171,6 +172,7 @@ export default function NotesPage() {
       </header>
 
       <div>
+        <PackChip className="mb-2" />
         <h1 className="text-3xl font-bold text-ink-900">My notes</h1>
         <p className="mt-1 text-ink-500">
           Questions you flagged to revisit or dig deeper into.

@@ -14,6 +14,11 @@
 // import early, ahead of the rest of the engine.
 
 import type { PackManifest, PackQuestion, PackScenario, PackConcept } from './data';
+import {
+  ACTIVE_PACK_ID_KEY,
+  HANDOFF_PACK_KEY,
+  insertedPackKey,
+} from '@/lib/packKeys';
 
 export type ActivePack = {
   manifest: PackManifest;
@@ -41,8 +46,9 @@ export function setActivePack(pack: ActivePack): void {
  * worker serves them from cache they can execute BEFORE the inline bootstrap
  * at the end of <head>, so relying on the global alone made an injected pack
  * lose the race and render the build-time one. Mirrors the bootstrap's
- * sources and precedence: `#pack=<base64-json>` hash, then
- * localStorage['quizmill.activePack'].
+ * sources and precedence: `#pack=<base64-json>` hash, then the external
+ * handoff blob (HANDOFF_PACK_KEY), then the pack-library pointer
+ * (ACTIVE_PACK_ID_KEY → the inserted pack it names).
  */
 function readHandedOffPack(): ActivePack | undefined {
   if (typeof window === 'undefined') return undefined; // SSG build
@@ -53,7 +59,11 @@ function readHandedOffPack(): ActivePack | undefined {
       // Inverse of the encoder: URI-component → base64 → UTF-8 JSON.
       raw = decodeURIComponent(escape(atob(decodeURIComponent(m[1]))));
     } else if (window.localStorage) {
-      raw = window.localStorage.getItem('quizmill.activePack');
+      raw = window.localStorage.getItem(HANDOFF_PACK_KEY);
+      if (!raw) {
+        const id = window.localStorage.getItem(ACTIVE_PACK_ID_KEY);
+        if (id) raw = window.localStorage.getItem(insertedPackKey(id));
+      }
     }
     if (!raw) return undefined;
     const pack = JSON.parse(raw) as ActivePack;

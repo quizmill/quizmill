@@ -40,8 +40,17 @@ afterEach(() => {
 });
 
 /** Minimal browser stub: a window with localStorage and a location hash. */
-function stubBrowser({ hash = '', stored = null }: { hash?: string; stored?: string | null }) {
-  const map = new Map<string, string>();
+function stubBrowser({
+  hash = '',
+  stored = null,
+  entries = {},
+}: {
+  hash?: string;
+  stored?: string | null;
+  /** Extra raw localStorage rows (e.g. pack-library keys). */
+  entries?: Record<string, string>;
+}) {
+  const map = new Map<string, string>(Object.entries(entries));
   if (stored !== null) map.set('quizmill.activePack', stored);
   vi.stubGlobal('window', {
     location: { hash },
@@ -108,6 +117,51 @@ describe('runtime pack source', () => {
     const { activeManifest } = await import('@/pack/source');
 
     expect(activeManifest.id).toBe('injected-pack');
+  });
+
+  // The pack library stores packs under quizmill.packLibrary.pack.<id>.v1
+  // and points at the active one via quizmill.activePackId — the lightest
+  // handoff: no duplicated JSON blob, just a pointer the bootstrap follows.
+  it('resolves the pack-library pointer to the inserted pack', async () => {
+    vi.resetModules();
+    stubBrowser({
+      entries: {
+        'quizmill.activePackId': 'injected-pack',
+        'quizmill.packLibrary.pack.injected-pack.v1': JSON.stringify(INJECTED),
+      },
+    });
+
+    const { activeManifest, activeQuestions } = await import('@/pack/source');
+
+    expect(activeManifest.id).toBe('injected-pack');
+    expect(activeQuestions).toHaveLength(1);
+  });
+
+  it('lets an external handoff blob outrank the library pointer', async () => {
+    vi.resetModules();
+    stubBrowser({
+      stored: JSON.stringify(INJECTED),
+      entries: {
+        'quizmill.activePackId': 'library-pack',
+        'quizmill.packLibrary.pack.library-pack.v1': JSON.stringify({
+          ...INJECTED,
+          manifest: { ...INJECTED.manifest, id: 'library-pack' },
+        }),
+      },
+    });
+
+    const { activeManifest } = await import('@/pack/source');
+
+    expect(activeManifest.id).toBe('injected-pack');
+  });
+
+  it('falls back to the build-time pack when the pointer names a missing pack', async () => {
+    vi.resetModules();
+    stubBrowser({ entries: { 'quizmill.activePackId': 'gone' } });
+
+    const { activeManifest } = await import('@/pack/source');
+
+    expect(activeManifest.id).not.toBe('injected-pack');
   });
 
   it('ignores junk in localStorage and falls back to the build-time pack', async () => {

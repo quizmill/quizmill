@@ -216,3 +216,74 @@ describe('notes sync end-to-end (client engine ↔ real worker ↔ real SQLite)'
     }
   });
 });
+
+describe('one sync key, many packs (the pack-library app model)', () => {
+  // The multi-pack app syncs every pack under ONE app-level key; the
+  // worker partitions rows by (user, pack) — these tests prove that
+  // partition holds end-to-end, so consolidating per-pack installs into
+  // one app cannot cross-contaminate or amplify anything server-side.
+
+  /** Raw wire call so we can vary the pack id (httpBackend pins PACK_ID
+   *  to the build manifest at module load). */
+  async function ops(key: string, pack: string, wireOps: unknown[]): Promise<Response> {
+    return fetch('https://sync.test/v1/ops', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ pack, ops: wireOps }),
+    });
+  }
+  async function pull(key: string, pack: string): Promise<Record<string, unknown[]>> {
+    const res = await fetch(`https://sync.test/v1/rows?pack=${encodeURIComponent(pack)}`, {
+      headers: { authorization: `Bearer ${key}` },
+    });
+    return res.json() as Promise<Record<string, unknown[]>>;
+  }
+  const session = (id: string, subject: string) => ({
+    t: 'sessions',
+    op: 'upsert',
+    id,
+    data: { id, subject, startedAt: 1, endedAt: 2, questionCount: 1, correctCount: 1 },
+  });
+
+  it('keeps each pack\'s rows isolated under the same key, even with equal row ids', async () => {
+    const key = generateSyncKey();
+
+    // Same row id "s1" written under two packs — the PK includes pack_id,
+    // so these are two rows, not one overwriting the other.
+    expect((await ops(key, 'solar-system-demo', [session('s1', 'planets')])).status).toBe(200);
+    expect((await ops(key, 'world-capitals', [session('s1', 'europe')])).status).toBe(200);
+
+    const solar = await pull(key, 'solar-system-demo');
+    const capitals = await pull(key, 'world-capitals');
+    expect(solar.sessions).toHaveLength(1);
+    expect(capitals.sessions).toHaveLength(1);
+    expect((solar.sessions[0] as { subject: string }).subject).toBe('planets');
+    expect((capitals.sessions[0] as { subject: string }).subject).toBe('europe');
+  });
+
+  it('clear-all scoped to one pack leaves the other packs\' rows untouched', async () => {
+    const key = generateSyncKey();
+    await ops(key, 'solar-system-demo', [session('s1', 'planets')]);
+    await ops(key, 'world-capitals', [session('s1', 'europe')]);
+
+    // "Reset all local progress" while solar is active → wipes ONLY solar.
+    expect(
+      (await ops(key, 'solar-system-demo', [{ t: 'clear-all', op: 'delete' }])).status,
+    ).toBe(200);
+
+    expect((await pull(key, 'solar-system-demo')).sessions).toHaveLength(0);
+    expect((await pull(key, 'world-capitals')).sessions).toHaveLength(1);
+  });
+
+  it('a consolidating user reaches their old per-pack-app rows with the same key + pack id', async () => {
+    // Yesterday: the dedicated pack app synced under (key, world-capitals).
+    const key = generateSyncKey();
+    await ops(key, 'world-capitals', [session('old-session', 'africa')]);
+
+    // Today: the multi-pack app, SAME key, activates that pack and pulls
+    // the same partition — the history is simply there.
+    const pulled = await pull(key, 'world-capitals');
+    expect(pulled.sessions).toHaveLength(1);
+    expect((pulled.sessions[0] as { id: string }).id).toBe('old-session');
+  });
+});

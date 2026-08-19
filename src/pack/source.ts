@@ -18,6 +18,13 @@ import type { PackManifest, PackQuestion, PackScenario, PackConcept } from './da
 
 const override = getActivePackOverride();
 
+/** The manifest COMPILED INTO this deployment, regardless of any runtime
+ *  override — the pack library UI lists it as the built-in pack. */
+export const buildTimeManifest = buildManifest as PackManifest;
+
+/** Question count of the compiled-in pack, for the library listing. */
+export const buildTimeQuestionCount = (buildQuestions as PackQuestion[]).length;
+
 export const activeManifest = (
   override ? override.manifest : buildManifest
 ) as PackManifest;

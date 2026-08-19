@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   ArrowLeft,
+  Boxes,
   Car,
   Gamepad2,
   Monitor,
@@ -12,6 +13,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { APP_CONFIG } from '@/config';
 import { InstallCard } from '@/components/InstallPrompt';
 import { SyncSettings } from '@/components/SyncSettings';
 import { TransferSettings } from '@/components/TransferSettings';
@@ -50,16 +52,35 @@ const THEME_CHOICES: {
 ];
 
 /**
- * Settings page:
- *  - SyncSettings   — cloud sync sign-in (dormant unless configured)
- *  - TransferSettings — export/import progress as a file (device moves)
- *  - Reset today    — remove just today's sessions
- *  - Reset all      — wipe local progress for the active pack
- *  - App version    — semver + build tag (tap it to reveal games)
- *  - `extras` slot  — e.g. the downvote browser
+ * Settings page, grouped into labelled sections so it stays scannable as
+ * cards accumulate:
+ *  - (top)            — InstallCard, a self-hiding call-to-action banner
+ *  - Packs            — pack library entry, question sources, `extras`
+ *                       slot (e.g. the downvote browser)
+ *  - Progress & sync  — SyncSettings, TransferSettings, the two resets
+ *  - This device      — appearance, drive mode
+ *  - About            — version + build (tap the version to reveal games)
  */
 export interface SettingsPageProps {
   extras?: ReactNode;
+}
+
+/** A labelled group of settings cards. */
+function SettingsSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section aria-label={title} className="flex flex-col gap-3">
+      <h2 className="px-1 pt-3 text-xs font-semibold uppercase tracking-wider text-ink-400">
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
 }
 
 export function SettingsPage({ extras }: SettingsPageProps) {
@@ -135,7 +156,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
       <div>
         <h1 className="text-3xl font-bold text-ink-900">Settings</h1>
         <p className="mt-1 text-ink-500">
-          Sync, reset, and app info.
+          Packs, progress &amp; sync, and app preferences.
         </p>
       </div>
 
@@ -145,15 +166,76 @@ export function SettingsPage({ extras }: SettingsPageProps) {
         </div>
       ) : null}
 
-      <section className="flex flex-col gap-3">
-        <InstallCard />
+      <InstallCard />
 
+      <SettingsSection title="Packs">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
+          <h3 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
+            <Boxes className="h-5 w-5 text-ink-500" />
+            Pack library
+          </h3>
+          <p className="mt-1 text-sm text-ink-600">
+            One app, many packs — insert new packs, swap the active one, and
+            keep each pack&apos;s progress. Practising now:{' '}
+            <strong>{APP_CONFIG.title}</strong>.
+          </p>
+          <Link
+            href="/packs/"
+            data-testid="open-packs"
+            className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50 dark:hover:bg-ink-100"
+          >
+            <Boxes className="h-4 w-4" />
+            Manage packs
+          </Link>
+        </div>
+
+        {packSources.length > 0 ? (
+          <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
+            <h3 className="text-lg font-semibold text-ink-900">Question sources</h3>
+            <p className="mt-1 text-sm text-ink-600">
+              Where this pack&apos;s questions come from.
+            </p>
+            <dl className="mt-3 flex flex-col gap-3">
+              {packSources.map((src) => (
+                <div key={src.label} className="flex gap-3">
+                  <dt>
+                    <span className="rounded-full border border-ink-200 bg-surface px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-500">
+                      {src.label}
+                    </span>
+                  </dt>
+                  <dd className="flex-1 text-sm text-ink-600">
+                    {src.url ? (
+                      <a
+                        href={src.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-900"
+                      >
+                        {src.name ?? src.label}
+                      </a>
+                    ) : (
+                      <span className="font-medium text-ink-800">{src.name ?? src.label}</span>
+                    )}
+                    {src.blurb ? <> — {src.blurb}</> : null}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ) : null}
+
+        {extras}
+      </SettingsSection>
+
+      <SettingsSection title="Progress & sync">
         <SyncSettings />
 
         <TransferSettings />
+      </SettingsSection>
 
+      <SettingsSection title="This device">
         <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-ink-900">Appearance</h2>
+          <h3 className="text-lg font-semibold text-ink-900">Appearance</h3>
           <p className="mt-1 text-sm text-ink-600">
             Auto follows your device&apos;s light/dark setting.
           </p>
@@ -187,10 +269,10 @@ export function SettingsPage({ extras }: SettingsPageProps) {
         <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
+              <h3 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
                 <Car className="h-5 w-5 text-ink-500" />
                 Drive mode
-              </h2>
+              </h3>
               <p className="mt-1 text-sm text-ink-600">
                 Hands-free voice quiz for the car — questions read aloud,
                 answers by voice. Adds a card to the home screen.
@@ -227,45 +309,13 @@ export function SettingsPage({ extras }: SettingsPageProps) {
           ) : null}
         </div>
 
-        {packSources.length > 0 ? (
-          <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-ink-900">Question sources</h2>
-            <p className="mt-1 text-sm text-ink-600">
-              Where this pack&apos;s questions come from.
-            </p>
-            <dl className="mt-3 flex flex-col gap-3">
-              {packSources.map((src) => (
-                <div key={src.label} className="flex gap-3">
-                  <dt>
-                    <span className="rounded-full border border-ink-200 bg-surface px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-500">
-                      {src.label}
-                    </span>
-                  </dt>
-                  <dd className="flex-1 text-sm text-ink-600">
-                    {src.url ? (
-                      <a
-                        href={src.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-900"
-                      >
-                        {src.name ?? src.label}
-                      </a>
-                    ) : (
-                      <span className="font-medium text-ink-800">{src.name ?? src.label}</span>
-                    )}
-                    {src.blurb ? <> — {src.blurb}</> : null}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        ) : null}
+      </SettingsSection>
 
+      <SettingsSection title="Reset">
         <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-ink-900">
+          <h3 className="text-lg font-semibold text-ink-900">
             Reset today&apos;s progress
-          </h2>
+          </h3>
           <p className="mt-1 text-sm text-ink-600">
             Removes only the sessions practised today.
           </p>
@@ -285,9 +335,9 @@ export function SettingsPage({ extras }: SettingsPageProps) {
         </div>
 
         <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-ink-900">
+          <h3 className="text-lg font-semibold text-ink-900">
             Reset all local progress
-          </h2>
+          </h3>
           <p className="mt-1 text-sm text-ink-600">
             Erases every saved session and answer on this device. Cloud
             sync rows (if signed in) stay — sign back in to restore.
@@ -311,7 +361,9 @@ export function SettingsPage({ extras }: SettingsPageProps) {
             Reset everything
           </Button>
         </div>
+      </SettingsSection>
 
+      <SettingsSection title="About">
         <div className="rounded-2xl border border-ink-200 bg-surface p-5 text-sm text-ink-600 shadow-sm">
           <div className="flex items-center justify-between">
             <span>App version</span>
@@ -345,9 +397,9 @@ export function SettingsPage({ extras }: SettingsPageProps) {
             data-testid="games-easter-egg"
             className="rounded-2xl border border-brand-300 bg-brand-50 p-5 shadow-sm"
           >
-            <h2 className="text-lg font-semibold text-ink-900">
+            <h3 className="text-lg font-semibold text-ink-900">
               🎮 You found the games!
-            </h2>
+            </h3>
             <p className="mt-1 text-sm text-ink-600">
               A little arcade tucked away as a reward for practising.
             </p>
@@ -364,9 +416,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
             </Link>
           </div>
         ) : null}
-
-        {extras}
-      </section>
+      </SettingsSection>
     </main>
   );
 }

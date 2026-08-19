@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { PackChip } from '@/components/PackChip';
 import { ArrowLeft, X } from 'lucide-react';
 import {
   ACHIEVEMENTS,
@@ -58,6 +59,7 @@ export default function StickersPage() {
       </header>
 
       <div>
+        <PackChip className="mb-2" />
         <h1 className="text-3xl font-bold text-ink-900">Sticker cabinet</h1>
         <p className="mt-1 text-ink-500">
           Earn stickers by practising. Tap a locked one to see how.

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { PackChip } from '@/components/PackChip';
 import { ArrowLeft, Flame } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { APP_CONFIG } from '@/config';
@@ -75,6 +76,7 @@ export default function ProgressPage() {
       </header>
 
       <div>
+        <PackChip className="mb-2" />
         <h1 className="text-3xl font-bold text-ink-900">Progress</h1>
         <p className="mt-1 text-ink-500">
           Your sessions, accuracy by category and over time, and where to
