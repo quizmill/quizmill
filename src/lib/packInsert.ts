@@ -182,3 +182,14 @@ export async function fetchPackFromUrl(
 function siblingAssetsBase(bundleUrl: string): string {
   return new URL('assets', bundleUrl).toString();
 }
+
+/**
+ * The `assets/` location a pack URL implies — the same derivation the
+ * insert flow uses, exposed for the runtime's backfill of packs inserted
+ * before assetsBase existed. Undefined for non-URL input (picked files).
+ */
+export function assetsBaseForUrl(input: string): string | undefined {
+  const resolved = resolvePackUrl(input);
+  if (!resolved) return undefined;
+  return resolved.kind === 'dir' ? `${resolved.base}/assets` : siblingAssetsBase(resolved.url);
+}
