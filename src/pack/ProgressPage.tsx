@@ -1,9 +1,11 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Flame } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { APP_CONFIG } from '@/config';
+import { recordEvent } from '@/lib/storage';
 import { useStorageData } from '@/lib/useStorage';
 import {
   accuracyByDay,
@@ -32,6 +34,9 @@ const DAILY_POINT_LIMIT = 30;
  * CSS/flex — no charting dependency; packs stay lightweight.
  */
 export default function ProgressPage() {
+  useEffect(() => {
+    recordEvent('progress_view');
+  }, []);
   const { sessions, attempts } = useStorageData();
 
   const streak = currentStreak(practiceDates(attempts));

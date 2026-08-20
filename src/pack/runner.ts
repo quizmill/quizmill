@@ -4,7 +4,8 @@
  * PackQuestion shape. The React components are the I/O shells;
  * everything that can be a function of plain inputs lives here.
  */
-import type { Attempt, Session } from '@/data/types';
+import { APP_BUILD } from '@/config';
+import type { Attempt, Session, SessionMode } from '@/data/types';
 import { pickSessionQuestions, type AttemptSummary } from '@/lib/selection';
 import { correctKeysOf, type OptionKey, type PackQuestion } from '@/pack/data';
 
@@ -52,6 +53,9 @@ export interface RunnerState {
   currentIndex: number;
   correctCount: number;
   startedAt: number;
+  /** When the CURRENT question appeared — buildAttempt derives the real
+   *  timeTakenSeconds from it. Stamped at session start and by moveToNext. */
+  questionShownAt: number;
 }
 
 /** Filter the full pack bank to questions for one category. */
@@ -143,11 +147,24 @@ export interface BuildAttemptArgs {
   categoryKey: string;
   now: number;
   attemptId: string;
+  /** How the session runs — denormalised onto the attempt. */
+  mode?: SessionMode;
+  /** The first option tapped before any revision, when the UI tracked it. */
+  firstSelected?: OptionKey;
+  /** Override the measured time (Drive Mode times its own speech loop). */
   timeTakenSeconds?: number;
 }
 
+/** Ceiling on a measured answer time — a question left open overnight is
+ *  a parked tab, not an hour of thought. */
+const MAX_TIME_TAKEN_SECONDS = 3600;
+
 export function buildAttempt(args: BuildAttemptArgs): Attempt {
   const { state, question, selected, categoryKey, now, attemptId } = args;
+  const measured = Math.min(
+    MAX_TIME_TAKEN_SECONDS,
+    Math.max(0, Math.round((now - state.questionShownAt) / 1000)),
+  );
   return {
     id: attemptId,
     sessionId: state.sessionId,
@@ -157,7 +174,7 @@ export function buildAttempt(args: BuildAttemptArgs): Attempt {
     // plain string so storage/sync/stats read it unchanged.
     selectedAnswer: [...selected].sort().join(','),
     isCorrect: gradeSelection(question, selected),
-    timeTakenSeconds: args.timeTakenSeconds ?? 1,
+    timeTakenSeconds: args.timeTakenSeconds ?? measured,
     // Subject is the engine type — packs store the category key here.
     subject: categoryKey,
     // Per-question rescue, same as CCA: pack questions are
@@ -166,6 +183,29 @@ export function buildAttempt(args: BuildAttemptArgs): Attempt {
     // the contrast with 11+'s per-concept rescue model).
     topic: question.id,
     difficulty: question.difficulty,
+    position: state.currentIndex + 1,
+    ...(args.firstSelected !== undefined ? { firstSelected: args.firstSelected } : {}),
+    ...(args.mode !== undefined ? { mode: args.mode } : {}),
+    ...(question.scenarioId ? { scenarioId: question.scenarioId } : {}),
+    ...(APP_BUILD ? { appBuild: APP_BUILD } : {}),
+  };
+}
+
+/**
+ * Coarse device context for a session — installed-PWA vs browser tab, and
+ * touch vs desktop. Deliberately nothing finer (no user agent, no screen
+ * sizes): enough for adoption analysis, useless for fingerprinting.
+ * Returns {} outside the browser so SSR-built sessions stay clean.
+ */
+export function deviceContext(): Pick<Session, 'display' | 'platform'> {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return {};
+  }
+  return {
+    display: window.matchMedia('(display-mode: standalone)').matches
+      ? 'standalone'
+      : 'browser',
+    platform: window.matchMedia('(pointer: coarse)').matches ? 'touch' : 'desktop',
   };
 }
 
@@ -173,7 +213,7 @@ export function buildAttempt(args: BuildAttemptArgs): Attempt {
 export function buildSessionStart(
   state: RunnerState,
   categoryKey: string,
-  mode: Session['mode'] = 'practice',
+  mode: SessionMode = 'practice',
 ): Session {
   return {
     id: state.sessionId,
@@ -183,6 +223,8 @@ export function buildSessionStart(
     questionCount: state.questions.length,
     correctCount: 0,
     mode,
+    ...(APP_BUILD ? { appBuild: APP_BUILD } : {}),
+    ...deviceContext(),
   };
 }
 
@@ -191,7 +233,7 @@ export function buildSessionEnd(
   state: RunnerState,
   categoryKey: string,
   endedAt: number,
-  mode: Session['mode'] = 'practice',
+  mode: SessionMode = 'practice',
 ): Session {
   return {
     id: state.sessionId,
@@ -201,6 +243,8 @@ export function buildSessionEnd(
     questionCount: state.questions.length,
     correctCount: state.correctCount,
     mode,
+    ...(APP_BUILD ? { appBuild: APP_BUILD } : {}),
+    ...deviceContext(),
   };
 }
 
@@ -231,7 +275,14 @@ export function advanceAfterAnswer(
   };
 }
 
-/** Move to the next question. Caller must ensure !isLastQuestion(state). */
-export function moveToNext(state: RunnerState): RunnerState {
-  return { ...state, currentIndex: state.currentIndex + 1 };
+/** Move to the next question. Caller must ensure !isLastQuestion(state).
+ *  Stamps questionShownAt so the next answer's time measures from here. */
+export function moveToNext(state: RunnerState, now: number = Date.now()): RunnerState {
+  return { ...state, currentIndex: state.currentIndex + 1, questionShownAt: now };
+}
+
+/** Seconds spent on the feedback/explanation screen after an answer,
+ *  clamped like timeTakenSeconds so a parked tab can't skew analysis. */
+export function feedbackSecondsSince(answeredAt: number, now: number = Date.now()): number {
+  return Math.min(MAX_TIME_TAKEN_SECONDS, Math.max(0, Math.round((now - answeredAt) / 1000)));
 }

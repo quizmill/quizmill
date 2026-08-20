@@ -16,9 +16,9 @@
  * (local data always stays put).
  */
 import { APP_CONFIG } from '@/config';
-import type { Attempt, Session } from '@/data/types';
+import type { AppEvent, Attempt, Session } from '@/data/types';
 import type { EarnedAchievement, QuestionNote, QuestionVote } from '../storage';
-import { KEY_PREFIX } from '../storage';
+import { KEY_PREFIX, recordEvent } from '../storage';
 import { hashSyncKey, normalizeSyncKey } from '../syncKey';
 import type { QueueOp, RemoteData, SyncBackend } from '../syncBackend';
 
@@ -33,13 +33,13 @@ const KEY_STORAGE = `${KEY_PREFIX}syncKey.v1`;
 
 export type WireOp =
   | {
-      t: 'sessions' | 'attempts' | 'achievements' | 'votes' | 'notes';
+      t: 'sessions' | 'attempts' | 'achievements' | 'votes' | 'notes' | 'events';
       op: 'upsert';
       id: string;
       /** Secondary key used for grouped deletes — attempts carry their
        *  sessionId here so "clear these sessions" can find them. */
       ref?: string;
-      data: Session | Attempt | EarnedAchievement | QuestionVote | QuestionNote;
+      data: Session | Attempt | EarnedAchievement | QuestionVote | QuestionNote | AppEvent;
     }
   | { t: 'votes' | 'notes'; op: 'delete'; id: string }
   | { t: 'clear-all'; op: 'delete' }
@@ -68,6 +68,8 @@ export function toWireOp(op: QueueOp): WireOp {
       return op.op === 'delete'
         ? { t: 'notes', op: 'delete', id: op.questionId }
         : { t: 'notes', op: 'upsert', id: op.row.questionId, data: op.row };
+    case 'events':
+      return { t: 'events', op: 'upsert', id: op.row.id, data: op.row };
     case 'clear-all':
       return { t: 'clear-all', op: 'delete' };
     case 'clear-sessions':
@@ -103,6 +105,7 @@ export async function setSyncKey(raw: string): Promise<boolean> {
   const canonical = normalizeSyncKey(raw);
   if (!canonical || typeof window === 'undefined') return false;
   window.localStorage.setItem(KEY_STORAGE, canonical);
+  recordEvent('sync_sign_in');
   await notifyAuth();
   return true;
 }
@@ -160,8 +163,9 @@ export const httpBackend: SyncBackend = {
       attempts: body.attempts ?? [],
       achievements: body.achievements ?? [],
       votes: body.votes ?? [],
-      // Older servers (pre-notes) don't return this key.
+      // Older servers don't return these keys (pre-notes / pre-events).
       notes: body.notes ?? [],
+      events: body.events ?? [],
     };
   },
 };

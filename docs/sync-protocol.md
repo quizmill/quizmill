@@ -56,7 +56,7 @@ trust, fine for quiz history; don't reuse for anything sensitive.
 Return every row for this user + pack, grouped by table, `200`:
 
 ```json
-{ "sessions": [...], "attempts": [...], "achievements": [...], "votes": [...], "notes": [...] }
+{ "sessions": [...], "attempts": [...], "achievements": [...], "votes": [...], "notes": [...], "events": [...] }
 ```
 
 Rows are returned exactly as uploaded (the client's local shapes — see
@@ -72,7 +72,7 @@ backoff-ish pacing (ops are idempotent, so at-least-once is safe).
 
 ```ts
 type WireOp =
-  | { t: 'sessions'|'attempts'|'achievements'|'votes'|'notes';
+  | { t: 'sessions'|'attempts'|'achievements'|'votes'|'notes'|'events';
       op: 'upsert'; id: string; ref?: string; data: object }
   | { t: 'votes'|'notes'; op: 'delete'; id: string }       // id = questionId
   | { t: 'clear-all'; op: 'delete' }                       // wipe user+pack
@@ -87,7 +87,7 @@ Required semantics:
 - **`ref`** — attempts carry their `sessionId` here; store it so
   `clear-sessions` can delete both the listed sessions AND every attempt
   whose `ref` is in the list.
-- **`clear-all`** — delete all five tables for this user + pack only.
+- **`clear-all`** — delete all six tables for this user + pack only.
 - **CORS** — the app is a static site on another origin: allow
   `GET, POST, OPTIONS` with `authorization, content-type` headers from
   `*` (bearer auth, no cookies).
@@ -97,7 +97,7 @@ per request, ≤32 KB per row, ≤200-char ids.
 
 ### Adding a table: deploy the server first
 
-When a release adds a synced table (as `notes` did), upgrade the server
+When a release adds a synced table (as `notes` and `events` did), upgrade the server
 BEFORE shipping the client — redeploy the worker (`npx wrangler deploy`
 from `cloudflare/`; the generic rows schema needs no migration) or run
 the new Supabase migration. A client that races ahead gets its new-table

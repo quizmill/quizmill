@@ -31,7 +31,7 @@
  * With no provider configured, sync stays dormant and the app is
  * pure-local.
  */
-import type { Attempt, Session } from '@/data/types';
+import type { AppEvent, Attempt, Session } from '@/data/types';
 import type { EarnedAchievement, QuestionNote, QuestionVote } from './storage';
 // The impl modules import only *types* from this file, so these imports
 // don't create a runtime cycle.
@@ -48,6 +48,7 @@ export type QueueOp =
   | { t: 'votes'; op: 'delete'; questionId: string }
   | { t: 'notes'; op: 'upsert'; row: QuestionNote }
   | { t: 'notes'; op: 'delete'; questionId: string }
+  | { t: 'events'; op: 'upsert'; row: AppEvent }
   | { t: 'clear-all'; op: 'delete' }
   | { t: 'clear-sessions'; op: 'delete'; sessionIds: string[] };
 
@@ -58,6 +59,7 @@ export interface RemoteData {
   achievements: EarnedAchievement[];
   votes: QuestionVote[];
   notes: QuestionNote[];
+  events: AppEvent[];
 }
 
 export interface SyncBackend {

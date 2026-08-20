@@ -74,9 +74,9 @@ import {
  * by voice (SpeechRecognition, where available) or by tapping the big
  * option tiles. Sessions mix all categories and record through the
  * same storage as the normal runner — attempts carry each question's
- * real category, the session carries the 'drive' pseudo-subject (mode
- * stays 'practice': the Supabase mirror constrains mode, and a drive
- * round IS practice).
+ * real category, the session carries the 'drive' pseudo-subject and
+ * mode 'drive' (the legacy Supabase mirror clamps unknown modes to
+ * 'practice' at its mapping layer — see supabaseBackend.ts).
  *
  * The screen is deliberately dark, huge, and low-information: it's a
  * status display, not a reading surface. Anything visual is for the
@@ -149,14 +149,16 @@ export function DriveRunner() {
       setPhase('empty');
       return;
     }
+    const now = Date.now();
     const initial: RunnerState = {
       sessionId: crypto.randomUUID(),
       questions: picked,
       currentIndex: 0,
       correctCount: 0,
-      startedAt: Date.now(),
+      startedAt: now,
+      questionShownAt: now,
     };
-    startSession(buildSessionStart(initial, DRIVE_SUBJECT));
+    startSession(buildSessionStart(initial, DRIVE_SUBJECT, 'drive'));
     setState(initial);
     setSelected(null);
     setLastHeard(null);
@@ -175,6 +177,9 @@ export function DriveRunner() {
       categoryKey: current.categoryKey,
       now: Date.now(),
       attemptId: crypto.randomUUID(),
+      // Drive answers ride the speech loop — the shown-at clock includes
+      // the question being read aloud, which IS the drive experience.
+      mode: 'drive',
     });
     recordAttempt(attempt);
     silentAchievementCheck();
@@ -185,7 +190,7 @@ export function DriveRunner() {
 
   function advance(fromState: RunnerState) {
     if (isLastQuestion(fromState)) {
-      endSession(buildSessionEnd(fromState, DRIVE_SUBJECT, Date.now()));
+      endSession(buildSessionEnd(fromState, DRIVE_SUBJECT, Date.now(), 'drive'));
       silentAchievementCheck();
       setPhase('done');
       return;

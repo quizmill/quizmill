@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, RefreshCw, Home, ListChecks } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -23,7 +23,7 @@ import { ConceptCard } from '@/pack/ConceptCard';
 import { QuestionMeta } from '@/pack/QuestionMeta';
 import { Celebration } from '@/components/Celebration';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
-import { loadAttempts, loadSessions } from '@/lib/storage';
+import { amendAttempt, loadAttempts, loadSessions } from '@/lib/storage';
 import { unresolvedMistakeIds } from '@/lib/mistakes';
 import {
   correctKeysOf,
@@ -39,6 +39,7 @@ import {
   buildAttempt,
   buildSessionEnd,
   buildSessionStart,
+  feedbackSecondsSince,
   formatKeyList,
   gradeSelection,
   isLastQuestion,
@@ -72,6 +73,10 @@ export function PackReviewRunner() {
   // The chosen option key(s) — one for single-answer, several for
   // multi-answer ("select all") questions.
   const [selected, setSelected] = useState<OptionKey[]>([]);
+  // First option tapped on the current question (first-instinct signal)
+  // and the just-recorded attempt (to stamp feedbackSeconds on Next).
+  const firstSelectedRef = useRef<OptionKey | null>(null);
+  const lastAttemptRef = useRef<{ id: string; answeredAt: number } | null>(null);
   const [finished, setFinished] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -99,6 +104,7 @@ export function PackReviewRunner() {
       currentIndex: 0,
       correctCount: 0,
       startedAt: now,
+      questionShownAt: now,
     };
     startSession(buildSessionStart(initial, picked[0].categoryKey, 'review'));
     setState(initial);
@@ -189,6 +195,7 @@ export function PackReviewRunner() {
 
   function handleSelect(key: OptionKey) {
     if (stage !== 'choosing') return;
+    firstSelectedRef.current ??= key;
     setSelected((prev) => nextSelection(prev, key, multi));
   }
 
@@ -203,8 +210,11 @@ export function PackReviewRunner() {
       categoryKey: current.categoryKey,
       now: Date.now(),
       attemptId: crypto.randomUUID(),
+      mode: 'review',
+      firstSelected: firstSelectedRef.current ?? undefined,
     });
     recordAttempt(attempt);
+    lastAttemptRef.current = { id: attempt.id, answeredAt: attempt.answeredAt };
     // Same re-read rationale as the practice runner — see there.
     checkNow(loadSessions(), loadAttempts());
     setState(advanceAfterAnswer(state, attempt.isCorrect));
@@ -213,6 +223,14 @@ export function PackReviewRunner() {
 
   function handleNext() {
     if (!state) return;
+    // How long the explanation was on screen — amended onto the attempt.
+    if (lastAttemptRef.current) {
+      amendAttempt(lastAttemptRef.current.id, {
+        feedbackSeconds: feedbackSecondsSince(lastAttemptRef.current.answeredAt),
+      });
+      lastAttemptRef.current = null;
+    }
+    firstSelectedRef.current = null;
     if (isLastQuestion(state)) {
       endSession(
         buildSessionEnd(state, state.questions[0].categoryKey, Date.now(), 'review'),

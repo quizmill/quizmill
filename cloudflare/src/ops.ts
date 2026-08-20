@@ -17,7 +17,7 @@
  * exactly like the localStorage source of truth it mirrors.
  */
 
-export const TABLES = ['sessions', 'attempts', 'achievements', 'votes', 'notes'] as const;
+export const TABLES = ['sessions', 'attempts', 'achievements', 'votes', 'notes', 'events'] as const;
 export type TableName = (typeof TABLES)[number];
 
 export type WireOp =

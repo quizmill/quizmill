@@ -63,6 +63,7 @@ const staleThenUpgradedBackend: SyncBackend = {
     achievements: [],
     votes: [],
     notes: cloud.acceptNotes ? [...cloud.notes.values()] : [],
+    events: [],
   }),
 };
 

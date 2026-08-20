@@ -20,7 +20,8 @@ const PACK_ID = APP_CONFIG.packId;
 
 // ── Field mapping: local camelCase  ⇄  Supabase snake_case ───────────────
 
-function sessionToRow(s: Session, user_id: string) {
+/** Exported for tests — the mode clamp is a compatibility guarantee. */
+export function sessionToRow(s: Session, user_id: string) {
   return {
     id: s.id,
     user_id,
@@ -30,7 +31,12 @@ function sessionToRow(s: Session, user_id: string) {
     ended_at: s.endedAt != null ? new Date(s.endedAt).toISOString() : null,
     question_count: s.questionCount,
     correct_count: s.correctCount,
-    mode: s.mode ?? 'practice',
+    // The Postgres schema constrains mode to the original pair; clamp the
+    // newer modes ('drive', 'notes') so their sessions still sync rather
+    // than wedging the queue on a CHECK violation. The analytics fields
+    // (appBuild, display, …) have no columns here and are dropped — the
+    // Supabase mirror is legacy; the http/D1 backend keeps full fidelity.
+    mode: s.mode === 'review' ? 'review' : 'practice',
   };
 }
 function rowToSession(r: Record<string, unknown>): Session {
@@ -146,6 +152,10 @@ export const supabaseBackend: SyncBackend = {
   },
 
   async runOp(op: QueueOp, user_id: string) {
+    // No events table in the Supabase schema — swallow the op before even
+    // touching the client, so an events write can never poison the queue
+    // on this backend.
+    if (op.t === 'events') return;
     const sb = getSupabase();
     if (!sb) throw new Error('supabase client unavailable');
     switch (op.t) {
@@ -259,6 +269,8 @@ export const supabaseBackend: SyncBackend = {
       achievements: (achievements.data ?? []).map(rowToAchievement),
       votes: (votes.data ?? []).map(rowToVote),
       notes: (notes.data ?? []).map(rowToNote),
+      // No events table here — see runOp's events no-op.
+      events: [],
     };
   },
 };

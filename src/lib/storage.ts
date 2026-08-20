@@ -9,7 +9,7 @@
  * static export build, the pages render with empty state; localStorage is
  * read once on mount via the hooks in `useStorage.ts`.
  */
-import type { Attempt, Session } from '@/data/types';
+import type { AppEvent, AppEventType, Attempt, Session } from '@/data/types';
 import { APP_CONFIG } from '@/config';
 
 // Per-pack key namespace so different packs opened in the same browser
@@ -22,6 +22,7 @@ export const ATTEMPTS_KEY = `${KEY_PREFIX}attempts.v1`;
 const ACHIEVEMENTS_KEY = `${KEY_PREFIX}achievements.v1`;
 const VOTES_KEY = `${KEY_PREFIX}votes.v1`;
 const NOTES_KEY = `${KEY_PREFIX}notes.v1`;
+const EVENTS_KEY = `${KEY_PREFIX}events.v1`;
 const PREFS_KEY = `${KEY_PREFIX}prefs.v1`;
 const SCRATCHPAD_KEY = `${KEY_PREFIX}scratchpad.v1`;
 
@@ -71,6 +72,7 @@ export type Mutation =
   | { table: 'votes'; op: 'delete'; questionId: string }
   | { table: 'notes'; row: QuestionNote }
   | { table: 'notes'; op: 'delete'; questionId: string }
+  | { table: 'events'; row: AppEvent }
   | { table: 'clear-all' }
   | { table: 'clear-sessions'; op: 'delete'; sessionIds: string[] };
 
@@ -273,6 +275,22 @@ export function saveAttempt(attempt: Attempt): void {
   notify({ table: 'attempts', row: attempt });
 }
 
+/**
+ * Patch an already-written attempt in place (e.g. stamp feedbackSeconds
+ * once the learner leaves the explanation) and re-emit it so the sync
+ * layer upserts the fuller row. A no-op for an unknown id — the round may
+ * have been cleared underneath us.
+ */
+export function amendAttempt(id: string, patch: Partial<Attempt>): void {
+  const all = loadAttempts();
+  const idx = all.findIndex((a) => a.id === id);
+  if (idx < 0) return;
+  const amended = { ...all[idx], ...patch, id };
+  all[idx] = amended;
+  writeJson(ATTEMPTS_KEY, all);
+  notify({ table: 'attempts', row: amended });
+}
+
 export function attemptsForSession(sessionId: string): Attempt[] {
   return loadAttempts().filter((a) => a.sessionId === sessionId);
 }
@@ -412,6 +430,44 @@ export function getNote(questionId: string): QuestionNote | undefined {
   return loadNotes().find((n) => n.questionId === questionId);
 }
 
+// ---- app events ----
+
+/**
+ * Local cap on stored events. The cloud mirror keeps everything it has
+ * received; locally only the newest window is retained so localStorage
+ * stays bounded — events are analytics, never app state.
+ */
+export const MAX_STORED_EVENTS = 500;
+
+export function loadEvents(): AppEvent[] {
+  return readJson<AppEvent[]>(EVENTS_KEY, []);
+}
+
+export function saveEvents(events: AppEvent[]): void {
+  writeJson(EVENTS_KEY, events.slice(-MAX_STORED_EVENTS));
+}
+
+/**
+ * Record one app event (see AppEventType — a closed list). Inert outside
+ * the browser. Returns the stored event, or null when not in a browser.
+ */
+export function recordEvent(
+  type: AppEventType,
+  data?: AppEvent['data'],
+  now: number = Date.now(),
+): AppEvent | null {
+  if (!browser()) return null;
+  const entry: AppEvent = {
+    id: crypto.randomUUID(),
+    type,
+    at: now,
+    ...(data && Object.keys(data).length > 0 ? { data } : {}),
+  };
+  saveEvents([...loadEvents(), entry]);
+  notify({ table: 'events', row: entry });
+  return entry;
+}
+
 // ---- bulk ops ----
 
 /**
@@ -425,6 +481,7 @@ export function clearAll(): void {
   window.localStorage.removeItem(ACHIEVEMENTS_KEY);
   window.localStorage.removeItem(VOTES_KEY);
   window.localStorage.removeItem(NOTES_KEY);
+  window.localStorage.removeItem(EVENTS_KEY);
   window.localStorage.removeItem(PREFS_KEY);
   window.localStorage.removeItem(SCRATCHPAD_KEY);
   notify({ table: 'clear-all' });
@@ -476,6 +533,7 @@ export function mergeRemote(remote: {
   achievements?: EarnedAchievement[];
   votes?: QuestionVote[];
   notes?: QuestionNote[];
+  events?: AppEvent[];
 }): boolean {
   if (!browser()) return false;
   let changed = false;
@@ -554,6 +612,22 @@ export function mergeRemote(remote: {
     }
     if (notesChanged) {
       saveNotes([...byQ.values()]);
+      changed = true;
+    }
+  }
+
+  if (remote.events?.length) {
+    const byId = new Map(loadEvents().map((e) => [e.id, e]));
+    let eventsChanged = false;
+    for (const r of remote.events) {
+      if (!byId.has(r.id)) {
+        byId.set(r.id, r); // events are immutable once written
+        eventsChanged = true;
+      }
+    }
+    if (eventsChanged) {
+      // Keep chronological order so the local cap drops the OLDEST.
+      saveEvents([...byId.values()].sort((a, b) => a.at - b.at));
       changed = true;
     }
   }
