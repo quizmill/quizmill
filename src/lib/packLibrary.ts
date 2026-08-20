@@ -141,11 +141,18 @@ export function insertPack(
     };
   }
 
+  // Keep the recorded assets location so the pack's images resolve after
+  // activation — but only a plain http(s) URL (never javascript:/data:).
+  const assetsBase =
+    typeof candidate.assetsBase === 'string' && /^https?:\/\//i.test(candidate.assetsBase)
+      ? candidate.assetsBase.replace(/\/+$/, '')
+      : undefined;
   const pack: ActivePack = {
     manifest,
     questions: candidate.questions as ActivePack['questions'],
     scenarios: candidate.scenarios as ActivePack['scenarios'],
     concepts: candidate.concepts as ActivePack['concepts'],
+    ...(assetsBase ? { assetsBase } : {}),
   };
   const entry: PackLibraryEntry = {
     id: manifest.id,
