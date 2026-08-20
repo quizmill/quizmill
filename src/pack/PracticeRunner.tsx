@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, RefreshCw, Home, ListChecks } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -23,7 +23,7 @@ import { ConceptCard } from '@/pack/ConceptCard';
 import { QuestionMeta } from '@/pack/QuestionMeta';
 import { Celebration } from '@/components/Celebration';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
-import { loadAttempts, loadSessions, loadLevelFilter } from '@/lib/storage';
+import { amendAttempt, loadAttempts, loadSessions, loadLevelFilter } from '@/lib/storage';
 import { streakProgress } from '@/lib/stats';
 import {
   correctKeysOf,
@@ -41,6 +41,7 @@ import {
   buildAttempt,
   buildSessionEnd,
   buildSessionStart,
+  feedbackSecondsSince,
   filterByLevel,
   formatKeyList,
   gradeSelection,
@@ -91,6 +92,10 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   // The active level-band filter (a manifest level key) or null = All.
   // Read from localStorage after mount, so SSR/first paint stay stable.
   const [levelFilter, setLevelFilter] = useState<string | null>(null);
+  // First option tapped on the current question (first-instinct signal)
+  // and the just-recorded attempt (to stamp feedbackSeconds on Next).
+  const firstSelectedRef = useRef<OptionKey | null>(null);
+  const lastAttemptRef = useRef<{ id: string; answeredAt: number } | null>(null);
 
   const bank = useMemo(
     () => filterByLevel(bankForCategory(packQuestions, categoryKey), levelFilter),
@@ -124,6 +129,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
       currentIndex: 0,
       correctCount: 0,
       startedAt: now,
+      questionShownAt: now,
     };
     startSession(buildSessionStart(initial, categoryKey));
     setState(initial);
@@ -220,6 +226,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
 
   function handleSelect(key: OptionKey) {
     if (stage !== 'choosing') return;
+    firstSelectedRef.current ??= key;
     setSelected((prev) => nextSelection(prev, key, multi));
   }
 
@@ -232,8 +239,11 @@ export function PackPracticeRunner({ categoryKey }: Props) {
       categoryKey,
       now: Date.now(),
       attemptId: crypto.randomUUID(),
+      mode: 'practice',
+      firstSelected: firstSelectedRef.current ?? undefined,
     });
     recordAttempt(attempt);
+    lastAttemptRef.current = { id: attempt.id, answeredAt: attempt.answeredAt };
     // Achievements evaluate against what's now persisted — re-read so
     // this can't race the useStorageData snapshot.
     const freshAttempts = loadAttempts();
@@ -253,6 +263,14 @@ export function PackPracticeRunner({ categoryKey }: Props) {
 
   function handleNext() {
     if (!state) return;
+    // How long the explanation was on screen — amended onto the attempt.
+    if (lastAttemptRef.current) {
+      amendAttempt(lastAttemptRef.current.id, {
+        feedbackSeconds: feedbackSecondsSince(lastAttemptRef.current.answeredAt),
+      });
+      lastAttemptRef.current = null;
+    }
+    firstSelectedRef.current = null;
     if (isLastQuestion(state)) {
       endSession(buildSessionEnd(state, categoryKey, Date.now()));
       // Session-shaped stickers (first session, flawless round, daily

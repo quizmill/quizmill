@@ -73,3 +73,10 @@ export const APP_CONFIG: AppConfig = {
   exam: (manifest as { exam?: ExamConfig }).exam,
   games: (manifest as { games?: GamesConfig }).games,
 };
+
+/**
+ * Engine+pack build stamp, inlined at build time (a pack repo's deploy
+ * sets NEXT_PUBLIC_APP_BUILD to its own commit — see deploy-pack.yml).
+ * Null in dev, so locally-written rows simply carry no appBuild.
+ */
+export const APP_BUILD: string | null = process.env.NEXT_PUBLIC_APP_BUILD ?? null;

@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { Download, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useImportProgress, useStorageData } from '@/lib/useStorage';
+import { recordEvent } from '@/lib/storage';
 import { exportProgressFile, TransferError } from '@/lib/transfer';
 
 /**
@@ -31,6 +32,7 @@ export function TransferSettings() {
     setNotice(null);
     try {
       const outcome = await exportProgressFile();
+      recordEvent('export');
       if (outcome === 'shared') {
         setNotice({ kind: 'ok', text: 'Progress file shared.' });
       } else if (outcome === 'downloaded') {

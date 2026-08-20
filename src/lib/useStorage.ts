@@ -125,6 +125,7 @@ export function useImportProgress() {
     const snapshot = parseSnapshot(text);
     const result = applySnapshot(snapshot);
     if (result.changed) {
+      storage.recordEvent('import');
       emit();
       // An import lands via mergeRemote, which deliberately doesn't feed
       // the sync queue — but from the cloud's perspective these ARE new

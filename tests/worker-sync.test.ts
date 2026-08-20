@@ -63,6 +63,16 @@ describe('toWireOp (client → wire)', () => {
     });
   });
 
+  it('ships events keyed by their own id', () => {
+    const event = { id: 'e1', type: 'game_open' as const, at: 5, data: { game: 'snake' } };
+    expect(toWireOp({ t: 'events', op: 'upsert', row: event })).toEqual({
+      t: 'events',
+      op: 'upsert',
+      id: 'e1',
+      data: event,
+    });
+  });
+
   it('marks attempts with their session as ref, for grouped deletes', () => {
     expect(toWireOp({ t: 'attempts', op: 'upsert', row: attempt })).toEqual({
       t: 'attempts',
@@ -105,6 +115,7 @@ describe('parseOp / parseOpsRequest (worker validation)', () => {
         op: 'upsert',
         row: { questionId: 'q1', text: 'more like this', updatedAt: 1 },
       }),
+      toWireOp({ t: 'events', op: 'upsert', row: { id: 'e1', type: 'app_open', at: 1 } }),
       toWireOp({ t: 'votes', op: 'delete', questionId: 'q1' }),
       toWireOp({ t: 'notes', op: 'delete', questionId: 'q1' }),
       toWireOp({ t: 'clear-all', op: 'delete' }),
@@ -218,5 +229,85 @@ describe('client and worker agree on identity', () => {
   it('rejects keys with too little material to be safe', async () => {
     expect(await userIdFromKey('short')).toBeNull();
     expect(await userIdFromKey('')).toBeNull();
+  });
+});
+
+describe('events table (server side)', () => {
+  it('statementsForOp upserts events like any row table (not insert-ignore)', () => {
+    const op = parseOp(
+      toWireOp({ t: 'events', op: 'upsert', row: { id: 'e1', type: 'app_open', at: 1 } }),
+    );
+    expect(op).not.toBeNull();
+    const [stmt] = statementsForOp(op as WireOp, 'user', 'pack');
+    expect(stmt.sql).toContain('DO UPDATE');
+    expect(stmt.params).toEqual([
+      'user',
+      'pack',
+      'events',
+      'e1',
+      '',
+      JSON.stringify({ id: 'e1', type: 'app_open', at: 1 }),
+    ]);
+  });
+});
+
+describe('backwards compatibility (pre-analytics clients)', () => {
+  it('still accepts the original five-table batch with legacy row shapes', () => {
+    // Exactly what an old client sends: no events table, no analytics
+    // fields on sessions/attempts, timeTakenSeconds hard-coded to 1.
+    const legacyOps = [
+      {
+        t: 'sessions',
+        op: 'upsert',
+        id: 's1',
+        data: {
+          id: 's1',
+          subject: 'c',
+          startedAt: 1,
+          endedAt: null,
+          questionCount: 10,
+          correctCount: 0,
+        },
+      },
+      {
+        t: 'attempts',
+        op: 'upsert',
+        id: 'a1',
+        ref: 's1',
+        data: {
+          id: 'a1',
+          sessionId: 's1',
+          questionId: 'q1',
+          answeredAt: 2,
+          selectedAnswer: 'A',
+          isCorrect: true,
+          timeTakenSeconds: 1,
+          subject: 'c',
+          topic: 'q1',
+          difficulty: 1,
+        },
+      },
+    ];
+    const parsed = parseOpsRequest({ pack: 'demo', ops: legacyOps });
+    expect(parsed).not.toBeNull();
+    expect(parsed!.ops).toHaveLength(2);
+  });
+
+  it('a new-shape attempt row passes the same validation untouched', () => {
+    const parsed = parseOp({
+      t: 'attempts',
+      op: 'upsert',
+      id: 'a2',
+      ref: 's1',
+      data: {
+        ...attempt,
+        position: 4,
+        firstSelected: 'B',
+        mode: 'review',
+        feedbackSeconds: 3,
+        appBuild: 'abc1234',
+      },
+    });
+    expect(parsed).not.toBeNull();
   });
 });

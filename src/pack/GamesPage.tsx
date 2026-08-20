@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { ArrowLeft, Gamepad2 } from 'lucide-react';
 import { enabledGames, type GameId } from '@/lib/games/registry';
+import { recordEvent } from '@/lib/storage';
 import { packGames } from '@/pack/data';
 
 // The game components (six games + their logic) are the heavy part of this
@@ -57,7 +58,10 @@ export default function GamesPage() {
             key={g.id}
             type="button"
             data-testid={`game-card-${g.id}`}
-            onClick={() => setActive(g.id)}
+            onClick={() => {
+              recordEvent('game_open', { game: g.id });
+              setActive(g.id);
+            }}
             className="tap-feedback group flex flex-col items-center gap-1.5 rounded-2xl border border-ink-200 bg-surface p-4 text-center shadow-sm transition hover:border-brand-500/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <span className="text-4xl leading-none" aria-hidden>

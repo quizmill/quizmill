@@ -75,6 +75,7 @@ async function handlePull(request: Request, env: Env, userId: string): Promise<R
     achievements: [],
     votes: [],
     notes: [],
+    events: [],
   };
   for (const row of results) {
     if ((TABLES as readonly string[]).includes(row.tbl)) {

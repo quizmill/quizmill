@@ -2,10 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   attemptHistory,
   buildAttempt,
+  buildSessionEnd,
+  buildSessionStart,
+  feedbackSecondsSince,
   filterByLevel,
   formatKeyList,
   gradeSelection,
   isBankFullySeen,
+  moveToNext,
   nextSelection,
   type RunnerState,
 } from '@/pack/runner';
@@ -122,6 +126,7 @@ describe('buildAttempt', () => {
     currentIndex: 0,
     correctCount: 0,
     startedAt: 0,
+    questionShownAt: 0,
   };
   function attemptFor(question: PackQuestion, selected: OptionKey[]) {
     return buildAttempt({
@@ -148,6 +153,139 @@ describe('buildAttempt', () => {
 
   it('marks an incomplete multi-answer selection incorrect', () => {
     expect(attemptFor(multiQ(), ['A']).isCorrect).toBe(false);
+  });
+});
+
+describe('buildAttempt analytics fields', () => {
+  const state: RunnerState = {
+    sessionId: 'sess',
+    questions: [],
+    currentIndex: 2,
+    correctCount: 0,
+    startedAt: 0,
+    questionShownAt: 10_000,
+  };
+
+  it('measures timeTakenSeconds from when the question appeared', () => {
+    const a = buildAttempt({
+      state,
+      question: q('t'),
+      selected: ['A'],
+      categoryKey: 'c',
+      now: 17_400, // 7.4s later
+      attemptId: 'att',
+    });
+    expect(a.timeTakenSeconds).toBe(7);
+  });
+
+  it('clamps the measurement to [0, 3600] (clock skew / parked tab)', () => {
+    const at = (now: number) =>
+      buildAttempt({ state, question: q('t'), selected: ['A'], categoryKey: 'c', now, attemptId: 'x' })
+        .timeTakenSeconds;
+    expect(at(9_000)).toBe(0); // now before shownAt → 0, never negative
+    expect(at(10_000 + 100_000_000)).toBe(3600);
+  });
+
+  it('lets an explicit timeTakenSeconds override the measurement (drive mode)', () => {
+    const a = buildAttempt({
+      state,
+      question: q('t'),
+      selected: ['A'],
+      categoryKey: 'c',
+      now: 17_400,
+      attemptId: 'att',
+      timeTakenSeconds: 42,
+    });
+    expect(a.timeTakenSeconds).toBe(42);
+  });
+
+  it('records position (1-based), mode and firstSelected when given', () => {
+    const a = buildAttempt({
+      state,
+      question: q('t'),
+      selected: ['A'],
+      categoryKey: 'c',
+      now: 11_000,
+      attemptId: 'att',
+      mode: 'review',
+      firstSelected: 'B',
+    });
+    expect(a.position).toBe(3);
+    expect(a.mode).toBe('review');
+    expect(a.firstSelected).toBe('B');
+  });
+
+  it('omits the optional fields when not provided — same shape legacy consumers read', () => {
+    const a = buildAttempt({
+      state,
+      question: q('t'),
+      selected: ['A'],
+      categoryKey: 'c',
+      now: 11_000,
+      attemptId: 'att',
+    });
+    expect('firstSelected' in a).toBe(false);
+    expect('mode' in a).toBe(false);
+    expect('scenarioId' in a).toBe(false);
+    expect('appBuild' in a).toBe(false); // NEXT_PUBLIC_APP_BUILD unset in tests
+  });
+
+  it('carries the scenarioId when the question sat under a scenario', () => {
+    const a = buildAttempt({
+      state,
+      question: { ...q('t'), scenarioId: 'sc1' },
+      selected: ['A'],
+      categoryKey: 'c',
+      now: 11_000,
+      attemptId: 'att',
+    });
+    expect(a.scenarioId).toBe('sc1');
+  });
+});
+
+describe('question timing helpers', () => {
+  it('moveToNext advances the index AND restamps questionShownAt', () => {
+    const s0: RunnerState = {
+      sessionId: 's',
+      questions: [q('a'), q('b')],
+      currentIndex: 0,
+      correctCount: 0,
+      startedAt: 0,
+      questionShownAt: 0,
+    };
+    const s1 = moveToNext(s0, 5_000);
+    expect(s1.currentIndex).toBe(1);
+    expect(s1.questionShownAt).toBe(5_000);
+  });
+
+  it('feedbackSecondsSince rounds and clamps like the answer timer', () => {
+    expect(feedbackSecondsSince(1_000, 4_400)).toBe(3);
+    expect(feedbackSecondsSince(1_000, 500)).toBe(0);
+    expect(feedbackSecondsSince(0, 100_000_000)).toBe(3600);
+  });
+});
+
+describe('session modes', () => {
+  const state: RunnerState = {
+    sessionId: 's',
+    questions: [q('a')],
+    currentIndex: 0,
+    correctCount: 1,
+    startedAt: 100,
+    questionShownAt: 100,
+  };
+
+  it('accepts the newer drive/notes modes on start and end records', () => {
+    expect(buildSessionStart(state, 'drive', 'drive').mode).toBe('drive');
+    expect(buildSessionEnd(state, 'c', 200, 'notes').mode).toBe('notes');
+  });
+
+  it('defaults to practice and omits appBuild/device fields outside a build/browser', () => {
+    const start = buildSessionStart(state, 'c');
+    expect(start.mode).toBe('practice');
+    expect('appBuild' in start).toBe(false);
+    expect('display' in start).toBe(false);
+    expect('platform' in start).toBe(false);
   });
 });
 

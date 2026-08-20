@@ -19,6 +19,7 @@ function stubBackend(): SyncBackend {
       achievements: [],
       votes: [],
       notes: [],
+      events: [],
     }),
   };
 }

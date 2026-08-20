@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Home, ListChecks, NotebookPen, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -22,7 +22,7 @@ import { ConceptCard } from '@/pack/ConceptCard';
 import { QuestionMeta } from '@/pack/QuestionMeta';
 import { Celebration } from '@/components/Celebration';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
-import { loadAttempts, loadNotes, loadSessions } from '@/lib/storage';
+import { amendAttempt, loadAttempts, loadNotes, loadSessions } from '@/lib/storage';
 import { notesPracticePool } from '@/pack/notes-practice';
 import {
   correctKeysOf,
@@ -37,6 +37,7 @@ import {
   buildAttempt,
   buildSessionEnd,
   buildSessionStart,
+  feedbackSecondsSince,
   formatKeyList,
   gradeSelection,
   isLastQuestion,
@@ -67,6 +68,10 @@ export function PackNotesRunner() {
   const [mounted, setMounted] = useState(false);
   const [stage, setStage] = useState<Stage>('choosing');
   const [selected, setSelected] = useState<OptionKey[]>([]);
+  // First option tapped on the current question (first-instinct signal)
+  // and the just-recorded attempt (to stamp feedbackSeconds on Next).
+  const firstSelectedRef = useRef<OptionKey | null>(null);
+  const lastAttemptRef = useRef<{ id: string; answeredAt: number } | null>(null);
   const [finished, setFinished] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -86,8 +91,9 @@ export function PackNotesRunner() {
       currentIndex: 0,
       correctCount: 0,
       startedAt: now,
+      questionShownAt: now,
     };
-    startSession(buildSessionStart(initial, picked[0].categoryKey));
+    startSession(buildSessionStart(initial, picked[0].categoryKey, 'notes'));
     setState(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted]);
@@ -181,6 +187,7 @@ export function PackNotesRunner() {
 
   function handleSelect(key: OptionKey) {
     if (stage !== 'choosing') return;
+    firstSelectedRef.current ??= key;
     setSelected((prev) => nextSelection(prev, key, multi));
   }
 
@@ -195,8 +202,11 @@ export function PackNotesRunner() {
       categoryKey: current.categoryKey,
       now: Date.now(),
       attemptId: crypto.randomUUID(),
+      mode: 'notes',
+      firstSelected: firstSelectedRef.current ?? undefined,
     });
     recordAttempt(attempt);
+    lastAttemptRef.current = { id: attempt.id, answeredAt: attempt.answeredAt };
     // Same re-read rationale as the practice runner — see there.
     checkNow(loadSessions(), loadAttempts());
     setState(advanceAfterAnswer(state, attempt.isCorrect));
@@ -205,8 +215,16 @@ export function PackNotesRunner() {
 
   function handleNext() {
     if (!state) return;
+    // How long the explanation was on screen — amended onto the attempt.
+    if (lastAttemptRef.current) {
+      amendAttempt(lastAttemptRef.current.id, {
+        feedbackSeconds: feedbackSecondsSince(lastAttemptRef.current.answeredAt),
+      });
+      lastAttemptRef.current = null;
+    }
+    firstSelectedRef.current = null;
     if (isLastQuestion(state)) {
-      endSession(buildSessionEnd(state, state.questions[0].categoryKey, Date.now()));
+      endSession(buildSessionEnd(state, state.questions[0].categoryKey, Date.now(), 'notes'));
       checkNow(loadSessions(), loadAttempts());
       setFinished(true);
       return;

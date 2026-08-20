@@ -11,11 +11,12 @@
  * Prefs and the scratchpad are deliberately excluded: they're device-local
  * by design (see storage.ts) and carry no progress.
  */
-import type { Attempt, Session } from '@/data/types';
+import type { AppEvent, Attempt, Session } from '@/data/types';
 import { APP_CONFIG } from '@/config';
 import {
   loadAchievements,
   loadAttempts,
+  loadEvents,
   loadNotes,
   loadSessions,
   loadVotes,
@@ -40,6 +41,8 @@ export interface ProgressSnapshot {
   votes: QuestionVote[];
   /** Added post-v1; absent in older files, so always optional on read. */
   notes?: QuestionNote[];
+  /** Added post-v1; absent in older files, so always optional on read. */
+  events?: AppEvent[];
 }
 
 export type TransferErrorCode =
@@ -110,6 +113,15 @@ function isNote(v: unknown): v is QuestionNote {
   );
 }
 
+function isEvent(v: unknown): v is AppEvent {
+  return (
+    isRecord(v) &&
+    typeof v.id === 'string' &&
+    typeof v.type === 'string' &&
+    typeof v.at === 'number'
+  );
+}
+
 function rows<T>(v: unknown, guard: (row: unknown) => row is T): T[] {
   return Array.isArray(v) ? v.filter(guard) : [];
 }
@@ -129,6 +141,7 @@ export function buildSnapshot(now: number = Date.now()): ProgressSnapshot {
     achievements: loadAchievements(),
     votes: loadVotes(),
     notes: loadNotes(),
+    events: loadEvents(),
   };
 }
 
@@ -228,6 +241,7 @@ export function parseSnapshot(
     achievements: rows(raw.achievements, isAchievement),
     votes: rows(raw.votes, isVote),
     notes: rows(raw.notes, isNote),
+    events: rows(raw.events, isEvent),
   };
 }
 
@@ -254,6 +268,7 @@ export function applySnapshot(snapshot: ProgressSnapshot): ImportResult {
     achievements: loadAchievements(),
     votes: loadVotes(),
     notes: loadNotes(),
+    events: loadEvents(),
   });
   const before = tables();
 
@@ -263,6 +278,7 @@ export function applySnapshot(snapshot: ProgressSnapshot): ImportResult {
     achievements: snapshot.achievements,
     votes: snapshot.votes,
     notes: snapshot.notes,
+    events: snapshot.events,
   });
 
   const after = tables();
