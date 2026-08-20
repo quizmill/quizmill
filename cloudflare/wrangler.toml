@@ -11,6 +11,14 @@ name = "quizmill-sync"
 main = "src/worker.ts"
 compatibility_date = "2026-06-01"
 
+# The canonical deployment answers on sync.quizmill.dev. The workers.dev
+# URL stays enabled alongside it because every app built before the domain
+# existed has that URL baked in as NEXT_PUBLIC_SYNC_URL — turning it off
+# would strand those installs until their next update. Deploying a fork?
+# Drop the routes line (or point it at your own zone) and keep workers_dev.
+routes = [{ pattern = "sync.quizmill.dev", custom_domain = true }]
+workers_dev = true
+
 [[d1_databases]]
 binding = "DB"
 database_name = "quizmill-sync"
