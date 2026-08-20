@@ -27,6 +27,16 @@ export type ActivePack = {
   scenarios?: PackScenario[];
   /** Optional concept cards; defaults to none when omitted. */
   concepts?: PackConcept[];
+  /**
+   * Absolute http(s) base URL of the pack's `assets/` directory, for
+   * packs injected at runtime. A runtime pack's image files are not part
+   * of this deployment's static export, so relative question/option
+   * `image` paths resolve against this instead of the app's own
+   * `/pack-assets/` (see PackImage). Recorded at insert time from the
+   * URL the pack was fetched from; absent for the build-time pack and
+   * for packs whose source had no reachable URL (e.g. picked files).
+   */
+  assetsBase?: string;
 };
 
 declare global {

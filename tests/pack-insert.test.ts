@@ -141,3 +141,68 @@ describe('fetchPackFromUrl', () => {
     if (!out.ok) expect(out.errors[0]).toContain('http');
   });
 });
+
+describe('fetchPackFromUrl — assetsBase for pack images', () => {
+  function fakeFetch(routes: Record<string, unknown>): typeof fetch {
+    return (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url in routes) {
+        return new Response(JSON.stringify(routes[url]), { status: 200 });
+      }
+      return new Response('nope', { status: 404 });
+    }) as typeof fetch;
+  }
+
+  it('derives assetsBase from a GitHub repo URL (raw assets/ dir)', async () => {
+    const base = 'https://raw.githubusercontent.com/quizmill/pack-music-theory/HEAD';
+    const out = await fetchPackFromUrl(
+      'https://github.com/quizmill/pack-music-theory',
+      fakeFetch({
+        [`${base}/pack.json`]: MANIFEST,
+        [`${base}/questions.json`]: QUESTIONS,
+      }),
+    );
+    expect(out.ok).toBe(true);
+    if (out.ok) expect(out.candidate.assetsBase).toBe(`${base}/assets`);
+  });
+
+  it('derives assetsBase from a plain (non-GitHub) directory URL', async () => {
+    const out = await fetchPackFromUrl(
+      'https://packs.example.com/music-theory/',
+      fakeFetch({
+        'https://packs.example.com/music-theory/pack.json': MANIFEST,
+        'https://packs.example.com/music-theory/questions.json': QUESTIONS,
+      }),
+    );
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.candidate.assetsBase).toBe('https://packs.example.com/music-theory/assets');
+    }
+  });
+
+  it('derives assetsBase from a bundle URL (sibling assets/ dir)', async () => {
+    const out = await fetchPackFromUrl(
+      'https://example.com/packs/mt/bundle.json',
+      fakeFetch({
+        'https://example.com/packs/mt/bundle.json': { manifest: MANIFEST, questions: QUESTIONS },
+      }),
+    );
+    expect(out.ok).toBe(true);
+    if (out.ok) expect(out.candidate.assetsBase).toBe('https://example.com/packs/mt/assets');
+  });
+
+  it('keeps an assetsBase the bundle itself declares', async () => {
+    const out = await fetchPackFromUrl(
+      'https://example.com/bundle.json',
+      fakeFetch({
+        'https://example.com/bundle.json': {
+          manifest: MANIFEST,
+          questions: QUESTIONS,
+          assetsBase: 'https://cdn.example.com/mt-assets',
+        },
+      }),
+    );
+    expect(out.ok).toBe(true);
+    if (out.ok) expect(out.candidate.assetsBase).toBe('https://cdn.example.com/mt-assets');
+  });
+});

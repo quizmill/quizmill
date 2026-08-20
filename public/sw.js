@@ -18,6 +18,10 @@
  */
 const CACHE_VERSION = '__BUILD_VERSION__';
 const CACHE_NAME = `quizmill-${CACHE_VERSION}`;
+// Images of runtime-inserted packs, prefetched by the page at insert time
+// (src/lib/packAssets.ts). Deploy-independent — it must survive the
+// activate purge, like the packs themselves survive in localStorage.
+const PACK_ASSETS_CACHE = 'quizmill-pack-assets';
 
 let PRECACHE_MANIFEST = [];
 try {
@@ -54,7 +58,9 @@ self.addEventListener('activate', (event) => {
     (async () => {
       const keys = await caches.keys();
       await Promise.all(
-        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)),
+        keys
+          .filter((k) => k !== CACHE_NAME && k !== PACK_ASSETS_CACHE)
+          .map((k) => caches.delete(k)),
       );
       await self.clients.claim();
     })(),
@@ -65,13 +71,33 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return;
+  if (url.origin !== self.location.origin) {
+    // Cross-origin: only IMAGES are ours to answer — a runtime-inserted
+    // pack's diagrams live on the pack's origin and were prefetched into
+    // PACK_ASSETS_CACHE at insert time. Everything else cross-origin
+    // (sync backends, fonts…) stays untouched.
+    if (req.destination === 'image') event.respondWith(handlePackAsset(req));
+    return;
+  }
   // Don't try to cache range requests (e.g. video seeking) — partial
   // responses confuse Cache.
   if (req.headers.has('range')) return;
 
   event.respondWith(handleFetch(req));
 });
+
+async function handlePackAsset(req) {
+  const cache = await caches.open(PACK_ASSETS_CACHE);
+  const cached = await cache.match(req.url);
+  if (cached) return cached;
+  // Not prefetched (inserted before this feature, or the prefetch missed
+  // one) — cache as you go, so anything viewed online works offline next.
+  const res = await fetch(req);
+  if (res.ok || res.type === 'opaque') {
+    cache.put(req.url, res.clone());
+  }
+  return res;
+}
 
 async function handleFetch(req) {
   const cache = await caches.open(CACHE_NAME);

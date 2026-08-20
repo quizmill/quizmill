@@ -1,11 +1,28 @@
 import { cn } from '@/lib/cn';
+import { getActivePackOverride } from '@/pack/runtime';
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
 /**
- * Render a pack-relative image asset. Pack images live in the pack's
- * `assets/` directory and are copied to `/pack-assets/` at build time
- * (scripts/pack-assets.ts). A plain <img> — the app is a static export,
+ * Resolve a pack-relative image path to a URL, exported for tests.
+ *
+ * Absolute http(s) URLs pass through untouched. Relative paths resolve
+ * against the RUNTIME pack's recorded `assetsBase` when one is active
+ * (a runtime-inserted pack ships no files in this deployment, so its
+ * images live wherever the pack was inserted from), and otherwise
+ * against the app's own `/pack-assets/` — the build-time pack's assets,
+ * mirrored there by scripts/pack-assets.ts.
+ */
+export function resolvePackImageSrc(src: string): string {
+  if (src.startsWith('http')) return src;
+  const relative = src.replace(/^\/+/, '');
+  const assetsBase = getActivePackOverride()?.assetsBase;
+  if (assetsBase) return `${assetsBase.replace(/\/+$/, '')}/${relative}`;
+  return `${BASE_PATH}/pack-assets/${relative}`;
+}
+
+/**
+ * Render a pack image asset. A plain <img> — the app is a static export,
  * and pack image dimensions aren't known ahead of time.
  */
 export function PackImage({
@@ -17,9 +34,6 @@ export function PackImage({
   alt?: string;
   className?: string;
 }) {
-  const resolved = src.startsWith('http')
-    ? src
-    : `${BASE_PATH}/pack-assets/${src.replace(/^\/+/, '')}`;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={resolved} alt={alt ?? ''} className={cn(className)} />;
+  return <img src={resolvePackImageSrc(src)} alt={alt ?? ''} className={cn(className)} />;
 }

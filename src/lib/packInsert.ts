@@ -21,6 +21,8 @@ export type PackCandidate = {
   questions?: unknown;
   scenarios?: unknown;
   concepts?: unknown;
+  /** Absolute base URL of the pack's `assets/` dir — see ActivePack. */
+  assetsBase?: string;
 };
 
 export type ParseOutcome =
@@ -144,6 +146,11 @@ export async function fetchPackFromUrl(
     if (!isBundle(value)) {
       return { ok: false, errors: ['the file is not a pack bundle (expected "manifest" and "questions")'] };
     }
+    // A bundle may declare where its assets live; otherwise assume the
+    // conventional `assets/` directory next to the bundle file.
+    if (typeof value.assetsBase !== 'string') {
+      value.assetsBase = siblingAssetsBase(resolved.url);
+    }
     return { ok: true, candidate: value };
   }
 
@@ -164,6 +171,14 @@ export async function fetchPackFromUrl(
       questions: questions.value,
       scenarios: scenarios.value,
       concepts: concepts.value,
+      // Where relative question/option `image` paths resolve from — the
+      // pack directory's `assets/`, mirroring the on-disk pack layout.
+      assetsBase: `${resolved.base}/assets`,
     },
   };
+}
+
+/** The conventional `assets/` directory next to a bundle .json URL. */
+function siblingAssetsBase(bundleUrl: string): string {
+  return new URL('assets', bundleUrl).toString();
 }

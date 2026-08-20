@@ -13,14 +13,26 @@ export interface Server {
  * Caller must have run `NEXT_PUBLIC_BASE_PATH="" npx next build` first so
  * the asset URLs are root-relative (http-server doesn't add a basePath).
  */
-export async function startStaticServer(port: number): Promise<Server> {
+export async function startStaticServer(
+  port: number,
+  opts: { dir?: string; cors?: boolean } = {},
+): Promise<Server> {
   // detached → own process group, so stop() can signal the WHOLE group.
   // npx is a wrapper that spawns the real http-server as a child; killing
   // just the wrapper leaves an orphaned server squatting on the port (and
   // "offline" tests quietly testing nothing).
   const proc = spawn(
     'npx',
-    ['--yes', 'http-server', 'out', '-p', String(port), '-s', '-c-1'],
+    [
+      '--yes',
+      'http-server',
+      opts.dir ?? 'out',
+      '-p',
+      String(port),
+      '-s',
+      '-c-1',
+      ...(opts.cors ? ['--cors'] : []),
+    ],
     { stdio: 'pipe', detached: true },
   );
   proc.stderr?.on('data', (d) => process.stderr.write(`[http-server] ${d}`));

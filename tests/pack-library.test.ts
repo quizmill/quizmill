@@ -207,3 +207,36 @@ describe('packProgress', () => {
     expect(packProgress('corrupt').sessions).toBe(0);
   });
 });
+
+describe('insertPack — image assetsBase', () => {
+  it('persists assetsBase so a re-read pack can resolve its images', () => {
+    const pack = { ...validPack(), assetsBase: 'https://example.com/mt/assets' };
+    const result = insertPack(pack, { buildPackId: BUILD_PACK_ID });
+    expect(result.ok).toBe(true);
+    expect(getInsertedPack('capitals-mini')?.assetsBase).toBe('https://example.com/mt/assets');
+  });
+
+  it('drops a non-http(s) assetsBase instead of storing junk', () => {
+    const pack = { ...validPack(), assetsBase: 'javascript:alert(1)' };
+    const result = insertPack(pack, { buildPackId: BUILD_PACK_ID });
+    expect(result.ok).toBe(true);
+    expect(getInsertedPack('capitals-mini')?.assetsBase).toBeUndefined();
+  });
+});
+
+describe('ejectPack — cached image cleanup', () => {
+  it('drops the pack’s cached images along with the pack', async () => {
+    const deleted: string[] = [];
+    vi.stubGlobal('caches', {
+      open: async () => ({
+        delete: async (url: string) => (deleted.push(String(url)), true),
+      }),
+    });
+    const pack = { ...validPack(), assetsBase: 'https://example.com/mt/assets' };
+    pack.questions[0] = { ...pack.questions[0], image: 'note.svg' } as (typeof pack.questions)[0];
+    expect(insertPack(pack, { buildPackId: BUILD_PACK_ID }).ok).toBe(true);
+
+    ejectPack('capitals-mini');
+    await vi.waitFor(() => expect(deleted).toEqual(['https://example.com/mt/assets/note.svg']));
+  });
+});
