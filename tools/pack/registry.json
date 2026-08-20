@@ -26,6 +26,12 @@
       "repo": "quizmill/pack-aws-genai"
     },
     {
+      "id": "music-theory",
+      "title": "Music Theory Practice",
+      "description": "Visual music-theory practice — read staves, key signatures, intervals and chords. 102 questions across five categories and three levels (Beginner → Advanced); 84 carry generated staff and keyboard diagrams, and four answer with images.",
+      "repo": "quizmill/pack-music-theory"
+    },
+    {
       "id": "world-capitals",
       "title": "Capitals of the World",
       "description": "Expert-level practice on the capital cities of the world — moved capitals (Astana, Naypyidaw, Nusantara), multiple-capital countries (South Africa, Bolivia, the Netherlands), and the ones map buffs reliably get wrong. 45 questions across five continents.",
