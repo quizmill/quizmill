@@ -223,3 +223,20 @@ describe('insertPack — image assetsBase', () => {
     expect(getInsertedPack('capitals-mini')?.assetsBase).toBeUndefined();
   });
 });
+
+describe('ejectPack — cached image cleanup', () => {
+  it('drops the pack’s cached images along with the pack', async () => {
+    const deleted: string[] = [];
+    vi.stubGlobal('caches', {
+      open: async () => ({
+        delete: async (url: string) => (deleted.push(String(url)), true),
+      }),
+    });
+    const pack = { ...validPack(), assetsBase: 'https://example.com/mt/assets' };
+    pack.questions[0] = { ...pack.questions[0], image: 'note.svg' } as (typeof pack.questions)[0];
+    expect(insertPack(pack, { buildPackId: BUILD_PACK_ID }).ok).toBe(true);
+
+    ejectPack('capitals-mini');
+    await vi.waitFor(() => expect(deleted).toEqual(['https://example.com/mt/assets/note.svg']));
+  });
+});

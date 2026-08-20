@@ -18,6 +18,7 @@
  * can re-read.
  */
 import { validatePack } from '../../tools/pack/schema';
+import { dropPackAssets } from '@/lib/packAssets';
 import type { ActivePack } from '@/pack/runtime';
 import {
   ACTIVE_PACK_ID_KEY,
@@ -188,6 +189,10 @@ export function insertPack(
 export function ejectPack(id: string): { wasActive: boolean } {
   if (!browser()) return { wasActive: false };
   const wasActive = getActivePackPointer() === id;
+  // Capture the pack before removal so its offline-cached images can be
+  // dropped too (fire-and-forget — eject stays synchronous).
+  const pack = getInsertedPack(id);
+  if (pack) void dropPackAssets(pack);
   window.localStorage.removeItem(insertedPackKey(id));
   writeIndex(readIndex().filter((e) => e.id !== id));
   if (wasActive) window.localStorage.removeItem(ACTIVE_PACK_ID_KEY);

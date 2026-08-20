@@ -21,11 +21,13 @@ import {
   PACK_LIBRARY_EVENT,
   activatePack,
   ejectPack,
+  getInsertedPack,
   insertPack,
   listInsertedPacks,
   packProgress,
   type PackLibraryEntry,
 } from '@/lib/packLibrary';
+import { cachePackAssets } from '@/lib/packAssets';
 import { fetchPackFromUrl, parsePackFiles, type ParseOutcome } from '@/lib/packInsert';
 import {
   loadRegistry,
@@ -196,10 +198,19 @@ export function PacksPage() {
       return;
     }
     setErrors([]);
-    setMessage(
-      `Inserted “${result.entry.title}” (${result.entry.questionCount} questions). Make it active to start practising.`,
-    );
+    const base = `Inserted “${result.entry.title}” (${result.entry.questionCount} questions). Make it active to start practising.`;
+    setMessage(base);
     refresh();
+    // Prefetch the pack's images for offline practice — in the background,
+    // the insert itself is already done.
+    const stored = getInsertedPack(result.entry.id);
+    if (stored) {
+      void cachePackAssets(stored).then(({ total, cached }) => {
+        if (total > 0 && cached > 0) {
+          setMessage(`${base} ${cached} of ${total} images saved for offline use.`);
+        }
+      });
+    }
   }
 
   async function handleFiles(list: FileList | null) {
