@@ -14,9 +14,11 @@
 // import early, ahead of the rest of the engine.
 
 import type { PackManifest, PackQuestion, PackScenario, PackConcept } from './data';
+import { assetsBaseForUrl } from '@/lib/packInsert';
 import {
   ACTIVE_PACK_ID_KEY,
   HANDOFF_PACK_KEY,
+  LIBRARY_INDEX_KEY,
   insertedPackKey,
 } from '@/lib/packKeys';
 
@@ -76,7 +78,7 @@ function readHandedOffPack(): ActivePack | undefined {
       }
     }
     if (!raw) return undefined;
-    const pack = JSON.parse(raw) as ActivePack;
+    const pack = backfillAssetsBase(JSON.parse(raw) as ActivePack);
     // Cache on the global so bootstrap and engine agree on one object.
     globalThis.__QUIZMILL_PACK__ = pack;
     return pack;
@@ -85,10 +87,48 @@ function readHandedOffPack(): ActivePack | undefined {
   }
 }
 
+/**
+ * Backfill for packs inserted before `assetsBase` existed (pre-v0.3.22):
+ * their stored JSON lacks it, so every image 404s — even online. The
+ * library index recorded each insert's origin (the pasted/registry URL),
+ * so derive the assets location from it once, persist it back, and warm
+ * the offline image cache the insert-time prefetch never ran for.
+ * Attempted at most once per page load; a pack with no usable origin
+ * (picked files) is left untouched.
+ */
+let backfillTried = false;
+function backfillAssetsBase(pack: ActivePack): ActivePack {
+  if (pack.assetsBase || backfillTried || typeof window === 'undefined') return pack;
+  backfillTried = true;
+  try {
+    const rawIndex = window.localStorage.getItem(LIBRARY_INDEX_KEY);
+    if (!rawIndex) return pack;
+    const entries = JSON.parse(rawIndex) as { id?: string; origin?: string }[];
+    const origin = Array.isArray(entries)
+      ? entries.find((e) => e && e.id === pack.manifest?.id)?.origin
+      : undefined;
+    if (typeof origin !== 'string') return pack;
+    const base = assetsBaseForUrl(origin);
+    if (!base) return pack;
+    pack.assetsBase = base;
+    const key = insertedPackKey(pack.manifest.id);
+    if (window.localStorage.getItem(key)) {
+      window.localStorage.setItem(key, JSON.stringify(pack));
+    }
+    // Dynamic import keeps this bootstrap-adjacent module feather-light.
+    void import('@/lib/packAssets')
+      .then((m) => m.cachePackAssets(pack))
+      .catch(() => undefined);
+  } catch {
+    // junk index — leave the pack as it was
+  }
+  return pack;
+}
+
 /** The injected pack, if any. `source.ts` reads this once at module load. */
 export function getActivePackOverride(): ActivePack | undefined {
   if (typeof globalThis !== 'undefined' && globalThis.__QUIZMILL_PACK__) {
-    return globalThis.__QUIZMILL_PACK__;
+    return backfillAssetsBase(globalThis.__QUIZMILL_PACK__);
   }
   return readHandedOffPack();
 }

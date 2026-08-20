@@ -186,3 +186,63 @@ describe('runtime pack source', () => {
     expect(PACK_CATEGORY_LABEL.basics).toBe('Basics');
   });
 });
+
+// Packs inserted BEFORE assetsBase existed (pre-v0.3.22) sit in localStorage
+// without it, so their images 404 even online. The library index recorded
+// each insert's origin URL — the runtime backfills assetsBase from it once,
+// persists it, and the pack's images work again without a re-insert.
+describe('assetsBase backfill for packs inserted before v0.3.22', () => {
+  const packKey = 'quizmill.packLibrary.pack.injected-pack.v1';
+
+  function stubLibrary(origin?: string) {
+    stubBrowser({
+      entries: {
+        'quizmill.activePackId': 'injected-pack',
+        [packKey]: JSON.stringify(INJECTED),
+        'quizmill.packLibrary.index.v1': JSON.stringify([
+          { id: 'injected-pack', title: 'Injected', ...(origin ? { origin } : {}) },
+        ]),
+      },
+    });
+  }
+
+  it('derives assetsBase from the recorded insert origin and persists it', async () => {
+    vi.resetModules();
+    stubLibrary('https://github.com/quizmill/pack-music-theory');
+    const { getActivePackOverride } = await import('@/pack/runtime');
+
+    const pack = getActivePackOverride();
+    expect(pack?.assetsBase).toBe(
+      'https://raw.githubusercontent.com/quizmill/pack-music-theory/HEAD/assets',
+    );
+    // Persisted, so future boots read it straight from storage.
+    const stored = JSON.parse(window.localStorage.getItem(packKey)!);
+    expect(stored.assetsBase).toBe(
+      'https://raw.githubusercontent.com/quizmill/pack-music-theory/HEAD/assets',
+    );
+  });
+
+  it('leaves a pack alone when the insert had no usable origin (picked files)', async () => {
+    vi.resetModules();
+    stubLibrary('pack.json, questions.json');
+    const { getActivePackOverride } = await import('@/pack/runtime');
+
+    expect(getActivePackOverride()?.assetsBase).toBeUndefined();
+    expect(JSON.parse(window.localStorage.getItem(packKey)!).assetsBase).toBeUndefined();
+  });
+
+  it('never overwrites an assetsBase the pack already has', async () => {
+    vi.resetModules();
+    stubBrowser({
+      entries: {
+        'quizmill.activePackId': 'injected-pack',
+        [packKey]: JSON.stringify({ ...INJECTED, assetsBase: 'https://cdn.example.com/a' }),
+        'quizmill.packLibrary.index.v1': JSON.stringify([
+          { id: 'injected-pack', title: 'Injected', origin: 'https://github.com/other/repo' },
+        ]),
+      },
+    });
+    const { getActivePackOverride } = await import('@/pack/runtime');
+    expect(getActivePackOverride()?.assetsBase).toBe('https://cdn.example.com/a');
+  });
+});
