@@ -194,6 +194,34 @@
    Settings → Style, or shipped as a pack's default via `look` in
    pack.json (kids' packs). It is a third palette remap alongside light
    and dark — same CSS-variable seam, and it composes with both. */
+
+/* The campaign typeface, self-hosted so it works offline (the woff2s are
+   emitted into the export and the service worker precaches everything).
+   Variable: weight 400–800, width 75–100%. Only Poster's font stack names
+   the family, so classic users never download a byte of it. */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 400 800;
+  font-stretch: 75% 100%;
+  font-display: swap;
+  src: url('./fonts/bricolage-grotesque-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 400 800;
+  font-stretch: 75% 100%;
+  font-display: swap;
+  src: url('./fonts/bricolage-grotesque-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+    U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
 :root[data-look='poster'] {
   --surface: 255 255 255;
 
@@ -289,7 +317,13 @@
   border: 2.5px solid rgb(var(--ink-900));
   box-shadow: 4px 4px 0 rgb(var(--ink-900));
 }
-/* Poster type: headings go chunky and tight, like the campaign. */
+/* Poster type: the campaign typeface everywhere, headings chunky and
+   tight. The system stack stays as fallback while the woff2 loads. */
+:root[data-look='poster'] body {
+  font-family:
+    'Bricolage Grotesque', -apple-system, BlinkMacSystemFont, 'Inter',
+    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
 :root[data-look='poster'] :is(h1, h2, h3) {
   font-weight: 800;
   letter-spacing: -0.02em;
