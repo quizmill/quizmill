@@ -97,6 +97,7 @@ jobs:
 
       - name: Publish CLI to npm
         if: steps.version.outputs.version != ''
+        id: publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
@@ -109,6 +110,7 @@ jobs:
           # Workspace-only version stamp; never committed back.
           npm version "${VERSION#v}" --no-git-tag-version
           npm publish --provenance --access public
+          echo "published=true" >> "$GITHUB_OUTPUT"
 
       - name: Tag and create the GitHub release
         if: steps.version.outputs.version != ''
@@ -121,6 +123,32 @@ jobs:
           git tag -a "$VERSION" -m "$VERSION"
           git push origin "refs/tags/$VERSION"
           gh release create "$VERSION" --generate-notes
+
+      # npm publish returns before the registry has fully processed the
+      # version — v0.3.25 took ~5 minutes to become `npm view`-able after a
+      # successful publish, which outran every downstream deploy's wait and
+      # failed the whole post-release rollout. So wait HERE, once, until the
+      # version is actually installable before telling anyone to build on
+      # it: the fan-out below and Deploy apps (which fires when this job
+      # completes) then start with npm already consistent, and their own
+      # shorter waits become a safety net instead of the only defence.
+      # Timing out is a WARNING, not an error: the deploys re-wait
+      # themselves, and the daily crons are the floor — registry slowness
+      # must not burn a release that already shipped.
+      - name: Wait for the version to be visible on npm
+        if: steps.publish.outputs.published == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          for i in $(seq 1 90); do
+            if npm view "quizmill@${VERSION#v}" version >/dev/null 2>&1; then
+              echo "quizmill@${VERSION#v} is visible on npm (after ~$((i * 10 - 10))s)."
+              exit 0
+            fi
+            echo "Waiting for quizmill@${VERSION#v} to appear on npm ($i/90)…"
+            sleep 10
+          done
+          echo "::warning::quizmill@${VERSION#v} still not visible after ~15 min — continuing; the deploys wait again themselves and the daily crons are the safety net."
 
       # Tell the personal-app pack repos a new engine shipped, so they
       # rebuild on it immediately (they also have a daily cron as a floor).

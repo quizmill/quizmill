@@ -75,7 +75,10 @@ jobs:
       # On a pinned version (post-release dispatch), wait for that exact
       # version to be installable from npm before building — sidesteps the
       # dist-tag propagation race that `@latest` loses right after a release.
-      # 'latest' needs no wait.
+      # 'latest' needs no wait. The Release workflow already waits for
+      # visibility before dispatching, so this normally succeeds on the
+      # first probe — but publish-to-visible latency has been observed at
+      # 5+ minutes (v0.3.25), so the backstop here is generous: ~10 min.
       - name: Resolve engine version
         id: engine
         run: |
@@ -84,16 +87,16 @@ jobs:
             echo "spec=latest" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          for i in $(seq 1 24); do
+          for i in $(seq 1 60); do
             if npm view "quizmill@$spec" version >/dev/null 2>&1; then
               echo "quizmill@$spec is available on npm."
               echo "spec=$spec" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            echo "Waiting for quizmill@$spec to propagate to npm ($i/24)…"
-            sleep 5
+            echo "Waiting for quizmill@$spec to propagate to npm ($i/60)…"
+            sleep 10
           done
-          echo "::error::quizmill@$spec never appeared on npm after ~2 min."
+          echo "::error::quizmill@$spec never appeared on npm after ~10 min."
           exit 1
 
       - name: Build "${{ inputs.pack }}" on quizmill@${{ steps.engine.outputs.spec }}
