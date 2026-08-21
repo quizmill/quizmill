@@ -2,10 +2,15 @@ import { describe, expect, it } from 'vitest';
 import type { Attempt, Session } from '../src/data/types';
 import { toWireOp } from '../src/lib/backends/httpBackend';
 import { hashSyncKey, generateSyncKey } from '../src/lib/syncKey';
+import { normalizeKeyName } from '../src/lib/syncKey';
 import {
+  MAX_KEY_NAME_LENGTH,
+  normalizeKeyName as workerNormalizeKeyName,
   parseOp,
   parseOpsRequest,
+  parseProfileRequest,
   statementsForOp,
+  statementsForProfile,
   userIdFromKey,
   type WireOp,
 } from '../cloudflare/src/ops';
@@ -309,5 +314,48 @@ describe('backwards compatibility (pre-analytics clients)', () => {
       },
     });
     expect(parsed).not.toBeNull();
+  });
+});
+
+describe('key names (profiles)', () => {
+  it('client and worker canonicalise names identically', () => {
+    const samples = [
+      'Leo',
+      "Dad's key",
+      '   Leo   iPad  ',
+      'Leo\u0000\u007f',
+      '\u{1F680}'.repeat(MAX_KEY_NAME_LENGTH + 3),
+      'x'.repeat(MAX_KEY_NAME_LENGTH + 10),
+      '',
+    ];
+    for (const raw of samples) {
+      expect(workerNormalizeKeyName(raw)).toBe(normalizeKeyName(raw));
+    }
+  });
+
+  it('accepts a name and hands back the canonical form', () => {
+    expect(parseProfileRequest({ name: '  Leo  ' })).toEqual({ name: 'Leo' });
+    // An empty name is valid input — it means "clear the name".
+    expect(parseProfileRequest({ name: '' })).toEqual({ name: '' });
+  });
+
+  it('rejects a missing, non-string, or absurdly long name', () => {
+    expect(parseProfileRequest({})).toBeNull();
+    expect(parseProfileRequest({ name: 42 })).toBeNull();
+    expect(parseProfileRequest(null)).toBeNull();
+    expect(parseProfileRequest({ name: 'x'.repeat(1_001) })).toBeNull();
+  });
+
+  it('upserts the name against the user id — not scoped to a pack', () => {
+    const [stmt] = statementsForProfile('Leo', 'user-hash');
+    expect(stmt.sql).toContain('INSERT INTO profiles');
+    expect(stmt.sql).toContain('DO UPDATE');
+    expect(stmt.params).toEqual(['user-hash', 'Leo']);
+  });
+
+  it('clears the name when it is emptied', () => {
+    const [stmt] = statementsForProfile('', 'user-hash');
+    expect(stmt.sql).toBe('DELETE FROM profiles WHERE user_id = ?');
+    expect(stmt.params).toEqual(['user-hash']);
   });
 });

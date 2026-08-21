@@ -29,3 +29,13 @@ CREATE TABLE IF NOT EXISTS rows (
 -- Grouped deletes: attempts are looked up by their owning session id.
 CREATE INDEX IF NOT EXISTS rows_by_ref
   ON rows (user_id, pack_id, tbl, ref);
+
+-- Key names: one optional human-readable label per sync key ("Leo",
+-- "Dad's key"), so a family holding several keys can tell them apart.
+-- Keyed by the same hashed user id, so the name travels with the key to
+-- any device that enters it. Absent row = unnamed key.
+CREATE TABLE IF NOT EXISTS profiles (
+  user_id    TEXT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);

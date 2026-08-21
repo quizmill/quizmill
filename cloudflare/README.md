@@ -75,6 +75,31 @@ key on another device links the two — like a Wi-Fi password for your
 practice history. Every request carries the key as a bearer token; the
 worker stores only its SHA-256 as the row partition, never the key itself.
 
+### Naming a key (whose history is this?)
+
+A key is unguessable noise, which is what you want for auth and exactly
+what you don't want when the house holds two of them. In the same card,
+**Name this key** labels it — "Leo", "Dad's key" — and the name is stored
+next to the key's hash on the worker, so it appears on every device that
+enters the key (and in the "Email me this key" subject line, so the two
+keys don't look alike in your inbox). Renaming on one device renames it
+everywhere; clearing the name clears it everywhere.
+
+The name is stored in the clear — it's a label its holder chose, readable
+only by someone who already has the key. Don't put anything secret in it.
+
+**Upgrading an existing deployment.** Key names live in a `profiles`
+table added after the first release. `schema.sql` is idempotent, so:
+
+```sh
+npx wrangler d1 execute quizmill-sync --remote --file=schema.sql
+npx wrangler deploy
+```
+
+Until that runs, the app keeps names on the device and says they haven't
+reached the other devices yet; it pushes them up by itself on the first
+visit after the upgrade.
+
 Anyone who knows a key can read and write the history behind it, so treat
 it like a password. That capability-URL trust model is a deliberate fit
 for the data mirrored here (quiz attempts, stickers, question votes) —
@@ -100,6 +125,8 @@ any language) lives in `docs/sync-protocol.md`.
 | `GET /` | none | liveness probe |
 | `GET /v1/rows?pack=<id>` | Bearer sync key | pull all rows for user+pack |
 | `POST /v1/ops` | Bearer sync key | apply `{ pack, ops: [...] }` idempotent mutations |
+| `GET /v1/profile` | Bearer sync key | this key's name, `{ name }` (`null` when unnamed) |
+| `POST /v1/profile` | Bearer sync key | name this key, `{ name }` (empty string clears it) |
 
 Rows are opaque JSON keyed by `(user_id, pack_id, tbl, id)` — the worker
 never interprets them; merge semantics live in the client

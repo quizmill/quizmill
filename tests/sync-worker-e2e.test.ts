@@ -16,7 +16,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { webcrypto } from 'node:crypto';
 import worker from '../cloudflare/src/worker';
-import { httpBackend, setSyncKey } from '../src/lib/backends/httpBackend';
+import {
+  getStoredKeyName,
+  httpBackend,
+  reconcileKeyName,
+  saveKeyName,
+  setSyncKey,
+} from '../src/lib/backends/httpBackend';
 import { generateSyncKey } from '../src/lib/syncKey';
 import * as storage from '../src/lib/storage';
 
@@ -285,5 +291,143 @@ describe('one sync key, many packs (the pack-library app model)', () => {
     const pulled = await pull(key, 'world-capitals');
     expect(pulled.sessions).toHaveLength(1);
     expect((pulled.sessions[0] as { id: string }).id).toBe('old-session');
+  });
+});
+
+/** Return to a device captured earlier (each device has its own
+ *  localStorage, so a handle is just its window). */
+function resumeDevice(handle: unknown): void {
+  (globalThis as { window?: unknown }).window = handle;
+}
+
+describe('key names end-to-end (name a key, read it on the other device)', () => {
+  it('a name set on one device shows up on every device holding the key', async () => {
+    const key = generateSyncKey();
+
+    // Dad's iPad: name the key.
+    await useDevice(key);
+    expect(await saveKeyName('Leo')).toEqual({ name: 'Leo', synced: true });
+
+    // Leo's phone: same key, fresh storage — the name arrives with it.
+    await useDevice(key);
+    expect(getStoredKeyName()).toBeNull();
+    expect(await reconcileKeyName()).toBe('Leo');
+    expect(getStoredKeyName()).toBe('Leo'); // …and is cached for offline
+  });
+
+  it('names are per key: two keys in one house stay distinguishable', async () => {
+    const dad = generateSyncKey();
+    const son = generateSyncKey();
+
+    await useDevice(dad);
+    await saveKeyName("Dad's key");
+    await useDevice(son);
+    await saveKeyName('Leo');
+
+    await useDevice(dad);
+    expect(await reconcileKeyName()).toBe("Dad's key");
+    await useDevice(son);
+    expect(await reconcileKeyName()).toBe('Leo');
+  });
+
+  it('a rename propagates to the other device', async () => {
+    const key = generateSyncKey();
+    await useDevice(key);
+    await saveKeyName('Leo');
+    await saveKeyName('Leo (year 6)');
+
+    await useDevice(key);
+    expect(await reconcileKeyName()).toBe('Leo (year 6)');
+  });
+
+  it('clearing a name clears it everywhere — a cached name is not resurrected', async () => {
+    const key = generateSyncKey();
+
+    // Device A names the key; device B picks the name up and caches it.
+    await useDevice(key);
+    await saveKeyName('Leo');
+    await useDevice(key);
+    const deviceB = globalThis.window;
+    expect(await reconcileKeyName()).toBe('Leo');
+
+    // Device A clears the name…
+    await useDevice(key);
+    expect(await saveKeyName('   ')).toEqual({ name: null, synced: true });
+
+    // …and device B drops its cached copy on the next reconcile rather
+    // than pushing the stale name back up.
+    resumeDevice(deviceB);
+    expect(await reconcileKeyName()).toBeNull();
+    expect(getStoredKeyName()).toBeNull();
+  });
+
+  it('stores the canonical name, so odd whitespace round-trips cleanly', async () => {
+    const key = generateSyncKey();
+    await useDevice(key);
+    await saveKeyName('   Leo    iPad  ');
+    await useDevice(key);
+    expect(await reconcileKeyName()).toBe('Leo iPad');
+  });
+
+  it('naming a key never touches the practice rows behind it', async () => {
+    const key = generateSyncKey();
+    await useDevice(key);
+    await httpBackend.runOp(
+      { t: 'notes', op: 'upsert', row: { questionId: 'q1', text: 'note', updatedAt: 1 } },
+      'u',
+    );
+    await saveKeyName('Leo');
+    expect((await httpBackend.pullAll('u')).notes).toHaveLength(1);
+
+    // …and resetting one pack's progress keeps the name: forgetting the
+    // history shouldn't make the device forget whose it is.
+    await httpBackend.runOp({ t: 'clear-all', op: 'delete' }, 'u');
+    expect((await httpBackend.pullAll('u')).notes).toHaveLength(0);
+    expect(await reconcileKeyName()).toBe('Leo');
+  });
+});
+
+describe('key names against a server that does not support them', () => {
+  /** A worker deployed before names existed: /v1/profile is a 404. */
+  function withPreNamesServer<T>(run: () => Promise<T>): Promise<T> {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes('/v1/profile')) {
+        return new Response(JSON.stringify({ error: 'not found' }), { status: 404 });
+      }
+      return originalFetch(input as never, init);
+    }) as typeof fetch;
+    return run().finally(() => {
+      globalThis.fetch = originalFetch;
+    });
+  }
+
+  it('keeps the name on this device and says it did not sync', async () => {
+    const key = generateSyncKey();
+    await useDevice(key);
+    const saved = await withPreNamesServer(() => saveKeyName('Leo'));
+    expect(saved).toEqual({ name: 'Leo', synced: false });
+    // Still shown here — the label is local-first, like the rest of the app.
+    expect(getStoredKeyName()).toBe('Leo');
+    expect(await withPreNamesServer(() => reconcileKeyName())).toBe('Leo');
+  });
+
+  it('pushes the name up by itself once the server is upgraded', async () => {
+    const key = generateSyncKey();
+
+    // Named while the server can't store it — the name is pending here.
+    await useDevice(key);
+    const device = globalThis.window;
+    await withPreNamesServer(() => saveKeyName('Leo'));
+
+    // Server upgraded: the next reconcile drains the pending name up…
+    expect(await reconcileKeyName()).toBe('Leo');
+
+    // …so a device linking afterwards reads it from the server.
+    await useDevice(key);
+    expect(await reconcileKeyName()).toBe('Leo');
+
+    resumeDevice(device);
+    expect(getStoredKeyName()).toBe('Leo');
   });
 });

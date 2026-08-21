@@ -94,6 +94,55 @@ export async function hashSyncKey(key: string): Promise<string> {
     .join('');
 }
 
+// ── Key names ───────────────────────────────────────────────────────────
+//
+// A key is unguessable noise by design, which makes "is this the iPad's
+// key or my son's?" unanswerable from the key alone. So a key may carry
+// one optional name the learner picks ("Leo", "Dad's key"). The name is
+// mirrored to the sync server against the same hashed user id, so it
+// travels to every device that enters the key — and, like the key itself,
+// it is app-level rather than per-pack.
+
+/** Longest name kept, in code points (so emoji survive whole). */
+export const MAX_KEY_NAME_LENGTH = 40;
+
+function isControl(ch: string): boolean {
+  const cp = ch.codePointAt(0) ?? 0;
+  return cp < 0x20 || cp === 0x7f;
+}
+
+/**
+ * Canonicalise a name: control characters become spaces, runs of
+ * whitespace collapse, the ends are trimmed, and the result is clamped to
+ * MAX_KEY_NAME_LENGTH code points (clamping by code point, not by UTF-16
+ * unit, so a trailing emoji is kept whole rather than split into half a
+ * surrogate pair). `''` means "no name".
+ *
+ * MUST match normalizeKeyName in cloudflare/src/ops.ts — client and
+ * server canonicalise identically, so what you type is what comes back
+ * on the other device (asserted in tests/worker-sync.test.ts).
+ */
+export function normalizeKeyName(raw: string): string {
+  const flattened = Array.from(raw)
+    .map((ch) => (isControl(ch) ? ' ' : ch))
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return Array.from(flattened).slice(0, MAX_KEY_NAME_LENGTH).join('').trim();
+}
+
+/**
+ * How to refer to a key in prose: its name when it has one, else a short
+ * fingerprint of the key itself (`QM-H3KDA…`) — enough to tell two keys
+ * apart on screen without printing either in full.
+ */
+export function syncKeyLabel(key: string, name?: string | null): string {
+  const named = normalizeKeyName(name ?? '');
+  if (named) return named;
+  const canonical = normalizeSyncKey(key);
+  return canonical ? `${canonical.split('-').slice(0, 2).join('-')}…` : 'this key';
+}
+
 /**
  * A mailto: URL that opens the user's own mail app with the key pre-filled,
  * addressed to nobody — they send it to themselves. This is the recovery
@@ -101,11 +150,20 @@ export async function hashSyncKey(key: string): Promise<string> {
  * the user's mail client, so no server (ours included) ever sees the key
  * or the address. Recovery = search your inbox for the app's name.
  */
-export function syncKeyMailto(key: string, appTitle: string): string {
+export function syncKeyMailto(
+  key: string,
+  appTitle: string,
+  name?: string | null,
+): string {
   const canonical = normalizeSyncKey(key) ?? key;
-  const subject = `${appTitle} — sync key`;
+  const named = normalizeKeyName(name ?? '');
+  // The name goes in the subject too: recovery is "search your inbox",
+  // and a household with two keys needs to know which mail is whose.
+  const subject = named
+    ? `${appTitle} — sync key for ${named}`
+    : `${appTitle} — sync key`;
   const body =
-    `Your sync key for ${appTitle}:\n\n` +
+    (named ? `Sync key for ${named} (${appTitle}):\n\n` : `Your sync key for ${appTitle}:\n\n`) +
     `${canonical}\n\n` +
     `To link a new device (or recover your progress), open the app, go to ` +
     `Settings → Sync across devices, and enter this key.\n\n` +

@@ -41,7 +41,10 @@ webmanifest are generated from the manifest by `scripts/pack-assets.ts`
   `src/lib/backends/` — see `docs/sync-protocol.md`. Built-ins: `http`
   (any server speaking the sync protocol, sync-key auth, selected by
   `NEXT_PUBLIC_SYNC_URL`; reference server = Cloudflare Worker+D1 in
-  `cloudflare/`) and `supabase` (`NEXT_PUBLIC_SUPABASE_URL`/
+  `cloudflare/`; a key can carry an optional readable name — "Leo",
+  "Dad's key" — mirrored per hashed user id via `GET/POST /v1/profile`
+  so a household with several keys knows which is which) and `supabase`
+  (`NEXT_PUBLIC_SUPABASE_URL`/
   `_PUBLISHABLE_KEY`); `NEXT_PUBLIC_SYNC_BACKEND` picks explicitly;
   dormant without any. `transfer.ts` = serverless file
   export/import of the same data), `useStorage.ts`

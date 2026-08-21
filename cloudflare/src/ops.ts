@@ -184,3 +184,72 @@ export async function userIdFromKey(bearer: string): Promise<string | null> {
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
+
+// ── Key names (the `profiles` table) ────────────────────────────────────
+//
+// A sync key is ~98 bits of unguessable noise, which is exactly what you
+// want for auth and exactly what you don't want when a household holds
+// several of them. A key may carry one optional human-readable name
+// ("Leo", "Dad's key") so the app can say WHOSE history it is syncing.
+//
+// Deliberately NOT pack-scoped: the key identifies the learner, and one
+// key already serves every pack (the client stores it app-level), so the
+// name lives once per user_id. Nor is it touched by `clear-all`, which
+// resets one pack's progress — wiping progress shouldn't make a device
+// forget whose it is.
+//
+// The name is stored in the clear. It is a label the key's holder chose
+// for themselves, readable only by someone already holding the key (which
+// is total access anyway) — so it's no new exposure, but it is also no
+// place for a secret.
+
+/** Longest name kept, in code points (so emoji survive whole). */
+export const MAX_KEY_NAME_LENGTH = 40;
+
+/** Beyond this the request is malformed rather than merely long. */
+const MAX_KEY_NAME_INPUT = 1_000;
+
+function isControl(ch: string): boolean {
+  const cp = ch.codePointAt(0) ?? 0;
+  return cp < 0x20 || cp === 0x7f;
+}
+
+/**
+ * Canonicalise a name: control characters become spaces, runs of
+ * whitespace collapse, the ends are trimmed, and the result is clamped to
+ * MAX_KEY_NAME_LENGTH code points (clamping by code point, not by UTF-16
+ * unit, so a trailing emoji is kept whole rather than split into half a
+ * surrogate pair). `''` means "no name" — stored as a deletion.
+ *
+ * MUST match normalizeKeyName in src/lib/syncKey.ts, so a name survives
+ * the round trip unchanged (asserted in tests/worker-sync.test.ts).
+ */
+export function normalizeKeyName(raw: string): string {
+  const flattened = Array.from(raw)
+    .map((ch) => (isControl(ch) ? ' ' : ch))
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return Array.from(flattened).slice(0, MAX_KEY_NAME_LENGTH).join('').trim();
+}
+
+/** Validate a `POST /v1/profile` body. Null = reject the request with 400. */
+export function parseProfileRequest(body: unknown): { name: string } | null {
+  if (!body || typeof body !== 'object') return null;
+  const b = body as Record<string, unknown>;
+  if (typeof b.name !== 'string' || b.name.length > MAX_KEY_NAME_INPUT) return null;
+  return { name: normalizeKeyName(b.name) };
+}
+
+const PROFILE_UPSERT_SQL = `INSERT INTO profiles (user_id, name, updated_at)
+VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+ON CONFLICT (user_id)
+DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at`;
+
+/** Statements storing a key's name — or clearing it, for an empty name. */
+export function statementsForProfile(name: string, userId: string): SqlStatement[] {
+  if (!name) {
+    return [{ sql: 'DELETE FROM profiles WHERE user_id = ?', params: [userId] }];
+  }
+  return [{ sql: PROFILE_UPSERT_SQL, params: [userId, name] }];
+}
