@@ -29,6 +29,9 @@ import {
 } from '@/lib/storage';
 import { useTheme } from '@/lib/useTheme';
 import type { ThemePref } from '@/lib/theme';
+import { useLook } from '@/lib/useLook';
+import { packDefaultLook } from '@/lib/look';
+import type { LookPref } from '@/lib/look';
 import {
   packSources,
   packGames,
@@ -49,6 +52,15 @@ const THEME_CHOICES: {
   { value: 'system', label: 'Auto', Icon: Monitor },
   { value: 'light', label: 'Light', Icon: Sun },
   { value: 'dark', label: 'Dark', Icon: Moon },
+];
+
+/** Visual style: follow the pack's default, or pin one on this device.
+ *  Poster is the loud quizmill.dev campaign look — kids' packs ship it
+ *  as their default via `look` in pack.json. */
+const LOOK_CHOICES: { value: LookPref; label: string }[] = [
+  { value: 'pack', label: 'Pack default' },
+  { value: 'classic', label: 'Classic' },
+  { value: 'poster', label: 'Poster' },
 ];
 
 /**
@@ -88,6 +100,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
   const resetAll = useResetAll();
   const resetToday = useResetToday();
   const [theme, setTheme] = useTheme();
+  const [look, setLook] = useLook();
 
   const [pending, setPending] = useState<'today' | 'all' | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -260,6 +273,36 @@ export function SettingsPage({ extras }: SettingsPageProps) {
                 )}
               >
                 <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <h3 className="mt-6 text-lg font-semibold text-ink-900">Style</h3>
+          <p className="mt-1 text-sm text-ink-600">
+            Poster is the big, colourful look. Pack default is{' '}
+            {packDefaultLook() === 'poster' ? 'Poster' : 'Classic'} for this pack.
+          </p>
+          <div
+            role="radiogroup"
+            aria-label="Visual style"
+            className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-ink-100 p-1"
+          >
+            {LOOK_CHOICES.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={look === value}
+                data-testid={`look-${value}`}
+                onClick={() => setLook(value)}
+                className={cn(
+                  'tap-feedback flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold',
+                  look === value
+                    ? 'bg-surface text-ink-900 shadow-sm'
+                    : 'text-ink-500 hover:text-ink-700',
+                )}
+              >
                 {label}
               </button>
             ))}

@@ -187,3 +187,144 @@
     }
   }
 }
+
+/* ————— The Poster look (data-look="poster") —————
+   The quizmill.dev campaign style inside the app: warm paper, hard ink
+   borders, offset shadows, the vivid sail palette. Enabled per device in
+   Settings → Style, or shipped as a pack's default via `look` in
+   pack.json (kids' packs). It is a third palette remap alongside light
+   and dark — same CSS-variable seam, and it composes with both. */
+
+/* The campaign typeface, self-hosted so it works offline (the woff2s are
+   emitted into the export and the service worker precaches everything).
+   Variable: weight 400–800, width 75–100%. Only Poster's font stack names
+   the family, so classic users never download a byte of it. */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 400 800;
+  font-stretch: 75% 100%;
+  font-display: swap;
+  src: url('./fonts/bricolage-grotesque-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 400 800;
+  font-stretch: 75% 100%;
+  font-display: swap;
+  src: url('./fonts/bricolage-grotesque-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+    U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+:root[data-look='poster'] {
+  --surface: 255 255 255;
+
+  /* warm ink ramp, from the site's paper/ink tokens */
+  --ink-50: 255 252 244; /* paper */
+  --ink-100: 255 244 217;
+  --ink-200: 236 226 209;
+  --ink-300: 200 188 170;
+  --ink-400: 141 131 117;
+  --ink-500: 91 81 69;
+  --ink-600: 62 54 44;
+  --ink-700: 42 36 29;
+  --ink-800: 26 22 17;
+  --ink-900: 20 17 13; /* ink — also every poster border and shadow */
+
+  /* brand = sail blue #2d4bff (white text on 500/600 measured ≥ 4.5:1) */
+  --brand-50: 237 240 255;
+  --brand-100: 219 226 255;
+  --brand-200: 186 199 255;
+  --brand-300: 143 163 255;
+  --brand-400: 92 117 255;
+  --brand-500: 45 75 255;
+  --brand-600: 45 75 255;
+  --brand-700: 33 56 199;
+  --brand-800: 26 45 158;
+  --brand-900: 20 34 118;
+
+  /* success = sail jade; text shade is the site's measured --t-jade */
+  --success-50: 230 249 241;
+  --success-100: 216 247 233;
+  --success-200: 178 240 214;
+  --success-500: 0 180 120;
+  --success-600: 0 154 103;
+  --success-700: 0 129 86;
+
+  /* warn = sail flame, darkened to the site's measured --t-flame where
+     it has to carry white text */
+  --warn-50: 255 238 232;
+  --warn-100: 255 224 216;
+  --warn-200: 255 197 181;
+  --warn-500: 222 48 0;
+  --warn-600: 199 43 0;
+  --warn-700: 168 36 0;
+}
+
+:root.dark[data-look='poster'] {
+  /* the site's dark poster: warm near-black ground, cream ink — so the
+     slab borders and shadows below turn cream, like the marketing site */
+  --surface: 27 23 18;
+
+  --ink-50: 16 14 11;
+  --ink-100: 28 23 16;
+  --ink-200: 42 33 21;
+  --ink-300: 74 63 48;
+  --ink-400: 138 127 110;
+  --ink-500: 184 172 153;
+  --ink-600: 205 195 178;
+  --ink-700: 224 216 200;
+  --ink-800: 240 233 219;
+  --ink-900: 255 246 227; /* cream */
+
+  --brand-50: 22 26 46;
+  --brand-100: 30 36 66;
+  --brand-200: 44 53 98;
+  --brand-300: 64 78 145;
+  --brand-400: 108 128 240;
+  --brand-500: 91 110 240;
+  --brand-600: 74 95 224; /* white text ≈ 5.2:1 */
+  --brand-700: 143 162 255;
+  --brand-800: 178 191 255;
+  --brand-900: 219 226 255;
+
+  --success-50: 14 38 28;
+  --success-100: 20 52 38;
+  --success-200: 28 74 54;
+  --success-500: 31 211 150;
+  --success-600: 0 154 103;
+  --success-700: 124 214 171;
+
+  --warn-50: 46 18 10;
+  --warn-100: 62 24 13;
+  --warn-200: 90 33 17;
+  --warn-500: 222 48 0;
+  --warn-600: 199 43 0;
+  --warn-700: 255 138 106;
+}
+
+/* Structure: in Poster, everything "raised" becomes a slab. shadow-sm is
+   the app's one raised-surface idiom (Card, primary/secondary Button, the
+   selected segment of toggles), so one hook restyles the lot — hard offset
+   shadow, thick ink border, no blur. Unlayered so it beats the utilities. */
+:root[data-look='poster'] .shadow-sm {
+  border: 2.5px solid rgb(var(--ink-900));
+  box-shadow: 4px 4px 0 rgb(var(--ink-900));
+}
+/* Poster type: the campaign typeface everywhere, headings chunky and
+   tight. The system stack stays as fallback while the woff2 loads. */
+:root[data-look='poster'] body {
+  font-family:
+    'Bricolage Grotesque', -apple-system, BlinkMacSystemFont, 'Inter',
+    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+:root[data-look='poster'] :is(h1, h2, h3) {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}

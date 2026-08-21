@@ -56,6 +56,8 @@ export interface AppConfig {
   homeSubtitle: string;
   /** PWA theme-color (browser chrome / iOS status bar). */
   themeColor: string;
+  /** Pack-declared default look ('poster' = the campaign style). */
+  look: 'classic' | 'poster';
   categories: CategoryDef[];
   /** Exam-readiness goal, when the pack declares one. */
   exam?: ExamConfig;
@@ -69,6 +71,7 @@ export const APP_CONFIG: AppConfig = {
   description: manifest.description,
   homeSubtitle: manifest.homeSubtitle,
   themeColor: manifest.themeColor,
+  look: manifest.look === 'poster' ? 'poster' : 'classic',
   categories: manifest.categories as CategoryDef[],
   exam: (manifest as { exam?: ExamConfig }).exam,
   games: (manifest as { games?: GamesConfig }).games,

@@ -154,6 +154,10 @@ export const packManifestSchema = z
     sources: z.array(packSourceSchema).max(12).optional(),
     /** Optional exam-readiness goal — see packExamSchema. */
     exam: packExamSchema.optional(),
+    /** Default visual look for this pack's app: 'poster' ships the loud
+     *  quizmill.dev campaign style (kids' packs). Device Settings can
+     *  override either way; omit for the calm classic UI. */
+    look: z.enum(['classic', 'poster']).optional(),
     /** Optional reward mini-games — see packGamesSchema. */
     games: packGamesSchema.optional(),
   })
