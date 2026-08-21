@@ -63,6 +63,8 @@ export type PackManifest = {
   sources?: PackSource[];
   exam?: PackExam;
   games?: PackGames;
+  /** Default visual look; 'poster' = the loud campaign style. */
+  look?: 'classic' | 'poster';
 };
 
 export type PackScenario = {

@@ -45,7 +45,11 @@ webmanifest are generated from the manifest by `scripts/pack-assets.ts`
   `_PUBLISHABLE_KEY`); `NEXT_PUBLIC_SYNC_BACKEND` picks explicitly;
   dormant without any. `transfer.ts` = serverless file
   export/import of the same data), `useStorage.ts`
-  (React hooks, event bus `quizmill:storage`).
+  (React hooks, event bus `quizmill:storage`), `theme.ts`/`look.ts`
+  (device appearance: colour scheme as a `dark` class, visual style as
+  `data-look="poster"` — the quizmill.dev campaign look, palette-remapped
+  via the CSS variables in globals.css; packs default it with `look` in
+  pack.json, Settings → Style overrides).
 - `src/pack/` — the app UI: Home, PracticeRunner, ReviewRunner,
   runner.ts (pure session logic), data.ts (typed pack loader),
   StickersPage + achievements{,-engine}.ts (sticker cabinet; mastery
