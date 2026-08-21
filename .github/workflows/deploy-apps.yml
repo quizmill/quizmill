@@ -92,6 +92,9 @@ jobs:
       # so @latest can still resolve to the previous version right after a
       # release. Pin + wait makes the post-release auto-deploy reliable and
       # removes the manual re-dispatch. No tag (fresh repo) → @latest.
+      # Release now waits for npm visibility before completing (so this
+      # normally hits on the first probe), but propagation has been observed
+      # at 5+ minutes (v0.3.25) — keep a generous ~10 min backstop.
       - name: Resolve engine version
         id: engine
         run: |
@@ -102,16 +105,16 @@ jobs:
             exit 0
           fi
           version="${tag#v}"
-          for i in $(seq 1 24); do
+          for i in $(seq 1 60); do
             if npm view "quizmill@$version" version >/dev/null 2>&1; then
               echo "quizmill@$version is available on npm."
               echo "spec=$version" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            echo "Waiting for quizmill@$version to propagate to npm ($i/24)…"
-            sleep 5
+            echo "Waiting for quizmill@$version to propagate to npm ($i/60)…"
+            sleep 10
           done
-          echo "::error::quizmill@$version never appeared on npm after ~2 min."
+          echo "::error::quizmill@$version never appeared on npm after ~10 min."
           exit 1
 
       - name: Build "${{ matrix.name }}" on quizmill@${{ steps.engine.outputs.spec }}
