@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MAX_KEY_NAME_LENGTH,
   SYNC_KEY_ALPHABET,
   SYNC_KEY_LENGTH,
   generateSyncKey,
   hashSyncKey,
   isValidSyncKey,
   maskSyncKey,
+  normalizeKeyName,
   normalizeSyncKey,
+  syncKeyLabel,
   syncKeyMailto,
 } from '../src/lib/syncKey';
 
@@ -108,5 +111,79 @@ describe('syncKeyMailto (self-email recovery)', () => {
     const body = params.get('body') ?? '';
     expect(body).toContain(key); // canonicalised, despite lowercase input
     expect(body).toContain('Settings');
+  });
+});
+
+describe('normalizeKeyName (readable names for keys)', () => {
+  it('keeps an ordinary name as typed', () => {
+    expect(normalizeKeyName('Leo')).toBe('Leo');
+    expect(normalizeKeyName("Dad's key")).toBe("Dad's key");
+  });
+
+  it('trims and collapses whitespace', () => {
+    expect(normalizeKeyName('   Leo   ')).toBe('Leo');
+    expect(normalizeKeyName('Leo\t\n  iPad')).toBe('Leo iPad');
+  });
+
+  it('flattens control characters instead of storing them', () => {
+    expect(normalizeKeyName('Le\u0000o\u007f')).toBe('Le o');
+  });
+
+  it("treats a blank name as 'no name'", () => {
+    expect(normalizeKeyName('')).toBe('');
+    expect(normalizeKeyName('   \n ')).toBe('');
+  });
+
+  it('clamps to the maximum length, without a dangling space', () => {
+    const long = 'Leo '.repeat(40);
+    const clamped = normalizeKeyName(long);
+    expect(Array.from(clamped).length).toBeLessThanOrEqual(MAX_KEY_NAME_LENGTH);
+    expect(clamped).toBe(clamped.trim());
+  });
+
+  it('clamps by code point, so a trailing emoji is never split in half', () => {
+    const rockets = '\u{1F680}'.repeat(MAX_KEY_NAME_LENGTH + 5);
+    const clamped = normalizeKeyName(rockets);
+    expect(Array.from(clamped)).toHaveLength(MAX_KEY_NAME_LENGTH);
+    // A UTF-16 slice would leave a lone surrogate here.
+    expect(clamped).toBe('\u{1F680}'.repeat(MAX_KEY_NAME_LENGTH));
+    expect(clamped.includes('\uFFFD')).toBe(false);
+  });
+
+  it('is idempotent — normalising twice changes nothing', () => {
+    const once = normalizeKeyName('  Leo   \u0007 iPad  ');
+    expect(normalizeKeyName(once)).toBe(once);
+  });
+});
+
+describe('syncKeyLabel', () => {
+  it('prefers the name when the key has one', () => {
+    expect(syncKeyLabel('QM-ABCDE-FGHJK-MNPQR-STVWX', 'Leo')).toBe('Leo');
+  });
+
+  it('falls back to a short fingerprint, never the whole key', () => {
+    const label = syncKeyLabel('QM-ABCDE-FGHJK-MNPQR-STVWX', null);
+    expect(label).toBe('QM-ABCDE\u2026');
+    expect(label).not.toContain('STVWX');
+  });
+
+  it('survives a junk key without throwing', () => {
+    expect(syncKeyLabel('nonsense', '')).toBe('this key');
+  });
+});
+
+describe('syncKeyMailto with a named key', () => {
+  it('names the key in the subject and body, so two keys look different', () => {
+    const url = syncKeyMailto('QM-ABCDE-FGHJK-MNPQR-STVWX', 'Eleven Plus', 'Leo');
+    const params = new URLSearchParams(url.slice('mailto:?'.length));
+    expect(params.get('subject')).toBe('Eleven Plus \u2014 sync key for Leo');
+    expect(params.get('body')).toContain('Sync key for Leo');
+  });
+
+  it('falls back to the unnamed wording for a nameless key', () => {
+    const url = syncKeyMailto('QM-ABCDE-FGHJK-MNPQR-STVWX', 'Eleven Plus', '  ');
+    const params = new URLSearchParams(url.slice('mailto:?'.length));
+    expect(params.get('subject')).toBe('Eleven Plus \u2014 sync key');
+    expect(params.get('body')).toContain('Your sync key for Eleven Plus');
   });
 });

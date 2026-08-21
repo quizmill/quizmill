@@ -19,8 +19,19 @@
  *   npx wrangler d1 create quizmill-sync        # paste id in wrangler.toml
  *   npx wrangler d1 execute quizmill-sync --remote --file=schema.sql
  *   npx wrangler deploy
+ *
+ * schema.sql is idempotent — re-run it on an existing deployment to pick
+ * up later tables (the `profiles` table backing key names was added
+ * after the first release).
  */
-import { parseOpsRequest, statementsForOp, userIdFromKey, TABLES } from './ops';
+import {
+  parseOpsRequest,
+  parseProfileRequest,
+  statementsForOp,
+  statementsForProfile,
+  userIdFromKey,
+  TABLES,
+} from './ops';
 import type { TableName } from './ops';
 
 // Minimal D1 surface, declared locally so the engine repo's `tsc` run
@@ -106,6 +117,35 @@ async function handleOps(request: Request, env: Env, userId: string): Promise<Re
   return json({ ok: true, applied: parsed.ops.length });
 }
 
+/**
+ * The optional human-readable name for this key ("Leo", "Dad's key") —
+ * how an app holding several keys tells them apart. Not pack-scoped: the
+ * key names a learner, not a pack. `null` = this key has no name.
+ */
+async function handleGetProfile(env: Env, userId: string): Promise<Response> {
+  const { results } = await env.DB.prepare('SELECT name FROM profiles WHERE user_id = ?')
+    .bind(userId)
+    .all<{ name: string }>();
+  return json({ name: results[0]?.name ?? null });
+}
+
+async function handlePutProfile(request: Request, env: Env, userId: string): Promise<Response> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'invalid JSON' }, 400);
+  }
+  const parsed = parseProfileRequest(body);
+  if (!parsed) return json({ error: 'invalid profile request' }, 400);
+  const statements = statementsForProfile(parsed.name, userId).map((s) =>
+    env.DB.prepare(s.sql).bind(...s.params),
+  );
+  await env.DB.batch(statements);
+  // Echo the stored (canonicalised) name so the client shows what landed.
+  return json({ ok: true, name: parsed.name || null });
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method === 'OPTIONS') {
@@ -127,6 +167,10 @@ export default {
       }
       if (pathname === '/v1/ops' && request.method === 'POST') {
         return await handleOps(request, env, userId);
+      }
+      if (pathname === '/v1/profile') {
+        if (request.method === 'GET') return await handleGetProfile(env, userId);
+        if (request.method === 'POST') return await handlePutProfile(request, env, userId);
       }
     } catch (err) {
       console.error('[quizmill-sync]', err);

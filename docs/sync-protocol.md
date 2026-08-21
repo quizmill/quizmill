@@ -63,6 +63,39 @@ Rows are returned exactly as uploaded (the client's local shapes — see
 `src/data/types.ts` and `src/lib/storage.ts`). Missing arrays are
 treated as empty.
 
+### `GET /v1/profile` and `POST /v1/profile` (optional)
+
+The learner-facing half of a sync key: one optional human-readable **name**
+per key ("Leo", "Dad's key"). Keys are unguessable noise by design, so a
+household running two of them cannot otherwise tell which app is syncing
+whose history. The name is stored against the same hashed user id — never
+the key — and is **not** pack-scoped: one key names one learner across
+every pack, and `clear-all` (which resets one pack's progress) leaves it
+alone.
+
+```
+GET  /v1/profile            → 200 { "name": "Leo" }   // or { "name": null }
+POST /v1/profile  { "name": "Leo" }
+                            → 200 { "ok": true, "name": "Leo" }
+```
+
+An empty `name` clears it. Canonicalise before storing — control
+characters to spaces, whitespace runs collapsed, trimmed, clamped to 40
+code points (clamp by code point so a trailing emoji isn't split) — and
+echo back what you stored; the client applies the identical rule
+(`normalizeKeyName`, mirrored in `src/lib/syncKey.ts` and
+`cloudflare/src/ops.ts`, asserted equal in `tests/worker-sync.test.ts`).
+Reject a non-string or absurdly long (>1000 char) name with `400`.
+
+The name is stored in the clear: it is a label its own key-holder chose,
+readable only by someone who already holds the key. Treat it as a label,
+not a secret.
+
+**Servers may skip this pair.** The client degrades: it keeps the name on
+the device, tells the user it hasn't reached their other devices, and
+retries the push on later visits — so a worker that gains `/v1/profile`
+later picks up names devices already hold.
+
 ### `POST /v1/ops`
 
 Body: `{ "pack": "<packId>", "ops": [WireOp, ...] }`. Apply in order;

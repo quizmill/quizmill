@@ -12,6 +12,7 @@ import {
   LogOut,
   Mail,
   Share2,
+  UserRound,
 } from 'lucide-react';
 import { Button, buttonStyles } from '@/components/ui/Button';
 import { SyncBackendFooter, SyncStatusLine } from '@/components/SyncStatusLine';
@@ -19,10 +20,14 @@ import { APP_CONFIG } from '@/config';
 import { useSyncStatus } from '@/lib/useStorage';
 import {
   clearSyncKey,
+  getStoredKeyName,
   getStoredSyncKey,
+  reconcileKeyName,
+  saveKeyName,
   setSyncKey,
 } from '@/lib/backends/httpBackend';
 import {
+  MAX_KEY_NAME_LENGTH,
   generateSyncKey,
   isValidSyncKey,
   maskSyncKey,
@@ -39,6 +44,11 @@ import {
  * A freshly-created key is shown revealed with a "save this" nudge — it
  * exists nowhere but this device until the user writes it down or enters
  * it elsewhere.
+ *
+ * A key can also carry a name ("Leo", "Dad's key"). Keys are unguessable
+ * noise by design, so a household running several of them can't otherwise
+ * tell which app is syncing whose history. The name rides along with the
+ * key on the server, so it shows up on every device that enters it.
  */
 export function SyncKeySettings() {
   const [key, setKey] = useState<string | null>(null);
@@ -49,24 +59,45 @@ export function SyncKeySettings() {
   const [entering, setEntering] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  // The key's optional name: cached locally for instant render, then
+  // refreshed from the server (which may know a name this device doesn't).
+  const [name, setName] = useState<string | null>(null);
+  const [naming, setNaming] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [savingName, setSavingName] = useState(false);
   // Web Share API availability — read after mount (SSR renders without it).
   const [canShare, setCanShare] = useState(false);
   const sync = useSyncStatus();
 
   useEffect(() => {
-    setKey(getStoredSyncKey());
+    const stored = getStoredSyncKey();
+    setKey(stored);
+    setName(getStoredKeyName());
     setCanShare(typeof navigator !== 'undefined' && Boolean(navigator.share));
     setReady(true);
+    if (!stored) return;
+    let live = true;
+    reconcileKeyName().then((n) => {
+      if (live) setName(n);
+    });
+    return () => {
+      live = false;
+    };
   }, []);
 
   async function createKey() {
     const fresh = generateSyncKey();
     await setSyncKey(fresh);
     setKey(fresh);
+    setName(null);
     setJustCreated(true);
     setRevealed(true);
     setError(null);
     setStatus(null);
+    // Naming is most useful at exactly this moment — a second key in the
+    // house is indistinguishable from the first without one.
+    setDraft('');
+    setNaming(true);
   }
 
   async function linkWithKey() {
@@ -85,6 +116,37 @@ export function SyncKeySettings() {
     setJustCreated(false);
     setRevealed(false);
     setStatus('Linked! Your history from other devices is on its way.');
+    // If the key was named elsewhere, say so — it's the confirmation that
+    // you linked the right one.
+    const linkedName = await reconcileKeyName();
+    setName(linkedName);
+    if (linkedName) {
+      setStatus(`Linked to “${linkedName}”. That history is on its way to this device.`);
+    }
+  }
+
+  function startNaming() {
+    setDraft(name ?? '');
+    setError(null);
+    setStatus(null);
+    setNaming(true);
+  }
+
+  async function commitName() {
+    setSavingName(true);
+    const { name: saved, synced } = await saveKeyName(draft);
+    setSavingName(false);
+    setName(saved);
+    setNaming(false);
+    if (!saved) {
+      setStatus('Name removed.');
+    } else if (synced) {
+      setStatus(`This key is now “${saved}” — your other devices will show the name too.`);
+    } else {
+      setStatus(
+        `Named “${saved}” on this device. We couldn't reach the sync server, so other devices will pick the name up later.`,
+      );
+    }
   }
 
   async function copyKey() {
@@ -102,10 +164,11 @@ export function SyncKeySettings() {
 
   async function shareKey() {
     if (!key) return;
+    const label = name ? ` (${name})` : '';
     try {
       await navigator.share({
-        title: `${APP_CONFIG.title} — sync key`,
-        text: `Sync key for ${APP_CONFIG.title}: ${key}\nEnter it in Settings → Sync across devices.`,
+        title: `${APP_CONFIG.title} — sync key${label}`,
+        text: `Sync key${label} for ${APP_CONFIG.title}: ${key}\nEnter it in Settings → Sync across devices.`,
       });
     } catch {
       // user dismissed the share sheet — nothing to do
@@ -115,6 +178,8 @@ export function SyncKeySettings() {
   async function stopSyncing() {
     await clearSyncKey();
     setKey(null);
+    setName(null);
+    setNaming(false);
     setJustCreated(false);
     setRevealed(false);
     setStatus('Sync is off. Your progress stays on this device.');
@@ -146,6 +211,60 @@ export function SyncKeySettings() {
               below, or pop it in a password manager.
             </p>
           )}
+
+          {/* Whose key is this? Optional, but the only way to tell two
+              keys apart once they're both in the family password manager. */}
+          {naming ? (
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input
+                type="text"
+                autoComplete="off"
+                spellCheck={false}
+                maxLength={MAX_KEY_NAME_LENGTH}
+                placeholder="Whose key is this? e.g. Leo"
+                data-testid="sync-key-name-input"
+                value={draft}
+                autoFocus
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void commitName();
+                  if (e.key === 'Escape') setNaming(false);
+                }}
+                className="flex-1 rounded-xl border border-ink-200 px-3 py-2 text-sm text-ink-800 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+              />
+              <div className="flex gap-2">
+                <Button onClick={commitName} disabled={savingName}>
+                  {savingName ? 'Saving…' : 'Save name'}
+                </Button>
+                <Button variant="secondary" onClick={() => setNaming(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+              {name ? (
+                <span
+                  data-testid="sync-key-name"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-brand-800"
+                >
+                  <UserRound className="h-4 w-4" />
+                  <strong className="font-semibold">{name}</strong>
+                </span>
+              ) : (
+                <span className="text-ink-500">This key isn't named yet.</span>
+              )}
+              <button
+                type="button"
+                onClick={startNaming}
+                data-testid="sync-key-name-edit"
+                className="text-xs text-ink-500 underline-offset-2 hover:underline"
+              >
+                {name ? 'Rename' : 'Name this key'}
+              </button>
+            </div>
+          )}
+
           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
             <code
               data-testid="sync-key"
@@ -167,9 +286,10 @@ export function SyncKeySettings() {
           <div className="mt-2 flex flex-wrap gap-2">
             {/* Recovery without infrastructure: opens the user's OWN mail
                 app with the key pre-filled — no server ever sees it.
-                Losing every device then just means searching your inbox. */}
+                Losing every device then just means searching your inbox.
+                The name rides along so two keys don't look alike there. */}
             <a
-              href={syncKeyMailto(key, APP_CONFIG.title)}
+              href={syncKeyMailto(key, APP_CONFIG.title, name)}
               className={buttonStyles({ variant: 'secondary', size: 'md' })}
             >
               <Mail className="h-4 w-4" />
