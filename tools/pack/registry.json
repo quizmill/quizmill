@@ -32,6 +32,12 @@
       "repo": "quizmill/pack-music-theory"
     },
     {
+      "id": "running-theory",
+      "title": "Ultra Training Theory",
+      "description": "Ultrarunning training theory practice — aerobic base, workouts, muscular endurance, periodization, fueling, recovery, and race execution across the frameworks of Johnston, Koop, Magness, and the Roches, including where they disagree. 83 questions across seven domains.",
+      "repo": "quizmill/pack-running"
+    },
+    {
       "id": "world-capitals",
       "title": "Capitals of the World",
       "description": "Expert-level practice on the capital cities of the world — moved capitals (Astana, Naypyidaw, Nusantara), multiple-capital countries (South Africa, Bolivia, the Netherlands), and the ones map buffs reliably get wrong. 45 questions across five continents.",
