@@ -61,9 +61,24 @@ function isEntry(p: unknown): p is PackListing {
   );
 }
 
+/**
+ * Drop malformed entries and collapse duplicate ids, first wins.
+ *
+ * Ids are unique in the source of truth — tools/pack/registrySchema.ts
+ * enforces that, and `npm run pack:list` plus the registry test fail on a
+ * duplicate. This is the runtime belt: the API and raw sources are fetched,
+ * so a bad publish must not render the same pack twice in the browse list
+ * (React would also warn on the repeated key).
+ */
 function sanitize(packs: unknown): PackListing[] {
   if (!Array.isArray(packs)) return [];
-  return packs.filter(isEntry).map((e) => ({ ...e, description: e.description ?? '' }));
+  const byId = new Map<string, PackListing>();
+  for (const p of packs) {
+    if (!isEntry(p)) continue;
+    if (byId.has(p.id)) continue;
+    byId.set(p.id, { ...p, description: p.description ?? '' });
+  }
+  return Array.from(byId.values());
 }
 
 /** The registry compiled into this build — the always-available floor. */
