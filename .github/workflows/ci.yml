@@ -47,4 +47,4 @@ jobs:
           NEXT_PUBLIC_BASE_PATH: ''
 
       - name: E2E (demo pack)
-        run: npx vitest run --config vitest.e2e.config.ts
+        run: npx vitest run --config vitest.e2e.config.mts
