@@ -64,7 +64,7 @@ Question banks should start as `draft`. Move individual questions to
 
 ## Publish a pack
 
-Create a public repo such as `quizmill/pack-aws-arch-pro` with the pack files
+Create a public repo such as `quizmill/pack-<topic>` with the pack files
 at the repo root. Add a README with:
 
 - what the pack covers
@@ -73,3 +73,23 @@ at the repo root. Add a README with:
 - any trademark or affiliation disclaimers
 
 Then open a registry PR adding the repo to `tools/pack/registry.json`.
+
+## Deploy the pack app
+
+A pack repo deploys its own app: add a `deploy.yml` that calls the engine's
+reusable workflow and supply the repo's own Cloudflare secrets.
+
+```yaml
+jobs:
+  deploy:
+    uses: quizmill/quizmill/.github/workflows/deploy-pack.yml@main
+    with:
+      project: <cloudflare-pages-project>
+      app: <pack-id>-app
+    secrets: inherit
+```
+
+The recipe builds the pack on a published engine (`npx quizmill@<version>
+build`), so a deployed app always matches the published CLI. Engine releases
+fan out to every pack repo automatically, so packs pick up engine
+improvements without a manual rebuild.
