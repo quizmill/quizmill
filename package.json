@@ -2,6 +2,9 @@
   "name": "quizmill",
   "version": "0.0.0-dev",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "predev": "tsx scripts/ensure-pack.ts",
     "dev": "next dev",
