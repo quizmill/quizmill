@@ -274,8 +274,11 @@ for none. Versions live in git tags (`vX.Y.Z`) — the package.json
 files carry a permanent `0.0.0-dev` sentinel and releases NEVER
 commit to main: the workflow computes the next version from the
 latest tag, npm-publishes `cli/` at it (version stamped in the CI
-workspace only; requires the `NPM_TOKEN` secret — granular automation
-token with bypass-2FA), waits for the version to be visible on npm,
+workspace only; via npm **trusted publishing** — the job's OIDC
+id-token, configured once on npmjs.com for this repo + `release.yml`;
+no npm token exists anywhere to expire — the old `NPM_TOKEN` granular
+token did exactly that after 90 days and silently broke releases
+v0.3.28+), waits for the version to be visible on npm,
 tags the merge commit, creates a GitHub release with generated notes,
 and fans out an `engine-update` dispatch to the pack repos
 (`PACK_DISPATCH_TOKEN`). Direct pushes to main never release —
