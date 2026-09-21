@@ -71,6 +71,21 @@ function byTestId<T extends HTMLElement>(id: string): T | null {
   return container.querySelector<T>(`[data-testid="${id}"]`);
 }
 
+/** Poll (settling React between ticks) until `probe` returns a value.
+ *  Creating or naming a key awaits the whole sign-in chain — hashing the
+ *  key, the sync engine's pull, the profile round trip — which can outlive
+ *  a single zero-delay tick on a loaded CI runner. A fixed one-tick settle
+ *  therefore flakes; a bounded wait doesn't. */
+async function waitFor<T>(probe: () => T | null | undefined, ms = 2000): Promise<T> {
+  const deadline = Date.now() + ms;
+  for (;;) {
+    const found = probe();
+    if (found) return found;
+    if (Date.now() > deadline) throw new Error('waitFor: timed out');
+    await settle();
+  }
+}
+
 function buttonLabelled(text: string): HTMLButtonElement {
   const match = Array.from(container.querySelectorAll('button')).find(
     (b) => b.textContent?.trim() === text,
@@ -100,17 +115,17 @@ async function type(input: HTMLInputElement, value: string) {
 /** Create a key and name it, the way the card is used the first time. */
 async function createAndName(name: string) {
   await click(buttonLabelled('Create a sync key'));
-  const input = byTestId<HTMLInputElement>('sync-key-name-input');
-  expect(input).not.toBeNull();
-  await type(input as HTMLInputElement, name);
+  const input = await waitFor(() => byTestId<HTMLInputElement>('sync-key-name-input'));
+  await type(input, name);
   await click(buttonLabelled('Save name'));
+  await waitFor(() => byTestId('sync-key-name'));
 }
 
 describe('naming a sync key', () => {
   it('offers the name field as soon as a key is created', async () => {
     await render();
     await click(buttonLabelled('Create a sync key'));
-    expect(byTestId('sync-key-name-input')).not.toBeNull();
+    expect(await waitFor(() => byTestId('sync-key-name-input'))).not.toBeNull();
   });
 
   it('shows the name once saved, and remembers it on the next visit', async () => {
