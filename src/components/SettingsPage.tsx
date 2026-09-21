@@ -7,6 +7,7 @@ import {
   Boxes,
   Car,
   Gamepad2,
+  GraduationCap,
   Monitor,
   Moon,
   Sun,
@@ -30,6 +31,7 @@ import {
 import { useTheme } from '@/lib/useTheme';
 import type { ThemePref } from '@/lib/theme';
 import { useLook } from '@/lib/useLook';
+import { loadCoachModeEnabled, saveCoachModeEnabled } from '@/lib/coach';
 import { packDefaultLook } from '@/lib/look';
 import type { LookPref } from '@/lib/look';
 import {
@@ -70,7 +72,7 @@ const LOOK_CHOICES: { value: LookPref; label: string }[] = [
  *  - Packs            — pack library entry, question sources, `extras`
  *                       slot (e.g. the downvote browser)
  *  - Progress & sync  — SyncSettings, TransferSettings, the two resets
- *  - This device      — appearance, drive mode
+ *  - This device      — appearance, drive mode, coach mode
  *  - About            — version + build (tap the version to reveal games)
  */
 export interface SettingsPageProps {
@@ -112,6 +114,15 @@ export function SettingsPage({ extras }: SettingsPageProps) {
     const next = !driveMode;
     setDriveMode(next);
     saveDriveModeEnabled(next);
+  };
+
+  // Coach mode opt-in (device-level) — the parent's replay of past sessions.
+  const [coachMode, setCoachMode] = useState(false);
+  useEffect(() => setCoachMode(loadCoachModeEnabled()), []);
+  const toggleCoachMode = () => {
+    const next = !coachMode;
+    setCoachMode(next);
+    saveCoachModeEnabled(next);
   };
 
   // Hidden games easter egg — revealed by tapping the version pill.
@@ -352,6 +363,51 @@ export function SettingsPage({ extras }: SettingsPageProps) {
           ) : null}
         </div>
 
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
+                <GraduationCap className="h-5 w-5 text-ink-500" />
+                Coach mode
+              </h3>
+              <p className="mt-1 text-sm text-ink-600">
+                For parents and tutors: go back through any past session
+                together, question by question, with answers hidden until you
+                reveal them. Nothing is recorded. Adds a card to the home
+                screen.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={coachMode}
+              aria-label="Coach mode"
+              data-testid="coach-mode-toggle"
+              onClick={toggleCoachMode}
+              className={cn(
+                'tap-feedback relative mt-1 inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors',
+                coachMode ? 'bg-brand-500' : 'bg-ink-200',
+              )}
+            >
+              <span
+                className={cn(
+                  'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
+                  coachMode ? 'translate-x-6' : 'translate-x-1',
+                )}
+              />
+            </button>
+          </div>
+          {coachMode ? (
+            <Link
+              href="/coach/"
+              data-testid="open-coach"
+              className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50 dark:hover:bg-ink-100"
+            >
+              <GraduationCap className="h-4 w-4" />
+              Open coach mode
+            </Link>
+          ) : null}
+        </div>
       </SettingsSection>
 
       <SettingsSection title="Reset">

@@ -47,7 +47,10 @@ offline.
   comma-joined string (`"A,C"`), so storage/sync/stats are unchanged.
 - `src/lib/` — engine: `selection.ts` (unseen-biased pick, seedable,
   ranks repeats rather than re-serving at random), `mistakes.ts` (re-ask
-  until rescued; packs use per-question rescue — topic = question id),
+  until rescued; packs use per-question rescue — topic = question id; a
+  later correct answer to the SAME question id also rescues, whatever
+  topic label either attempt carries, so attempts migrated from older
+  engines can't pin themselves to the review queue),
   `readiness.ts` (exam-readiness estimate — latest *cold look* per
   question, coverage-gated, Wilson band, blueprint-weighted by category
   `weight`; drives `ExamReadiness.tsx` on Home + Progress, dormant
@@ -92,7 +95,13 @@ offline.
   `generatedFrom {questionId, note}` schema field — shown as a NoteOrigin
   chip in the answer panel, counted as follow-ups on the note cards, and
   practised together at `/practice/notes` via `notes-practice.ts`),
-  GamesPage + games/ (reward mini-games — see below).
+  GamesPage + games/ (reward mini-games — see below),
+  CoachPage (`/coach`: parent/tutor replay of any past session, question
+  by question with the learner's pick, timing and explanation hidden
+  behind a per-question or all-at-once reveal; options are tappable so
+  you can answer again together but NOTHING is recorded. Device-level
+  opt-in `quizmill.coach.v1` via Settings → Coach mode, which also adds a
+  Home card; pure grouping/replay logic in `src/lib/coachSessions.ts`).
   In `src/components/`: InstallPrompt (Add-to-Home-Screen), Scratchpad
   (a collapsible Write/Draw working space in the runners — textarea +
   freehand canvas, expandable full-screen; one pad per pack, kept in

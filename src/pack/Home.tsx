@@ -7,6 +7,7 @@ import {
   BarChart3,
   Car,
   Flame,
+  GraduationCap,
   NotebookPen,
   RefreshCw,
   Settings,
@@ -29,6 +30,7 @@ import {
   loadDriveModeEnabled,
 } from '@/lib/storage';
 import { levelNudge, streakProgress } from '@/lib/stats';
+import { loadCoachModeEnabled } from '@/lib/coach';
 import { latestColdLook } from '@/lib/readiness';
 import { cn } from '@/lib/cn';
 import {
@@ -140,6 +142,8 @@ export default function PackHome() {
   // Drive Mode is opt-in (Settings toggle) — the Home card only shows
   // once it's switched on. Read after mount like the other prefs.
   const [driveMode, setDriveMode] = useState(false);
+  // Coach mode is the same kind of opt-in, for the parent's device.
+  const [coachMode, setCoachMode] = useState(false);
   // In runtime-pack mode, hold the first paint until mount (see RUNTIME_PACK_MODE).
   const [mounted, setMounted] = useState(!RUNTIME_PACK_MODE);
   useEffect(() => {
@@ -148,6 +152,7 @@ export default function PackHome() {
     setLevelState(loadLevelFilter());
     setDismissedNudge(loadDismissedNudge());
     setDriveMode(loadDriveModeEnabled());
+    setCoachMode(loadCoachModeEnabled());
   }, []);
   const setLevel = (next: string | null) => {
     setLevelState(next);
@@ -302,6 +307,27 @@ export default function PackHome() {
             </div>
           </div>
           <ArrowRight className="h-5 w-5 flex-shrink-0 text-night-400" />
+        </Link>
+      ) : null}
+
+      {coachMode ? (
+        <Link
+          href="/coach/"
+          data-testid="coach-card"
+          className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-4 shadow-sm"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-brand-700">
+              <GraduationCap className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="text-base font-semibold text-ink-900">Coach</div>
+              <div className="text-sm text-ink-600">
+                Go back through a session together — answers hidden until you say.
+              </div>
+            </div>
+          </div>
+          <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-400" />
         </Link>
       ) : null}
 
