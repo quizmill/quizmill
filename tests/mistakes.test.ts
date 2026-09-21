@@ -199,3 +199,37 @@ describe('pickSimilarQuestion', () => {
     expect(out?.id).not.toBe('q1');
   });
 });
+
+describe('rescue by question id (migrated attempts)', () => {
+  // Attempts migrated from an older engine carry a free-text topic label
+  // ("reading comprehension") while every attempt this engine writes uses
+  // the question id as topic. A later correct answer to the SAME question
+  // must still rescue the old mistake, or it sits at the top of the review
+  // queue forever.
+  it('unresolvedMistakeIds rescues a wrong attempt whose topic label differs from the later correct one', () => {
+    expect(
+      unresolvedMistakeIds([
+        att('q1', false, 100, { subject: 'english', topic: 'reading comprehension' }),
+        att('q1', true, 200, { subject: 'english', topic: 'q1' }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it('unresolvedMistakes applies the same rule', () => {
+    expect(
+      unresolvedMistakes([
+        att('q1', false, 100, { subject: 'english', topic: 'reading comprehension' }),
+        att('q1', true, 200, { subject: 'english', topic: 'q1' }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it('does not rescue when the later correct answer is to a different question on a different topic', () => {
+    expect(
+      unresolvedMistakeIds([
+        att('q1', false, 100, { subject: 'english', topic: 'reading comprehension' }),
+        att('q2', true, 200, { subject: 'english', topic: 'q2' }),
+      ]),
+    ).toEqual(['q1']);
+  });
+});

@@ -7,6 +7,12 @@
  * the CONCEPT, not the specific question — getting any same-topic question
  * right shows the kid understands and rescues the original mistake.
  *
+ * A later correct attempt at the SAME question always rescues too, whatever
+ * topic label either attempt carries. Attempts migrated from older engines
+ * carry free-text topics ("reading comprehension") while this engine writes
+ * the question id as topic; without the question-id fallback such a mistake
+ * could never be rescued and would pin itself to the top of every review.
+ *
  * The companion `pickSimilarQuestion` picks the recall question to actually
  * show the kid in a review session: a different question on the same topic.
  */
@@ -36,6 +42,7 @@ export function unresolvedMistakeIds(attempts: readonly Attempt[]): string[] {
   const sorted = [...attempts].sort((a, b) => a.answeredAt - b.answeredAt);
 
   const lastCorrectOnTopic = new Map<string, number>();
+  const lastCorrectOnQuestion = new Map<string, number>();
   /** questionId → { topicKey, t } for the kid's latest wrong attempt at this question. */
   const lastWrong = new Map<string, { tk: string; t: number }>();
 
@@ -43,6 +50,7 @@ export function unresolvedMistakeIds(attempts: readonly Attempt[]): string[] {
     const tk = topicKey(a.subject, a.topic);
     if (a.isCorrect) {
       lastCorrectOnTopic.set(tk, a.answeredAt);
+      lastCorrectOnQuestion.set(a.questionId, a.answeredAt);
     } else {
       lastWrong.set(a.questionId, { tk, t: a.answeredAt });
     }
@@ -50,7 +58,10 @@ export function unresolvedMistakeIds(attempts: readonly Attempt[]): string[] {
 
   const unresolved: { id: string; t: number }[] = [];
   for (const [qid, { tk, t }] of lastWrong) {
-    const lastOk = lastCorrectOnTopic.get(tk) ?? -Infinity;
+    const lastOk = Math.max(
+      lastCorrectOnTopic.get(tk) ?? -Infinity,
+      lastCorrectOnQuestion.get(qid) ?? -Infinity,
+    );
     if (lastOk < t) unresolved.push({ id: qid, t });
   }
 
@@ -73,12 +84,14 @@ export function unresolvedMistakes(
   const sorted = [...attempts].sort((a, b) => a.answeredAt - b.answeredAt);
 
   const lastCorrectOnTopic = new Map<string, number>();
+  const lastCorrectOnQuestion = new Map<string, number>();
   const lastWrong = new Map<string, Attempt>();
 
   for (const a of sorted) {
     const tk = topicKey(a.subject, a.topic);
     if (a.isCorrect) {
       lastCorrectOnTopic.set(tk, a.answeredAt);
+      lastCorrectOnQuestion.set(a.questionId, a.answeredAt);
     } else {
       lastWrong.set(a.questionId, a);
     }
@@ -87,7 +100,10 @@ export function unresolvedMistakes(
   const out: { questionId: string; wrongAttempt: Attempt }[] = [];
   for (const [qid, attempt] of lastWrong) {
     const tk = topicKey(attempt.subject, attempt.topic);
-    const lastOk = lastCorrectOnTopic.get(tk) ?? -Infinity;
+    const lastOk = Math.max(
+      lastCorrectOnTopic.get(tk) ?? -Infinity,
+      lastCorrectOnQuestion.get(qid) ?? -Infinity,
+    );
     if (lastOk < attempt.answeredAt) {
       out.push({ questionId: qid, wrongAttempt: attempt });
     }
