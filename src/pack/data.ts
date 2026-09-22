@@ -13,6 +13,7 @@ import {
   activeConcepts,
 } from './source';
 import { categoryIcon } from './category-icon';
+import { buildLevels } from '@/lib/xp';
 
 export type PackCategory = {
   key: string;
@@ -47,6 +48,10 @@ export type PackGames = {
   include?: string[];
 };
 
+/** Optional XP/levels progression declared by the pack. Presence enables;
+ *  deliberately no options yet. */
+export type PackProgression = Record<string, never>;
+
 /** Option keys, A–F (v2 allows 2–6 options; v1 packs use A–D). */
 export type OptionKey = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
@@ -63,6 +68,7 @@ export type PackManifest = {
   sources?: PackSource[];
   exam?: PackExam;
   games?: PackGames;
+  progression?: PackProgression;
   /** Default visual look; 'poster' = the loud campaign style. */
   look?: 'classic' | 'poster';
 };
@@ -147,6 +153,14 @@ export const packExam = packManifest.exam;
 export const packGames = packManifest.games;
 /** Whether this pack ships the reward mini-games at all. */
 export const gamesEnabled = packGames !== undefined;
+
+/** Whether this pack opts into the XP/levels progression. Off (the
+ *  default) means no XP, no levels, no level card — zero footprint. */
+export const progressionEnabled = packManifest.progression !== undefined;
+
+/** The XP ladder, scaled to THIS pack's bank size — Master Miller ≈
+ *  every question first-answered correctly. See buildLevels. */
+export const PACK_XP_LEVELS = buildLevels(activeQuestions.length);
 
 export const packQuestions = activeQuestions;
 

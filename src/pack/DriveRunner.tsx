@@ -31,6 +31,7 @@ import {
   recordEarnedAchievements,
 } from '@/lib/storage';
 import { newlyEarnedAchievements } from '@/pack/achievements-engine';
+import { recordLevelCrossings } from '@/pack/useLevelUp';
 import {
   cancelListening,
   cancelSpeech,
@@ -135,10 +136,13 @@ export function DriveRunner() {
 
   function silentAchievementCheck() {
     // Same evaluation the visual runners do via useAchievementUnlock,
-    // minus the Celebration overlay — no confetti at 60 mph.
+    // minus the Celebration overlay — no confetti at 60 mph. Level
+    // crossings are persisted the same silent way, so the XP high-water
+    // mark can't fall behind a drive session.
     const earned = new Set(loadAchievements().map((e) => e.id));
     const fresh = newlyEarnedAchievements(loadSessions(), loadAttempts(), earned);
     if (fresh.length > 0) recordEarnedAchievements(fresh);
+    recordLevelCrossings(loadAttempts());
   }
 
   function handleStart() {

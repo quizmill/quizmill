@@ -13,6 +13,7 @@ import {
   Printer,
   Sun,
   Trash2,
+  Wheat,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { APP_CONFIG } from '@/config';
@@ -33,6 +34,10 @@ import { useTheme } from '@/lib/useTheme';
 import type { ThemePref } from '@/lib/theme';
 import { useLook } from '@/lib/useLook';
 import { loadCoachModeEnabled, saveCoachModeEnabled } from '@/lib/coach';
+import {
+  loadProgressionShown,
+  saveProgressionShown,
+} from '@/lib/progressionPref';
 import { loadPaperModeEnabled, savePaperModeEnabled } from '@/lib/paper';
 import { packDefaultLook } from '@/lib/look';
 import type { LookPref } from '@/lib/look';
@@ -40,6 +45,7 @@ import {
   packSources,
   packGames,
   gamesEnabled,
+  progressionEnabled,
 } from '@/pack/data';
 import { enabledGames } from '@/lib/games/registry';
 
@@ -125,6 +131,18 @@ export function SettingsPage({ extras }: SettingsPageProps) {
     const next = !coachMode;
     setCoachMode(next);
     saveCoachModeEnabled(next);
+  };
+
+  // Levels & XP visibility (device-level) — the parent lever over the
+  // progression layer packs opt into. Hiding never resets anything: XP
+  // is derived from history, so switching back on picks up where the
+  // practice actually is.
+  const [progressionShown, setProgressionShown] = useState(true);
+  useEffect(() => setProgressionShown(loadProgressionShown()), []);
+  const toggleProgressionShown = () => {
+    const next = !progressionShown;
+    setProgressionShown(next);
+    saveProgressionShown(next);
   };
 
   // Paper practice opt-in (device-level) — print sheets, mark them back in.
@@ -464,6 +482,46 @@ export function SettingsPage({ extras }: SettingsPageProps) {
             </Link>
           ) : null}
         </div>
+
+        {/* Only for packs that opt into progression — the parent lever.
+            Hiding is display-only: XP stays derived from history. */}
+        {progressionEnabled ? (
+          <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
+                  <Wheat className="h-5 w-5 text-ink-500" />
+                  Levels &amp; XP
+                </h3>
+                <p className="mt-1 text-sm text-ink-600">
+                  The level ladder and XP earned from practice. For parents:
+                  turn this off to hide points on this device — nothing is
+                  lost, and switching back on picks up where practice
+                  really is.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={progressionShown}
+                aria-label="Levels & XP"
+                data-testid="progression-toggle"
+                onClick={toggleProgressionShown}
+                className={cn(
+                  'tap-feedback relative mt-1 inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors',
+                  progressionShown ? 'bg-brand-500' : 'bg-ink-200',
+                )}
+              >
+                <span
+                  className={cn(
+                    'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
+                    progressionShown ? 'translate-x-6' : 'translate-x-1',
+                  )}
+                />
+              </button>
+            </div>
+          </div>
+        ) : null}
       </SettingsSection>
 
       <SettingsSection title="Reset">

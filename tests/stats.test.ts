@@ -11,7 +11,7 @@ import {
   sessionSummary,
   weakestQuestions,
 } from '@/lib/stats';
-import { currentStreak } from '@/lib/streak';
+import { currentStreak, longestStreak } from '@/lib/streak';
 
 const NOON = new Date('2026-06-10T12:00:00').getTime();
 
@@ -131,8 +131,72 @@ describe('currentStreak', () => {
     expect(currentStreak([day(1), day(2)], today)).toBe(2);
   });
 
-  it('breaks on a gap', () => {
-    expect(currentStreak([day(0), day(2), day(3)], today)).toBe(1);
+  it('bridges a single missed day with the weekly grace day', () => {
+    // Missed day 1, but practised either side — the grace day keeps the
+    // run whole (and the bridged day counts toward its length).
+    expect(currentStreak([day(0), day(2), day(3)], today)).toBe(4);
+  });
+
+  it('breaks on a two-day gap — grace covers one day, never two', () => {
+    expect(currentStreak([day(0), day(3), day(4)], today)).toBe(1);
+  });
+
+  it('does not bridge a gap with nothing on the far side', () => {
+    // A missed yesterday with no earlier practice is the end of the
+    // streak, not a bridge to nowhere.
+    expect(currentStreak([day(0)], today)).toBe(1);
+  });
+
+  it('allows only one grace day per 7-day stretch', () => {
+    // Two single-day gaps close together: the first (day 1) is bridged,
+    // the second (day 3) is too soon after — the run stops there.
+    expect(
+      currentStreak([day(0), day(2), day(4), day(5)], today),
+    ).toBe(3);
+  });
+
+  it('grants a fresh grace day after a full week of practice', () => {
+    // Gap at day 1 and another at day 9 — eight counted days apart, so
+    // both bridges hold and the whole fortnight reads as one streak.
+    const dates = [
+      day(0),
+      ...[2, 3, 4, 5, 6, 7, 8].map(day),
+      ...[10, 11].map(day),
+    ];
+    expect(currentStreak(dates, today)).toBe(12);
+  });
+
+  it('can bridge a missed yesterday before today’s practice', () => {
+    // Missed yesterday (swimming lesson), opens the app today before
+    // practising: the streak still reads alive off the earlier run, with
+    // the bridged day counted like any other grace day.
+    expect(currentStreak([day(2), day(3)], today)).toBe(3);
+  });
+});
+
+describe('longestStreak', () => {
+  const today = new Date('2026-06-10T12:00:00');
+  const day = (offset: number) =>
+    new Date(today.getTime() - offset * 24 * 3600_000);
+
+  it('is 0 with no practice days', () => {
+    expect(longestStreak([])).toBe(0);
+  });
+
+  it('finds the best run anywhere in history, not just the current one', () => {
+    // A 4-day run three weeks ago beats the current 2-day run.
+    const dates = [day(0), day(1), ...[20, 21, 22, 23].map(day)];
+    expect(longestStreak(dates)).toBe(4);
+  });
+
+  it('applies the same weekly grace day as the live streak', () => {
+    // One bridged gap inside an old run: 5 days, not 2+2.
+    const dates = [20, 21, 23, 24].map(day);
+    expect(longestStreak(dates)).toBe(5);
+  });
+
+  it('counts duplicate same-day dates once', () => {
+    expect(longestStreak([day(0), day(0), day(1)])).toBe(2);
   });
 });
 
@@ -168,12 +232,12 @@ describe('practiceDates', () => {
     expect(practiceDates(attempts)).toHaveLength(1);
   });
 
-  it('a light tap-and-leave day does not keep the streak alive', () => {
-    // Full rounds two and three days ago, but only a couple of questions
-    // today → today doesn't count, so the streak reads 0 (the run before
-    // today is already broken by the gap at "yesterday").
+  it('a light tap-and-leave day does not itself extend the streak', () => {
+    // Full rounds two and three days ago, a couple of questions today →
+    // today doesn't count yet, but the missed "yesterday" is bridged by
+    // the grace day, so the earlier run still reads alive at 3.
     const attempts = [...onDay(0, 2), ...onDay(2, 10), ...onDay(3, 10)];
-    expect(currentStreak(practiceDates(attempts), today)).toBe(0);
+    expect(currentStreak(practiceDates(attempts), today)).toBe(3);
   });
 
   it('keeps the streak alive on days the user practised but never finished a session', () => {
@@ -220,7 +284,33 @@ describe('streakProgress', () => {
 
   it('is empty for a learner who hasn’t practised', () => {
     const p = streakProgress([], today);
-    expect(p).toMatchObject({ streak: 0, answeredToday: 0, remaining: 10, goalMet: false });
+    expect(p).toMatchObject({
+      streak: 0,
+      bestStreak: 0,
+      answeredToday: 0,
+      remaining: 10,
+      goalMet: false,
+    });
+  });
+
+  it('never reports a best below the live streak (provisional bridge)', () => {
+    // Missed yesterday, practised the two days before: the live streak
+    // counts the bridged yesterday (3), and best must not read lower —
+    // even though the bridge only enters the permanent record once
+    // practice resumes after it.
+    const p = streakProgress([...onDay(2, 10), ...onDay(3, 10)], today);
+    expect(p.streak).toBe(3);
+    expect(p.bestStreak).toBe(3);
+  });
+
+  it('remembers the best-ever streak after the live one resets', () => {
+    // A 3-day run last month; nothing since until today's full round.
+    const old = [1, 2, 3].flatMap((weekOffset) =>
+      onDay(20 + weekOffset, 10),
+    );
+    const p = streakProgress([...old, ...onDay(0, 10)], today);
+    expect(p.streak).toBe(1);
+    expect(p.bestStreak).toBe(3);
   });
 });
 

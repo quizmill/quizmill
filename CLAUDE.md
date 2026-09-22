@@ -38,7 +38,8 @@ offline.
   pack names itself (Year, Grade, CEFR) and practice can filter by; and
   a `sources` legend rendered in Settings. v1 packs stay valid
   unchanged. Also additive across both versions: the optional `exam`
-  block (readiness goal), `games` block, and `look` default.
+  block (readiness goal), `games` block, `progression` block (opt-in
+  XP/levels — see `xp.ts` below), and `look` default.
   A question carries either `correctKey` (single answer) **or**
   `correctKeys` (2+ answers, "select all that apply"; graded by
   set-equality, all-or-nothing). The runner/UI normalise via
@@ -55,7 +56,25 @@ offline.
   question, coverage-gated, Wilson band, blueprint-weighted by category
   `weight`; drives `ExamReadiness.tsx` on Home + Progress, dormant
   without a pack `exam` block), `stats.ts` (progress aggregates, level
-  nudge), `streak.ts` (consecutive practice days), `storage.ts`
+  nudge), `streak.ts` (consecutive practice days — deliberately
+  forgiving: one missed day per 7 is bridged by an automatic grace day,
+  and `longestStreak` keeps a best-ever record a lapse can't erase;
+  anti-loss-aversion choices for kids, not growth hacks), `xp.ts` +
+  `progressionPref.ts` (XP/levels for packs with a manifest
+  `progression` block — XP is a pure derivation over attempts like
+  everything else: nothing stored/synced, retroactive credit,
+  mastery-weighted so re-answering known questions pays only a token
+  point, a BOUNDED mill-themed ladder scaled to the bank (top rank ≈
+  first-correcting the bank; auxiliary XP means it lands near ~80%
+  coverage, deliberately a touch generous), and deliberately no
+  notifications, no randomness, no spendable currency; level crossings
+  persist as opaque `level-N` rows in the achievements store so sync +
+  celebrate-once come free — `recordLevelCrossings` in
+  `src/pack/useLevelUp.ts` is the single recorder and EVERY
+  attempt-producing path must reach it (visual runners via the hook,
+  Drive silently, imported/synced history via the ProgressCard effect);
+  `progressionPref` is the device-level parent off-switch in Settings →
+  Levels & XP, which hides UI but never stops recording), `storage.ts`
   (localStorage, namespaced `quizmill.<packId>.*`; also the analytics
   capture surface — `recordEvent`/`loadEvents`/`amendAttempt`),
   `sync.ts` (backend-agnostic mirror engine; pluggable provider registry

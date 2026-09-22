@@ -127,6 +127,16 @@ export const packGamesSchema = z.object({
   include: z.array(gameIdSchema).min(1).max(GAME_IDS.length).optional(),
 });
 
+/**
+ * Optional XP/levels progression (additive; valid for v1 and v2 packs).
+ * Presence enables the accumulating progression layer — XP derived from
+ * the attempt history, a bounded named-level ladder, a level card on
+ * Home. Built for kids' packs; deliberately has no options yet (no
+ * tuning knobs a pack could use to make it grabbier). Absent → no XP or
+ * levels anywhere, exactly as today.
+ */
+export const packProgressionSchema = z.object({});
+
 export const packManifestSchema = z
   .object({
     schemaVersion: z.union([z.literal(1), z.literal(2)]),
@@ -160,6 +170,8 @@ export const packManifestSchema = z
     look: z.enum(['classic', 'poster']).optional(),
     /** Optional reward mini-games — see packGamesSchema. */
     games: packGamesSchema.optional(),
+    /** Optional XP/levels progression — see packProgressionSchema. */
+    progression: packProgressionSchema.optional(),
   })
   .superRefine((m, ctx) => {
     const keys = m.categories.map((c) => c.key);
