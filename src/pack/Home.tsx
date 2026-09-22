@@ -8,6 +8,7 @@ import {
   Car,
   GraduationCap,
   NotebookPen,
+  Printer,
   RefreshCw,
   Settings,
   TrendingDown,
@@ -29,6 +30,7 @@ import {
 } from '@/lib/storage';
 import { levelNudge } from '@/lib/stats';
 import { loadCoachModeEnabled } from '@/lib/coach';
+import { loadPaperModeEnabled } from '@/lib/paper';
 import { latestColdLook } from '@/lib/readiness';
 import { cn } from '@/lib/cn';
 import {
@@ -82,6 +84,8 @@ export default function PackHome() {
   const [driveMode, setDriveMode] = useState(false);
   // Coach mode is the same kind of opt-in, for the parent's device.
   const [coachMode, setCoachMode] = useState(false);
+  // Paper practice too — print sheets, mark them back in.
+  const [paperMode, setPaperMode] = useState(false);
   // In runtime-pack mode, hold the first paint until mount (see RUNTIME_PACK_MODE).
   const [mounted, setMounted] = useState(!RUNTIME_PACK_MODE);
   useEffect(() => {
@@ -91,6 +95,7 @@ export default function PackHome() {
     setDismissedNudge(loadDismissedNudge());
     setDriveMode(loadDriveModeEnabled());
     setCoachMode(loadCoachModeEnabled());
+    setPaperMode(loadPaperModeEnabled());
   }, []);
   const setLevel = (next: string | null) => {
     setLevelState(next);
@@ -262,6 +267,29 @@ export default function PackHome() {
               <div className="text-base font-semibold text-ink-900">Coach</div>
               <div className="text-sm text-ink-600">
                 Go back through a session together — answers hidden until you say.
+              </div>
+            </div>
+          </div>
+          <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-400" />
+        </Link>
+      ) : null}
+
+      {paperMode ? (
+        <Link
+          href="/paper/"
+          data-testid="paper-card"
+          className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-ink-400/25 bg-ink-50 p-4 shadow-sm"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-ink-200 text-ink-700">
+              <Printer className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="text-base font-semibold text-ink-900">
+                Paper practice
+              </div>
+              <div className="text-sm text-ink-600">
+                Print a sheet, practise on paper, mark it back in.
               </div>
             </div>
           </div>

@@ -9,8 +9,10 @@
  * consumer treats "absent" as "unknown" — never as zero.
  */
 
-/** How a session was run. Older records omit it (= 'practice'). */
-export type SessionMode = 'practice' | 'review' | 'drive' | 'notes';
+/** How a session was run. Older records omit it (= 'practice').
+ *  'paper' = answered on a printed sheet, entered afterwards — its
+ *  attempts carry the marking time, and timeTakenSeconds 1 (unmeasured). */
+export type SessionMode = 'practice' | 'review' | 'drive' | 'notes' | 'paper';
 
 export interface Attempt {
   id: string; // crypto.randomUUID() at write time

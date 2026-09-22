@@ -188,6 +188,43 @@
   }
 }
 
+/* ————— Paper practice: print only the worksheet —————
+   While a sheet is on screen, PaperPage sets body[data-paper-print] —
+   so these rules never touch printing any other page. visibility (not
+   display) keeps the layout boxes, so the absolutely-positioned sheet
+   still flows and page-breaks normally. Everything inside the sheet is
+   forced to plain black-on-white: a worksheet, whatever the app theme
+   (a dark-mode device would otherwise print pale ink-token text). */
+@media print {
+  body[data-paper-print] * {
+    visibility: hidden;
+  }
+  body[data-paper-print] .paper-sheet,
+  body[data-paper-print] .paper-sheet * {
+    visibility: visible;
+  }
+  body[data-paper-print] .paper-sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+  }
+  body[data-paper-print] .paper-sheet,
+  body[data-paper-print] .paper-sheet * {
+    color: #000 !important;
+    border-color: #000 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+  body[data-paper-print] .paper-question {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+
 /* ————— The Poster look (data-look="poster") —————
    The quizmill.dev campaign style inside the app: warm paper, hard ink
    borders, offset shadows, the vivid sail palette. Enabled per device in

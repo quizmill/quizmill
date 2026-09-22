@@ -10,6 +10,7 @@ import {
   GraduationCap,
   Monitor,
   Moon,
+  Printer,
   Sun,
   Trash2,
   Wheat,
@@ -37,6 +38,7 @@ import {
   loadProgressionShown,
   saveProgressionShown,
 } from '@/lib/progressionPref';
+import { loadPaperModeEnabled, savePaperModeEnabled } from '@/lib/paper';
 import { packDefaultLook } from '@/lib/look';
 import type { LookPref } from '@/lib/look';
 import {
@@ -141,6 +143,15 @@ export function SettingsPage({ extras }: SettingsPageProps) {
     const next = !progressionShown;
     setProgressionShown(next);
     saveProgressionShown(next);
+  };
+
+  // Paper practice opt-in (device-level) — print sheets, mark them back in.
+  const [paperMode, setPaperMode] = useState(false);
+  useEffect(() => setPaperMode(loadPaperModeEnabled()), []);
+  const togglePaperMode = () => {
+    const next = !paperMode;
+    setPaperMode(next);
+    savePaperModeEnabled(next);
   };
 
   // Hidden games easter egg — revealed by tapping the version pill.
@@ -423,6 +434,51 @@ export function SettingsPage({ extras }: SettingsPageProps) {
             >
               <GraduationCap className="h-4 w-4" />
               Open coach mode
+            </Link>
+          ) : null}
+        </div>
+
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
+                <Printer className="h-5 w-5 text-ink-500" />
+                Paper practice
+              </h3>
+              <p className="mt-1 text-sm text-ink-600">
+                Print a worksheet, practise away from the screen, then mark
+                the answers back in — they count like any practice session.
+                Adds a card to the home screen.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={paperMode}
+              aria-label="Paper practice"
+              data-testid="paper-mode-toggle"
+              onClick={togglePaperMode}
+              className={cn(
+                'tap-feedback relative mt-1 inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors',
+                paperMode ? 'bg-brand-500' : 'bg-ink-200',
+              )}
+            >
+              <span
+                className={cn(
+                  'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
+                  paperMode ? 'translate-x-6' : 'translate-x-1',
+                )}
+              />
+            </button>
+          </div>
+          {paperMode ? (
+            <Link
+              href="/paper/"
+              data-testid="open-paper"
+              className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50 dark:hover:bg-ink-100"
+            >
+              <Printer className="h-4 w-4" />
+              Open paper practice
             </Link>
           ) : null}
         </div>
