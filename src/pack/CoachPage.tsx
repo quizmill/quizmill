@@ -127,12 +127,16 @@ export function CoachPage() {
   function open(t: Target) {
     window.location.hash = hashFor(t);
     setTarget(t);
+    // The list may be scrolled a long way down; the replay starts at its top.
+    window.scrollTo(0, 0);
   }
 
   function close() {
-    // Replace the hash without a scroll jump; back-button history stays sane.
+    // Replace the hash (no history entry of its own); the browser's back
+    // button also lands here via hashchange.
     window.history.replaceState(null, '', window.location.pathname + window.location.search);
     setTarget(null);
+    window.scrollTo(0, 0);
   }
 
   if (!mounted) {
@@ -199,10 +203,8 @@ export function CoachPage() {
           Coach
         </h1>
         <p className="mt-1 text-ink-500">
-          Go back through practice together. Pick a whole day or a single
-          session to see every question, what was answered, and the
-          explanation — answers stay hidden until you reveal them. Nothing
-          here is recorded.
+          Pick a day or a session and go through it together. Answers stay
+          hidden until you reveal them, and nothing is recorded.
         </p>
       </div>
 
@@ -374,7 +376,9 @@ function ReplayView({
 
   return (
     <main className="flex flex-col gap-5">
-      <header className="flex items-center justify-between">
+      {/* Sticky: a day replay runs to dozens of cards, and reveal-all is
+          the control you reach for halfway down. */}
+      <header className="sticky top-0 z-10 -mx-1 flex items-center justify-between bg-ink-50/95 px-1 py-2 backdrop-blur">
         <button
           type="button"
           onClick={onBack}
@@ -526,14 +530,17 @@ function ReplayCard({
         className="flex flex-col gap-3 rounded-2xl border border-ink-200 bg-surface p-4 shadow-sm"
       >
         <div className="flex flex-wrap items-center gap-1.5 text-sm">
-          <QuestionMeta question={question} />
+          <QuestionMeta question={question} hideTags />
           {scenario ? (
             <span className="rounded-full border border-ink-300 bg-surface px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-700">
               {scenario.title}
             </span>
           ) : null}
-          <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-600">
+          <span className="inline-flex items-center gap-1 rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-600">
             Q {step.index} / {total}
+            <span aria-hidden>·</span>
+            <Clock className="h-3 w-3" />
+            <span className="normal-case">{formatSpan(attempt.timeTakenSeconds)}</span>
           </span>
           {prior.length > 0 ? (
             <span
@@ -544,10 +551,6 @@ function ReplayCard({
               seen {prior.length}× before
             </span>
           ) : null}
-          <span className="ml-auto inline-flex items-center gap-1 text-xs text-ink-500">
-            <Clock className="h-3 w-3" />
-            {formatSpan(attempt.timeTakenSeconds)}
-          </span>
         </div>
 
         {scenario?.stem ? (
