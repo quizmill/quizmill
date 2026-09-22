@@ -227,3 +227,72 @@ describe('CoachPage', () => {
     expect(container.querySelectorAll('[data-testid="coach-day"]')).toHaveLength(2);
   });
 });
+
+describe('CoachPage — whole-day review and history', () => {
+  it('reviews the whole day in answer order with a divider per session', async () => {
+    seedHistory();
+    await render(<CoachPage />);
+    await click(container.querySelectorAll('[data-testid="coach-day-review"]')[0]);
+    expect(window.location.hash).toBe('#day=2026-9-21');
+    const steps = container.querySelectorAll('[data-testid="coach-step"]');
+    // today: s-early (1 answer) then s-late (2 answers), oldest first
+    expect(steps).toHaveLength(3);
+    expect(container.querySelectorAll('[data-testid="coach-session-divider"]')).toHaveLength(2);
+    expect(container.textContent).toContain('2/3');
+    expect(container.textContent).toContain('Mistakes review');
+  });
+
+  it('filters to mistakes only, and reveal-all covers just the shown ones', async () => {
+    seedHistory();
+    window.location.hash = '#day=2026-9-21';
+    await render(<CoachPage />);
+    expect(container.querySelectorAll('[data-testid="coach-step"]')).toHaveLength(3);
+    await click(q('[data-testid="coach-filter-wrong"]'));
+    const steps = container.querySelectorAll('[data-testid="coach-step"]');
+    expect(steps).toHaveLength(1);
+    expect(q('[data-testid="coach-filter-wrong"]').textContent).toContain('(1)');
+    await click(q('[data-testid="coach-toggle-all"]'));
+    expect(container.querySelectorAll('[data-testid="coach-answer"]')).toHaveLength(1);
+    expect(q('[data-testid="coach-answer"]').textContent).toContain('Got it wrong');
+    // back to all: the other two stay hidden
+    await click(q('[data-testid="coach-filter-all"]'));
+    expect(container.querySelectorAll('[data-testid="coach-step"]')).toHaveLength(3);
+    expect(container.querySelectorAll('[data-testid="coach-answer"]')).toHaveLength(1);
+  });
+
+  it('shows what happened on earlier attempts at the same question', async () => {
+    const { q1 } = seedHistory();
+    // q1 was answered right yesterday (a4) and wrong today (a1)
+    window.location.hash = '#session=s-late';
+    await render(<CoachPage />);
+    const step = container.querySelectorAll('[data-testid="coach-step"]')[0];
+    expect(step.querySelector('[data-testid="coach-seen-before"]')?.textContent).toContain('seen 1× before');
+    await click(step.querySelector('[data-testid="coach-reveal"]')!);
+    const prior = q('[data-testid="coach-prior"]');
+    expect(prior.textContent).toContain('Before this: right every time (1×)');
+    expect(prior.textContent).toContain('right');
+    // and yesterday's session shows no history for its first sighting
+    await click(q('[data-testid="coach-back"]'));
+    window.location.hash = '#session=s-yesterday';
+    window.dispatchEvent(new Event('hashchange'));
+    await act(async () => {});
+    const first = container.querySelectorAll('[data-testid="coach-step"]')[0];
+    expect(first.querySelector('[data-testid="coach-seen-before"]')).toBeNull();
+    expect(first.textContent).toContain(q1.prompt.slice(0, 20));
+  });
+
+  it('says so when a day had no mistakes', async () => {
+    const { q1 } = seedHistory();
+    const day = new Date(2026, 8, 19, 10, 0).getTime();
+    const sessions = JSON.parse(localStorage.getItem(SESSIONS_KEY)!) as Session[];
+    const attempts = JSON.parse(localStorage.getItem(ATTEMPTS_KEY)!) as Attempt[];
+    sessions.push({ id: 's-perfect', subject: q1.categoryKey, startedAt: day, endedAt: day + 60_000, questionCount: 1, correctCount: 1 });
+    attempts.push({ id: 'a9', sessionId: 's-perfect', questionId: q1.id, answeredAt: day + 10_000, selectedAnswer: q1.correctKey!, isCorrect: true, timeTakenSeconds: 5, subject: q1.categoryKey, topic: q1.id, difficulty: 2 });
+    localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+    localStorage.setItem(ATTEMPTS_KEY, JSON.stringify(attempts));
+    window.location.hash = '#day=2026-9-19';
+    await render(<CoachPage />);
+    await click(q('[data-testid="coach-filter-wrong"]'));
+    expect(container.querySelector('[data-testid="coach-no-mistakes"]')).not.toBeNull();
+  });
+});

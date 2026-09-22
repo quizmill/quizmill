@@ -96,10 +96,12 @@ offline.
   chip in the answer panel, counted as follow-ups on the note cards, and
   practised together at `/practice/notes` via `notes-practice.ts`),
   GamesPage + games/ (reward mini-games — see below),
-  CoachPage (`/coach`: parent/tutor replay of any past session, question
-  by question with the learner's pick, timing and explanation hidden
-  behind a per-question or all-at-once reveal; options are tappable so
-  you can answer again together but NOTHING is recorded. Device-level
+  CoachPage (`/coach`: parent/tutor replay of any past session — or a
+  whole day across its sessions (`#day=`) — question by question with
+  the learner's pick, timing, explanation and the history of earlier
+  attempts at that question hidden behind a per-question or all-at-once
+  reveal; a Mistakes-only filter; options are tappable so you can answer
+  again together but NOTHING is recorded. Device-level
   opt-in `quizmill.coach.v1` via Settings → Coach mode, which also adds a
   Home card; pure grouping/replay logic in `src/lib/coachSessions.ts`).
   In `src/components/`: InstallPrompt (Add-to-Home-Screen), Scratchpad
