@@ -79,12 +79,13 @@ function corrects(n: number): Attempt[] {
 }
 
 describe('useLevelUp', () => {
+  // Demo pack (18 questions) → floor scale 1000, thresholds
+  // 0/30/80/150/240/350/480/630/800/1000.
+
   it('records the crossing once and surfaces one celebration', () => {
-    // 10 first corrects: 10×11 + 25 daily = 135 XP → level 2.
-    const attempts = corrects(10);
-    expect(
-      10 * (XP_EFFORT + XP_FIRST_CORRECT) + XP_DAILY_GOAL,
-    ).toBeGreaterThanOrEqual(100);
+    // 3 first corrects: 3×11 = 33 XP → level 2 (30).
+    const attempts = corrects(3);
+    expect(3 * (XP_EFFORT + XP_FIRST_CORRECT)).toBeGreaterThanOrEqual(30);
 
     let crossed = 0;
     act(() => {
@@ -102,15 +103,20 @@ describe('useLevelUp', () => {
   });
 
   it('backfills skipped rungs but celebrates only the level reached', () => {
-    // 39 first corrects: 39×11 + 25 = 454 XP → straight to level 4.
+    // 10 first corrects: 10×11 + 25 daily = 135 XP → straight to
+    // level 3 (80), past level 2.
+    expect(
+      10 * (XP_EFFORT + XP_FIRST_CORRECT) + XP_DAILY_GOAL,
+    ).toBeGreaterThanOrEqual(80);
     let crossed = 0;
     act(() => {
-      crossed = hook().checkNow(corrects(39));
+      crossed = hook().checkNow(corrects(10));
     });
-    expect(crossed).toBe(4);
+    expect(crossed).toBe(3);
     const ids = loadAchievements().map((e) => e.id);
-    expect(ids).toEqual(expect.arrayContaining(['level-2', 'level-3', 'level-4']));
-    expect(container.textContent).toContain('Apprentice Miller');
+    expect(ids).toEqual(expect.arrayContaining(['level-2', 'level-3']));
+    expect(ids).not.toContain('level-4');
+    expect(container.textContent).toContain('Mill Hand');
   });
 
   it('no-ops when the device pref hides Levels & XP', () => {
@@ -121,5 +127,20 @@ describe('useLevelUp', () => {
     });
     expect(crossed).toBe(0);
     expect(loadAchievements()).toEqual([]);
+  });
+
+  it('a stretched ladder never un-records a reached level', () => {
+    // Records survive as opaque rows whatever the ladder does — the
+    // display floor (levelProgress + recordedLevel) reads them back.
+    act(() => {
+      hook().checkNow(corrects(10));
+    });
+    const before = loadAchievements().map((e) => e.id);
+    act(() => {
+      // Re-check with LESS XP (e.g. the formula's inputs shrank after a
+      // pack swap-back): nothing is removed, nothing re-celebrated.
+      hook().checkNow(corrects(3));
+    });
+    expect(loadAchievements().map((e) => e.id)).toEqual(before);
   });
 });

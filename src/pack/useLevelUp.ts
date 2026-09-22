@@ -2,9 +2,9 @@
 
 import { useCallback, useState } from 'react';
 import type { Attempt } from '@/data/types';
-import { LEVELS, levelForXp, totalXp, type XpLevel } from '@/lib/xp';
+import { levelForXp, totalXp, type XpLevel } from '@/lib/xp';
 import { loadAchievements, recordEarnedAchievements } from '@/lib/storage';
-import { progressionEnabled } from '@/pack/data';
+import { progressionEnabled, PACK_XP_LEVELS } from '@/pack/data';
 import { loadProgressionShown } from '@/lib/progressionPref';
 
 /** Storage ids for level crossings — opaque to the achievements store
@@ -46,7 +46,7 @@ export function useLevelUp(): {
 
   const checkNow = useCallback((attempts: readonly Attempt[]): number => {
     if (!progressionEnabled || !loadProgressionShown()) return 0;
-    const reached = levelForXp(totalXp(attempts));
+    const reached = levelForXp(totalXp(attempts), PACK_XP_LEVELS);
     const already = recordedLevel(loadAchievements().map((e) => e.id));
     if (reached.level <= already) return 0;
     const fresh: string[] = [];
@@ -69,7 +69,7 @@ export function levelUpCelebration(l: XpLevel): {
   name: string;
   description: string;
 } {
-  const next = LEVELS.find((x) => x.level === l.level + 1);
+  const next = PACK_XP_LEVELS.find((x) => x.level === l.level + 1);
   return {
     emoji: l.emoji,
     name: `Level ${l.level} — ${l.name}`,

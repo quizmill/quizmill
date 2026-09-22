@@ -81,12 +81,14 @@ describe('PackHome level card (progression)', () => {
 
   it('derives the level and XP retroactively from history', async () => {
     // 10 first-time-correct answers today: 10×(1+10) + 25 daily = 135 XP.
+    // Demo ladder (18-question bank → the 1000 XP floor): level 3 at 80,
+    // level 4 at 150.
     localStorage.setItem(ATTEMPTS_KEY, JSON.stringify(fullDay(0)));
     await render();
     const card = container.querySelector('[data-testid="level-card"]');
-    expect(card!.textContent).toContain('Level 2 · Fresh Flour');
+    expect(card!.textContent).toContain('Level 3 · Mill Hand');
     expect(card!.textContent).toContain('135 XP');
-    expect(card!.textContent).toContain('115 XP to Mill Hand');
+    expect(card!.textContent).toContain('15 XP to Apprentice Miller');
   });
 
   it('is hidden when the device pref turns Levels & XP off', async () => {

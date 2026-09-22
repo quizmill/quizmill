@@ -42,23 +42,56 @@ export interface XpLevel {
   xp: number;
 }
 
-/**
- * The ladder. Early levels come quickly (a keen first week clears 2–3),
- * later ones take real mastery. Bounded on purpose: "finished" is a
- * healthier endpoint for a nine-year-old than an infinite grind.
- */
-export const LEVELS: readonly XpLevel[] = [
-  { level: 1, name: 'Grain', emoji: '🌾', xp: 0 },
-  { level: 2, name: 'Fresh Flour', emoji: '🥖', xp: 100 },
-  { level: 3, name: 'Mill Hand', emoji: '🧺', xp: 250 },
-  { level: 4, name: 'Apprentice Miller', emoji: '🛠️', xp: 450 },
-  { level: 5, name: 'Stone Turner', emoji: '🪨', xp: 700 },
-  { level: 6, name: 'Journeyman Miller', emoji: '🥾', xp: 1000 },
-  { level: 7, name: 'Wheelwright', emoji: '🛞', xp: 1400 },
-  { level: 8, name: 'Millstone Master', emoji: '⚙️', xp: 1900 },
-  { level: 9, name: 'Windmill Wizard', emoji: '🌬️', xp: 2500 },
-  { level: 10, name: 'Master Miller', emoji: '🏰', xp: 3200 },
+/** The ten mill-themed ranks, in order. Names are fixed; the XP each
+ *  one costs is scaled to the pack — see {@link buildLevels}. */
+export const LEVEL_LADDER: readonly { name: string; emoji: string }[] = [
+  { name: 'Grain', emoji: '🌾' },
+  { name: 'Fresh Flour', emoji: '🥖' },
+  { name: 'Mill Hand', emoji: '🧺' },
+  { name: 'Apprentice Miller', emoji: '🛠️' },
+  { name: 'Stone Turner', emoji: '🪨' },
+  { name: 'Journeyman Miller', emoji: '🥾' },
+  { name: 'Wheelwright', emoji: '🛞' },
+  { name: 'Millstone Master', emoji: '⚙️' },
+  { name: 'Windmill Wizard', emoji: '🌬️' },
+  { name: 'Master Miller', emoji: '🏰' },
 ];
+
+/** Cumulative share of the pack's ladder scale each rank costs — early
+ *  levels come quickly (a keen first week clears a couple), later ones
+ *  take real mastery. */
+const LEVEL_FRACTIONS = [0, 0.03, 0.08, 0.15, 0.24, 0.35, 0.48, 0.63, 0.8, 1];
+
+/** Small banks get a floor so a 20-question pack can't be "mastered" in
+ *  an afternoon — daily-goal bonuses and rescues carry the rest. */
+export const MIN_LADDER_XP = 1000;
+
+/**
+ * Build the ladder for a pack of `questionCount` questions. The scale is
+ * the XP of first-answering the whole bank correctly, so the top rank
+ * MEANS something: Master Miller ≈ every question in the pack answered
+ * right at least once (daily bonuses and rescue points cover the wrong
+ * turns along the way). Bigger bank → longer ladder, automatically; the
+ * ladder is bounded on purpose — "finished" is a healthier endpoint for
+ * a nine-year-old than an infinite grind.
+ *
+ * A pack's bank can grow (e.g. questions generated from notes), which
+ * raises the thresholds; the persisted `level-N` records then act as a
+ * display floor (see useLevelUp/levelProgress) so a level once reached
+ * is never shown as lost.
+ */
+export function buildLevels(questionCount: number): XpLevel[] {
+  const scale = Math.max(
+    questionCount * (XP_EFFORT + XP_FIRST_CORRECT),
+    MIN_LADDER_XP,
+  );
+  return LEVEL_LADDER.map((l, i) => ({
+    level: i + 1,
+    name: l.name,
+    emoji: l.emoji,
+    xp: Math.round((LEVEL_FRACTIONS[i] * scale) / 5) * 5,
+  }));
+}
 
 /**
  * Total XP for an attempt history. Chronological walk so "first correct"
@@ -85,10 +118,10 @@ export function totalXp(attempts: readonly Attempt[]): number {
   return xp;
 }
 
-/** The highest level whose threshold the XP total has reached. */
-export function levelForXp(xp: number): XpLevel {
-  let reached = LEVELS[0];
-  for (const l of LEVELS) {
+/** The highest rung of `levels` whose threshold the XP total reached. */
+export function levelForXp(xp: number, levels: readonly XpLevel[]): XpLevel {
+  let reached = levels[0];
+  for (const l of levels) {
     if (xp >= l.xp) reached = l;
     else break;
   }
@@ -101,7 +134,7 @@ export interface LevelProgress {
   next: XpLevel | null;
   /** Total XP (echoed for display). */
   xp: number;
-  /** XP earned within the current level. */
+  /** XP earned within the current level (0 when held up by the floor). */
   intoLevel: number;
   /** XP still needed for the next level; 0 at the top. */
   toNext: number;
@@ -109,21 +142,33 @@ export interface LevelProgress {
   pct: number;
 }
 
-/** Progress toward the next rung, for the Home level card. */
-export function levelProgress(xp: number): LevelProgress {
-  const level = levelForXp(xp);
-  const next = LEVELS.find((l) => l.level === level.level + 1) ?? null;
+/**
+ * Progress toward the next rung, for the Home level card. `floorLevel`
+ * (the persisted high-water mark) keeps a level once reached on display
+ * even if the ladder has since stretched under a grown bank — the bar
+ * then simply reads empty until the derived XP catches back up.
+ */
+export function levelProgress(
+  xp: number,
+  levels: readonly XpLevel[],
+  floorLevel = 1,
+): LevelProgress {
+  const derived = levelForXp(xp, levels);
+  const level =
+    levels.find((l) => l.level === Math.max(derived.level, floorLevel)) ??
+    derived;
+  const next = levels.find((l) => l.level === level.level + 1) ?? null;
   if (!next) {
-    return { level, next: null, xp, intoLevel: xp - level.xp, toNext: 0, pct: 100 };
+    return { level, next: null, xp, intoLevel: Math.max(0, xp - level.xp), toNext: 0, pct: 100 };
   }
   const span = next.xp - level.xp;
-  const intoLevel = xp - level.xp;
+  const intoLevel = Math.max(0, xp - level.xp);
   return {
     level,
     next,
     xp,
     intoLevel,
-    toNext: span - intoLevel,
+    toNext: next.xp - Math.max(xp, level.xp),
     pct: Math.min(100, Math.floor((intoLevel / span) * 100)),
   };
 }

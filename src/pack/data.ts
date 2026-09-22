@@ -13,6 +13,7 @@ import {
   activeConcepts,
 } from './source';
 import { categoryIcon } from './category-icon';
+import { buildLevels } from '@/lib/xp';
 
 export type PackCategory = {
   key: string;
@@ -156,6 +157,10 @@ export const gamesEnabled = packGames !== undefined;
 /** Whether this pack opts into the XP/levels progression. Off (the
  *  default) means no XP, no levels, no level card — zero footprint. */
 export const progressionEnabled = packManifest.progression !== undefined;
+
+/** The XP ladder, scaled to THIS pack's bank size — Master Miller ≈
+ *  every question first-answered correctly. See buildLevels. */
+export const PACK_XP_LEVELS = buildLevels(activeQuestions.length);
 
 export const packQuestions = activeQuestions;
 
