@@ -289,6 +289,36 @@ describe('buildPaperResult', () => {
     expect(again.attempts[0].id).toBe(first.attempts[0].id);
     expect(again.session.id).toBe(first.session.id);
   });
+
+  it('keeps the original day of answers entered in an earlier batch', () => {
+    // A sheet marked in two sittings (7 questions today, the rest
+    // tomorrow): the first batch must keep its own answeredAt, or the
+    // re-mark would move that day's streak credit to the second day.
+    const TWO_DAYS = 2 * 24 * 60 * 60 * 1000;
+    const first = buildPaperResult(
+      s,
+      [
+        { questionId: 'q1', question: q1, selected: ['B'] },
+        { questionId: 'q3', question: q3, selected: null },
+      ],
+      NOW,
+    );
+    const prior = new Map(first.attempts.map((a) => [a.id, a.answeredAt]));
+    const again = buildPaperResult(
+      s,
+      [
+        { questionId: 'q1', question: q1, selected: ['A'] }, // corrected too
+        { questionId: 'q3', question: q3, selected: ['D'] },
+      ],
+      NOW + TWO_DAYS,
+      prior,
+    );
+    expect(again.attempts).toHaveLength(2);
+    expect(again.attempts[0].answeredAt).toBe(first.attempts[0].answeredAt);
+    expect(again.attempts[0].selectedAnswer).toBe('A');
+    expect(again.attempts[1].answeredAt).toBeGreaterThanOrEqual(NOW + TWO_DAYS);
+    expect(again.session.correctCount).toBe(1);
+  });
 });
 
 describe('answerBoxLabel', () => {
