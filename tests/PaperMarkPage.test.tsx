@@ -112,6 +112,12 @@ describe('PaperMarkPage', () => {
     ]);
     expect(attempts.every((a) => a.mode === 'paper')).toBe(true);
     expect(attempts.every((a) => a.timeTakenSeconds === 1)).toBe(true);
+
+    // The scanned sheet is now stored on this device too — it shows in
+    // the Paper list as marked, and its answer key can be printed here.
+    const stored = getPaperSheet(sheet.id);
+    expect(stored?.questionIds).toEqual(sheet.questionIds);
+    expect(stored?.markedAt).toBeDefined();
   });
 
   it('re-marking upserts the same rows instead of duplicating them', async () => {
@@ -227,6 +233,31 @@ describe('PaperPage', () => {
     expect(q('[data-testid="paper-sheet"]').textContent).toContain(
       sheets[0].code,
     );
+  });
+
+  it('opens a sheet from a QR payload link and keeps it on this device', async () => {
+    const sheet = demoSheet();
+    const payload = encodePaperPayload(payloadFromSheet(sheet, APP_CONFIG.packId));
+    window.location.hash = `#s=${payload}`;
+    await render(<PaperPage />);
+
+    // Straight to the sheet view — with the answer key one tap away.
+    expect(q('[data-testid="paper-sheet"]').textContent).toContain('P-TEST');
+    expect(q('[data-testid="view-key"]')).toBeDefined();
+    expect(getPaperSheet(sheet.id)?.code).toBe('P-TEST');
+    // The hash becomes the plain local form, so reloads and the back
+    // button behave like a sheet made here.
+    expect(window.location.hash).toBe(`#sheet=${encodeURIComponent(sheet.id)}`);
+  });
+
+  it('explains a QR payload from a different pack', async () => {
+    window.location.hash = `#s=${encodePaperPayload(
+      payloadFromSheet(demoSheet(), 'some-other-pack'),
+    )}`;
+    await render(<PaperPage />);
+    expect(container.textContent).toContain('different pack');
+    expect(container.querySelector('[data-testid="paper-sheet"]')).toBeNull();
+    expect(getPaperSheet('sheet-under-test')).toBeUndefined();
   });
 
   it('switches to a printable answer key for the coach', async () => {

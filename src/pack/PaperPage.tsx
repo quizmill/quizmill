@@ -36,24 +36,47 @@ import {
 import { attemptHistory, bankForCategory, filterByLevel } from '@/pack/runner';
 import { PackImage } from '@/pack/PackImage';
 import {
+  adoptPaperSheet,
   answerBoxLabel,
   composePaperSheet,
+  decodePaperPayload,
   deletePaperSheet,
   encodePaperPayload,
   loadPaperSheets,
   payloadFromSheet,
   resolveSheetQuestions,
   savePaperSheet,
+  sheetFromPayload,
   DEFAULT_PAPER_COUNT,
   PAPER_COUNT_CHOICES,
   type PaperSheet,
 } from '@/pack/paper';
 
-/** What the URL hash points at: the list/compose screen, or one sheet. */
-function sheetIdFromHash(): string | null {
-  if (typeof window === 'undefined') return null;
+/** What the URL hash points at: the list/compose screen, one stored
+ *  sheet (`#sheet=<id>`), or a sheet carried in the link itself
+ *  (`#s=<payload>`, the same self-describing payload the printed QR
+ *  encodes — so a sheet printed on one device can be opened, and its
+ *  answer key printed, on another). */
+type HashTarget =
+  | { kind: 'list' }
+  | { kind: 'sheet'; id: string }
+  | { kind: 'payload'; sheet: PaperSheet }
+  | { kind: 'wrong-pack'; pack: string }
+  | { kind: 'bad-payload' };
+
+function targetFromHash(): HashTarget {
+  if (typeof window === 'undefined') return { kind: 'list' };
   const h = window.location.hash;
-  return h.startsWith('#sheet=') ? decodeURIComponent(h.slice('#sheet='.length)) : null;
+  if (h.startsWith('#sheet=')) {
+    return { kind: 'sheet', id: decodeURIComponent(h.slice('#sheet='.length)) };
+  }
+  if (h.startsWith('#s=')) {
+    const payload = decodePaperPayload(h.slice('#s='.length));
+    if (!payload) return { kind: 'bad-payload' };
+    if (payload.pack !== APP_CONFIG.packId) return { kind: 'wrong-pack', pack: payload.pack };
+    return { kind: 'payload', sheet: sheetFromPayload(payload) };
+  }
+  return { kind: 'list' };
 }
 
 const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
@@ -76,15 +99,39 @@ export function PaperPage() {
   const { attempts, sessions } = useStorageData();
   const [mounted, setMounted] = useState(false);
   const [sheetId, setSheetId] = useState<string | null>(null);
-  // Bumped after create/delete so the list re-reads localStorage.
+  // Why an `#s=` link couldn't be opened here, shown above the list.
+  const [linkProblem, setLinkProblem] = useState<
+    { kind: 'wrong-pack'; pack: string } | { kind: 'bad-payload' } | null
+  >(null);
+  // Bumped after create/delete/adopt so the list re-reads localStorage.
   const [sheetsVersion, setSheetsVersion] = useState(0);
 
   useEffect(() => {
     setMounted(true);
-    setSheetId(sheetIdFromHash());
-    const onHash = () => setSheetId(sheetIdFromHash());
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
+    const resolve = () => {
+      const target = targetFromHash();
+      if (target.kind === 'payload') {
+        // Keep it on this device, then continue as a plain stored sheet
+        // (reloads and the back button behave like a sheet made here).
+        const adopted = adoptPaperSheet(target.sheet);
+        window.history.replaceState(
+          null,
+          '',
+          `#sheet=${encodeURIComponent(adopted.id)}`,
+        );
+        setSheetsVersion((v) => v + 1);
+        setLinkProblem(null);
+        setSheetId(adopted.id);
+        return;
+      }
+      setLinkProblem(
+        target.kind === 'wrong-pack' || target.kind === 'bad-payload' ? target : null,
+      );
+      setSheetId(target.kind === 'sheet' ? target.id : null);
+    };
+    resolve();
+    window.addEventListener('hashchange', resolve);
+    return () => window.removeEventListener('hashchange', resolve);
   }, []);
 
   const sheets = useMemo(
@@ -131,6 +178,20 @@ export function PaperPage() {
           answers back in — progress counts just like on-screen practice.
         </p>
       </header>
+
+      {linkProblem ? (
+        <p className="rounded-2xl border border-warn-500/40 bg-warn-50 p-4 text-sm text-ink-700">
+          {linkProblem.kind === 'wrong-pack' ? (
+            <>
+              That sheet belongs to a different pack (<strong>{linkProblem.pack}</strong>),
+              but this app has <strong>{APP_CONFIG.packId}</strong> active. Swap
+              packs first, then open the link again.
+            </>
+          ) : (
+            <>That sheet link couldn&apos;t be read — try scanning the QR code on the printout again.</>
+          )}
+        </p>
+      ) : null}
 
       <ComposeCard
         attempts={attempts}
