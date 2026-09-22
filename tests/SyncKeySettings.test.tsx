@@ -52,11 +52,17 @@ afterEach(async () => {
 });
 
 /** Let React settle: the card's handlers await real async work (hashing
- *  the key, the profile round trip), which outlives a microtask flush. */
-async function settle() {
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+ *  the key, the profile round trip), which outlives a microtask flush.
+ *  One macrotask isn't enough either — crypto.subtle.digest resolves off
+ *  the threadpool, and on Node 26 it lands a turn or two later than it
+ *  does on 22, so a single flush left the name field unrendered about
+ *  one run in ten. Flush repeatedly instead of guessing at one tick. */
+async function settle(turns = 5) {
+  for (let i = 0; i < turns; i += 1) {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
 }
 
 async function render() {

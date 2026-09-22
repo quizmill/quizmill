@@ -14,12 +14,15 @@ export default defineConfig({
     hookTimeout: 60_000,
     globalSetup: ['./tests/e2e-pack/setup.ts'],
     pool: 'forks',
-    poolOptions: { forks: { singleFork: true } },
+    // One shared fork, one file at a time — four Puppeteer specs racing
+    // over the same static server is flaky. (vitest 5 flattened
+    // poolOptions.forks.singleFork into isolate + fileParallelism.)
+    isolate: false,
     fileParallelism: false,
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
     },
   },
 });
