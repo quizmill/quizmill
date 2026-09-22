@@ -180,10 +180,11 @@ export function PaperMarkPage() {
       ...m,
       selected: selections[i] ?? null,
     }));
-    const result = buildPaperResult(sheet, withSelections, Date.now());
     // Deterministic ids + amend-or-append = marking twice upserts the
-    // same rows (saveAttempt alone would duplicate them).
-    const existing = new Set(loadAttempts().map((a) => a.id));
+    // same rows (saveAttempt alone would duplicate them); rows from an
+    // earlier batch keep their own answeredAt (see buildPaperResult).
+    const existing = new Map(loadAttempts().map((a) => [a.id, a.answeredAt]));
+    const result = buildPaperResult(sheet, withSelections, Date.now(), existing);
     for (const attempt of result.attempts) {
       if (existing.has(attempt.id)) amendAttempt(attempt.id, attempt);
       else saveAttempt(attempt);
@@ -219,7 +220,8 @@ export function PaperMarkPage() {
         </p>
         <p className="mt-2 text-sm text-ink-600">
           Tap the letters written in each answer box. Left blank on the
-          sheet? Leave it unset here.
+          sheet? Leave it unset here — you can save part of the sheet now
+          and come back for the rest.
         </p>
         {alreadyMarked ? (
           <p className="mt-1 text-sm text-warn-600">
@@ -383,6 +385,14 @@ function SavedView({ sheet, result }: { sheet: PaperSheet; result: PaperResultRo
             <p className="mt-1 text-sm text-ink-600">
               The {wrong === 1 ? 'question' : `${wrong} questions`} answered
               wrong {wrong === 1 ? 'is' : 'are'} waiting in mistakes review.
+            </p>
+          ) : null}
+          {result.blankCount > 0 ? (
+            <p className="mt-1 text-sm text-ink-600">
+              {result.blankCount} {result.blankCount === 1 ? 'question' : 'questions'}{' '}
+              left blank — open this sheet again to add{' '}
+              {result.blankCount === 1 ? 'it' : 'them'} later; what you entered
+              stays filled in.
             </p>
           ) : null}
         </div>

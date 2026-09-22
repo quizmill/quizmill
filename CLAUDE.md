@@ -131,7 +131,12 @@ offline.
   in; marking writes a `mode: 'paper'` session + attempts with
   DETERMINISTIC ids derived from the sheet id, so re-marking upserts
   instead of double-counting, and streak/mistakes/readiness/stickers
-  pick it up untouched. Sheets live locally
+  pick it up untouched. A sheet can be marked in BATCHES (a few
+  questions today, the rest tomorrow): re-opening pre-fills what was
+  entered and rows from an earlier batch keep their own `answeredAt`,
+  so streak credit never moves. The sheet screen also prints a coach's
+  ANSWER KEY (same numbering, correct letters, explanations, linked
+  concept cards; no QR) as a separate printout. Sheets live locally
   (`quizmill.<packId>.paperSheets.v1`, deliberately not synced); device
   opt-in `quizmill.paper.v1` like Coach; print CSS gated on
   `body[data-paper-print]` in globals.css; design notes in

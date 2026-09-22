@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { webcrypto } from 'node:crypto';
@@ -152,6 +152,45 @@ describe('PaperMarkPage', () => {
     expect(loadSessions()).toHaveLength(1);
   });
 
+  it('marks a sheet in batches without moving the first batch to a later day', async () => {
+    const sheet = demoSheet();
+    savePaperSheet(sheet);
+    const [q1, q2] = packQuestions;
+    const DAY1 = new Date(2026, 8, 22, 18, 0).getTime();
+    const DAY2 = DAY1 + 24 * 60 * 60 * 1000;
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      // Day 1: only the first question done.
+      vi.setSystemTime(DAY1);
+      window.location.hash = `#sheet=${sheet.id}`;
+      await render(<PaperMarkPage />);
+      await click(q(`[aria-label="Question 1: answer ${correctKeysOf(q1)[0]}"]`));
+      await click(q('[data-testid="save-marks"]'));
+      expect(q('[data-testid="mark-saved"]').textContent).toContain('1/1 correct');
+      expect(q('[data-testid="mark-saved"]').textContent).toMatch(/2 .*left blank/);
+
+      // Day 2: back for the rest — the earlier answer keeps its own day.
+      await act(async () => {
+        root?.unmount();
+      });
+      vi.setSystemTime(DAY2);
+      window.location.hash = `#sheet=${sheet.id}`;
+      await render(<PaperMarkPage />);
+      await click(q(`[aria-label="Question 2: answer ${correctKeysOf(q2)[0]}"]`));
+      await click(q('[data-testid="save-marks"]'));
+
+      const attempts = loadAttempts().sort((a, b) => a.id.localeCompare(b.id));
+      expect(attempts).toHaveLength(2);
+      expect(attempts[0].answeredAt).toBeGreaterThanOrEqual(DAY1);
+      expect(attempts[0].answeredAt).toBeLessThan(DAY2);
+      expect(attempts[1].answeredAt).toBeGreaterThanOrEqual(DAY2);
+      expect(loadSessions()).toHaveLength(1);
+      expect(loadSessions()[0].correctCount).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('refuses a sheet from a different pack', async () => {
     const payload = encodePaperPayload(
       payloadFromSheet(demoSheet(), 'some-other-pack'),
@@ -188,5 +227,40 @@ describe('PaperPage', () => {
     expect(q('[data-testid="paper-sheet"]').textContent).toContain(
       sheets[0].code,
     );
+  });
+
+  it('switches to a printable answer key for the coach', async () => {
+    await render(<PaperPage />);
+    await click(q('[data-testid="create-sheet"]'));
+    const sheets = JSON.parse(
+      localStorage.getItem(`quizmill.${APP_CONFIG.packId}.paperSheets.v1`) ?? '[]',
+    );
+    const first = packQuestions.find((x) => x.id === sheets[0].questionIds[0])!;
+    const sheetTitle = document.title;
+
+    // The worksheet itself carries no answers.
+    expect(container.querySelector('[data-testid="key-answer"]')).toBeNull();
+
+    await click(q('[data-testid="view-key"]'));
+    const key = q('[data-testid="paper-answer-key"]');
+    expect(container.querySelector('[data-testid="paper-sheet"]')).toBeNull();
+    expect(key.querySelector('svg')).toBeNull(); // no QR — not for marking
+    expect(key.textContent).toContain(sheets[0].code);
+    const answers = Array.from(
+      container.querySelectorAll('[data-testid="key-answer"]'),
+    ).map((el) => el.textContent?.trim());
+    expect(answers).toHaveLength(10);
+    expect(answers[0]).toBe(correctKeysOf(first).join(','));
+    expect(
+      container.querySelectorAll('[data-testid="key-explanation"]')[0].textContent,
+    ).toContain(first.explanation.slice(0, 20));
+    // Still printable: the print hook stays on, and the PDF gets its own name.
+    expect(document.body.getAttribute('data-paper-print')).toBe('1');
+    expect(document.title).toBe(`${sheetTitle} - answer key`);
+
+    await click(q('[data-testid="view-sheet"]'));
+    expect(q('[data-testid="paper-sheet"]')).toBeDefined();
+    expect(container.querySelector('[data-testid="paper-answer-key"]')).toBeNull();
+    expect(document.title).toBe(sheetTitle);
   });
 });
