@@ -86,6 +86,53 @@ describe('paper practice', () => {
     expect(await page.title()).not.toContain(String(code));
   });
 
+  it('prints a QR a camera can actually decode, and it opens the marking page', async () => {
+    await clickButtonByText(page, 'Create sheet');
+    await page.waitForSelector('[data-testid="paper-sheet"] svg path');
+
+    // "Scan" the QR the way a phone does: rasterise the SVG at roughly
+    // its printed resolution (36mm at 300dpi ≈ 425px) and run jsQR over
+    // the pixels. This is the regression net for payload density and
+    // the quiet zone — an unscannable code fails here, not at the
+    // kitchen table.
+    await page.addScriptTag({ path: 'node_modules/jsqr/dist/jsQR.js' });
+    const decoded = await page.evaluate(async () => {
+      const svg = document.querySelector('[data-testid="paper-sheet"] svg')!;
+      const xml = new XMLSerializer().serializeToString(svg);
+      const img = new Image();
+      const loaded = new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+      img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(xml)}`;
+      await loaded;
+      const SIZE = 425;
+      const canvas = document.createElement('canvas');
+      canvas.width = SIZE;
+      canvas.height = SIZE;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, SIZE, SIZE);
+      ctx.drawImage(img, 0, 0, SIZE, SIZE);
+      const data = ctx.getImageData(0, 0, SIZE, SIZE);
+      type JsQr = (d: Uint8ClampedArray, w: number, h: number) => { data: string } | null;
+      const result = (window as unknown as { jsQR: JsQr }).jsQR(
+        data.data,
+        SIZE,
+        SIZE,
+      );
+      return result?.data ?? null;
+    });
+
+    expect(decoded).not.toBeNull();
+    expect(decoded).toContain('/paper/mark/#s=2.');
+
+    // The decoded URL is the whole loop: opening it lands on marking.
+    await page.goto(decoded!, { waitUntil: 'networkidle0' });
+    await page.waitForSelector('[data-testid="mark-rows"]');
+    await waitForText(page, /P-[A-Z2-9]{4}/);
+  });
+
   it('prints an answer key for the coach under its own PDF name', async () => {
     await clickButtonByText(page, 'Create sheet');
     await page.waitForSelector('[data-testid="paper-sheet"]');

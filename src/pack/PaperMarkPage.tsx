@@ -63,11 +63,12 @@ type Source =
   | { kind: 'not-found' }
   | { kind: 'none' };
 
-function sourceFromHash(): Source {
+async function sourceFromHash(): Promise<Source> {
   if (typeof window === 'undefined') return { kind: 'none' };
   const h = window.location.hash;
   if (h.startsWith('#s=')) {
-    const payload = decodePaperPayload(h.slice('#s='.length));
+    // Async: the compressed payload form inflates via DecompressionStream.
+    const payload = await decodePaperPayload(h.slice('#s='.length));
     if (!payload) return { kind: 'bad-payload' };
     if (payload.pack !== APP_CONFIG.packId) {
       return { kind: 'wrong-pack', pack: payload.pack };
@@ -101,8 +102,13 @@ export function PaperMarkPage() {
 
   useEffect(() => {
     setMounted(true);
-    const resolve = () => {
-      const next = sourceFromHash();
+    // Guard against a hashchange landing while an earlier decode is
+    // still inflating — only the latest resolution may set state.
+    let latest = 0;
+    const resolve = async () => {
+      const token = ++latest;
+      const next = await sourceFromHash();
+      if (token !== latest) return;
       setSource(next);
       setSaved(null);
       if (next.kind === 'ready') {
@@ -124,9 +130,10 @@ export function PaperMarkPage() {
         setSelections([]);
       }
     };
-    resolve();
-    window.addEventListener('hashchange', resolve);
-    return () => window.removeEventListener('hashchange', resolve);
+    const onHash = () => void resolve();
+    onHash();
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
   const sheet = source.kind === 'ready' ? source.sheet : null;

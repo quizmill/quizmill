@@ -223,6 +223,12 @@
     break-inside: avoid;
     page-break-inside: avoid;
   }
+  /* Physical size on paper, not CSS-pixel-derived: ~0.45mm+ per module
+     for a compressed payload, which phone cameras resolve reliably. */
+  body[data-paper-print] .paper-qr {
+    width: 36mm;
+    height: 36mm;
+  }
 }
 
 /* ————— The Poster look (data-look="poster") —————

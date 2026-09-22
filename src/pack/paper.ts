@@ -185,19 +185,85 @@ export function sheetFromPayload(payload: PaperPayload): PaperSheet {
   };
 }
 
-/** Unicode-safe base64url (the `#s=` fragment the QR encodes). */
-export function encodePaperPayload(payload: PaperPayload): string {
+function toBase64Url(bytes: Uint8Array): string {
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function fromBase64Url(encoded: string): Uint8Array<ArrayBuffer> {
+  const bin = atob(encoded.replace(/-/g, '+').replace(/_/g, '/'));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+// Drive the (de)compression stream directly through its own writer and
+// reader — no Blob/Response detour, which keeps it working in any
+// environment that provides the stream itself (including test DOMs
+// whose Blob is not the platform one).
+async function pipeThrough(
+  bytes: Uint8Array<ArrayBuffer>,
+  stream: CompressionStream | DecompressionStream,
+): Promise<Uint8Array> {
+  const writer = stream.writable.getWriter();
+  const writing = writer.write(bytes).then(() => writer.close());
+  const reader = stream.readable.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    total += value.length;
+  }
+  await writing;
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
+}
+
+/**
+ * Encode the `#s=` fragment the QR carries. The QR's scannability on
+ * paper is a direct function of payload length (every ~30 chars is
+ * another QR version, and module size shrinks with each), and question
+ * ids dominate the payload while sharing long prefixes — so the payload
+ * is deflate-compressed (`2.` + base64url(deflate-raw(json))), which
+ * roughly quarters it for real packs. Browsers without
+ * CompressionStream fall back to the legacy uncompressed base64url
+ * form, which stays decodable either way (sheets printed by older
+ * builds carry it too).
+ */
+export async function encodePaperPayload(payload: PaperPayload): Promise<string> {
   const json = JSON.stringify(payload);
-  const b64 = btoa(unescape(encodeURIComponent(json)));
-  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const bytes = new TextEncoder().encode(json);
+  if (typeof CompressionStream !== 'undefined') {
+    const deflated = await pipeThrough(bytes, new CompressionStream('deflate-raw'));
+    return `2.${toBase64Url(deflated)}`;
+  }
+  return toBase64Url(bytes);
 }
 
 /** Strict decode — anything malformed returns null rather than throwing,
- *  so a mangled URL degrades to a clear "can't read this sheet" screen. */
-export function decodePaperPayload(encoded: string): PaperPayload | null {
+ *  so a mangled URL degrades to a clear "can't read this sheet" screen.
+ *  Accepts both the compressed `2.` form and the legacy plain form. */
+export async function decodePaperPayload(encoded: string): Promise<PaperPayload | null> {
   try {
-    const b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
-    const json = decodeURIComponent(escape(atob(b64)));
+    let json: string;
+    if (encoded.startsWith('2.')) {
+      if (typeof DecompressionStream === 'undefined') return null;
+      const inflated = await pipeThrough(
+        fromBase64Url(encoded.slice(2)),
+        new DecompressionStream('deflate-raw'),
+      );
+      json = new TextDecoder().decode(inflated);
+    } else {
+      json = new TextDecoder().decode(fromBase64Url(encoded));
+    }
     const raw: unknown = JSON.parse(json);
     if (typeof raw !== 'object' || raw === null) return null;
     const p = raw as Record<string, unknown>;
