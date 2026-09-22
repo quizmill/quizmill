@@ -23,18 +23,44 @@ export function recordedLevel(earnedIds: readonly string[]): number {
 }
 
 /**
- * Level-up detection for the runners — the XP sibling of
- * `useAchievementUnlock`. After each recorded attempt call
- * `checkNow(attempts)`: every newly crossed level is persisted as an
- * opaque `level-N` record (riding the achievements store, and therefore
- * sync), and the HIGHEST new one is surfaced for a single celebration —
- * a learner whose history already spans several levels gets one "you're
- * level 7!" moment, not a parade. The records double as a high-water
- * mark: a crossing celebrated on one device is never re-celebrated on
- * another.
+ * Persist any level crossings the attempt history has earned, as opaque
+ * `level-N` records (riding the achievements store, and therefore sync).
+ * The records are the high-water mark that floors the displayed level
+ * and keeps a crossing celebrated once, ever, across devices — so EVERY
+ * attempt-producing or history-merging path must land here eventually:
+ * the visual runners via `useLevelUp`, Drive Mode silently after each
+ * answer, and imported/synced history via the ProgressCard effect the
+ * next time Home renders.
  *
- * No-ops entirely unless the pack opts into progression and the device
- * hasn't hidden it (Settings → Levels & XP).
+ * Recording is deliberately independent of the device's Levels & XP
+ * pref — hiding the UI must not let the high-water mark fall behind.
+ * Only the pack's opt-in gates it. Returns the newly reached level, or
+ * null when nothing new was crossed.
+ */
+export function recordLevelCrossings(
+  attempts: readonly Attempt[],
+): XpLevel | null {
+  if (!progressionEnabled) return null;
+  const reached = levelForXp(totalXp(attempts), PACK_XP_LEVELS);
+  const already = recordedLevel(loadAchievements().map((e) => e.id));
+  if (reached.level <= already) return null;
+  const fresh: string[] = [];
+  for (let n = already + 1; n <= reached.level; n++) {
+    fresh.push(`${LEVEL_ID_PREFIX}${n}`);
+  }
+  recordEarnedAchievements(fresh);
+  return reached;
+}
+
+/**
+ * Level-up detection for the visual runners — the XP sibling of
+ * `useAchievementUnlock`. After each recorded attempt call
+ * `checkNow(attempts)`: crossings are persisted via
+ * {@link recordLevelCrossings}, and the level reached is surfaced for a
+ * single celebration — a learner whose history already spans several
+ * levels gets one "you're level 7!" moment, not a parade. The
+ * celebration (not the recording) honours the device's Levels & XP
+ * pref.
  */
 export function useLevelUp(): {
   nextLevelUp: XpLevel | null;
@@ -45,16 +71,9 @@ export function useLevelUp(): {
   const [pending, setPending] = useState<XpLevel | null>(null);
 
   const checkNow = useCallback((attempts: readonly Attempt[]): number => {
-    if (!progressionEnabled || !loadProgressionShown()) return 0;
-    const reached = levelForXp(totalXp(attempts), PACK_XP_LEVELS);
-    const already = recordedLevel(loadAchievements().map((e) => e.id));
-    if (reached.level <= already) return 0;
-    const fresh: string[] = [];
-    for (let n = already + 1; n <= reached.level; n++) {
-      fresh.push(`${LEVEL_ID_PREFIX}${n}`);
-    }
-    recordEarnedAchievements(fresh);
-    setPending((p) => p ?? reached);
+    const reached = recordLevelCrossings(attempts);
+    if (!reached) return 0;
+    if (loadProgressionShown()) setPending((p) => p ?? reached);
     return reached.level;
   }, []);
 

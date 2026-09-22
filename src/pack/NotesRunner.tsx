@@ -21,6 +21,7 @@ import { PackImage } from '@/pack/PackImage';
 import { ConceptCard } from '@/pack/ConceptCard';
 import { QuestionMeta } from '@/pack/QuestionMeta';
 import { Celebration } from '@/components/Celebration';
+import { levelUpCelebration, useLevelUp } from '@/pack/useLevelUp';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { amendAttempt, loadAttempts, loadNotes, loadSessions } from '@/lib/storage';
 import { notesPracticePool } from '@/pack/notes-practice';
@@ -62,6 +63,7 @@ export function PackNotesRunner() {
   const startSession = useStartSession();
   const endSession = useEndSession();
   const { nextUnlock, checkNow, clearNextUnlock } = useAchievementUnlock();
+  const { nextLevelUp, checkNow: checkLevelNow, clearNextLevelUp } = useLevelUp();
 
   const [state, setState] = useState<RunnerState | null>(null);
   const [nothingToPractice, setNothingToPractice] = useState(false);
@@ -137,6 +139,12 @@ export function PackNotesRunner() {
       <main className="flex flex-col gap-5">
         {nextUnlock ? (
           <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
+        ) : nextLevelUp ? (
+          <Celebration
+            label="Level up!"
+            achievement={levelUpCelebration(nextLevelUp)}
+            onDone={clearNextLevelUp}
+          />
         ) : null}
         <BackLink />
         <div className="rounded-2xl border border-ink-200 bg-surface p-8 text-center shadow-sm">
@@ -208,7 +216,9 @@ export function PackNotesRunner() {
     recordAttempt(attempt);
     lastAttemptRef.current = { id: attempt.id, answeredAt: attempt.answeredAt };
     // Same re-read rationale as the practice runner — see there.
-    checkNow(loadSessions(), loadAttempts());
+    const freshAttempts = loadAttempts();
+    checkNow(loadSessions(), freshAttempts);
+    checkLevelNow(freshAttempts);
     setState(advanceAfterAnswer(state, attempt.isCorrect));
     setStage('feedback');
   }
@@ -242,6 +252,12 @@ export function PackNotesRunner() {
     <main className="flex flex-col gap-5">
       {nextUnlock ? (
         <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
+      ) : nextLevelUp ? (
+        <Celebration
+          label="Level up!"
+          achievement={levelUpCelebration(nextLevelUp)}
+          onDone={clearNextLevelUp}
+        />
       ) : null}
       <header className="flex items-center justify-between">
         <BackLink />

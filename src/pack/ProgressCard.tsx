@@ -12,7 +12,7 @@ import {
   loadProgressionShown,
 } from '@/lib/progressionPref';
 import { progressionEnabled, PACK_XP_LEVELS } from '@/pack/data';
-import { recordedLevel } from '@/pack/useLevelUp';
+import { recordLevelCrossings, recordedLevel } from '@/pack/useLevelUp';
 
 /**
  * The single "how am I doing" card on Home: the level row (for packs
@@ -37,6 +37,14 @@ export function ProgressCard({ attempts }: { attempts: readonly Attempt[] }) {
     window.addEventListener(PROGRESSION_EVENT, read);
     return () => window.removeEventListener(PROGRESSION_EVENT, read);
   }, []);
+
+  // Catch-all for history that arrives OUTSIDE a runner (file import,
+  // sync merge, another device): whenever Home sees new attempts, any
+  // level they earned is persisted, so the high-water record can never
+  // lag the ledger for long. No-ops without the pack's opt-in.
+  useEffect(() => {
+    recordLevelCrossings(attempts);
+  }, [attempts]);
 
   const showLevel = progressionEnabled && prefShown;
   const { streak, bestStreak, goal, answeredToday, remaining, goalMet } =

@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import type { Attempt } from '@/data/types';
 import { loadAchievements } from '@/lib/storage';
 import { saveProgressionShown } from '@/lib/progressionPref';
-import { recordedLevel, useLevelUp } from '@/pack/useLevelUp';
+import { recordLevelCrossings, recordedLevel, useLevelUp } from '@/pack/useLevelUp';
 import { XP_DAILY_GOAL, XP_EFFORT, XP_FIRST_CORRECT } from '@/lib/xp';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -119,14 +119,29 @@ describe('useLevelUp', () => {
     expect(container.textContent).toContain('Mill Hand');
   });
 
-  it('no-ops when the device pref hides Levels & XP', () => {
+  it('records but never celebrates when the device pref hides Levels & XP', () => {
+    // Hiding the UI must not let the high-water mark fall behind.
     saveProgressionShown(false);
     let crossed = 0;
     act(() => {
       crossed = hook().checkNow(corrects(10));
     });
-    expect(crossed).toBe(0);
-    expect(loadAchievements()).toEqual([]);
+    expect(crossed).toBe(3);
+    expect(loadAchievements().map((e) => e.id)).toContain('level-3');
+    expect(container.textContent ?? '').not.toContain('Mill Hand');
+  });
+
+  it('recordLevelCrossings persists silently for non-visual paths', () => {
+    // The standalone recorder (Drive Mode, ProgressCard backfill for
+    // imported/synced history) writes the same rows with no React and
+    // no celebration.
+    const reached = recordLevelCrossings(corrects(10));
+    expect(reached?.level).toBe(3);
+    expect(loadAchievements().map((e) => e.id)).toEqual(
+      expect.arrayContaining(['level-2', 'level-3']),
+    );
+    expect(recordLevelCrossings(corrects(10))).toBeNull();
+    expect(container.textContent ?? '').not.toContain('Mill Hand');
   });
 
   it('a stretched ladder never un-records a reached level', () => {

@@ -64,12 +64,17 @@ offline.
   `progression` block — XP is a pure derivation over attempts like
   everything else: nothing stored/synced, retroactive credit,
   mastery-weighted so re-answering known questions pays only a token
-  point, a BOUNDED mill-themed ladder, and deliberately no
+  point, a BOUNDED mill-themed ladder scaled to the bank (top rank ≈
+  first-correcting the bank; auxiliary XP means it lands near ~80%
+  coverage, deliberately a touch generous), and deliberately no
   notifications, no randomness, no spendable currency; level crossings
   persist as opaque `level-N` rows in the achievements store so sync +
-  celebrate-once come free (`src/pack/useLevelUp.ts`), and
+  celebrate-once come free — `recordLevelCrossings` in
+  `src/pack/useLevelUp.ts` is the single recorder and EVERY
+  attempt-producing path must reach it (visual runners via the hook,
+  Drive silently, imported/synced history via the ProgressCard effect);
   `progressionPref` is the device-level parent off-switch in Settings →
-  Levels & XP), `storage.ts`
+  Levels & XP, which hides UI but never stops recording), `storage.ts`
   (localStorage, namespaced `quizmill.<packId>.*`; also the analytics
   capture surface — `recordEvent`/`loadEvents`/`amendAttempt`),
   `sync.ts` (backend-agnostic mirror engine; pluggable provider registry

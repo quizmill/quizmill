@@ -293,6 +293,16 @@ describe('streakProgress', () => {
     });
   });
 
+  it('never reports a best below the live streak (provisional bridge)', () => {
+    // Missed yesterday, practised the two days before: the live streak
+    // counts the bridged yesterday (3), and best must not read lower —
+    // even though the bridge only enters the permanent record once
+    // practice resumes after it.
+    const p = streakProgress([...onDay(2, 10), ...onDay(3, 10)], today);
+    expect(p.streak).toBe(3);
+    expect(p.bestStreak).toBe(3);
+  });
+
   it('remembers the best-ever streak after the live one resets', () => {
     // A 3-day run last month; nothing since until today's full round.
     const old = [1, 2, 3].flatMap((weekOffset) =>

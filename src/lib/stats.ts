@@ -196,9 +196,15 @@ export function streakProgress(
     if (toDayKey(new Date(a.answeredAt)) === todayKey) answeredToday += 1;
   }
   const days = practiceDates(attempts, goal);
+  const streak = currentStreak(days, today);
   return {
-    streak: currentStreak(days, today),
-    bestStreak: longestStreak(days),
+    streak,
+    // The record can never read below the live streak. The live number
+    // may include a provisionally bridged "yesterday" that longestStreak
+    // deliberately doesn't count until practice resumes after it (a
+    // grace day enters the permanent record only once consummated), so
+    // take the max rather than trusting either alone.
+    bestStreak: Math.max(longestStreak(days), streak),
     goal,
     answeredToday,
     remaining: Math.max(0, goal - answeredToday),

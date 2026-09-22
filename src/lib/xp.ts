@@ -67,13 +67,15 @@ const LEVEL_FRACTIONS = [0, 0.03, 0.08, 0.15, 0.24, 0.35, 0.48, 0.63, 0.8, 1];
 export const MIN_LADDER_XP = 1000;
 
 /**
- * Build the ladder for a pack of `questionCount` questions. The scale is
- * the XP of first-answering the whole bank correctly, so the top rank
- * MEANS something: Master Miller ≈ every question in the pack answered
- * right at least once (daily bonuses and rescue points cover the wrong
- * turns along the way). Bigger bank → longer ladder, automatically; the
- * ladder is bounded on purpose — "finished" is a healthier endpoint for
- * a nine-year-old than an infinite grind.
+ * Build the ladder for a pack of `questionCount` questions. The scale
+ * is the XP of first-answering the whole bank correctly, so bigger
+ * bank → longer ladder, automatically. Effort, rescue and daily-goal
+ * XP also count toward it, so in practice the top rank arrives around
+ * ~80% first-correct coverage rather than exactly 100% — deliberately
+ * a touch generous: a kids' reward shouldn't be a coverage grind wall
+ * that one unanswerable question can hold hostage. The ladder is
+ * bounded on purpose — "finished" is a healthier endpoint for a
+ * nine-year-old than an infinite grind.
  *
  * A pack's bank can grow (e.g. questions generated from notes), which
  * raises the thresholds; the persisted `level-N` records then act as a
