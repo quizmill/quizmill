@@ -14,10 +14,15 @@ name: Release
 # `git describe` (see next.config.ts). A release = compute next version
 # from the latest tag + bump, npm-publish cli/ at that version (bumped
 # in the CI workspace only), tag the merge commit, create the GitHub
-# release. npm publish needs an NPM_TOKEN repo secret (granular
-# automation token with bypass-2FA); until it's set, that step skips
-# with a notice. Publish runs before tagging so a rejected publish
-# burns nothing — just rerun.
+# release. npm publish uses npm TRUSTED PUBLISHING (OIDC): the job's
+# id-token lets npm verify this exact workflow in this exact repo, so no
+# npm token is stored anywhere and nothing expires. One-time setup on
+# npmjs.com → package `quizmill` → Settings → Trusted publisher → GitHub
+# Actions, organisation `quizmill`, repository `quizmill`, workflow
+# `release.yml`, no environment. (The previous NPM_TOKEN granular token
+# expired after 90 days and silently broke every release from v0.3.28;
+# tokens are no longer read at all.) Publish runs before tagging so a
+# rejected publish burns nothing — just rerun.
 
 on:
   pull_request:
@@ -95,17 +100,23 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
+      # Trusted publishing needs npm >= 11.5.1; Node 22 ships an older npm.
+      - name: Update npm for trusted publishing
+        if: steps.version.outputs.version != ''
+        run: |
+          npm install -g npm@latest
+          npm --version
+
+      # No NODE_AUTH_TOKEN on purpose: with the job's id-token permission,
+      # npm mints a short-lived publish credential from GitHub's OIDC token
+      # (and attaches provenance). A stale token in the environment would
+      # take precedence over OIDC and fail — so none is read.
       - name: Publish CLI to npm
         if: steps.version.outputs.version != ''
         id: publish
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "::notice::NPM_TOKEN secret not set — skipping npm publish. Publish cli/ manually or add the secret."
-            exit 0
-          fi
           cd cli
           # Workspace-only version stamp; never committed back.
           npm version "${VERSION#v}" --no-git-tag-version
