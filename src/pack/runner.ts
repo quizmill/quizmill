@@ -122,11 +122,12 @@ export function pickSessionFromBank(
   bank: PackQuestion[],
   history: ReadonlyMap<string, AttemptSummary>,
   rng?: () => number,
+  count: number = QUESTION_COUNT,
 ): PackQuestion[] | null {
   if (bank.length === 0) return null;
   const selectable = bank.map((q) => ({ ...q, topic: q.categoryKey }));
   const picked = pickSessionQuestions(selectable, {
-    count: Math.min(QUESTION_COUNT, bank.length),
+    count: Math.min(count, bank.length),
     historicalAttemptedIds: new Set(history.keys()),
     currentSessionIds: new Set(),
     history,

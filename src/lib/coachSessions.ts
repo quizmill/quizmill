@@ -41,6 +41,7 @@ export const SESSION_MODE_LABEL: Record<SessionMode, string> = {
   review: 'Mistakes review',
   drive: 'Drive mode',
   notes: 'Notes practice',
+  paper: 'Paper sheet',
 };
 
 function byAnsweredAt(a: Attempt, b: Attempt): number {

@@ -103,7 +103,20 @@ offline.
   reveal; a Mistakes-only filter; options are tappable so you can answer
   again together but NOTHING is recorded. Device-level
   opt-in `quizmill.coach.v1` via Settings → Coach mode, which also adds a
-  Home card; pure grouping/replay logic in `src/lib/coachSessions.ts`).
+  Home card; pure grouping/replay logic in `src/lib/coachSessions.ts`),
+  PaperPage + PaperMarkPage + paper.ts (`/paper`: print-a-worksheet
+  practice — a sheet composed by the normal selection engine, printed
+  (or saved as PDF from the same dialog) with write-in answer boxes and
+  a QR deep-linking to `/paper/mark` with the whole question list in the
+  fragment, so any device with the pack active can tap-to-mark it back
+  in; marking writes a `mode: 'paper'` session + attempts with
+  DETERMINISTIC ids derived from the sheet id, so re-marking upserts
+  instead of double-counting, and streak/mistakes/readiness/stickers
+  pick it up untouched. Sheets live locally
+  (`quizmill.<packId>.paperSheets.v1`, deliberately not synced); device
+  opt-in `quizmill.paper.v1` like Coach; print CSS gated on
+  `body[data-paper-print]` in globals.css; design notes in
+  `docs/investigations/paper-practice.md`).
   In `src/components/`: InstallPrompt (Add-to-Home-Screen), Scratchpad
   (a collapsible Write/Draw working space in the runners — textarea +
   freehand canvas, expandable full-screen; one pad per pack, kept in
