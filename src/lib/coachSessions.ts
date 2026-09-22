@@ -123,15 +123,21 @@ export interface ReplayStep<Q> {
   question: Q;
   /** 1-based position in the replay (after dropping unknown questions). */
   index: number;
+  /** First shown step of its session — a whole-day replay draws a
+   *  divider here. Always true for the first step. */
+  sessionStart: boolean;
 }
 
 export interface Replay<Q> {
   steps: ReplayStep<Q>[];
   /** Attempts skipped because their question is not in this pack. */
   unknownQuestions: number;
+  answered: number;
+  correct: number;
 }
 
-/** Lay one session out in answer order, joined to the pack's questions. */
+/** Lay attempts out in answer order, joined to the pack's questions. One
+ *  session's attempts, or a whole day's (see `dayReplay`). */
 export function sessionReplay<Q extends { id: string }>(
   attempts: readonly Attempt[],
   questionById: ReadonlyMap<string, Q>,
@@ -139,15 +145,55 @@ export function sessionReplay<Q extends { id: string }>(
   const sorted = [...attempts].sort(byAnsweredAt);
   const steps: ReplayStep<Q>[] = [];
   let unknownQuestions = 0;
+  let lastSession: string | null = null;
   for (const attempt of sorted) {
     const question = questionById.get(attempt.questionId);
     if (!question) {
       unknownQuestions++;
       continue;
     }
-    steps.push({ attempt, question, index: steps.length + 1 });
+    steps.push({
+      attempt,
+      question,
+      index: steps.length + 1,
+      sessionStart: attempt.sessionId !== lastSession,
+    });
+    lastSession = attempt.sessionId;
   }
-  return { steps, unknownQuestions };
+  return {
+    steps,
+    unknownQuestions,
+    answered: steps.length,
+    correct: steps.filter((s) => s.attempt.isCorrect).length,
+  };
+}
+
+/** Every answer of one day in the order given, across all its sessions. */
+export function dayReplay<Q extends { id: string }>(
+  day: CoachDay,
+  questionById: ReadonlyMap<string, Q>,
+): Replay<Q> {
+  return sessionReplay(
+    day.sessions.flatMap((s) => s.attempts),
+    questionById,
+  );
+}
+
+/** Earlier attempts at the same question, oldest first — the history a
+ *  parent needs to know whether a miss is new or a repeat, and what was
+ *  picked the previous times. */
+export function priorAttempts(
+  attempt: Attempt,
+  all: readonly Attempt[],
+): Attempt[] {
+  return all
+    .filter(
+      (a) =>
+        a.questionId === attempt.questionId &&
+        a.id !== attempt.id &&
+        a.answeredAt < attempt.answeredAt,
+    )
+    .sort(byAnsweredAt);
 }
 
 /** "A" or "A, C" → the option keys the learner selected. */

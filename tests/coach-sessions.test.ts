@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Attempt, Session } from '@/data/types';
 import {
+  dayReplay,
   formatSpan,
   groupSessionsByDay,
+  priorAttempts,
   selectedKeys,
   sessionReplay,
 } from '@/lib/coachSessions';
@@ -154,5 +156,45 @@ describe('formatSpan', () => {
     expect(formatSpan(45)).toBe('45 s');
     expect(formatSpan(130)).toBe('2 min');
     expect(formatSpan(3900)).toBe('1 h 05 min');
+  });
+});
+
+describe('dayReplay', () => {
+  it('concatenates a day\'s sessions oldest first and marks where each session starts', () => {
+    const sessions = [
+      session({ id: 'early', startedAt: at(2026, 9, 21, 19) }),
+      session({ id: 'late', startedAt: at(2026, 9, 21, 20) }),
+    ];
+    const attempts = [
+      attempt({ sessionId: 'late', answeredAt: at(2026, 9, 21, 20, 1), questionId: 'q3' }),
+      attempt({ sessionId: 'early', answeredAt: at(2026, 9, 21, 19, 2), questionId: 'q2', isCorrect: false }),
+      attempt({ sessionId: 'early', answeredAt: at(2026, 9, 21, 19, 1), questionId: 'q1' }),
+    ];
+    const [day] = groupSessionsByDay(sessions, attempts);
+    const replay = dayReplay(day, new Map([['q1', { id: 'q1' }], ['q2', { id: 'q2' }], ['q3', { id: 'q3' }]]));
+    expect(replay.steps.map((s) => [s.index, s.question.id, s.sessionStart])).toEqual([
+      [1, 'q1', true],
+      [2, 'q2', false],
+      [3, 'q3', true],
+    ]);
+    expect(replay.answered).toBe(3);
+    expect(replay.correct).toBe(2);
+  });
+});
+
+describe('priorAttempts', () => {
+  it('lists earlier attempts at the same question, oldest first, excluding this and later ones', () => {
+    const target = attempt({ sessionId: 's3', answeredAt: 300, questionId: 'q1', isCorrect: false });
+    const all = [
+      attempt({ sessionId: 's4', answeredAt: 400, questionId: 'q1' }), // later — ignored
+      target,
+      attempt({ sessionId: 's2', answeredAt: 200, questionId: 'q1', selectedAnswer: 'C' }),
+      attempt({ sessionId: 's1', answeredAt: 100, questionId: 'q1', isCorrect: false, selectedAnswer: 'B' }),
+      attempt({ sessionId: 's1', answeredAt: 150, questionId: 'q2', isCorrect: false }), // other question
+    ];
+    expect(priorAttempts(target, all).map((a) => [a.answeredAt, a.isCorrect, a.selectedAnswer])).toEqual([
+      [100, false, 'B'],
+      [200, true, 'C'],
+    ]);
   });
 });

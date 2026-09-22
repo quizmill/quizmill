@@ -11,9 +11,17 @@ import {
  * pack defines levels), and any tags (topic, source marker, …). All
  * pack-driven — the engine carries no domain terminology.
  */
-export function QuestionMeta({ question }: { question: PackQuestion }) {
+export function QuestionMeta({
+  question,
+  hideTags = false,
+}: {
+  question: PackQuestion;
+  /** Category + level only — for views where the pack's tags are noise
+   *  (the coach replay shows a parent the question, not its taxonomy). */
+  hideTags?: boolean;
+}) {
   const levelLabel = question.level ? PACK_LEVEL_LABEL[question.level] : undefined;
-  const tags = question.tags ?? [];
+  const tags = hideTags ? [] : (question.tags ?? []);
   return (
     <>
       <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand-700">
