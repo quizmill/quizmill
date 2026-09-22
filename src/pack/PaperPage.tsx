@@ -152,9 +152,15 @@ export function PaperPage() {
               const marked =
                 s.markedAt !== undefined || sessions.some((ses) => ses.id === s.id);
               return (
-                <Link
+                // A plain anchor, NOT next/link: the router navigates
+                // hash-only hrefs via history.pushState, which never fires
+                // the `hashchange` event this page (and Coach) key off —
+                // the URL would change but the view wouldn't. Native hash
+                // navigation fires it and keeps the back button working.
+                <a
                   key={s.id}
                   href={`#sheet=${encodeURIComponent(s.id)}`}
+                  data-testid={`sheet-row-${s.code}`}
                   className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-ink-200 bg-surface p-4 shadow-sm"
                 >
                   <div className="min-w-0">
@@ -180,7 +186,7 @@ export function PaperPage() {
                     </div>
                   </div>
                   <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-400" />
-                </Link>
+                </a>
               );
             })}
           </div>
@@ -346,11 +352,20 @@ function SheetView({
 
   // The print stylesheet only strips the app chrome while a sheet is on
   // screen (body[data-paper-print] — see globals.css), so printing any
-  // other page keeps working normally.
+  // other page keeps working normally. The tab title becomes the sheet's
+  // stamp while it's open: browsers derive the "Save as PDF" filename
+  // from document.title, so each sheet saves under a unique name
+  // (app - code - date) instead of piles of identically named PDFs.
   useEffect(() => {
+    const original = document.title;
+    const date = new Date(sheet.createdAt).toISOString().slice(0, 10);
+    document.title = `${APP_CONFIG.title} - ${sheet.code} - ${date}`;
     document.body.setAttribute('data-paper-print', '1');
-    return () => document.body.removeAttribute('data-paper-print');
-  }, []);
+    return () => {
+      document.title = original;
+      document.body.removeAttribute('data-paper-print');
+    };
+  }, [sheet]);
 
   // The QR deep-links to the marking page with the whole sheet in the
   // fragment, so marking works on any device with this pack active.

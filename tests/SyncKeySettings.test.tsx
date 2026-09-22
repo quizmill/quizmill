@@ -145,6 +145,9 @@ describe('naming a sync key', () => {
   it('says an unnamed key is unnamed, and offers to name it', async () => {
     await render();
     await click(buttonLabelled('Create a sync key'));
+    // The name form appears only once the sign-in chain settles — wait
+    // for it like the other tests do, or the Cancel click can outrun it.
+    await waitFor(() => byTestId('sync-key-name-input'));
     await click(buttonLabelled('Cancel'));
     expect(byTestId('sync-key-name')).toBeNull();
     expect(container.textContent).toContain("This key isn't named yet");
