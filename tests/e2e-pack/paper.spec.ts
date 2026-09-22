@@ -86,6 +86,20 @@ describe('paper practice', () => {
     expect(await page.title()).not.toContain(String(code));
   });
 
+  it('prints an answer key for the coach under its own PDF name', async () => {
+    await clickButtonByText(page, 'Create sheet');
+    await page.waitForSelector('[data-testid="paper-sheet"]');
+    await page.click('[data-testid="view-key"]');
+    await page.waitForSelector('[data-testid="paper-answer-key"]');
+    expect(await page.$('[data-testid="paper-sheet"]')).toBeNull();
+    expect(await page.title()).toMatch(/ - answer key$/);
+    const answers = await page.$$eval('[data-testid="key-answer"]', (els) =>
+      els.map((el) => el.textContent?.trim()),
+    );
+    expect(answers).toHaveLength(10);
+    expect(answers.every((a) => /^[A-F](,[A-F])*$/.test(a ?? ''))).toBe(true);
+  });
+
   it('marks a sheet back in and records a paper session', async () => {
     await clickButtonByText(page, 'Create sheet');
     await page.waitForSelector('[data-testid="paper-sheet"]');

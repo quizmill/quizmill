@@ -258,6 +258,9 @@ export interface PaperResultRows {
   attempts: Attempt[];
   correctCount: number;
   answeredCount: number;
+  /** Markable questions left without an answer — the learner can come
+   *  back for them; re-opening the sheet pre-fills what was entered. */
+  blankCount: number;
 }
 
 /**
@@ -272,11 +275,17 @@ export interface PaperResultRows {
  * answeredAt is the MARKING time (we don't know when the learner sat
  * it), staggered by 1ms per row so per-question ordering stays stable,
  * and timeTakenSeconds is 1 — the documented "unmeasured" sentinel.
+ * A sheet can be marked in batches (a few questions today, the rest
+ * tomorrow): `priorAnsweredAt` (attempt id → answeredAt of the rows
+ * already stored) keeps an earlier batch on its own day, so re-marking
+ * never moves streak credit — only rows entered for the first time get
+ * stamped `now`.
  */
 export function buildPaperResult(
   sheet: PaperSheet,
   marks: PaperMark[],
   now: number,
+  priorAnsweredAt?: ReadonlyMap<string, number>,
 ): PaperResultRows {
   const attempts: Attempt[] = [];
   let correctCount = 0;
@@ -284,11 +293,12 @@ export function buildPaperResult(
     if (!mark.question || !mark.selected || mark.selected.length === 0) return;
     const isCorrect = gradeSelection(mark.question, mark.selected);
     if (isCorrect) correctCount++;
+    const id = `${sheet.id}:a${i + 1}`;
     attempts.push({
-      id: `${sheet.id}:a${i + 1}`,
+      id,
       sessionId: sheet.id,
       questionId: mark.question.id,
-      answeredAt: now + i,
+      answeredAt: priorAnsweredAt?.get(id) ?? now + i,
       selectedAnswer: [...mark.selected].sort().join(','),
       isCorrect,
       timeTakenSeconds: 1, // unmeasured — the sheet keeps no clock
@@ -312,7 +322,14 @@ export function buildPaperResult(
     ...(APP_BUILD ? { appBuild: APP_BUILD } : {}),
     ...deviceContext(),
   };
-  return { session, attempts, correctCount, answeredCount: attempts.length };
+  const markable = marks.filter((m) => m.question !== null).length;
+  return {
+    session,
+    attempts,
+    correctCount,
+    answeredCount: attempts.length,
+    blankCount: markable - attempts.length,
+  };
 }
 
 /** Answer-box hint printed under a question. */

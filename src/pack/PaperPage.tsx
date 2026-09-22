@@ -7,6 +7,7 @@ import {
   ArrowRight,
   CheckCircle2,
   ClipboardCheck,
+  KeyRound,
   Printer,
   Trash2,
 } from 'lucide-react';
@@ -19,6 +20,8 @@ import { cn } from '@/lib/cn';
 import { useStorageData } from '@/lib/useStorage';
 import { loadLevelFilter } from '@/lib/storage';
 import {
+  correctKeysOf,
+  isMultiAnswer,
   packLevels,
   packManifest,
   packQuestions,
@@ -26,6 +29,7 @@ import {
   PACK_CATEGORY_ICON,
   PACK_CATEGORY_LABEL,
   PACK_CATEGORY_TONE,
+  PACK_CONCEPT_BY_ID,
   PACK_LEVEL_LABEL,
   type PackQuestion,
 } from '@/pack/data';
@@ -350,22 +354,30 @@ function SheetView({
   );
   const missing = marks.filter((m) => m.question === null).length;
 
+  // Which printable is on screen: the learner's worksheet, or the
+  // coach's answer key (correct letters + explanations, same numbering,
+  // no QR) — printed separately so the worksheet itself stays
+  // answer-free.
+  const [view, setView] = useState<SheetPrintView>('sheet');
+
   // The print stylesheet only strips the app chrome while a sheet is on
   // screen (body[data-paper-print] — see globals.css), so printing any
   // other page keeps working normally. The tab title becomes the sheet's
   // stamp while it's open: browsers derive the "Save as PDF" filename
   // from document.title, so each sheet saves under a unique name
-  // (app - code - date) instead of piles of identically named PDFs.
+  // (app - code - date, "- answer key" for the coach's copy) instead of
+  // piles of identically named PDFs.
   useEffect(() => {
     const original = document.title;
     const date = new Date(sheet.createdAt).toISOString().slice(0, 10);
-    document.title = `${APP_CONFIG.title} - ${sheet.code} - ${date}`;
+    const suffix = view === 'key' ? ' - answer key' : '';
+    document.title = `${APP_CONFIG.title} - ${sheet.code} - ${date}${suffix}`;
     document.body.setAttribute('data-paper-print', '1');
     return () => {
       document.title = original;
       document.body.removeAttribute('data-paper-print');
     };
-  }, [sheet]);
+  }, [sheet, view]);
 
   // The QR deep-links to the marking page with the whole sheet in the
   // fragment, so marking works on any device with this pack active.
@@ -451,10 +463,56 @@ function SheetView({
         </p>
       </div>
 
-      <PrintableSheet sheet={sheet} markUrl={markUrl} />
+      <div className="flex flex-col gap-1.5">
+        <div
+          role="radiogroup"
+          aria-label="What to print"
+          className="grid grid-cols-2 gap-1 rounded-xl bg-ink-100 p-1"
+        >
+          {(
+            [
+              ['sheet', 'Worksheet', Printer],
+              ['key', 'Answer key', KeyRound],
+            ] as [SheetPrintView, string, typeof Printer][]
+          ).map(([value, label, Icon]) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={view === value}
+              data-testid={`view-${value}`}
+              onClick={() => setView(value)}
+              className={cn(
+                'tap-feedback inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold',
+                view === value
+                  ? 'bg-surface text-ink-900 shadow-sm'
+                  : 'text-ink-500 hover:text-ink-700',
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+        {view === 'key' ? (
+          <p className="text-center text-xs text-ink-500">
+            For the coach: the correct letters and explanations, numbered
+            like the worksheet. Print it separately and keep it out of sight.
+          </p>
+        ) : null}
+      </div>
+
+      {view === 'key' ? (
+        <PrintableAnswerKey sheet={sheet} />
+      ) : (
+        <PrintableSheet sheet={sheet} markUrl={markUrl} />
+      )}
     </main>
   );
 }
+
+/** Which printable the sheet screen shows (and `window.print()` prints). */
+type SheetPrintView = 'sheet' | 'key';
 
 /**
  * The worksheet itself — on screen a "paper" preview (explicit white,
@@ -562,6 +620,121 @@ function PrintableSheet({
       <div className="mt-2 border-t-2 border-neutral-900 pt-3 text-center text-[10px] text-neutral-500">
         Sheet {sheet.code} · scan the code to enter the answers · made with
         quizmill
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The coach's copy of a sheet: the same numbering, the correct letter(s)
+ * where the learner's answer box sits, the winning option's text, the
+ * explanation and any linked concept card — everything the person going
+ * through the marked sheet with the learner wants to hand. Same
+ * `.paper-sheet` print treatment as the worksheet; no QR (this page is
+ * not for marking) and no name/date lines.
+ */
+function PrintableAnswerKey({ sheet }: { sheet: PaperSheet }) {
+  const marks = resolveSheetQuestions(sheet.questionIds, packQuestions);
+  return (
+    <div
+      className="paper-sheet rounded-2xl border border-ink-200 bg-white p-6 text-neutral-900 shadow-sm"
+      data-testid="paper-answer-key"
+    >
+      <div className="flex items-start justify-between gap-4 border-b-2 border-neutral-900 pb-4">
+        <div className="min-w-0">
+          <div className="text-lg font-bold">{APP_CONFIG.title}</div>
+          <div className="mt-0.5 text-sm font-semibold uppercase tracking-wide text-neutral-700">
+            Answer key · for the coach
+          </div>
+          <div className="mt-0.5 text-sm text-neutral-600">
+            {PACK_CATEGORY_LABEL[sheet.categoryKey] ?? sheet.categoryKey}
+            {sheet.level
+              ? ` · ${PACK_LEVEL_LABEL[sheet.level] ?? sheet.level}`
+              : ''}{' '}
+            · {sheet.questionIds.length} questions ·{' '}
+            {DATE_FORMAT.format(sheet.createdAt)}
+          </div>
+        </div>
+        <div className="flex flex-col items-end">
+          <span className="font-mono text-xl font-bold">{sheet.code}</span>
+          <span className="text-[10px] text-neutral-500">sheet code</span>
+        </div>
+      </div>
+
+      <ol className="mt-4 flex flex-col divide-y divide-neutral-200">
+        {marks.map((mark, i) => {
+          const q = mark.question;
+          const keys = q ? correctKeysOf(q) : [];
+          // The winning option(s) spelled out — except options whose text
+          // is just their own letter (image-only options, non-verbal
+          // banks), which add nothing next to the key.
+          const answerLines = keys.flatMap((k) => {
+            const text = q?.options.find((o) => o.key === k)?.text.trim();
+            return text && text !== k ? [{ key: k, text }] : [];
+          });
+          const concept = q?.conceptId ? PACK_CONCEPT_BY_ID[q.conceptId] : undefined;
+          return (
+            <li key={mark.questionId} className="paper-question flex gap-3 py-4">
+              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border-2 border-neutral-900 text-sm font-bold">
+                {i + 1}
+              </span>
+              {q ? (
+                <div className="min-w-0 flex-1 text-sm leading-relaxed">
+                  <div className="font-medium text-neutral-700">
+                    <McqMarkdown text={q.prompt} />
+                  </div>
+                  {answerLines.length > 0 ? (
+                    <div className="mt-1.5 flex flex-col gap-0.5">
+                      {answerLines.map((line) => (
+                        <div key={line.key} className="flex items-start gap-2">
+                          <span className="font-bold">{line.key}.</span>
+                          <span className="min-w-0 font-semibold">
+                            <McqMarkdown text={line.text} />
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  <p
+                    className="mt-1.5 text-neutral-800"
+                    data-testid="key-explanation"
+                  >
+                    <McqMarkdown text={q.explanation} />
+                  </p>
+                  {concept ? (
+                    <div className="mt-2 rounded-lg border border-neutral-300 p-2 text-[13px] text-neutral-700">
+                      <div className="font-semibold">Concept: {concept.title}</div>
+                      <div className="mt-0.5">
+                        <McqMarkdown text={concept.body} />
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="flex-1 text-sm italic text-neutral-400">
+                  (This question is no longer in the pack.)
+                </div>
+              )}
+              {q ? (
+                <div className="flex w-16 flex-shrink-0 flex-col items-center gap-1">
+                  <span
+                    className="flex h-12 w-14 items-center justify-center rounded-lg border-2 border-neutral-900 font-mono text-lg font-bold"
+                    data-testid="key-answer"
+                  >
+                    {keys.join(',')}
+                  </span>
+                  <span className="text-center text-[9px] leading-tight text-neutral-500">
+                    {isMultiAnswer(q) ? 'all of these' : 'answer'}
+                  </span>
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
+
+      <div className="mt-2 border-t-2 border-neutral-900 pt-3 text-center text-[10px] text-neutral-500">
+        Answer key for sheet {sheet.code} · made with quizmill
       </div>
     </div>
   );
