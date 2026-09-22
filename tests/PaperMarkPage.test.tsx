@@ -61,6 +61,22 @@ function q(sel: string): HTMLElement {
   return el;
 }
 
+/** Poll (settling React between ticks) until `probe` returns a value.
+ *  The QR payload (de)compression rides zlib, which completes on a
+ *  macrotask — a plain act() flush isn't enough for the page's
+ *  in-effect decode to land. */
+async function waitFor<T>(probe: () => T | null | undefined | false, ms = 2000): Promise<T> {
+  const deadline = Date.now() + ms;
+  for (;;) {
+    const found = probe();
+    if (found) return found;
+    if (Date.now() > deadline) throw new Error('waitFor: timed out');
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+}
+
 /** A three-question sheet over the demo pack's real bank. */
 function demoSheet(): PaperSheet {
   const picked = packQuestions.slice(0, 3);
@@ -76,11 +92,13 @@ function demoSheet(): PaperSheet {
 describe('PaperMarkPage', () => {
   it('marks a sheet from the QR payload and writes a paper session', async () => {
     const sheet = demoSheet();
-    const payload = encodePaperPayload(payloadFromSheet(sheet, APP_CONFIG.packId));
+    const payload = await encodePaperPayload(
+      payloadFromSheet(sheet, APP_CONFIG.packId),
+    );
     window.location.hash = `#s=${payload}`;
 
     await render(<PaperMarkPage />);
-    expect(container.textContent).toContain('P-TEST');
+    await waitFor(() => container.textContent?.includes('P-TEST'));
 
     // Q1: the correct letter; Q2: a wrong one; Q3 left blank (skipped).
     const [q1, q2] = packQuestions.slice(0, 2);
@@ -153,12 +171,12 @@ describe('PaperMarkPage', () => {
   });
 
   it('refuses a sheet from a different pack', async () => {
-    const payload = encodePaperPayload(
+    const payload = await encodePaperPayload(
       payloadFromSheet(demoSheet(), 'some-other-pack'),
     );
     window.location.hash = `#s=${payload}`;
     await render(<PaperMarkPage />);
-    expect(container.textContent).toContain('different pack');
+    await waitFor(() => container.textContent?.includes('different pack'));
     expect(container.querySelector('[data-testid="save-marks"]')).toBeNull();
   });
 
@@ -183,7 +201,15 @@ describe('PaperPage', () => {
     // The hash navigation lands on the sheet view with the print layout.
     expect(window.location.hash).toContain('#sheet=');
     expect(q('[data-testid="paper-sheet"]')).toBeDefined();
-    expect(q('[data-testid="paper-sheet"] svg')).toBeDefined(); // the QR
+    // The QR appears once the async payload encode lands.
+    const qrSvg = await waitFor(() =>
+      container.querySelector<HTMLElement>('[data-testid="paper-sheet"] svg'),
+    );
+    // Spec quiet zone: the first dark module (finder corner) sits 4
+    // modules in, and the viewBox is 8 modules wider than the symbol.
+    expect(qrSvg.querySelector('path')?.getAttribute('d')).toMatch(/^M4 4h1/);
+    const [, , vbSize] = (qrSvg.getAttribute('viewBox') ?? '').split(' ').map(Number);
+    expect(vbSize).toBeGreaterThan(8);
     expect(document.body.getAttribute('data-paper-print')).toBe('1');
     expect(q('[data-testid="paper-sheet"]').textContent).toContain(
       sheets[0].code,

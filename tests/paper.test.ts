@@ -130,10 +130,10 @@ describe('composePaperSheet', () => {
 });
 
 describe('paper payload encode/decode', () => {
-  it('round-trips a sheet through the QR payload', () => {
+  it('round-trips a sheet through the QR payload', async () => {
     const s = sheet({ questionIds: ['q-ünïcode', 'q2'] });
     const payload = payloadFromSheet(s, 'my-pack');
-    const decoded = decodePaperPayload(encodePaperPayload(payload));
+    const decoded = await decodePaperPayload(await encodePaperPayload(payload));
     expect(decoded).toEqual(payload);
     expect(sheetFromPayload(decoded!)).toEqual({
       id: s.id,
@@ -144,21 +144,51 @@ describe('paper payload encode/decode', () => {
     });
   });
 
-  it('is base64url (no +, / or =) so it survives a URL fragment', () => {
-    const encoded = encodePaperPayload(
+  it('survives a URL fragment: "2." + base64url, no +, / or =', async () => {
+    const encoded = await encodePaperPayload(
       payloadFromSheet(sheet({ questionIds: Array(40).fill('q?~x') }), 'p'),
     );
-    expect(encoded).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(encoded).toMatch(/^2\.[A-Za-z0-9_-]+$/);
   });
 
-  it('rejects garbage, wrong versions and missing fields', () => {
-    expect(decodePaperPayload('not base64 at all!!')).toBeNull();
-    expect(decodePaperPayload(btoa('{"v":1}'))).toBeNull();
-    expect(decodePaperPayload(btoa(JSON.stringify({ v: 2 })))).toBeNull();
+  it('still decodes the legacy uncompressed form (already-printed sheets)', async () => {
+    const payload = payloadFromSheet(sheet({ questionIds: ['q-ünïcode', 'q2'] }), 'p');
+    // What pre-compression builds printed: plain base64url of the JSON.
+    const legacy = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    expect(await decodePaperPayload(legacy)).toEqual(payload);
+  });
+
+  it('keeps a realistic worst-case sheet scannable when printed', async () => {
+    // 20 long real-world ids (shared prefix, like eleven-plus banks).
+    const ids = Array.from(
+      { length: 20 },
+      (_, i) => `eleven-plus-nonverbal-y6-question-${i + 100}`,
+    );
+    const payload = payloadFromSheet(
+      sheet({ id: crypto.randomUUID(), questionIds: ids, categoryKey: 'nonverbal' }),
+      'eleven-plus',
+    );
+    const url = `https://leven.quizmill.dev/paper/mark/#s=${await encodePaperPayload(payload)}`;
+    const qrcodegen = (await import('qrcode-generator')).default;
+    const qr = qrcodegen(0, 'M');
+    qr.addData(url, 'Byte');
+    qr.make();
+    // ≤ 77 modules (version 15) keeps every module ≥ ~0.4mm at the
+    // printed 36mm incl. quiet zone — the floor phone cameras resolve.
+    // The uncompressed form measured 137 modules (0.18mm): unscannable.
+    expect(qr.getModuleCount()).toBeLessThanOrEqual(77);
+  });
+
+  it('rejects garbage, wrong versions and missing fields', async () => {
+    expect(await decodePaperPayload('not base64 at all!!')).toBeNull();
+    expect(await decodePaperPayload('2.@@not-deflate@@')).toBeNull();
+    expect(await decodePaperPayload(btoa('{"v":1}'))).toBeNull();
+    expect(await decodePaperPayload(btoa(JSON.stringify({ v: 2 })))).toBeNull();
     const good = payloadFromSheet(sheet(), 'p');
-    expect(decodePaperPayload(btoa(JSON.stringify({ ...good, qs: [] })))).toBeNull();
-    expect(decodePaperPayload(btoa(JSON.stringify({ ...good, qs: [1, 2] })))).toBeNull();
-    expect(decodePaperPayload(btoa(JSON.stringify({ ...good, t: 'yesterday' })))).toBeNull();
+    const enc = (obj: object) => btoa(JSON.stringify(obj));
+    expect(await decodePaperPayload(enc({ ...good, qs: [] }))).toBeNull();
+    expect(await decodePaperPayload(enc({ ...good, qs: [1, 2] }))).toBeNull();
+    expect(await decodePaperPayload(enc({ ...good, t: 'yesterday' }))).toBeNull();
   });
 });
 

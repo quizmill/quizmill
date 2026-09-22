@@ -371,9 +371,17 @@ function SheetView({
   // fragment, so marking works on any device with this pack active.
   const [markUrl, setMarkUrl] = useState<string | null>(null);
   useEffect(() => {
-    const payload = encodePaperPayload(payloadFromSheet(sheet, APP_CONFIG.packId));
-    const base = new URL('mark/', window.location.href.split('#')[0]);
-    setMarkUrl(`${base.href}#s=${payload}`);
+    let stale = false;
+    void encodePaperPayload(payloadFromSheet(sheet, APP_CONFIG.packId)).then(
+      (payload) => {
+        if (stale) return;
+        const base = new URL('mark/', window.location.href.split('#')[0]);
+        setMarkUrl(`${base.href}#s=${payload}`);
+      },
+    );
+    return () => {
+      stale = true;
+    };
   }, [sheet]);
 
   return (
@@ -491,7 +499,7 @@ function PrintableSheet({
           </div>
         </div>
         <div className="flex flex-col items-center">
-          {markUrl ? <QrCode value={markUrl} className="h-24 w-24" /> : null}
+          {markUrl ? <QrCode value={markUrl} className="paper-qr h-28 w-28" /> : null}
           <span className="mt-1 font-mono text-sm font-bold">{sheet.code}</span>
         </div>
       </div>
