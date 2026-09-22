@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { seededRng } from '@/lib/selection';
 import {
+  adoptPaperSheet,
   answerBoxLabel,
   buildPaperResult,
   composePaperSheet,
@@ -288,6 +289,40 @@ describe('buildPaperResult', () => {
     expect(again.attempts[0].selectedAnswer).toBe('A');
     expect(again.attempts[1].answeredAt).toBeGreaterThanOrEqual(NOW + TWO_DAYS);
     expect(again.session.correctCount).toBe(1);
+  });
+});
+
+describe('adoptPaperSheet', () => {
+  let store: Map<string, string>;
+  beforeEach(() => {
+    store = new Map();
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => void store.set(k, v),
+        removeItem: (k: string) => void store.delete(k),
+      },
+      dispatchEvent: () => true,
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('stores a sheet arriving from a QR payload so this device has it too', () => {
+    const s = sheetFromPayload(payloadFromSheet(sheet(), 'demo'));
+    expect(getPaperSheet(s.id)).toBeUndefined();
+    const adopted = adoptPaperSheet(s);
+    expect(adopted).toEqual(s);
+    expect(getPaperSheet(s.id)).toEqual(s);
+  });
+
+  it('keeps the local record (and its markedAt) when the sheet is already here', () => {
+    const local = { ...sheet(), markedAt: 1234 };
+    savePaperSheet(local);
+    const fromQr = sheetFromPayload(payloadFromSheet(local, 'demo'));
+    const adopted = adoptPaperSheet(fromQr);
+    expect(adopted.markedAt).toBe(1234);
+    expect(getPaperSheet(local.id)?.markedAt).toBe(1234);
+    expect(loadPaperSheets()).toHaveLength(1);
   });
 });
 
