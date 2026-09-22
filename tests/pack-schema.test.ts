@@ -440,6 +440,28 @@ describe('validatePack', () => {
     expect(validatePack(input).ok).toBe(false);
   });
 
+  // ——— XP/levels progression (opt-in) ———
+
+  it('accepts an empty progression block (presence enables)', () => {
+    const input = loadDemo();
+    (input.manifest as { progression?: unknown }).progression = {};
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('accepts a manifest without progression (v1 packs stay valid)', () => {
+    const input = loadDemo();
+    delete (input.manifest as { progression?: unknown }).progression;
+    expect(validatePack(input).ok).toBe(true);
+  });
+
+  it('rejects a non-object progression block', () => {
+    const input = loadDemo();
+    (input.manifest as { progression?: unknown }).progression = true;
+    expect(validatePack(input).ok).toBe(false);
+  });
+
   // The demo pack itself carries generatedFrom examples (demo-planets-012/013),
   // so the "accepts the committed demo pack" test covers the happy path.
   it('accepts a dangling generatedFrom reference (soft — original may be culled)', () => {

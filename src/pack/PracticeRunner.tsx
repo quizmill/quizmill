@@ -23,13 +23,17 @@ import { ConceptCard } from '@/pack/ConceptCard';
 import { QuestionMeta } from '@/pack/QuestionMeta';
 import { Celebration } from '@/components/Celebration';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
+import { levelUpCelebration, useLevelUp } from '@/pack/useLevelUp';
 import { amendAttempt, loadAttempts, loadSessions, loadLevelFilter } from '@/lib/storage';
 import { streakProgress } from '@/lib/stats';
+import { totalXp } from '@/lib/xp';
+import { loadProgressionShown } from '@/lib/progressionPref';
 import {
   correctKeysOf,
   isMultiAnswer,
   packQuestions,
   packScenarios,
+  progressionEnabled,
   PACK_CATEGORY_LABEL,
   PACK_CONCEPT_BY_ID,
   type OptionKey,
@@ -72,6 +76,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   const startSession = useStartSession();
   const endSession = useEndSession();
   const { nextUnlock, checkNow, clearNextUnlock } = useAchievementUnlock();
+  const { nextLevelUp, checkNow: checkLevelNow, clearNextLevelUp } = useLevelUp();
 
   const [state, setState] = useState<RunnerState | null>(null);
   const [outOfQuestions, setOutOfQuestions] = useState(false);
@@ -89,6 +94,11 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   // (null when there's nothing to show). Distinct from sticker unlocks so a
   // plain day (1-day, 2-day…) still gets a nod, not only milestone days.
   const [streakDone, setStreakDone] = useState<number | null>(null);
+  // XP earned by the just-checked answer, shown as a small chip in the
+  // feedback panel. Null when progression is off (pack or device) or
+  // between questions. A deterministic, explainable number on purpose —
+  // never a surprise mechanic.
+  const [xpGained, setXpGained] = useState<number | null>(null);
   // The active level-band filter (a manifest level key) or null = All.
   // Read from localStorage after mount, so SSR/first paint stay stable.
   const [levelFilter, setLevelFilter] = useState<string | null>(null);
@@ -172,6 +182,12 @@ export function PackPracticeRunner({ categoryKey }: Props) {
       <main className="flex flex-col gap-5">
         {nextUnlock ? (
           <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
+        ) : nextLevelUp ? (
+          <Celebration
+            label="Level up!"
+            achievement={levelUpCelebration(nextLevelUp)}
+            onDone={clearNextLevelUp}
+          />
         ) : null}
         <BackLink />
         <div className="rounded-2xl border border-ink-200 bg-surface p-8 text-center shadow-sm">
@@ -232,6 +248,10 @@ export function PackPracticeRunner({ categoryKey }: Props) {
 
   function handleCheck() {
     if (!state || selected.length === 0) return;
+    // Snapshot XP before the write so the chip can show exactly what
+    // this answer earned (first-correct/rescue bonuses included).
+    const showXp = progressionEnabled && loadProgressionShown();
+    const xpBefore = showXp ? totalXp(loadAttempts()) : 0;
     const attempt = buildAttempt({
       state,
       question: current,
@@ -247,7 +267,9 @@ export function PackPracticeRunner({ categoryKey }: Props) {
     // Achievements evaluate against what's now persisted — re-read so
     // this can't race the useStorageData snapshot.
     const freshAttempts = loadAttempts();
+    if (showXp) setXpGained(totalXp(freshAttempts) - xpBefore);
     const unlocked = checkNow(loadSessions(), freshAttempts);
+    checkLevelNow(freshAttempts);
     // Celebrate keeping the streak the moment today's goal is met — but only
     // on the exact crossing, and not when a sticker already fired this turn
     // (that's celebration enough; avoids two toasts stacking).
@@ -271,6 +293,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
       lastAttemptRef.current = null;
     }
     firstSelectedRef.current = null;
+    setXpGained(null);
     if (isLastQuestion(state)) {
       endSession(buildSessionEnd(state, categoryKey, Date.now()));
       // Session-shaped stickers (first session, flawless round, daily
@@ -292,6 +315,12 @@ export function PackPracticeRunner({ categoryKey }: Props) {
     <main className="flex flex-col gap-5">
       {nextUnlock ? (
         <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
+      ) : nextLevelUp ? (
+        <Celebration
+          label="Level up!"
+          achievement={levelUpCelebration(nextLevelUp)}
+          onDone={clearNextLevelUp}
+        />
       ) : streakDone !== null ? (
         <Celebration
           label={streakDone === 1 ? 'Streak started' : 'Streak kept'}
@@ -406,13 +435,23 @@ export function PackPracticeRunner({ categoryKey }: Props) {
               : 'border-warn-500/30 bg-warn-100/60',
           )}
         >
-          <div
-            className={cn(
-              'text-lg font-bold',
-              isCorrect ? 'text-success-700' : 'text-warn-700',
-            )}
-          >
-            {isCorrect ? 'Correct.' : 'Not quite.'}
+          <div className="flex items-center justify-between gap-2">
+            <div
+              className={cn(
+                'text-lg font-bold',
+                isCorrect ? 'text-success-700' : 'text-warn-700',
+              )}
+            >
+              {isCorrect ? 'Correct.' : 'Not quite.'}
+            </div>
+            {xpGained !== null ? (
+              <span
+                data-testid="xp-chip"
+                className="rounded-full bg-brand-500/15 px-2 py-0.5 text-xs font-semibold text-brand-700"
+              >
+                +{xpGained} XP
+              </span>
+            ) : null}
           </div>
           {!isCorrect ? (
             <div className="text-[15px] text-ink-700">

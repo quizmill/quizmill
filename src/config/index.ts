@@ -45,6 +45,10 @@ export interface GamesConfig {
   include?: string[];
 }
 
+/** Optional XP/levels progression, mirrored from the manifest
+ *  `progression` block. Presence enables; absent → no XP anywhere. */
+export type ProgressionConfig = Record<string, never>;
+
 export interface AppConfig {
   /** Pack identifier — also namespaces localStorage. */
   packId: string;
@@ -63,6 +67,8 @@ export interface AppConfig {
   exam?: ExamConfig;
   /** Reward mini-games, when the pack switches them on. */
   games?: GamesConfig;
+  /** XP/levels progression, when the pack opts in. */
+  progression?: ProgressionConfig;
 }
 
 export const APP_CONFIG: AppConfig = {
@@ -75,6 +81,7 @@ export const APP_CONFIG: AppConfig = {
   categories: manifest.categories as CategoryDef[],
   exam: (manifest as { exam?: ExamConfig }).exam,
   games: (manifest as { games?: GamesConfig }).games,
+  progression: (manifest as { progression?: ProgressionConfig }).progression,
 };
 
 /**

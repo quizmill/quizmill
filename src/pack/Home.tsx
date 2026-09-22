@@ -44,6 +44,7 @@ import {
   PACK_LEVEL_BY_QUESTION_ID,
 } from '@/pack/data';
 import { ExamReadinessTile } from '@/pack/ExamReadiness';
+import { LevelCard } from '@/pack/LevelCard';
 
 /**
  * Daily-streak status with progress toward today's goal. Surfaced on Home so
@@ -53,9 +54,9 @@ import { ExamReadinessTile } from '@/pack/ExamReadiness';
  * with no live streak and no practice today (nothing to nudge).
  */
 function StreakCard({ attempts }: { attempts: readonly Attempt[] }) {
-  const { streak, goal, answeredToday, remaining, goalMet } =
+  const { streak, bestStreak, goal, answeredToday, remaining, goalMet } =
     streakProgress(attempts);
-  if (streak === 0 && answeredToday === 0) return null;
+  if (streak === 0 && answeredToday === 0 && bestStreak === 0) return null;
 
   const pct = Math.min(100, Math.round((answeredToday / goal) * 100));
   return (
@@ -77,8 +78,19 @@ function StreakCard({ attempts }: { attempts: readonly Attempt[] }) {
         <Flame className="h-5 w-5" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-base font-semibold text-ink-900">
-          {streak > 0 ? `${streak}-day streak` : 'Start a streak'}
+        <div className="flex items-baseline gap-2">
+          <span className="text-base font-semibold text-ink-900">
+            {streak > 0 ? `${streak}-day streak` : 'Start a streak'}
+          </span>
+          {/* The record outlives any reset — a missed day never erases it. */}
+          {bestStreak > streak ? (
+            <span
+              data-testid="best-streak"
+              className="text-xs font-medium text-ink-500"
+            >
+              Best: {bestStreak} days
+            </span>
+          ) : null}
         </div>
         <div className="mt-0.5 text-sm text-ink-600">
           {goalMet
@@ -260,6 +272,8 @@ export default function PackHome() {
       <InstallBanner />
 
       <StreakCard attempts={attempts} />
+
+      <LevelCard attempts={attempts} />
 
       <section className="grid grid-cols-2 gap-3">
         <StatTile

@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import PackHome from '@/pack/Home';
 import { ATTEMPTS_KEY, saveLevelFilter } from '@/lib/storage';
+import { saveProgressionShown } from '@/lib/progressionPref';
 import type { Attempt } from '@/data/types';
 
 // React needs this flag to allow act() outside @testing-library.
@@ -58,6 +59,57 @@ function categoryStatLine(label: string): string {
   expect(card, `expected a category card for ${label}`).toBeTruthy();
   return card!.textContent ?? '';
 }
+
+const DAY = 24 * 3600_000;
+
+/** N distinct-question correct attempts, `offset` days ago. */
+function fullDay(offset: number, n = 10): Attempt[] {
+  return Array.from({ length: n }, (_, i) => ({
+    ...attempt(`demo-planets-${offset}-${i}`, 'planets', true),
+    id: `d${offset}-a${i}`,
+    answeredAt: Date.now() - offset * DAY,
+  }));
+}
+
+describe('PackHome level card (progression)', () => {
+  it('shows Level 1 · Grain before any practice', async () => {
+    await render();
+    const card = container.querySelector('[data-testid="level-card"]');
+    expect(card).toBeTruthy();
+    expect(card!.textContent).toContain('Level 1 · Grain');
+  });
+
+  it('derives the level and XP retroactively from history', async () => {
+    // 10 first-time-correct answers today: 10×(1+10) + 25 daily = 135 XP.
+    localStorage.setItem(ATTEMPTS_KEY, JSON.stringify(fullDay(0)));
+    await render();
+    const card = container.querySelector('[data-testid="level-card"]');
+    expect(card!.textContent).toContain('Level 2 · Fresh Flour');
+    expect(card!.textContent).toContain('135 XP');
+    expect(card!.textContent).toContain('115 XP to Mill Hand');
+  });
+
+  it('is hidden when the device pref turns Levels & XP off', async () => {
+    saveProgressionShown(false);
+    await render();
+    expect(container.querySelector('[data-testid="level-card"]')).toBeNull();
+  });
+});
+
+describe('PackHome best-ever streak', () => {
+  it('shows the record when the live streak has lapsed', async () => {
+    // A 3-day run three weeks ago, nothing since: current streak 0, but
+    // the record survives — that is the anti-loss-aversion point.
+    localStorage.setItem(
+      ATTEMPTS_KEY,
+      JSON.stringify([...fullDay(20), ...fullDay(21), ...fullDay(22)]),
+    );
+    await render();
+    const best = container.querySelector('[data-testid="best-streak"]');
+    expect(best).toBeTruthy();
+    expect(best!.textContent).toContain('Best: 3 days');
+  });
+});
 
 describe('PackHome category stats', () => {
   it('counts only attempts within the active level filter', async () => {

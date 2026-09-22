@@ -5,7 +5,7 @@
  * are passed in (not imported from APP_CONFIG) for the same reason.
  */
 import type { Attempt, Session } from '@/data/types';
-import { currentStreak, toDayKey } from './streak';
+import { currentStreak, longestStreak, toDayKey } from './streak';
 
 export interface CategoryAccuracy {
   key: string;
@@ -167,6 +167,8 @@ export interface StreakProgress {
   /** Current streak length in days (includes today once the goal is met,
    *  otherwise the live run counting back from yesterday). */
   streak: number;
+  /** Best-ever streak — the record a missed day can't erase. */
+  bestStreak: number;
   /** Questions needed in a day to keep the streak (the daily goal). */
   goal: number;
   /** Questions answered so far today (local). */
@@ -193,8 +195,10 @@ export function streakProgress(
   for (const a of attempts) {
     if (toDayKey(new Date(a.answeredAt)) === todayKey) answeredToday += 1;
   }
+  const days = practiceDates(attempts, goal);
   return {
-    streak: currentStreak(practiceDates(attempts, goal), today),
+    streak: currentStreak(days, today),
+    bestStreak: longestStreak(days),
     goal,
     answeredToday,
     remaining: Math.max(0, goal - answeredToday),

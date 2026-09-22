@@ -23,13 +23,17 @@ import { ConceptCard } from '@/pack/ConceptCard';
 import { QuestionMeta } from '@/pack/QuestionMeta';
 import { Celebration } from '@/components/Celebration';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
+import { levelUpCelebration, useLevelUp } from '@/pack/useLevelUp';
 import { amendAttempt, loadAttempts, loadSessions } from '@/lib/storage';
 import { unresolvedMistakeIds } from '@/lib/mistakes';
+import { totalXp } from '@/lib/xp';
+import { loadProgressionShown } from '@/lib/progressionPref';
 import {
   correctKeysOf,
   isMultiAnswer,
   packQuestions,
   packScenarios,
+  progressionEnabled,
   PACK_CONCEPT_BY_ID,
   type OptionKey,
   type PackQuestion,
@@ -65,9 +69,12 @@ export function PackReviewRunner() {
   const startSession = useStartSession();
   const endSession = useEndSession();
   const { nextUnlock, checkNow, clearNextUnlock } = useAchievementUnlock();
+  const { nextLevelUp, checkNow: checkLevelNow, clearNextLevelUp } = useLevelUp();
 
   const [state, setState] = useState<RunnerState | null>(null);
   const [nothingToReview, setNothingToReview] = useState(false);
+  // XP earned by the just-checked answer — see the practice runner.
+  const [xpGained, setXpGained] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
   const [stage, setStage] = useState<Stage>('choosing');
   // The chosen option key(s) — one for single-answer, several for
@@ -149,6 +156,12 @@ export function PackReviewRunner() {
       <main className="flex flex-col gap-5">
         {nextUnlock ? (
           <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
+        ) : nextLevelUp ? (
+          <Celebration
+            label="Level up!"
+            achievement={levelUpCelebration(nextLevelUp)}
+            onDone={clearNextLevelUp}
+          />
         ) : null}
         <BackLink />
         <div className="rounded-2xl border border-ink-200 bg-surface p-8 text-center shadow-sm">
@@ -201,6 +214,10 @@ export function PackReviewRunner() {
 
   function handleCheck() {
     if (!state || selected.length === 0) return;
+    // Snapshot XP before the write so the chip shows what this answer
+    // earned — in review that's often the rescue bonus, on purpose.
+    const showXp = progressionEnabled && loadProgressionShown();
+    const xpBefore = showXp ? totalXp(loadAttempts()) : 0;
     const attempt = buildAttempt({
       state,
       question: current,
@@ -216,7 +233,10 @@ export function PackReviewRunner() {
     recordAttempt(attempt);
     lastAttemptRef.current = { id: attempt.id, answeredAt: attempt.answeredAt };
     // Same re-read rationale as the practice runner — see there.
-    checkNow(loadSessions(), loadAttempts());
+    const freshAttempts = loadAttempts();
+    if (showXp) setXpGained(totalXp(freshAttempts) - xpBefore);
+    checkNow(loadSessions(), freshAttempts);
+    checkLevelNow(freshAttempts);
     setState(advanceAfterAnswer(state, attempt.isCorrect));
     setStage('feedback');
   }
@@ -231,6 +251,7 @@ export function PackReviewRunner() {
       lastAttemptRef.current = null;
     }
     firstSelectedRef.current = null;
+    setXpGained(null);
     if (isLastQuestion(state)) {
       endSession(
         buildSessionEnd(state, state.questions[0].categoryKey, Date.now(), 'review'),
@@ -253,6 +274,12 @@ export function PackReviewRunner() {
     <main className="flex flex-col gap-5">
       {nextUnlock ? (
         <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
+      ) : nextLevelUp ? (
+        <Celebration
+          label="Level up!"
+          achievement={levelUpCelebration(nextLevelUp)}
+          onDone={clearNextLevelUp}
+        />
       ) : null}
       <header className="flex items-center justify-between">
         <BackLink />
@@ -343,13 +370,23 @@ export function PackReviewRunner() {
               : 'border-warn-500/30 bg-warn-100/60',
           )}
         >
-          <div
-            className={cn(
-              'text-lg font-bold',
-              isCorrect ? 'text-success-700' : 'text-warn-700',
-            )}
-          >
-            {isCorrect ? 'Rescued.' : "We'll bring this one back later."}
+          <div className="flex items-center justify-between gap-2">
+            <div
+              className={cn(
+                'text-lg font-bold',
+                isCorrect ? 'text-success-700' : 'text-warn-700',
+              )}
+            >
+              {isCorrect ? 'Rescued.' : "We'll bring this one back later."}
+            </div>
+            {xpGained !== null ? (
+              <span
+                data-testid="xp-chip"
+                className="rounded-full bg-brand-500/15 px-2 py-0.5 text-xs font-semibold text-brand-700"
+              >
+                +{xpGained} XP
+              </span>
+            ) : null}
           </div>
           {!isCorrect ? (
             <div className="text-[15px] text-ink-700">
