@@ -23,6 +23,7 @@ import {
   dayReplay,
   formatSpan,
   groupSessionsByDay,
+  isTimed,
   priorAttempts,
   selectedKeys,
   sessionReplay,
@@ -298,11 +299,15 @@ function SessionRow({
           <div className="mt-0.5 truncate text-sm text-ink-600">{subjects}</div>
           <div className="mt-1 flex items-center gap-2 text-xs text-ink-500">
             <span>{TIME_FORMAT.format(new Date(cs.session.startedAt))}</span>
-            <span aria-hidden>·</span>
-            <span className="inline-flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {formatSpan(cs.spanSeconds)}
-            </span>
+            {cs.timed ? (
+              <>
+                <span aria-hidden>·</span>
+                <span className="inline-flex items-center gap-1" data-testid="coach-session-span">
+                  <Clock className="h-3 w-3" />
+                  {formatSpan(cs.spanSeconds)}
+                </span>
+              </>
+            ) : null}
           </div>
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
@@ -538,9 +543,15 @@ function ReplayCard({
           ) : null}
           <span className="inline-flex items-center gap-1 rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-600">
             Q {step.index} / {total}
-            <span aria-hidden>·</span>
-            <Clock className="h-3 w-3" />
-            <span className="normal-case">{formatSpan(attempt.timeTakenSeconds)}</span>
+            {isTimed(attempt) ? (
+              <>
+                <span aria-hidden>·</span>
+                <Clock className="h-3 w-3" />
+                <span className="normal-case" data-testid="coach-step-time">
+                  {formatSpan(attempt.timeTakenSeconds)}
+                </span>
+              </>
+            ) : null}
           </span>
           {prior.length > 0 ? (
             <span

@@ -3,6 +3,7 @@ import type { Attempt, Session } from '@/data/types';
 import {
   dayReplay,
   formatSpan,
+  isTimed,
   groupSessionsByDay,
   priorAttempts,
   selectedKeys,
@@ -196,5 +197,26 @@ describe('priorAttempts', () => {
       [100, false, 'B'],
       [200, true, 'C'],
     ]);
+  });
+});
+
+describe('isTimed', () => {
+  it('is false for paper sheets and for the unmeasured 1-second sentinel', () => {
+    const paper = attempt({ sessionId: 's', answeredAt: 100, mode: 'paper', timeTakenSeconds: 1 });
+    expect(isTimed(paper)).toBe(false);
+    const legacy = attempt({ sessionId: 's', answeredAt: 100, timeTakenSeconds: 1 });
+    expect(isTimed(legacy)).toBe(false);
+    const real = attempt({ sessionId: 's', answeredAt: 100, timeTakenSeconds: 12 });
+    expect(isTimed(real)).toBe(true);
+  });
+
+  it('a session summary is untimed when none of its answers were timed', () => {
+    const s = session({ id: 'p', startedAt: at(2026, 9, 28, 17), mode: 'paper' });
+    const attempts = [
+      attempt({ sessionId: 'p', answeredAt: at(2026, 9, 28, 17, 0), mode: 'paper', timeTakenSeconds: 1 }),
+      attempt({ sessionId: 'p', answeredAt: at(2026, 9, 28, 17, 0) + 1, mode: 'paper', timeTakenSeconds: 1 }),
+    ];
+    const [day] = groupSessionsByDay([s], attempts);
+    expect(day.sessions[0].timed).toBe(false);
   });
 });
