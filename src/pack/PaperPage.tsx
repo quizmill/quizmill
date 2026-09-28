@@ -64,14 +64,16 @@ type HashTarget =
   | { kind: 'wrong-pack'; pack: string }
   | { kind: 'bad-payload' };
 
-function targetFromHash(): HashTarget {
+async function targetFromHash(): Promise<HashTarget> {
   if (typeof window === 'undefined') return { kind: 'list' };
   const h = window.location.hash;
   if (h.startsWith('#sheet=')) {
     return { kind: 'sheet', id: decodeURIComponent(h.slice('#sheet='.length)) };
   }
   if (h.startsWith('#s=')) {
-    const payload = decodePaperPayload(h.slice('#s='.length));
+    // Async: the compressed payload form inflates via DecompressionStream
+    // (see decodePaperPayload) — same as the mark page.
+    const payload = await decodePaperPayload(h.slice('#s='.length));
     if (!payload) return { kind: 'bad-payload' };
     if (payload.pack !== APP_CONFIG.packId) return { kind: 'wrong-pack', pack: payload.pack };
     return { kind: 'payload', sheet: sheetFromPayload(payload) };
@@ -108,8 +110,13 @@ export function PaperPage() {
 
   useEffect(() => {
     setMounted(true);
-    const resolve = () => {
-      const target = targetFromHash();
+    // Each hash change resolves asynchronously; a stale resolution (the
+    // hash moved on while a payload was inflating) must not win.
+    let generation = 0;
+    const resolve = async () => {
+      const mine = ++generation;
+      const target = await targetFromHash();
+      if (mine !== generation) return;
       if (target.kind === 'payload') {
         // Keep it on this device, then continue as a plain stored sheet
         // (reloads and the back button behave like a sheet made here).
@@ -129,9 +136,13 @@ export function PaperPage() {
       );
       setSheetId(target.kind === 'sheet' ? target.id : null);
     };
-    resolve();
-    window.addEventListener('hashchange', resolve);
-    return () => window.removeEventListener('hashchange', resolve);
+    const onHash = () => void resolve();
+    void resolve();
+    window.addEventListener('hashchange', onHash);
+    return () => {
+      generation++; // cancel any in-flight resolution on unmount
+      window.removeEventListener('hashchange', onHash);
+    };
   }, []);
 
   const sheets = useMemo(
