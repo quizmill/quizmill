@@ -280,6 +280,15 @@ export interface PaperResultRows {
  * already stored) keeps an earlier batch on its own day, so re-marking
  * never moves streak credit — only rows entered for the first time get
  * stamped `now`.
+ *
+ * The SESSION is dated the same way — it starts at its earliest answer
+ * and ends at this marking — never at the sheet's print time. A sheet
+ * printed on Tuesday and sat on Sunday is Sunday's practice everywhere
+ * (Coach, streaks, day charts); dating it to the print day put the
+ * session on one day and its answers on another. It also counts the
+ * answers actually marked (`questionCount` = attempts written), not the
+ * sheet's size, so a half-marked sheet doesn't read as 7/20 in Progress
+ * and 7/11 in Coach. Blanks are reported separately (`blankCount`).
  */
 export function buildPaperResult(
   sheet: PaperSheet,
@@ -311,12 +320,13 @@ export function buildPaperResult(
       ...(APP_BUILD ? { appBuild: APP_BUILD } : {}),
     });
   });
+  const earliest = attempts.reduce((min, a) => Math.min(min, a.answeredAt), now);
   const session: Session = {
     id: sheet.id,
     subject: sheet.categoryKey,
-    startedAt: sheet.createdAt,
+    startedAt: earliest,
     endedAt: now + marks.length,
-    questionCount: marks.length,
+    questionCount: attempts.length,
     correctCount,
     mode: 'paper',
     ...(APP_BUILD ? { appBuild: APP_BUILD } : {}),

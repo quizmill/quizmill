@@ -97,12 +97,15 @@ describe('PaperMarkPage', () => {
 
     const sessions = loadSessions();
     expect(sessions).toHaveLength(1);
+    // Two answers marked (one blank): the session counts what was marked
+    // and is dated to the marking, not to when the sheet was printed.
     expect(sessions[0]).toMatchObject({
       id: 'sheet-under-test',
       mode: 'paper',
-      questionCount: 3,
+      questionCount: 2,
       correctCount: 1,
     });
+    expect(sessions[0].startedAt).toBeGreaterThan(Date.now() - 60_000);
 
     const attempts = loadAttempts();
     expect(attempts).toHaveLength(2);

@@ -134,7 +134,11 @@ offline.
   pick it up untouched. A sheet can be marked in BATCHES (a few
   questions today, the rest tomorrow): re-opening pre-fills what was
   entered and rows from an earlier batch keep their own `answeredAt`,
-  so streak credit never moves. The sheet screen also prints a coach's
+  so streak credit never moves. The session is dated by its earliest
+  ANSWER (marking time), never the print time — a sheet printed Tuesday
+  and sat Sunday is Sunday's practice — and `questionCount` is the
+  answers actually marked, so Coach/Progress/streaks agree on the
+  score. The sheet screen also prints a coach's
   ANSWER KEY (same numbering, correct letters, explanations, linked
   concept cards; no QR) as a separate printout. Sheets live locally
   (`quizmill.<packId>.paperSheets.v1`, deliberately not synced); device
