@@ -266,9 +266,11 @@ describe('PaperPage', () => {
 
   it('opens a sheet from a QR payload link and keeps it on this device', async () => {
     const sheet = demoSheet();
-    const payload = encodePaperPayload(payloadFromSheet(sheet, APP_CONFIG.packId));
+    const payload = await encodePaperPayload(payloadFromSheet(sheet, APP_CONFIG.packId));
     window.location.hash = `#s=${payload}`;
     await render(<PaperPage />);
+    // The payload inflates asynchronously before the sheet view appears.
+    await waitFor(() => container.querySelector('[data-testid="paper-sheet"]'));
 
     // Straight to the sheet view — with the answer key one tap away.
     expect(q('[data-testid="paper-sheet"]').textContent).toContain('P-TEST');
@@ -280,10 +282,11 @@ describe('PaperPage', () => {
   });
 
   it('explains a QR payload from a different pack', async () => {
-    window.location.hash = `#s=${encodePaperPayload(
+    window.location.hash = `#s=${await encodePaperPayload(
       payloadFromSheet(demoSheet(), 'some-other-pack'),
     )}`;
     await render(<PaperPage />);
+    await waitFor(() => container.textContent?.includes('different pack'));
     expect(container.textContent).toContain('different pack');
     expect(container.querySelector('[data-testid="paper-sheet"]')).toBeNull();
     expect(getPaperSheet('sheet-under-test')).toBeUndefined();
