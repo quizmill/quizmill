@@ -224,15 +224,32 @@ describe('buildPaperResult', () => {
       answeredAt: NOW + 1,
     });
 
+    // The session is dated by when it was ANSWERED (marked), not when the
+    // sheet was printed — a sheet printed on Tuesday and sat on Sunday is
+    // Sunday's practice. And it counts the answers actually marked, so
+    // every view (Coach, Progress, streaks) agrees on the score.
     expect(out.session).toMatchObject({
       id: 'sheet-1111',
       subject: 'planets',
-      startedAt: s.createdAt,
-      questionCount: 3,
+      startedAt: NOW,
+      questionCount: 2,
       correctCount: 2,
       mode: 'paper',
     });
-    expect(out.session.endedAt).toBe(NOW + 3);
+    expect(out.session.endedAt).toBeGreaterThanOrEqual(NOW + 1);
+    expect(out.blankCount).toBe(1);
+  });
+
+  it('dates the session to the marking day even when the sheet was printed days earlier', () => {
+    const SIX_DAYS = 6 * 24 * 60 * 60 * 1000;
+    const printed = sheet({ createdAt: NOW - SIX_DAYS });
+    const out = buildPaperResult(
+      printed,
+      [{ questionId: 'q1', question: q1, selected: ['B'] }],
+      NOW,
+    );
+    expect(out.session.startedAt).toBe(NOW);
+    expect(out.attempts[0].answeredAt).toBe(NOW);
   });
 
   it('marks wrong and partial multi-answers wrong (all-or-nothing)', () => {
@@ -288,6 +305,11 @@ describe('buildPaperResult', () => {
     expect(again.attempts[0].selectedAnswer).toBe('A');
     expect(again.attempts[1].answeredAt).toBeGreaterThanOrEqual(NOW + TWO_DAYS);
     expect(again.session.correctCount).toBe(1);
+    // The session stays on the day of its FIRST answers; the later batch
+    // only extends its end.
+    expect(again.session.startedAt).toBe(first.attempts[0].answeredAt);
+    expect(again.session.endedAt).toBeGreaterThanOrEqual(NOW + TWO_DAYS);
+    expect(again.session.questionCount).toBe(2);
   });
 });
 
