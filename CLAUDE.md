@@ -320,7 +320,10 @@ Merging a PR into main bumps **patch** by default; label
 for none. Versions live in git tags (`vX.Y.Z`) — the package.json
 files carry a permanent `0.0.0-dev` sentinel and releases NEVER
 commit to main: the workflow computes the next version from the
-latest tag, npm-publishes `cli/` at it (version stamped in the CI
+latest tag, waits for the CI run of that exact main commit to pass
+(a PR's green CI was on its branch; two green branches can merge into
+a red main — refuse, fix, then dispatch manually), npm-publishes
+`cli/` at it (version stamped in the CI
 workspace only; via npm **trusted publishing** — the job's OIDC
 id-token, configured once on npmjs.com for this repo + `release.yml`;
 no npm token exists anywhere to expire — the old `NPM_TOKEN` granular
