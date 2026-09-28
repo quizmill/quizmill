@@ -162,7 +162,8 @@ describe('naming a sync key', () => {
     expect(input?.value).toBe('Leo'); // starts from the current name
     await type(input as HTMLInputElement, 'Leo (year 6)');
     await click(buttonLabelled('Save name'));
-    expect(byTestId('sync-key-name')?.textContent).toContain('Leo (year 6)');
+    // Saving awaits the profile round trip before the new name renders.
+    await waitFor(() => byTestId('sync-key-name')?.textContent?.includes('Leo (year 6)'));
     expect(container.textContent).not.toContain('“Leo”'); // no stale name left
     expect(serverName).toBe('Leo (year 6)');
   });
@@ -173,6 +174,7 @@ describe('naming a sync key', () => {
     await click(byTestId('sync-key-name-edit') as HTMLElement);
     await type(byTestId<HTMLInputElement>('sync-key-name-input') as HTMLInputElement, '   ');
     await click(buttonLabelled('Save name'));
+    await waitFor(() => container.textContent?.includes('Name removed.'));
     expect(byTestId('sync-key-name')).toBeNull();
     expect(serverName).toBeNull();
   });
@@ -192,8 +194,10 @@ describe('naming a sync key', () => {
       'QM-ABCDE-FGHJK-MNPQR-STVWX',
     );
     await click(buttonLabelled('Link this device'));
+    // Linking stores the key, then asks the server for its name — two
+    // async hops before the name lands on the card.
+    await waitFor(() => container.textContent?.includes('Linked to “Leo”'));
     expect(byTestId('sync-key-name')?.textContent).toContain('Leo');
-    expect(container.textContent).toContain('Linked to “Leo”');
   });
 
   it("drops the old key's name when a different key is linked", async () => {
@@ -201,11 +205,10 @@ describe('naming a sync key', () => {
     await createAndName('Leo');
     await click(buttonLabelled('Turn off sync on this device'));
     serverName = null;
-    await type(
-      byTestId<HTMLInputElement>('sync-key-input') as HTMLInputElement,
-      'QM-ABCDE-FGHJK-MNPQR-STVWX',
-    );
+    const input = await waitFor(() => byTestId<HTMLInputElement>('sync-key-input'));
+    await type(input, 'QM-ABCDE-FGHJK-MNPQR-STVWX');
     await click(buttonLabelled('Link this device'));
+    await waitFor(() => container.textContent?.includes('Linked!'));
     expect(byTestId('sync-key-name')).toBeNull();
   });
 
