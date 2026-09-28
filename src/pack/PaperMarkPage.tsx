@@ -34,6 +34,7 @@ import {
 } from '@/pack/data';
 import { nextSelection } from '@/pack/runner';
 import {
+  adoptPaperSheet,
   buildPaperResult,
   decodePaperPayload,
   getPaperSheet,
@@ -72,7 +73,9 @@ function sourceFromHash(): Source {
     if (payload.pack !== APP_CONFIG.packId) {
       return { kind: 'wrong-pack', pack: payload.pack };
     }
-    return { kind: 'ready', sheet: sheetFromPayload(payload) };
+    // Scanned here → this device keeps the sheet too (list, re-mark,
+    // answer key), and the "Marked" stamp on save has a record to land on.
+    return { kind: 'ready', sheet: adoptPaperSheet(sheetFromPayload(payload)) };
   }
   if (h.startsWith('#sheet=')) {
     const sheet = getPaperSheet(decodeURIComponent(h.slice('#sheet='.length)));
@@ -89,8 +92,9 @@ function sourceFromHash(): Source {
  * and stickers all pick it up like any other practice.
  *
  * Opened via `#s=<payload>` (the printed QR — self-describing, works on
- * any device with this pack active) or `#sheet=<id>` (a sheet stored on
- * this device).
+ * any device with this pack active, and is adopted into this device's
+ * sheet list on arrival) or `#sheet=<id>` (a sheet stored on this
+ * device).
  */
 export function PaperMarkPage() {
   const [mounted, setMounted] = useState(false);

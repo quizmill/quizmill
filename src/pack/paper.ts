@@ -127,6 +127,20 @@ export function savePaperSheet(sheet: PaperSheet): void {
   writePaperSheets([sheet, ...rest].slice(0, MAX_STORED_SHEETS));
 }
 
+/**
+ * Keep a sheet that arrived from elsewhere (a scanned QR / `#s=` link)
+ * on this device, so it shows in the Paper list, can be re-marked and
+ * can print its answer key here too. The local record wins when one
+ * already exists — it may carry `markedAt`, which the payload never
+ * does.
+ */
+export function adoptPaperSheet(sheet: PaperSheet): PaperSheet {
+  const existing = getPaperSheet(sheet.id);
+  if (existing) return existing;
+  savePaperSheet(sheet);
+  return sheet;
+}
+
 export function deletePaperSheet(id: string): void {
   writePaperSheets(loadPaperSheets().filter((s) => s.id !== id));
 }
