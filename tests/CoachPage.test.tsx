@@ -296,3 +296,33 @@ describe('CoachPage — whole-day review and history', () => {
     expect(container.querySelector('[data-testid="coach-no-mistakes"]')).not.toBeNull();
   });
 });
+
+describe('CoachPage — untimed sessions', () => {
+  it('shows no clock for a marked paper sheet, in the list or the replay', async () => {
+    const { q1, q2 } = seedHistory();
+    const day = new Date(2026, 8, 28, 17, 14).getTime();
+    const sessions = JSON.parse(localStorage.getItem(SESSIONS_KEY)!) as Session[];
+    const attempts = JSON.parse(localStorage.getItem(ATTEMPTS_KEY)!) as Attempt[];
+    sessions.push({ id: 'sheet-1', subject: q1.categoryKey, startedAt: day, endedAt: day + 2, questionCount: 2, correctCount: 1, mode: 'paper' });
+    attempts.push(
+      { id: 'sheet-1:a1', sessionId: 'sheet-1', questionId: q1.id, answeredAt: day, selectedAnswer: q1.correctKey!, isCorrect: true, timeTakenSeconds: 1, subject: q1.categoryKey, topic: q1.id, difficulty: 2, position: 1, mode: 'paper' },
+      { id: 'sheet-1:a2', sessionId: 'sheet-1', questionId: q2.id, answeredAt: day + 1, selectedAnswer: 'A', isCorrect: false, timeTakenSeconds: 1, subject: q2.categoryKey, topic: q2.id, difficulty: 2, position: 2, mode: 'paper' },
+    );
+    localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+    localStorage.setItem(ATTEMPTS_KEY, JSON.stringify(attempts));
+
+    await render(<CoachPage />);
+    const rows = Array.from(container.querySelectorAll('[data-testid="coach-session"]'));
+    const paperRow = rows.find((r) => r.textContent?.includes('Paper sheet'))!;
+    expect(paperRow.querySelector('[data-testid="coach-session-span"]')).toBeNull();
+    expect(paperRow.textContent).not.toContain('0 s');
+    // a normal session still shows its span
+    const timedRow = rows.find((r) => r.textContent?.includes('Practice') && !r.textContent?.includes('Paper'))!;
+    expect(timedRow.querySelector('[data-testid="coach-session-span"]')).not.toBeNull();
+
+    await click(paperRow);
+    const steps = container.querySelectorAll('[data-testid="coach-step"]');
+    expect(steps).toHaveLength(2);
+    expect(container.querySelector('[data-testid="coach-step-time"]')).toBeNull();
+  });
+});

@@ -22,8 +22,21 @@ export interface CoachSession {
   subjects: string[];
   /** Seconds from the first answer to the last (0 for a single answer). */
   spanSeconds: number;
+  /** False when no answer in the session carries a real clock — a marked
+   *  paper sheet, or rows from builds that never timed answers — so the
+   *  UI can leave timing out instead of printing "0 s". */
+  timed: boolean;
   /** True when the session never wrote an end record. */
   abandoned: boolean;
+}
+
+/**
+ * Whether an attempt's timing means anything. Paper sheets keep no
+ * clock, and `timeTakenSeconds: 1` is the engine's documented
+ * "unmeasured" sentinel (older builds always wrote 1).
+ */
+export function isTimed(attempt: Pick<Attempt, 'mode' | 'timeTakenSeconds'>): boolean {
+  return attempt.mode !== 'paper' && attempt.timeTakenSeconds > 1;
 }
 
 export interface CoachDay {
@@ -91,6 +104,7 @@ export function groupSessionsByDay(
       correct: list.filter((a) => a.isCorrect).length,
       subjects,
       spanSeconds: Math.max(0, Math.round((last.answeredAt - first.answeredAt) / 1000)),
+      timed: list.some(isTimed),
       abandoned: session.endedAt === null,
     });
   }
