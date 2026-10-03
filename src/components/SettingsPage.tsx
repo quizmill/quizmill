@@ -281,7 +281,11 @@ export function SettingsPage({ extras }: SettingsPageProps) {
       </SettingsSection>
 
       <SettingsSection title="Progress & sync">
-        <SyncSettings />
+        {/* Deep-link target (`/settings/#sync`) for screens that need the
+            device linked first — e.g. marking a scanned paper sheet. */}
+        <div id="sync" className="scroll-mt-4 empty:hidden">
+          <SyncSettings />
+        </div>
 
         <TransferSettings />
       </SettingsSection>

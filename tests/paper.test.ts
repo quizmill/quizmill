@@ -10,10 +10,12 @@ import {
   encodePaperPayload,
   getPaperSheet,
   loadPaperSheets,
+  markStatus,
   newSheetCode,
   payloadFromSheet,
   recordSheetMarked,
   resolveSheetQuestions,
+  savedMarksForSheet,
   savePaperSheet,
   sheetFromPayload,
   MAX_STORED_SHEETS,
@@ -341,6 +343,46 @@ describe('buildPaperResult', () => {
     expect(again.session.startedAt).toBe(first.attempts[0].answeredAt);
     expect(again.session.endedAt).toBeGreaterThanOrEqual(NOW + TWO_DAYS);
     expect(again.session.questionCount).toBe(2);
+  });
+});
+
+describe('batches: savedMarksForSheet + markStatus', () => {
+  const s = sheet();
+  const firstBatch = buildPaperResult(
+    s,
+    [
+      { questionId: 'q1', question: question('q1'), selected: ['B'] },
+      { questionId: 'q2', question: question('q2', { correctKey: undefined, correctKeys: ['A', 'C'] }), selected: ['C', 'A'] },
+      { questionId: 'q3', question: question('q3'), selected: null },
+    ],
+    1_000,
+  ).attempts;
+
+  it('lines stored answers up with sheet positions', () => {
+    const saved = savedMarksForSheet(s, firstBatch);
+    expect(saved).toEqual([
+      { keys: ['B'], answeredAt: 1_000 },
+      { keys: ['A', 'C'], answeredAt: 1_001 },
+      null,
+    ]);
+  });
+
+  it("ignores another session's attempts at the same questions", () => {
+    const elsewhere = firstBatch.map((a) => ({ ...a, sessionId: 'on-screen-session' }));
+    expect(savedMarksForSheet(s, elsewhere)).toEqual([null, null, null]);
+  });
+
+  it('tells new, saved, changed and blank rows apart', () => {
+    const saved = { keys: ['A', 'C'] as const, answeredAt: 1 };
+    const stored = { keys: [...saved.keys], answeredAt: 1 };
+    expect(markStatus(null, null)).toBe('blank');
+    expect(markStatus(null, [])).toBe('blank');
+    expect(markStatus(null, ['B'])).toBe('new');
+    expect(markStatus(stored, ['C', 'A'])).toBe('saved'); // order doesn't matter
+    expect(markStatus(stored, ['A'])).toBe('changed');
+    // A stored answer can't be blanked — an empty pick leaves it as saved.
+    expect(markStatus(stored, null)).toBe('saved');
+    expect(markStatus(stored, [])).toBe('saved');
   });
 });
 

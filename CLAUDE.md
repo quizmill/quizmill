@@ -132,9 +132,18 @@ offline.
   DETERMINISTIC ids derived from the sheet id, so re-marking upserts
   instead of double-counting, and streak/mistakes/readiness/stickers
   pick it up untouched. A sheet can be marked in BATCHES (a few
-  questions today, the rest tomorrow): re-opening pre-fills what was
-  entered and rows from an earlier batch keep their own `answeredAt`,
-  so streak credit never moves. The session is dated by its earliest
+  questions today, the rest tomorrow): re-opening shows rows the sheet
+  already has as settled "Answered previously" cards (no letters to tap
+  until "Change"; a stored answer can be corrected but never blanked),
+  read LIVE from storage so a batch entered on another device appears
+  when sync pulls it — `savedMarksForSheet`/`markStatus` in paper.ts.
+  Save writes only new + corrected rows (the button counts just those)
+  and rows from an earlier batch keep their own `answeredAt`, so streak
+  credit never moves. `SaveDestination` (+ `useSyncIdentity`) says whose
+  progress the answers land in — the key's name, "not linked" with a
+  deep link to `/settings/#sync`, or "this device only" — because the
+  QR opens in whatever browser the camera picks, which may not hold the
+  learner's sync key. The session is dated by its earliest
   ANSWER (marking time), never the print time — a sheet printed Tuesday
   and sat Sunday is Sunday's practice — and `questionCount` is the
   answers actually marked, so Coach/Progress/streaks agree on the

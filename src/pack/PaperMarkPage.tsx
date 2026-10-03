@@ -8,7 +8,9 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Eraser,
+  Pencil,
   RefreshCw,
+  Undo2,
 } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
 import { PackChip } from '@/components/PackChip';
@@ -16,7 +18,6 @@ import { McqMarkdown } from '@/components/McqMarkdown';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 import {
-  attemptsForSession,
   loadAchievements,
   loadAttempts,
   loadSessions,
@@ -33,17 +34,22 @@ import {
   type OptionKey,
 } from '@/pack/data';
 import { nextSelection } from '@/pack/runner';
+import { SaveDestination } from '@/pack/SaveDestination';
 import {
   adoptPaperSheet,
   buildPaperResult,
   decodePaperPayload,
   getPaperSheet,
+  markStatus,
   recordSheetMarked,
   resolveSheetQuestions,
+  savedMarksForSheet,
   sheetFromPayload,
+  type MarkStatus,
   type PaperMark,
   type PaperResultRows,
   type PaperSheet,
+  type SavedMark,
 } from '@/pack/paper';
 
 // Same event bus the storage hooks use (see src/lib/useStorage.ts) — the
@@ -56,6 +62,21 @@ const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
   month: 'short',
 });
 
+/** "earlier today" / "Sat 26 Sept" — when an earlier batch was entered. */
+function whenLabel(ts: number): string {
+  const then = new Date(ts);
+  const now = new Date();
+  const sameDay =
+    then.getFullYear() === now.getFullYear() &&
+    then.getMonth() === now.getMonth() &&
+    then.getDate() === now.getDate();
+  return sameDay ? 'earlier today' : DATE_FORMAT.format(ts);
+}
+
+function plural(n: number, one: string): string {
+  return `${n} ${one}${n === 1 ? '' : 's'}`;
+}
+
 /** How the page was opened, resolved from the URL hash. */
 type Source =
   | { kind: 'ready'; sheet: PaperSheet }
@@ -63,6 +84,17 @@ type Source =
   | { kind: 'bad-payload' }
   | { kind: 'not-found' }
   | { kind: 'none' };
+
+/** What one press of Save did — the saved screen reports it in full so
+ *  a second batch never reads as the first one being entered again. */
+interface SaveOutcome {
+  /** The whole sheet so far (earlier batches included). */
+  result: PaperResultRows;
+  added: number;
+  corrected: number;
+  /** Answered previously and left alone — not rewritten. */
+  kept: number;
+}
 
 async function sourceFromHash(): Promise<Source> {
   if (typeof window === 'undefined') return { kind: 'none' };
@@ -92,6 +124,14 @@ async function sourceFromHash(): Promise<Source> {
  * src/pack/paper.ts), so sync, streaks, the mistakes queue, readiness
  * and stickers all pick it up like any other practice.
  *
+ * A sheet is often entered in batches (1–10 today, 11–20 tomorrow) and
+ * on whichever phone scanned the QR, so the screen is explicit about
+ * both: rows the sheet already has are shown settled as "Answered
+ * previously" — read live from storage, so a batch entered on another
+ * device appears the moment sync pulls it down — and Save writes only
+ * what was added or corrected. `SaveDestination` says whose progress
+ * that lands in.
+ *
  * Opened via `#s=<payload>` (the printed QR — self-describing, works on
  * any device with this pack active, and is adopted into this device's
  * sheet list on arrival) or `#sheet=<id>` (a sheet stored on this
@@ -100,9 +140,13 @@ async function sourceFromHash(): Promise<Source> {
 export function PaperMarkPage() {
   const [mounted, setMounted] = useState(false);
   const [source, setSource] = useState<Source>({ kind: 'none' });
-  const [selections, setSelections] = useState<(OptionKey[] | null)[]>([]);
-  const [alreadyMarked, setAlreadyMarked] = useState(false);
-  const [saved, setSaved] = useState<PaperResultRows | null>(null);
+  // Letters picked in THIS visit, by sheet position. A row absent here
+  // shows what storage holds for it (or nothing).
+  const [edits, setEdits] = useState<Record<number, OptionKey[] | null>>({});
+  // Previously answered rows the marker has opened up to correct.
+  const [reopened, setReopened] = useState<ReadonlySet<number>>(new Set());
+  const [storageVersion, setStorageVersion] = useState(0);
+  const [outcome, setOutcome] = useState<SaveOutcome | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -114,30 +158,21 @@ export function PaperMarkPage() {
       const next = await sourceFromHash();
       if (token !== latest) return;
       setSource(next);
-      setSaved(null);
-      if (next.kind === 'ready') {
-        // Pre-fill from an earlier marking of this same sheet, so
-        // re-opening it edits instead of starting blank.
-        const prior = attemptsForSession(next.sheet.id);
-        const byQuestion = new Map(prior.map((a) => [a.questionId, a]));
-        setAlreadyMarked(prior.length > 0);
-        setSelections(
-          next.sheet.questionIds.map((qid) => {
-            const a = byQuestion.get(qid);
-            if (!a) return null;
-            const keys = a.selectedAnswer.split(',').filter(Boolean) as OptionKey[];
-            return keys.length > 0 ? keys : null;
-          }),
-        );
-      } else {
-        setAlreadyMarked(false);
-        setSelections([]);
-      }
+      setOutcome(null);
+      setEdits({});
+      setReopened(new Set());
     };
     const onHash = () => void resolve();
     onHash();
+    // Attempts can land underneath an open sheet: sync pulling a batch
+    // that was entered on another device.
+    const onStorage = () => setStorageVersion((v) => v + 1);
     window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
+    window.addEventListener(STORAGE_EVENT, onStorage);
+    return () => {
+      window.removeEventListener('hashchange', onHash);
+      window.removeEventListener(STORAGE_EVENT, onStorage);
+    };
   }, []);
 
   const sheet = source.kind === 'ready' ? source.sheet : null;
@@ -145,11 +180,16 @@ export function PaperMarkPage() {
     () => (sheet ? resolveSheetQuestions(sheet.questionIds, packQuestions) : []),
     [sheet],
   );
+  const saved = useMemo(
+    () => (sheet ? savedMarksForSheet(sheet, loadAttempts()) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- storageVersion invalidates the localStorage read
+    [sheet, storageVersion],
+  );
 
   if (!mounted) return null;
 
-  if (saved && sheet) {
-    return <SavedView sheet={sheet} result={saved} />;
+  if (outcome && sheet) {
+    return <SavedView sheet={sheet} outcome={outcome} />;
   }
 
   if (!sheet) {
@@ -182,45 +222,113 @@ export function PaperMarkPage() {
     );
   }
 
-  const answered = selections.filter((s) => s !== null && s.length > 0).length;
+  /** The letters a row stands at: this visit's pick, else what storage
+   *  holds. An emptied pick over a stored answer falls back to it — a
+   *  stored answer can be corrected, never blanked. */
+  const selectionAt = (
+    i: number,
+    stored: (SavedMark | null)[],
+  ): OptionKey[] | null => {
+    const draft = edits[i];
+    if (draft && draft.length > 0) return draft;
+    return stored[i]?.keys ?? null;
+  };
+
+  const statuses: (MarkStatus | null)[] = marks.map((m, i) =>
+    m.question ? markStatus(saved[i] ?? null, selectionAt(i, saved)) : null,
+  );
+  const count = (s: MarkStatus) => statuses.filter((x) => x === s).length;
+  const added = count('new');
+  const changed = count('changed');
+  const blank = count('blank');
+  const previously = count('saved') + changed;
   const markable = marks.filter((m) => m.question !== null).length;
   const missing = marks.length - markable;
 
   const save = () => {
-    const withSelections = marks.map((m, i) => ({
-      ...m,
-      selected: selections[i] ?? null,
-    }));
-    // Deterministic ids + amend-or-append = marking twice upserts the
-    // same rows (saveAttempt alone would duplicate them); rows from an
-    // earlier batch keep their own answeredAt (see buildPaperResult).
-    const existing = new Map(loadAttempts().map((a) => [a.id, a.answeredAt]));
-    const result = buildPaperResult(sheet, withSelections, Date.now(), existing);
+    const now = Date.now();
+    // Read storage afresh rather than trusting the render's snapshot —
+    // the rows written below must be judged against what is there NOW.
+    const all = loadAttempts();
+    const stored = savedMarksForSheet(sheet, all);
+    const existing = new Map(all.map((a) => [a.id, a]));
+    // The result covers the whole sheet so far (earlier batches keep
+    // their own answeredAt — see buildPaperResult), so the session row
+    // counts every answer the sheet has, not just this batch.
+    const result = buildPaperResult(
+      sheet,
+      marks.map((m, i) => ({ ...m, selected: selectionAt(i, stored) })),
+      now,
+      new Map(all.map((a) => [a.id, a.answeredAt])),
+    );
+    // Deterministic ids + write-only-what-moved: a row answered
+    // previously is left untouched, a corrected one is amended in place,
+    // and only new rows are appended — nothing is ever double-counted.
+    let addedNow = 0;
+    let correctedNow = 0;
     for (const attempt of result.attempts) {
-      if (existing.has(attempt.id)) amendAttempt(attempt.id, attempt);
-      else saveAttempt(attempt);
+      const prior = existing.get(attempt.id);
+      if (!prior) {
+        saveAttempt(attempt);
+        addedNow++;
+      } else if (prior.selectedAnswer !== attempt.selectedAnswer) {
+        amendAttempt(attempt.id, attempt);
+        correctedNow++;
+      } else if (prior.isCorrect !== attempt.isCorrect) {
+        // Same letters, but the pack's answer key has changed since.
+        amendAttempt(attempt.id, attempt);
+      }
     }
     saveSession(result.session);
-    recordSheetMarked(sheet.id, Date.now());
+    recordSheetMarked(sheet.id, now);
     // Quiet sticker check (same evaluation the runners do) — the learner
     // sees anything new in the cabinet.
     const earned = new Set(loadAchievements().map((e) => e.id));
     const fresh = newlyEarnedAchievements(loadSessions(), loadAttempts(), earned);
     if (fresh.length > 0) recordEarnedAchievements(fresh);
     window.dispatchEvent(new Event(STORAGE_EVENT));
-    setSaved(result);
+    setOutcome({
+      result,
+      added: addedNow,
+      corrected: correctedNow,
+      kept: result.attempts.length - addedNow - correctedNow,
+    });
   };
+
+  // First marking: progress through the sheet ("Save 7/20 answers").
+  // Later batches: only what this press will actually write.
+  let saveLabel: string;
+  if (previously === 0) {
+    saveLabel = `Save ${added}/${markable} answer${added === 1 ? '' : 's'}`;
+  } else if (added + changed === 0) {
+    saveLabel = 'Nothing new to save';
+  } else {
+    const parts = [
+      added > 0 ? plural(added, 'new answer') : null,
+      changed > 0 ? plural(changed, 'change') : null,
+    ].filter(Boolean);
+    saveLabel = `Save ${parts.join(' + ')}`;
+  }
+
+  const footnote = [
+    previously > 0 ? `${previously} answered previously` : null,
+    previously > 0 && blank > 0 ? `${blank} still to enter` : null,
+    missing > 0 ? `${plural(missing, 'question')} no longer in the pack — skipped` : null,
+  ].filter(Boolean);
 
   return (
     <main className="flex flex-col gap-5">
       <Header />
       <div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <h2 className="font-mono text-2xl font-bold text-ink-900">{sheet.code}</h2>
-          {alreadyMarked ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-success-100 px-2 py-0.5 text-xs font-semibold text-success-700">
+          {previously > 0 ? (
+            <span
+              className="inline-flex items-center gap-1 rounded-full bg-success-100 px-2 py-0.5 text-xs font-semibold text-success-700"
+              data-testid="previously-count"
+            >
               <CheckCircle2 className="h-3.5 w-3.5" />
-              Marked before
+              {previously}/{markable} answered previously
             </span>
           ) : null}
         </div>
@@ -230,16 +338,28 @@ export function PaperMarkPage() {
           {DATE_FORMAT.format(sheet.createdAt)}
         </p>
         <p className="mt-2 text-sm text-ink-600">
-          Tap the letters written in each answer box. Left blank on the
-          sheet? Leave it unset here — you can save part of the sheet now
-          and come back for the rest.
+          {previously === 0 ? (
+            <>
+              Tap the letters written in each answer box. Left blank on the
+              sheet? Leave it unset here — you can save part of the sheet now
+              and come back for the rest.
+            </>
+          ) : blank + added === 0 ? (
+            <>
+              Every question on this sheet is already saved. Tap{' '}
+              <strong>Change</strong> on one to correct it.
+            </>
+          ) : (
+            <>
+              Questions answered previously are already saved and stay as
+              they are. Tap the letters for the rest — only what you add or
+              change now is saved, so nothing is counted twice.
+            </>
+          )}
         </p>
-        {alreadyMarked ? (
-          <p className="mt-1 text-sm text-warn-600">
-            Saving again updates the same session — nothing is double-counted.
-          </p>
-        ) : null}
       </div>
+
+      <SaveDestination phase="before" />
 
       <ol className="flex flex-col gap-2.5" data-testid="mark-rows">
         {marks.map((mark, i) => (
@@ -247,32 +367,52 @@ export function PaperMarkPage() {
             key={mark.questionId}
             index={i}
             mark={mark}
-            selected={selections[i] ?? null}
-            onSelect={(next) =>
-              setSelections((prev) => {
-                const copy = [...prev];
-                copy[i] = next;
-                return copy;
-              })
-            }
+            saved={saved[i] ?? null}
+            selected={selectionAt(i, saved)}
+            status={statuses[i] ?? 'blank'}
+            reopened={reopened.has(i)}
+            onReopen={(open) => {
+              setReopened((prev) => {
+                const next = new Set(prev);
+                if (open) next.add(i);
+                else next.delete(i);
+                return next;
+              });
+              // Closing a row puts back what was stored for it.
+              if (!open) {
+                setEdits((prev) => {
+                  const next = { ...prev };
+                  delete next[i];
+                  return next;
+                });
+              }
+            }}
+            onSelect={(next) => setEdits((prev) => ({ ...prev, [i]: next }))}
           />
         ))}
       </ol>
 
-      <div className="sticky bottom-4 flex flex-col gap-1">
-        <Button
-          onClick={save}
-          disabled={answered === 0}
-          data-testid="save-marks"
-          size="lg"
-        >
-          <ClipboardCheck className="h-5 w-5" />
-          Save {answered}/{markable} answer{answered === 1 ? '' : 's'}
-        </Button>
-        {missing > 0 ? (
-          <p className="text-center text-xs text-ink-500">
-            {missing} question{missing === 1 ? '' : 's'} no longer in the pack —
-            skipped.
+      {/* Floats over the rows, so both pieces carry their own backing:
+          the page colour behind the button (a disabled one is
+          translucent) and a solid pill for the footnote. */}
+      <div className="sticky bottom-4 flex flex-col items-stretch gap-1.5">
+        <div className="flex flex-col rounded-xl bg-ink-50">
+          <Button
+            onClick={save}
+            disabled={added + changed === 0}
+            data-testid="save-marks"
+            size="lg"
+          >
+            <ClipboardCheck className="h-5 w-5" />
+            {saveLabel}
+          </Button>
+        </div>
+        {footnote.length > 0 ? (
+          <p
+            className="self-center rounded-full border border-ink-200 bg-surface px-3 py-0.5 text-center text-xs text-ink-600 shadow-sm"
+            data-testid="save-footnote"
+          >
+            {footnote.join(' · ')}
           </p>
         ) : null}
       </div>
@@ -301,12 +441,22 @@ function Header() {
 function MarkRow({
   index,
   mark,
+  saved,
   selected,
+  status,
+  reopened,
+  onReopen,
   onSelect,
 }: {
   index: number;
   mark: PaperMark;
+  /** What storage already holds for this row (an earlier batch). */
+  saved: SavedMark | null;
   selected: OptionKey[] | null;
+  status: MarkStatus;
+  /** A previously answered row opened up for correcting. */
+  reopened: boolean;
+  onReopen: (open: boolean) => void;
   onSelect: (next: OptionKey[] | null) => void;
 }) {
   const q = mark.question;
@@ -317,17 +467,69 @@ function MarkRow({
       </li>
     );
   }
+  const number = (
+    <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-ink-100 text-xs font-bold text-ink-700">
+      {index + 1}
+    </span>
+  );
+
+  // Answered in an earlier batch and not being corrected: shown settled,
+  // with no letters to tap — it can't be mistaken for input still owed.
+  if (saved && !reopened) {
+    return (
+      <li
+        className="flex flex-col gap-2 rounded-2xl border border-ink-200 bg-ink-50 px-4 py-3"
+        data-testid={`mark-row-${index + 1}`}
+        data-status={status}
+      >
+        <div className="flex items-start gap-2 text-sm text-ink-500">
+          {number}
+          <span className="line-clamp-1 min-w-0 flex-1 leading-6">
+            <McqMarkdown text={q.prompt} />
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex flex-shrink-0 items-center gap-1 rounded-full bg-success-100 px-2 py-0.5 text-xs font-semibold text-success-700">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Answered previously
+          </span>
+          <span className="truncate text-xs text-ink-500">
+            {whenLabel(saved.answeredAt)}
+          </span>
+          <span className="flex-1" />
+          <span
+            className="rounded-lg border border-ink-200 bg-surface px-2 py-0.5 font-mono text-sm font-bold text-ink-700"
+            aria-label={`Saved answer: ${saved.keys.join(', ')}`}
+          >
+            {saved.keys.join(' ')}
+          </span>
+          <button
+            type="button"
+            aria-label={`Question ${index + 1}: change answer`}
+            onClick={() => onReopen(true)}
+            className="tap-feedback inline-flex flex-shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-ink-600 hover:bg-ink-100"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Change
+          </button>
+        </div>
+      </li>
+    );
+  }
+
   const multi = isMultiAnswer(q);
   const keys = selected ?? [];
   return (
     <li
-      className="flex flex-col gap-2.5 rounded-2xl border border-ink-200 bg-surface p-4 shadow-sm"
+      className={cn(
+        'flex flex-col gap-2.5 rounded-2xl border bg-surface p-4 shadow-sm',
+        status === 'changed' ? 'border-warn-500/60' : 'border-ink-200',
+      )}
       data-testid={`mark-row-${index + 1}`}
+      data-status={status}
     >
       <div className="flex items-start gap-2 text-sm text-ink-800">
-        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-ink-100 text-xs font-bold text-ink-700">
-          {index + 1}
-        </span>
+        {number}
         <span className="min-w-0 flex-1 leading-snug">
           <McqMarkdown text={q.prompt} />
         </span>
@@ -362,7 +564,19 @@ function MarkRow({
           </span>
         ) : null}
         <span className="flex-1" />
-        {keys.length > 0 ? (
+        {saved ? (
+          // A stored answer has no eraser — the way out of a correction
+          // is back to what was saved.
+          <button
+            type="button"
+            aria-label={`Question ${index + 1}: keep the saved answer`}
+            onClick={() => onReopen(false)}
+            className="tap-feedback inline-flex flex-shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-ink-600 hover:bg-ink-100"
+          >
+            <Undo2 className="h-3.5 w-3.5" />
+            Keep {saved.keys.join(' ')}
+          </button>
+        ) : keys.length > 0 ? (
           <button
             type="button"
             aria-label={`Question ${index + 1}: clear answer`}
@@ -373,12 +587,37 @@ function MarkRow({
           </button>
         ) : null}
       </div>
+      {saved ? (
+        <p
+          className={cn(
+            'text-xs',
+            status === 'changed' ? 'font-semibold text-warn-600' : 'text-ink-500',
+          )}
+        >
+          {status === 'changed' ? (
+            <>
+              Changing the saved answer ({saved.keys.join(' ')}) — this
+              corrects it, it doesn&apos;t add a second one.
+            </>
+          ) : (
+            <>
+              Answered previously ({whenLabel(saved.answeredAt)}) — pick a
+              different letter to correct it.
+            </>
+          )}
+        </p>
+      ) : null}
     </li>
   );
 }
 
-function SavedView({ sheet, result }: { sheet: PaperSheet; result: PaperResultRows }) {
+function SavedView({ sheet, outcome }: { sheet: PaperSheet; outcome: SaveOutcome }) {
+  const { result, added, corrected, kept } = outcome;
   const wrong = result.answeredCount - result.correctCount;
+  const wrote = [
+    added > 0 ? `${plural(added, 'new answer')} added` : null,
+    corrected > 0 ? `${plural(corrected, 'answer')} corrected` : null,
+  ].filter(Boolean);
   return (
     <main className="flex flex-col gap-5" data-testid="mark-saved">
       <Header />
@@ -388,10 +627,27 @@ function SavedView({ sheet, result }: { sheet: PaperSheet; result: PaperResultRo
           <div className="text-2xl font-bold text-ink-900">
             {result.correctCount}/{result.answeredCount} correct
           </div>
-          <p className="mt-1 text-sm text-ink-600">
-            Sheet {sheet.code} is in the books — it counts like any practice
-            session.
-          </p>
+          {kept === 0 && corrected === 0 ? (
+            <p className="mt-1 text-sm text-ink-600">
+              Sheet {sheet.code} is in the books — it counts like any practice
+              session.
+            </p>
+          ) : (
+            // A later batch (or a correction): spell out what this save
+            // wrote, and that the score above is the sheet, not the batch.
+            <p className="mt-1 text-sm text-ink-600" data-testid="saved-breakdown">
+              {wrote.join(', ')}
+              {kept > 0 ? (
+                <>
+                  {' '}
+                  — the {kept} answered previously{' '}
+                  {kept === 1 ? 'was left as it was' : 'were left as they were'},
+                  so nothing is counted twice
+                </>
+              ) : null}
+              . The score is for sheet {sheet.code} so far.
+            </p>
+          )}
           {wrong > 0 ? (
             <p className="mt-1 text-sm text-ink-600">
               The {wrong === 1 ? 'question' : `${wrong} questions`} answered
@@ -408,6 +664,7 @@ function SavedView({ sheet, result }: { sheet: PaperSheet; result: PaperResultRo
           ) : null}
         </div>
       </div>
+      <SaveDestination phase="after" />
       <div className="flex flex-col gap-2">
         {wrong > 0 ? (
           // Scoped to this sheet — the plain queue is oldest-first across

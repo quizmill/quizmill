@@ -422,6 +422,55 @@ export function buildPaperResult(
   };
 }
 
+// ── Batches: what the sheet already has vs what is being entered now ─────
+
+/** An answer this sheet already has in storage — entered in an earlier
+ *  batch here, or on another device and pulled down by sync. */
+export interface SavedMark {
+  keys: OptionKey[];
+  answeredAt: number;
+}
+
+/** The stored answer for each sheet position (null = not entered yet). */
+export function savedMarksForSheet(
+  sheet: PaperSheet,
+  attempts: readonly Attempt[],
+): (SavedMark | null)[] {
+  const byQuestion = new Map<string, Attempt>();
+  for (const a of attempts) {
+    if (a.sessionId === sheet.id) byQuestion.set(a.questionId, a);
+  }
+  return sheet.questionIds.map((qid) => {
+    const a = byQuestion.get(qid);
+    if (!a) return null;
+    const keys = a.selectedAnswer.split(',').filter(Boolean) as OptionKey[];
+    return keys.length > 0 ? { keys, answeredAt: a.answeredAt } : null;
+  });
+}
+
+/**
+ * Where one row of the marking screen stands:
+ *  - `blank`   nothing stored, nothing picked
+ *  - `new`     picked now, not stored yet — saving adds it
+ *  - `saved`   stored earlier and left alone — saving doesn't touch it
+ *  - `changed` stored earlier, a different answer picked — saving corrects it
+ *
+ * A stored answer can be corrected but never blanked (there is no
+ * "un-answer" in the history), so an empty pick over a stored answer
+ * reads as `saved`.
+ */
+export type MarkStatus = 'blank' | 'new' | 'saved' | 'changed';
+
+export function markStatus(
+  saved: SavedMark | null,
+  selected: OptionKey[] | null,
+): MarkStatus {
+  const picked = selected && selected.length > 0 ? [...selected].sort().join(',') : '';
+  if (!saved) return picked ? 'new' : 'blank';
+  if (!picked || picked === [...saved.keys].sort().join(',')) return 'saved';
+  return 'changed';
+}
+
 /** Answer-box hint printed under a question. */
 export function answerBoxLabel(question: PackQuestion): string {
   // Deliberately no count for multi-answer — the screen runner doesn't

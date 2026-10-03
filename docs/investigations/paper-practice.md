@@ -144,6 +144,34 @@ no server work.
   same sync key entered in Settings. Both are one-time setup a
   household with sync already has.
 
+**As built — the two things the marker has to be told** (both came out
+of real use: a sheet marked in two sittings, on a phone that had only
+ever scanned the QR):
+
+- *Where the answers go.* The QR opens in whatever browser the camera
+  hands it to — often not the installed app, and often with no sync key.
+  The marking screen therefore opens with a `SaveDestination` line:
+  "Saving to **Leo**" (the key's name, or a short fingerprint of an
+  unnamed key), "This device is not linked" with a deep link to
+  `/settings/#sync`, or "this device only" in a build without sync. The
+  saved screen repeats it, following the live sync state ("Synced to
+  Leo"). Marking unlinked isn't lost work: linking the device later
+  pushes everything local up.
+- *What is already in.* Rows the sheet already has are shown settled —
+  "Answered previously · Thu 1 Oct · B" — with no letters to tap, so a
+  second batch can't read as re-entering the first. They are read live
+  from storage, so a batch entered on another device shows up when sync
+  pulls it down (and the session row then counts both batches, not just
+  the one typed here). "Change" opens one for correcting; a stored
+  answer can be corrected but never blanked. Save counts and writes only
+  what is new or corrected ("Save 5 new answers"; "Nothing new to save"
+  when there is nothing).
+
+Known gap: a *correction* to an already-synced row does not reach a
+device that already holds that row — `mergeRemote` treats attempts as
+immutable once written. Adding rows across devices is fine; corrections
+are best made on one device.
+
 Why tap-to-mark first: 10 taps is genuinely faster than photograph →
 upload → wait → verify, it works offline in the car/kitchen, and it
 exercises 100% of the plumbing the photo path needs (sheet identity,
