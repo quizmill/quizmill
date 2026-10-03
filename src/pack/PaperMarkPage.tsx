@@ -410,7 +410,12 @@ function SavedView({ sheet, result }: { sheet: PaperSheet; result: PaperResultRo
       </div>
       <div className="flex flex-col gap-2">
         {wrong > 0 ? (
-          <Link href="/practice/review/" className="w-full">
+          // Scoped to this sheet — the plain queue is oldest-first across
+          // all history and would open on unrelated mistakes.
+          <Link
+            href={`/practice/review/#session=${encodeURIComponent(sheet.id)}`}
+            className="w-full"
+          >
             <Button block variant="secondary">
               <RefreshCw className="h-4 w-4" />
               Review the mistakes together

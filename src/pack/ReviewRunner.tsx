@@ -25,7 +25,7 @@ import { Celebration } from '@/components/Celebration';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { levelUpCelebration, useLevelUp } from '@/pack/useLevelUp';
 import { amendAttempt, loadAttempts, loadSessions } from '@/lib/storage';
-import { unresolvedMistakeIds } from '@/lib/mistakes';
+import { sessionMistakeIds, unresolvedMistakeIds } from '@/lib/mistakes';
 import { totalXp } from '@/lib/xp';
 import { loadProgressionShown } from '@/lib/progressionPref';
 import {
@@ -57,11 +57,25 @@ const REVIEW_BATCH_SIZE = 10;
 
 type Stage = 'choosing' | 'feedback';
 
+/** `#session=<id>` narrows the review to the mistakes of that one session. */
+function scopeFromHash(): string | null {
+  if (typeof window === 'undefined') return null;
+  const h = window.location.hash;
+  return h.startsWith('#session=')
+    ? decodeURIComponent(h.slice('#session='.length))
+    : null;
+}
+
 /**
  * Review-mode runner for the pack variant: re-asks questions the user
  * got wrong and hasn't since rescued. Same structure as the CCA
  * ReviewRunner (including the mount-race guard — see the comment
  * there) over the pack data source.
+ *
+ * Opened plain it works through the whole queue, oldest mistake first, a
+ * batch at a time. Opened with `#session=<id>` (the paper marking page
+ * does this) it re-asks only that session's mistakes, all of them, in
+ * the order they were asked.
  */
 export function PackReviewRunner() {
   const { attempts } = useStorageData();
@@ -73,6 +87,7 @@ export function PackReviewRunner() {
 
   const [state, setState] = useState<RunnerState | null>(null);
   const [nothingToReview, setNothingToReview] = useState(false);
+  const [scoped, setScoped] = useState(false);
   // XP earned by the just-checked answer — see the practice runner.
   const [xpGained, setXpGained] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -90,7 +105,12 @@ export function PackReviewRunner() {
 
   useEffect(() => {
     if (!mounted || state) return;
-    const ids = unresolvedMistakeIds(attempts).slice(0, REVIEW_BATCH_SIZE);
+    const scope = scopeFromHash();
+    setScoped(scope !== null);
+    const ids =
+      scope !== null
+        ? sessionMistakeIds(attempts, scope)
+        : unresolvedMistakeIds(attempts).slice(0, REVIEW_BATCH_SIZE);
     if (ids.length === 0) {
       setNothingToReview(true);
       return;
@@ -116,7 +136,24 @@ export function PackReviewRunner() {
     startSession(buildSessionStart(initial, picked[0].categoryKey, 'review'));
     setState(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted, attempts]);
+  }, [mounted, attempts, state]);
+
+  /** Results → next batch. Restarts in place: a link back to this same
+   *  route wouldn't remount the runner, leaving the results screen up. */
+  function handleReviewMore() {
+    // A scoped review is finished — carry on with the rest of the queue.
+    if (scoped) {
+      window.history.replaceState(
+        null,
+        '',
+        window.location.pathname + window.location.search,
+      );
+    }
+    setState(null);
+    setFinished(false);
+    setStage('choosing');
+    setSelected([]);
+  }
 
   if (nothingToReview) {
     return (
@@ -127,9 +164,18 @@ export function PackReviewRunner() {
             Nothing to review
           </h1>
           <p className="mt-2 text-ink-600">
-            You haven&apos;t got any unresolved mistakes right now. Keep
-            practising — questions you get wrong show up here so you can
-            retry them.
+            {scoped ? (
+              <>
+                Every mistake from that session has been rescued already —
+                nothing left to go over.
+              </>
+            ) : (
+              <>
+                You haven&apos;t got any unresolved mistakes right now. Keep
+                practising — questions you get wrong show up here so you can
+                retry them.
+              </>
+            )}
           </p>
           <Link href="/" className="mt-4 inline-block">
             <Button size="lg">Back to home</Button>
@@ -179,12 +225,10 @@ export function PackReviewRunner() {
             queue.
           </p>
           <div className="mt-6 flex flex-col gap-2">
-            <Link href="/practice/review/" className="block">
-              <Button size="lg" block>
-                <RefreshCw className="h-4 w-4" />
-                Review more
-              </Button>
-            </Link>
+            <Button size="lg" block onClick={handleReviewMore}>
+              <RefreshCw className="h-4 w-4" />
+              Review more
+            </Button>
             <Link href="/" className="block">
               <Button size="lg" variant="secondary" block>
                 <Home className="h-4 w-4" />

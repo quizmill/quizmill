@@ -14,6 +14,7 @@ import {
   launchBrowser,
   newPage,
   resetOrigin,
+  seedAttempts,
   waitForText,
 } from '../e2e/helpers';
 
@@ -175,5 +176,59 @@ describe('paper practice', () => {
     await page.goto(baseUrl() + '/paper/', { waitUntil: 'networkidle0' });
     await page.waitForSelector('[data-testid="paper-sheet-list"]');
     await waitForText(page, 'Marked');
+  });
+
+  it("reviews the sheet's own mistakes, not the older ones in the queue", async () => {
+    // Two stale mistakes head the global review queue (oldest first) —
+    // the regression: "Review the mistakes together" opened on those
+    // instead of the question the sheet just got wrong.
+    await seedAttempts(page, [
+      { questionId: 'demo-explore-001', subject: 'space-exploration', topic: 'demo-explore-001', isCorrect: false, agoMs: 7 * 24 * 3600_000 },
+      { questionId: 'demo-explore-002', subject: 'space-exploration', topic: 'demo-explore-002', isCorrect: false, agoMs: 6 * 24 * 3600_000 },
+    ]);
+
+    await clickButtonByText(page, 'Create sheet');
+    await page.waitForSelector('[data-testid="paper-sheet"]');
+    // Read the right answers off the coach's key, so Q1 can be marked
+    // wrong and Q2 right whatever the sheet dealt.
+    await page.click('[data-testid="view-key"]');
+    await page.waitForSelector('[data-testid="paper-answer-key"]');
+    const key = await page.$$eval('[data-testid="key-answer"]', (els) =>
+      els.map((el) => el.textContent?.trim() ?? ''),
+    );
+    await page.click('[data-testid="view-sheet"]');
+    await clickButtonByText(page, 'Mark answers');
+    await page.waitForSelector('[data-testid="mark-rows"]');
+
+    // One letter that isn't the whole answer is wrong for single- and
+    // multi-answer questions alike.
+    await page.click(`[aria-label="Question 1: answer ${key[0] === 'A' ? 'B' : 'A'}"]`);
+    for (const letter of key[1].split(',')) {
+      await page.click(`[aria-label="Question 2: answer ${letter}"]`);
+    }
+    await page.click('[data-testid="save-marks"]');
+    await page.waitForSelector('[data-testid="mark-saved"]');
+    await waitForText(page, '1/2 correct');
+
+    await clickButtonByText(page, 'Review the mistakes together');
+    await waitForText(page, 'Q 1 / 1');
+
+    // Answer it: the review attempt lands on the sheet's Q1.
+    await page.evaluate(() => {
+      const buttons = Array.from(document.querySelectorAll('button'));
+      const aBtn = buttons.find((b) => /^A/.test(b.textContent?.trim() ?? ''));
+      if (aBtn) (aBtn as HTMLButtonElement).click();
+    });
+    await clickButtonByText(page, 'Check answer');
+    await waitForText(page, 'See results');
+    const attempts: { id: string; mode?: string; questionId: string }[] =
+      await page.evaluate(
+        (k) => JSON.parse(localStorage.getItem(k) ?? '[]'),
+        ATTEMPTS_KEY,
+      );
+    const sheetQ1 = attempts.find((a) => a.mode === 'paper' && a.id.endsWith(':a1'));
+    const reviewed = attempts.filter((a) => a.mode === 'review');
+    expect(reviewed).toHaveLength(1);
+    expect(reviewed[0].questionId).toBe(sheetQ1?.questionId);
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   pickSimilarQuestion,
+  sessionMistakeIds,
   unresolvedMistakeIds,
   unresolvedMistakes,
 } from '../src/lib/mistakes';
@@ -231,5 +232,56 @@ describe('rescue by question id (migrated attempts)', () => {
         att('q2', true, 200, { subject: 'english', topic: 'q2' }),
       ]),
     ).toEqual(['q1']);
+  });
+});
+
+describe('sessionMistakeIds (review scoped to one session)', () => {
+  // Pack attempts carry the question id as topic (per-question rescue).
+  const paper = (
+    questionId: string,
+    isCorrect: boolean,
+    position: number,
+    over: Partial<Attempt> = {},
+  ) =>
+    att(questionId, isCorrect, 1000, {
+      sessionId: 'sheet',
+      topic: questionId,
+      position,
+      ...over,
+    });
+
+  it("returns only that session's mistakes, not the rest of the queue", () => {
+    // An older mistake sits at the head of the global queue — reviewing a
+    // just-marked sheet must not open on it.
+    const attempts = [
+      att('old', false, 100, { sessionId: 'earlier', topic: 'old' }),
+      paper('p1', true, 1),
+      paper('p2', false, 2),
+    ];
+    expect(unresolvedMistakeIds(attempts)[0]).toBe('old');
+    expect(sessionMistakeIds(attempts, 'sheet')).toEqual(['p2']);
+  });
+
+  it('keeps the order the questions had on the sheet', () => {
+    // Batch marking: Q3 was entered a day before Q1, but the sheet (and
+    // the paper in hand) still reads 1 then 3.
+    const attempts = [
+      paper('p3', false, 3, { answeredAt: 500 }),
+      paper('p1', false, 1, { answeredAt: 900 }),
+    ];
+    expect(sessionMistakeIds(attempts, 'sheet')).toEqual(['p1', 'p3']);
+  });
+
+  it('drops mistakes that were rescued since', () => {
+    const attempts = [
+      paper('p1', false, 1),
+      paper('p2', false, 2),
+      att('p1', true, 2000, { sessionId: 'review', topic: 'p1' }),
+    ];
+    expect(sessionMistakeIds(attempts, 'sheet')).toEqual(['p2']);
+  });
+
+  it('returns nothing for an unknown session', () => {
+    expect(sessionMistakeIds([paper('p1', false, 1)], 'nope')).toEqual([]);
   });
 });

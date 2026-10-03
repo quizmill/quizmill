@@ -138,7 +138,11 @@ offline.
   ANSWER (marking time), never the print time — a sheet printed Tuesday
   and sat Sunday is Sunday's practice — and `questionCount` is the
   answers actually marked, so Coach/Progress/streaks agree on the
-  score. The sheet screen also prints a coach's
+  score. The saved screen's "Review the mistakes together" opens the
+  review runner SCOPED to the sheet (`/practice/review/#session=<sheet
+  id>`, `sessionMistakeIds`: that session's unresolved mistakes in sheet
+  order — the plain queue is oldest-first across all history and would
+  open on unrelated questions). The sheet screen also prints a coach's
   ANSWER KEY (same numbering, correct letters, explanations, linked
   concept cards; no QR) as a separate printout. Sheets live locally
   (`quizmill.<packId>.paperSheets.v1`, deliberately not synced — the QR
