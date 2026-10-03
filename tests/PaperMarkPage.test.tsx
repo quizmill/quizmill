@@ -5,10 +5,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import { webcrypto } from 'node:crypto';
 import { PaperMarkPage } from '@/pack/PaperMarkPage';
 import { PaperPage } from '@/pack/PaperPage';
-import { loadAttempts, loadSessions } from '@/lib/storage';
+import { loadAttempts, loadSessions, mergeRemote } from '@/lib/storage';
 import { APP_CONFIG } from '@/config';
 import { packQuestions, correctKeysOf } from '@/pack/data';
 import {
+  buildPaperResult,
   encodePaperPayload,
   getPaperSheet,
   payloadFromSheet,
@@ -174,7 +175,8 @@ describe('PaperMarkPage', () => {
     });
     window.location.hash = `#sheet=${sheet.id}`;
     await render(<PaperMarkPage />);
-    expect(container.textContent).toContain('Marked before');
+    expect(container.textContent).toContain('Answered previously');
+    await click(q('[aria-label="Question 1: change answer"]'));
     const prefilled = q(`[aria-label="Question 1: answer ${wrong1}"]`);
     expect(prefilled.getAttribute('aria-pressed')).toBe('true');
 
@@ -241,6 +243,162 @@ describe('PaperMarkPage', () => {
     window.location.hash = '#s=@@@not-a-payload@@@';
     await render(<PaperMarkPage />);
     expect(container.textContent).toContain("couldn't be read");
+  });
+});
+
+describe('PaperMarkPage — batches', () => {
+  /** Mark question 1 (correctly) and save, then close the page. */
+  async function markFirstBatch(sheet: PaperSheet) {
+    savePaperSheet(sheet);
+    window.location.hash = `#sheet=${sheet.id}`;
+    await render(<PaperMarkPage />);
+    await click(
+      q(`[aria-label="Question 1: answer ${correctKeysOf(packQuestions[0])[0]}"]`),
+    );
+    await click(q('[data-testid="save-marks"]'));
+    await act(async () => {
+      root?.unmount();
+    });
+    window.location.hash = `#sheet=${sheet.id}`;
+  }
+
+  it('shows an earlier batch as answered previously and saves only what is new', async () => {
+    const sheet = demoSheet();
+    await markFirstBatch(sheet);
+    const firstBatch = loadAttempts()[0];
+
+    await render(<PaperMarkPage />);
+    // Row 1 is settled: labelled, and not offered for input again.
+    const row1 = q('[data-testid="mark-row-1"]');
+    expect(row1.getAttribute('data-status')).toBe('saved');
+    expect(row1.textContent).toContain('Answered previously');
+    expect(container.querySelector('[aria-label^="Question 1: answer"]')).toBeNull();
+    expect(q('[data-testid="mark-row-2"]').getAttribute('data-status')).toBe('blank');
+    // Nothing entered yet → nothing to save (not "Save 1/3").
+    const save = q('[data-testid="save-marks"]') as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    expect(save.textContent).toContain('Nothing new to save');
+
+    await click(
+      q(`[aria-label="Question 2: answer ${correctKeysOf(packQuestions[1])[0]}"]`),
+    );
+    expect(save.textContent).toContain('Save 1 new answer');
+    await click(save);
+
+    const saved = q('[data-testid="mark-saved"]').textContent ?? '';
+    expect(saved).toContain('2/2 correct'); // the sheet so far
+    expect(saved).toContain('1 new answer added');
+    expect(saved).toMatch(/answered previously/);
+    const attempts = loadAttempts().sort((a, b) => a.id.localeCompare(b.id));
+    expect(attempts).toHaveLength(2);
+    expect(attempts[0]).toEqual(firstBatch); // the earlier row wasn't rewritten
+    expect(loadSessions()[0]).toMatchObject({ questionCount: 2, correctCount: 2 });
+  });
+
+  it('lets an earlier answer be corrected, but never blanked', async () => {
+    const sheet = demoSheet();
+    await markFirstBatch(sheet);
+    const before = loadAttempts()[0];
+    const [q1] = packQuestions;
+    const wrong1 = q1.options
+      .map((o) => o.key)
+      .find((k) => !correctKeysOf(q1).includes(k))!;
+
+    await render(<PaperMarkPage />);
+    await click(q('[aria-label="Question 1: change answer"]'));
+    // The stored letter is shown picked; there is no eraser for it.
+    expect(
+      q(`[aria-label="Question 1: answer ${before.selectedAnswer}"]`).getAttribute(
+        'aria-pressed',
+      ),
+    ).toBe('true');
+    expect(container.querySelector('[aria-label="Question 1: clear answer"]')).toBeNull();
+
+    await click(q(`[aria-label="Question 1: answer ${wrong1}"]`));
+    expect(q('[data-testid="mark-row-1"]').getAttribute('data-status')).toBe('changed');
+    expect(q('[data-testid="save-marks"]').textContent).toContain('Save 1 change');
+    await click(q('[data-testid="save-marks"]'));
+
+    const attempts = loadAttempts();
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0].selectedAnswer).toBe(wrong1);
+    expect(attempts[0].answeredAt).toBe(before.answeredAt);
+    expect(q('[data-testid="mark-saved"]').textContent).toContain('1 answer corrected');
+  });
+
+  it('picks up answers that arrive from another device while the sheet is open', async () => {
+    // Device B scans the QR before sync has pulled device A's batch.
+    const sheet = demoSheet();
+    const payload = await encodePaperPayload(payloadFromSheet(sheet, APP_CONFIG.packId));
+    window.location.hash = `#s=${payload}`;
+    await render(<PaperMarkPage />);
+    await waitFor(() => container.textContent?.includes('P-TEST'));
+    expect(container.textContent).not.toContain('Answered previously');
+
+    // …then the pull lands: question 1 was answered on device A yesterday.
+    const [q1, q2] = packQuestions;
+    const remote = buildPaperResult(
+      sheet,
+      [{ questionId: q1.id, question: q1, selected: [correctKeysOf(q1)[0]] }],
+      Date.now() - 86_400_000,
+    );
+    await act(async () => {
+      mergeRemote({ sessions: [remote.session], attempts: remote.attempts });
+      window.dispatchEvent(new Event('quizmill:storage'));
+    });
+    expect(q('[data-testid="mark-row-1"]').textContent).toContain('Answered previously');
+
+    await click(q(`[aria-label="Question 2: answer ${correctKeysOf(q2)[0]}"]`));
+    await click(q('[data-testid="save-marks"]'));
+
+    // The session covers BOTH devices' answers, not just this batch.
+    expect(loadAttempts()).toHaveLength(2);
+    expect(loadSessions()).toHaveLength(1);
+    expect(loadSessions()[0]).toMatchObject({ questionCount: 2, correctCount: 2 });
+    expect(loadSessions()[0].startedAt).toBe(remote.attempts[0].answeredAt);
+  });
+});
+
+describe('PaperMarkPage — where the answers go', () => {
+  async function openSheet() {
+    const sheet = demoSheet();
+    savePaperSheet(sheet);
+    window.location.hash = `#sheet=${sheet.id}`;
+    await render(<PaperMarkPage />);
+    return q('[data-testid="save-destination"]');
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it('says answers stay on this device when the app has no sync', async () => {
+    const dest = await openSheet();
+    expect(dest.getAttribute('data-destination')).toBe('off');
+    expect(dest.textContent).toContain('this device');
+  });
+
+  it('warns when sync exists but this device is not linked', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SYNC_URL', 'https://sync.example');
+    const dest = await openSheet();
+    expect(dest.getAttribute('data-destination')).toBe('unlinked');
+    expect(dest.textContent).toContain('not linked');
+    expect(dest.querySelector('a')?.getAttribute('href')).toMatch(/^\/settings\/?#sync$/);
+  });
+
+  it('names the sync key the answers are saved to', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SYNC_URL', 'https://sync.example');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ name: 'Leo' }), { status: 200 })),
+    );
+    localStorage.setItem('quizmill.syncKey.v1', 'QM-ABCDE-FGH23-JKMNP-QRSTV');
+    const dest = await openSheet();
+    expect(dest.getAttribute('data-destination')).toBe('linked');
+    // A fingerprint until the name is known — never the whole key.
+    expect(dest.textContent).not.toContain('FGH23');
+    await waitFor(() => dest.textContent?.includes('Leo'));
   });
 });
 
