@@ -69,6 +69,30 @@ export function unresolvedMistakeIds(attempts: readonly Attempt[]): string[] {
   return unresolved.map((x) => x.id);
 }
 
+/**
+ * The unresolved mistakes made in ONE session, in the order that session
+ * asked them — for reviewing a just-marked paper sheet with the page still
+ * in hand. The global queue is oldest-mistake-first across all history, so
+ * it would open on unrelated questions; this keeps to the sheet. Mistakes
+ * rescued since (in any session) drop out, same rule as the queue.
+ */
+export function sessionMistakeIds(
+  attempts: readonly Attempt[],
+  sessionId: string,
+): string[] {
+  const unresolved = new Set(unresolvedMistakeIds(attempts));
+  const seen = new Set<string>();
+  return attempts
+    .filter((a) => a.sessionId === sessionId && !a.isCorrect)
+    .sort(
+      (a, b) =>
+        (a.position ?? Infinity) - (b.position ?? Infinity) ||
+        a.answeredAt - b.answeredAt,
+    )
+    .map((a) => a.questionId)
+    .filter((id) => unresolved.has(id) && !seen.has(id) && seen.add(id));
+}
+
 export function unresolvedMistakeCount(attempts: readonly Attempt[]): number {
   return unresolvedMistakeIds(attempts).length;
 }

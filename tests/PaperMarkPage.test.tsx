@@ -112,6 +112,15 @@ describe('PaperMarkPage', () => {
 
     // Confirmation, with the wrong answer routed to review.
     expect(q('[data-testid="mark-saved"]').textContent).toContain('1/2 correct');
+    // …and the review button opens THIS sheet's mistakes, not the whole
+    // queue (which starts on older, unrelated mistakes).
+    const review = Array.from(container.querySelectorAll('a')).find((a) =>
+      a.textContent?.includes('Review the mistakes together'),
+    );
+    // (The build's trailingSlash config isn't loaded under vitest.)
+    expect(review?.getAttribute('href')).toMatch(
+      /^\/practice\/review\/?#session=sheet-under-test$/,
+    );
 
     const sessions = loadSessions();
     expect(sessions).toHaveLength(1);
