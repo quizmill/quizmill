@@ -289,7 +289,7 @@ export default function PackHome() {
                 Paper practice
               </div>
               <div className="text-sm text-ink-600">
-                Print a sheet, practise on paper, mark it back in.
+                Print a sheet or write on it on screen, then mark it back in.
               </div>
             </div>
           </div>

@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   KeyRound,
+  PenLine,
   Printer,
   Trash2,
 } from 'lucide-react';
@@ -35,6 +36,8 @@ import {
 } from '@/pack/data';
 import { attemptHistory, bankForCategory, filterByLevel } from '@/pack/runner';
 import { PackImage } from '@/pack/PackImage';
+import { PaperWriteView } from '@/pack/PaperWriteView';
+import { deleteSheetInk, hasSheetInk, pruneSheetInk } from '@/pack/paperInk';
 import {
   adoptPaperSheet,
   answerBoxLabel,
@@ -53,13 +56,15 @@ import {
 } from '@/pack/paper';
 
 /** What the URL hash points at: the list/compose screen, one stored
- *  sheet (`#sheet=<id>`), or a sheet carried in the link itself
+ *  sheet (`#sheet=<id>`), that sheet opened for writing on screen
+ *  (`#write=<id>`), or a sheet carried in the link itself
  *  (`#s=<payload>`, the same self-describing payload the printed QR
  *  encodes — so a sheet printed on one device can be opened, and its
  *  answer key printed, on another). */
 type HashTarget =
   | { kind: 'list' }
   | { kind: 'sheet'; id: string }
+  | { kind: 'write'; id: string }
   | { kind: 'payload'; sheet: PaperSheet }
   | { kind: 'wrong-pack'; pack: string }
   | { kind: 'bad-payload' };
@@ -69,6 +74,9 @@ async function targetFromHash(): Promise<HashTarget> {
   const h = window.location.hash;
   if (h.startsWith('#sheet=')) {
     return { kind: 'sheet', id: decodeURIComponent(h.slice('#sheet='.length)) };
+  }
+  if (h.startsWith('#write=')) {
+    return { kind: 'write', id: decodeURIComponent(h.slice('#write='.length)) };
   }
   if (h.startsWith('#s=')) {
     // Async: the compressed payload form inflates via DecompressionStream
@@ -90,17 +98,20 @@ const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
 const SCENARIOS_BY_ID = new Map(packScenarios.map((s) => [s.id, s]));
 
 /**
- * Paper practice — print a worksheet, then mark it back in. Two screens
- * on one static route: the compose/list screen, and one sheet
- * (`#sheet=<id>`) with its print layout, so the browser's back button
- * returns to the list. The marking flow lives at /paper/mark — the
- * printed QR deep-links there so any device with this pack (and the
- * same sync key) can enter the answers.
+ * Paper practice — print a worksheet (or write on it on screen), then
+ * mark it back in. Three screens on one static route: the compose/list
+ * screen, one sheet (`#sheet=<id>`) with its print layout, and that
+ * sheet as a page to write on (`#write=<id>` — PaperWriteView, for a
+ * tablet when there is no printer), so the browser's back button steps
+ * back through them. The marking flow lives at /paper/mark — the sheet's
+ * QR deep-links there so any device with this pack (and the same sync
+ * key) can enter the answers.
  */
 export function PaperPage() {
   const { attempts, sessions } = useStorageData();
   const [mounted, setMounted] = useState(false);
   const [sheetId, setSheetId] = useState<string | null>(null);
+  const [writing, setWriting] = useState(false);
   // Why an `#s=` link couldn't be opened here, shown above the list.
   const [linkProblem, setLinkProblem] = useState<
     { kind: 'wrong-pack'; pack: string } | { kind: 'bad-payload' } | null
@@ -129,12 +140,16 @@ export function PaperPage() {
         setSheetsVersion((v) => v + 1);
         setLinkProblem(null);
         setSheetId(adopted.id);
+        setWriting(false);
         return;
       }
       setLinkProblem(
         target.kind === 'wrong-pack' || target.kind === 'bad-payload' ? target : null,
       );
-      setSheetId(target.kind === 'sheet' ? target.id : null);
+      setSheetId(
+        target.kind === 'sheet' || target.kind === 'write' ? target.id : null,
+      );
+      setWriting(target.kind === 'write');
     };
     const onHash = () => void resolve();
     void resolve();
@@ -154,6 +169,9 @@ export function PaperPage() {
   if (!mounted) return null;
 
   const sheet = sheetId ? sheets.find((s) => s.id === sheetId) : undefined;
+  if (sheetId && sheet && writing) {
+    return <WriteSheet sheet={sheet} />;
+  }
   if (sheetId && sheet) {
     return (
       <SheetView
@@ -163,6 +181,7 @@ export function PaperPage() {
         }
         onDelete={() => {
           deletePaperSheet(sheet.id);
+          deleteSheetInk(sheet.id);
           setSheetsVersion((v) => v + 1);
           window.location.hash = '';
         }}
@@ -185,8 +204,8 @@ export function PaperPage() {
           </Link>
         </div>
         <p className="mt-1 text-ink-500">
-          Print a worksheet, practise away from the screen, then mark the
-          answers back in — progress counts just like on-screen practice.
+          Print a worksheet — or write on it on a tablet — then mark the
+          answers back in. Progress counts just like on-screen practice.
         </p>
       </header>
 
@@ -254,6 +273,12 @@ export function PaperPage() {
                           Waiting
                         </span>
                       )}
+                      {hasSheetInk(s.id) ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-800">
+                          <PenLine className="h-3 w-3" />
+                          Written on screen
+                        </span>
+                      ) : null}
                     </div>
                     <div className="mt-0.5 truncate text-sm text-ink-500">
                       {PACK_CATEGORY_LABEL[s.categoryKey] ?? s.categoryKey} ·{' '}
@@ -300,6 +325,8 @@ function ComposeCard({
     });
     if (!composed) return;
     savePaperSheet(composed.sheet);
+    // The sheet list is capped — ink of a sheet that just aged out goes too.
+    pruneSheetInk();
     onCreated(composed.sheet);
   };
 
@@ -410,6 +437,45 @@ function ComposeCard({
   );
 }
 
+/**
+ * The QR's deep link: the marking page with the whole sheet in the
+ * fragment, so marking works on any device with this pack active. Null
+ * until the (async, compressed) payload is encoded.
+ */
+function useMarkUrl(sheet: PaperSheet): string | null {
+  const [markUrl, setMarkUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let stale = false;
+    void encodePaperPayload(payloadFromSheet(sheet, APP_CONFIG.packId)).then(
+      (payload) => {
+        if (stale) return;
+        const base = new URL('mark/', window.location.href.split('#')[0]);
+        setMarkUrl(`${base.href}#s=${payload}`);
+      },
+    );
+    return () => {
+      stale = true;
+    };
+  }, [sheet]);
+  return markUrl;
+}
+
+/** One sheet as a page to write on (`#write=<id>`) — see PaperWriteView. */
+function WriteSheet({ sheet }: { sheet: PaperSheet }) {
+  const markUrl = useMarkUrl(sheet);
+  return (
+    <PaperWriteView
+      sheet={sheet}
+      markUrl={markUrl}
+      onClose={() => {
+        window.location.hash = `sheet=${encodeURIComponent(sheet.id)}`;
+      }}
+    >
+      <PrintableSheet sheet={sheet} markUrl={null} variant="screen" />
+    </PaperWriteView>
+  );
+}
+
 /** One sheet: actions + the print layout (also the on-screen preview). */
 function SheetView({
   sheet,
@@ -451,22 +517,9 @@ function SheetView({
     };
   }, [sheet, view]);
 
-  // The QR deep-links to the marking page with the whole sheet in the
-  // fragment, so marking works on any device with this pack active.
-  const [markUrl, setMarkUrl] = useState<string | null>(null);
-  useEffect(() => {
-    let stale = false;
-    void encodePaperPayload(payloadFromSheet(sheet, APP_CONFIG.packId)).then(
-      (payload) => {
-        if (stale) return;
-        const base = new URL('mark/', window.location.href.split('#')[0]);
-        setMarkUrl(`${base.href}#s=${payload}`);
-      },
-    );
-    return () => {
-      stale = true;
-    };
-  }, [sheet]);
+  const markUrl = useMarkUrl(sheet);
+  // Ink already on this sheet → the button resumes rather than starts.
+  const hasInk = useMemo(() => hasSheetInk(sheet.id), [sheet.id]);
 
   return (
     <main className="flex flex-col gap-5">
@@ -519,27 +572,38 @@ function SheetView({
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2">
         <div className="flex gap-2">
           <Button onClick={() => window.print()} data-testid="print-sheet" block>
             <Printer className="h-4 w-4" />
             Print / PDF
           </Button>
           <Button
-            variant="secondary"
             block
-            data-testid="mark-sheet"
+            data-testid="write-sheet"
             onClick={() => {
-              window.location.href = `mark/#sheet=${encodeURIComponent(sheet.id)}`;
+              window.location.hash = `write=${encodeURIComponent(sheet.id)}`;
             }}
           >
-            <ClipboardCheck className="h-4 w-4" />
-            Mark answers
+            <PenLine className="h-4 w-4" />
+            {hasInk ? 'Continue on screen' : 'Write on screen'}
           </Button>
         </div>
+        <Button
+          variant="secondary"
+          block
+          data-testid="mark-sheet"
+          onClick={() => {
+            window.location.href = `mark/#sheet=${encodeURIComponent(sheet.id)}`;
+          }}
+        >
+          <ClipboardCheck className="h-4 w-4" />
+          Mark answers
+        </Button>
         <p className="text-center text-xs text-ink-500">
-          No printer handy? Choose “Save as PDF” in the print dialog to send
-          the sheet somewhere that has one.
+          No printer? <strong>Write on screen</strong> turns the sheet into a
+          page to scribble on with a pencil or a finger — best on a tablet.
+          Or choose “Save as PDF” in the print dialog to print it elsewhere.
         </p>
       </div>
 
@@ -599,15 +663,23 @@ type SheetPrintView = 'sheet' | 'key';
  * whatever the app theme), in print the ONLY visible element. Plain
  * borders and black text: worksheet aesthetics, and printers strip
  * background colour anyway.
+ *
+ * `variant="screen"` is the same sheet as a page to WRITE on
+ * (PaperWriteView lays ink over it): no name/date lines or header QR,
+ * and roomier — bigger type, a bigger answer box (a finger writes
+ * larger than a biro) and blank working space under every question.
  */
 function PrintableSheet({
   sheet,
   markUrl,
+  variant = 'print',
 }: {
   sheet: PaperSheet;
   markUrl: string | null;
+  variant?: 'print' | 'screen';
 }) {
   const marks = resolveSheetQuestions(sheet.questionIds, packQuestions);
+  const screen = variant === 'screen';
   return (
     <div
       className="paper-sheet rounded-2xl border border-ink-200 bg-white p-6 text-neutral-900 shadow-sm"
@@ -623,14 +695,23 @@ function PrintableSheet({
               : ''}{' '}
             · {sheet.questionIds.length} questions
           </div>
-          <div className="mt-6 flex gap-6 text-sm text-neutral-600">
-            <span className="flex-1 border-b border-neutral-400 pb-0.5">Name</span>
-            <span className="flex-1 border-b border-neutral-400 pb-0.5">Date</span>
-          </div>
+          {screen ? (
+            <div className="mt-2 text-sm text-neutral-600">
+              Write the letter of your answer in each box. Use any blank
+              space for working.
+            </div>
+          ) : (
+            <div className="mt-6 flex gap-6 text-sm text-neutral-600">
+              <span className="flex-1 border-b border-neutral-400 pb-0.5">Name</span>
+              <span className="flex-1 border-b border-neutral-400 pb-0.5">Date</span>
+            </div>
+          )}
         </div>
         <div className="flex flex-col items-center">
           {markUrl ? <QrCode value={markUrl} className="paper-qr h-28 w-28" /> : null}
-          <span className="mt-1 font-mono text-sm font-bold">{sheet.code}</span>
+          <span className="mt-1 whitespace-nowrap font-mono text-sm font-bold">
+            {sheet.code}
+          </span>
         </div>
       </div>
 
@@ -645,12 +726,21 @@ function PrintableSheet({
               ? SCENARIOS_BY_ID.get(q.scenarioId)
               : undefined;
           return (
-            <li key={mark.questionId} className="paper-question flex gap-3 py-4">
+            <li
+              key={mark.questionId}
+              className={cn('paper-question flex gap-3', screen ? 'pb-20 pt-5' : 'py-4')}
+              data-testid={`sheet-question-${i + 1}`}
+            >
               <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border-2 border-neutral-900 text-sm font-bold">
                 {i + 1}
               </span>
               {q ? (
-                <div className="min-w-0 flex-1 text-sm leading-relaxed">
+                <div
+                  className={cn(
+                    'min-w-0 flex-1 leading-relaxed',
+                    screen ? 'text-base' : 'text-sm',
+                  )}
+                >
                   {scenario?.stem ? (
                     <p className="mb-1.5 rounded-lg bg-neutral-100 p-2 italic text-neutral-700">
                       <McqMarkdown text={scenario.stem} />
@@ -685,8 +775,19 @@ function PrintableSheet({
                 </div>
               )}
               {q ? (
-                <div className="flex w-16 flex-shrink-0 flex-col items-center gap-1">
-                  <span className="h-12 w-14 rounded-lg border-2 border-neutral-900" />
+                <div
+                  className={cn(
+                    'flex flex-shrink-0 flex-col items-center gap-1',
+                    screen ? 'w-24' : 'w-16',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'rounded-lg border-2 border-neutral-900',
+                      screen ? 'h-20 w-24' : 'h-12 w-14',
+                    )}
+                    data-testid={`answer-box-${i + 1}`}
+                  />
                   <span className="text-center text-[9px] leading-tight text-neutral-500">
                     {answerBoxLabel(q)}
                   </span>
