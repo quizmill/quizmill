@@ -178,6 +178,54 @@ describe('paper practice', () => {
     await waitForText(page, 'Marked');
   });
 
+  it('writes on a sheet on screen: ink lands where the pen went and survives a reload', async () => {
+    await clickButtonByText(page, 'Create sheet');
+    await page.waitForSelector('[data-testid="paper-sheet"]');
+    await page.click('[data-testid="write-sheet"]');
+    await page.waitForSelector('[data-testid="ink-surface"]');
+
+    const rectOf = (sel: string) =>
+      page.$eval(sel, (el) => {
+        const r = el.getBoundingClientRect();
+        return { x: r.x, y: r.y, w: r.width, h: r.height };
+      });
+
+    // A tick inside the first answer box, with a real pointer.
+    const box = await rectOf('[data-testid="answer-box-1"]');
+    await page.mouse.move(box.x + box.w * 0.25, box.y + box.h * 0.5);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.w * 0.45, box.y + box.h * 0.75, { steps: 6 });
+    await page.mouse.move(box.x + box.w * 0.8, box.y + box.h * 0.25, { steps: 6 });
+    await page.mouse.up();
+
+    // The stroke is drawn inside that box — the page is a scaled,
+    // fixed-width layout, so this is the coordinate mapping end to end.
+    const inside = async () => {
+      const ink = await rectOf('[data-testid="ink-stroke"]');
+      const b = await rectOf('[data-testid="answer-box-1"]');
+      return (
+        ink.x >= b.x && ink.y >= b.y && ink.x + ink.w <= b.x + b.w && ink.y + ink.h <= b.y + b.h
+      );
+    };
+    await page.waitForSelector('[data-testid="ink-stroke"]');
+    expect(await inside()).toBe(true);
+
+    // Saved as it landed: a reload brings the sheet back with its ink,
+    // still in the box.
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.waitForSelector('[data-testid="ink-stroke"]');
+    expect(await page.$$eval('[data-testid="ink-stroke"]', (els) => els.length)).toBe(1);
+    expect(await inside()).toBe(true);
+
+    // Finished → the foot of the page leads to marking this very sheet.
+    const code = await page.$eval('[data-testid="write-finish"] .font-mono', (el) =>
+      el.textContent?.trim(),
+    );
+    await page.click('[data-testid="write-mark-here"]');
+    await page.waitForSelector('[data-testid="mark-rows"]');
+    await waitForText(page, code!);
+  });
+
   it("reviews the sheet's own mistakes, not the older ones in the queue", async () => {
     // Two stale mistakes head the global review queue (oldest first) —
     // the regression: "Review the mistakes together" opened on those

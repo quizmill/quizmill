@@ -161,7 +161,20 @@ offline.
   re-mark and print the answer key there); device
   opt-in `quizmill.paper.v1` like Coach; print CSS gated on
   `body[data-paper-print]` in globals.css; design notes in
-  `docs/investigations/paper-practice.md`).
+  `docs/investigations/paper-practice.md`). No printer: `/paper/#write=
+  <sheet id>` (PaperWriteView + paperInk.ts) shows the same sheet as one
+  long page to WRITE on with a pencil or finger — a roomier `variant=
+  "screen"` of the print layout under a free-ink SVG overlay (not a
+  canvas: a long page blows iOS's canvas size limit), laid out at ONE
+  fixed width pinned by the first stroke and scaled to the viewport, so
+  ink stays on its question through rotation/reload. A stylus always
+  writes; a finger writes or scrolls per a toolbar toggle that the first
+  stylus contact flips to "scrolls" (two fingers scroll while fingers
+  write; touches are ignored while the stylus is down). Ink is vector
+  strokes per sheet in localStorage (`quizmill.<packId>.paperInk.v1.
+  <sheet id>`, NOT synced — whoever enters the answers looks at this
+  screen, as with a printout) and the foot of the page carries the same
+  marking QR.
   In `src/components/`: InstallPrompt (Add-to-Home-Screen), Scratchpad
   (a collapsible Write/Draw working space in the runners — textarea +
   freehand canvas, expandable full-screen; one pad per pack, kept in

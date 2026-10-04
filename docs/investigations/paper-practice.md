@@ -172,6 +172,39 @@ device that already holds that row — `mergeRemote` treats attempts as
 immutable once written. Adding rows across devices is fine; corrections
 are best made on one device.
 
+**As built — a sheet without a printer (write on screen).** The same
+sheet opens as one long scrolling page to write on (`#write=<id>`), for
+a tablet with a pencil or a finger: letters go in the answer boxes,
+working goes wherever there is room, and when the learner is done the
+QR at the foot of the page is scanned with another device to enter the
+answers — the printout loop with the tablet standing in for the paper.
+
+- *Ink is an SVG overlay, not a canvas.* A 20-question page at a
+  tablet's pixel ratio is well past iOS's canvas area limit; SVG paths
+  have no such ceiling, stay crisp at any scale, and need no redraw
+  loop. Strokes are stored as vectors (flat x,y arrays, tenths of a
+  pixel), thinned as they are written.
+- *One layout width, scaled.* The page is laid out at a fixed width —
+  the viewport's, pinned when the first stroke lands — and CSS-scaled to
+  fit, so text wraps identically after a rotation or a reload and ink
+  stays on the question it was written against. Clearing the sheet
+  unpins it.
+- *Pen writes, finger scrolls — when there is a pen.* A stylus always
+  writes. What a finger does is a toolbar toggle: it starts as "writes"
+  so a pencil-less tablet works at once (two fingers scroll), and the
+  first stylus contact flips it to "scrolls". Native scrolling is kept
+  for fingers (momentum matters on a long page); the stylus is stopped
+  from scrolling by cancelling its `touchstart`, the one place a page
+  can still veto a scroll. Touches are ignored while the stylus is down
+  (a resting palm).
+- *Ink stays on the device* (localStorage per sheet, not synced, pruned
+  with the sheet). The marker reads the answers off this screen, so the
+  ink never needs to travel; syncing it would mean a new table for
+  something that is, by design, looked at once.
+- *Not attempted:* recognising the handwritten letters. The marker
+  still taps them in — same reasoning as Phase B below, and a
+  handwritten "C" vs "G" from a nine-year-old wants a human anyway.
+
 Why tap-to-mark first: 10 taps is genuinely faster than photograph →
 upload → wait → verify, it works offline in the car/kitchen, and it
 exercises 100% of the plumbing the photo path needs (sheet identity,

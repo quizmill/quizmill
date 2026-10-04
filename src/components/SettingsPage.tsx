@@ -450,9 +450,9 @@ export function SettingsPage({ extras }: SettingsPageProps) {
                 Paper practice
               </h3>
               <p className="mt-1 text-sm text-ink-600">
-                Print a worksheet, practise away from the screen, then mark
-                the answers back in — they count like any practice session.
-                Adds a card to the home screen.
+                Print a worksheet — or write on it with a pencil on a tablet
+                — then mark the answers back in. They count like any
+                practice session. Adds a card to the home screen.
               </p>
             </div>
             <button
