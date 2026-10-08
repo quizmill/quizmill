@@ -99,6 +99,35 @@ describe('composePaperSheet', () => {
     expect(out!.sheet.level).toBeUndefined();
   });
 
+  it("prints the whole bank in pack order for count 'all'", () => {
+    // Seen questions and an rng would reshuffle a normal sheet — a whole
+    // paper must come out exactly as the pack lists it.
+    const history = new Map([['q1', { lastAnsweredAt: 1, lastCorrect: true }]]);
+    const out = composePaperSheet(bank, history, {
+      categoryKey: 'planets',
+      count: 'all',
+      level: 'cgp4',
+      rng: seededRng(7),
+    });
+    expect(out!.sheet.questionIds).toEqual(['q1', 'q2', 'q3', 'q4', 'q5']);
+    expect(out!.questions.map((q) => q.id)).toEqual(['q1', 'q2', 'q3', 'q4', 'q5']);
+    expect(out!.sheet.level).toBe('cgp4');
+    expect(
+      composePaperSheet([], new Map(), { categoryKey: 'planets', count: 'all' }),
+    ).toBeNull();
+  });
+
+  it('round-trips a 50-question whole paper through the QR payload in order', async () => {
+    const ids = Array.from({ length: 50 }, (_, i) => `cgp-paper4-${String(i + 1).padStart(3, '0')}`);
+    const out = composePaperSheet(ids.map((id) => question(id)), new Map(), {
+      categoryKey: 'planets',
+      count: 'all',
+    });
+    const encoded = await encodePaperPayload(payloadFromSheet(out!.sheet, 'pack'));
+    expect(encoded.length).toBeLessThan(400);
+    expect((await decodePaperPayload(encoded))!.qs).toEqual(ids);
+  });
+
   it('clamps to the bank size and prefers unseen questions', () => {
     const history = new Map([
       ['q1', { lastAnsweredAt: 10, lastCorrect: true }],

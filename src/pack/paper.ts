@@ -54,6 +54,13 @@ export const MAX_STORED_SHEETS = 50;
 export const PAPER_COUNT_CHOICES = [5, 10, 15, 20] as const;
 export const DEFAULT_PAPER_COUNT = 10;
 
+/** 'all' = the whole (category + level) bank in pack order — a past paper
+ *  printed as written, so its question numbers match the original. Only
+ *  offered up to this many questions: the QR carries every id, and much
+ *  past a 50-question paper it gets too dense to scan off a printout. */
+export const PAPER_ALL_MAX = 60;
+export type PaperCount = number | 'all';
+
 // Unambiguous letters/digits for the human sheet code — no 0/O, 1/I/L,
 // 5/S, 8/B so a scribbled note or a phone photo can't misread it.
 const CODE_ALPHABET = 'ACDEFHJKMNPQRTUVWXYZ234679';
@@ -69,14 +76,15 @@ export function newSheetCode(rng: () => number = Math.random): string {
 /**
  * Compose a new sheet from a bank (already filtered to the category and
  * level, exactly like a practice session) using the same unseen-biased
- * selection. Returns null when the bank is empty.
+ * selection — or, for `count: 'all'`, the whole bank in pack order.
+ * Returns null when the bank is empty.
  */
 export function composePaperSheet(
   bank: PackQuestion[],
   history: ReadonlyMap<string, AttemptSummary>,
   options: {
     categoryKey: string;
-    count: number;
+    count: PaperCount;
     level?: string;
     id?: string;
     code?: string;
@@ -84,7 +92,12 @@ export function composePaperSheet(
     rng?: () => number;
   },
 ): { sheet: PaperSheet; questions: PackQuestion[] } | null {
-  const questions = pickSessionFromBank(bank, history, options.rng, options.count);
+  const questions =
+    options.count === 'all'
+      ? bank.length > 0
+        ? [...bank]
+        : null
+      : pickSessionFromBank(bank, history, options.rng, options.count);
   if (!questions) return null;
   return {
     sheet: {
