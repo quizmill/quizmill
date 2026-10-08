@@ -51,7 +51,9 @@ import {
   savePaperSheet,
   sheetFromPayload,
   DEFAULT_PAPER_COUNT,
+  PAPER_ALL_MAX,
   PAPER_COUNT_CHOICES,
+  type PaperCount,
   type PaperSheet,
 } from '@/pack/paper';
 
@@ -312,9 +314,15 @@ function ComposeCard({
   // learner is working on.
   const [level, setLevel] = useState<string | null>(null);
   useEffect(() => setLevel(loadLevelFilter()), []);
-  const [count, setCount] = useState<number>(DEFAULT_PAPER_COUNT);
+  const [chosenCount, setCount] = useState<PaperCount>(DEFAULT_PAPER_COUNT);
 
   const bank = filterByLevel(bankForCategory(packQuestions, categoryKey), level);
+  // "All" prints a whole level in pack order (a past paper as written) —
+  // only for a single level small enough for the QR to stay scannable.
+  const allAvailable = level !== null && bank.length > 0 && bank.length <= PAPER_ALL_MAX;
+  const count: PaperCount =
+    chosenCount === 'all' && !allAvailable ? DEFAULT_PAPER_COUNT : chosenCount;
+  const sheetSize = count === 'all' ? bank.length : Math.min(count, bank.length);
 
   const create = () => {
     const history = attemptHistory([...attempts], categoryKey);
@@ -402,7 +410,7 @@ function ComposeCard({
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium text-ink-600">Questions</span>
         <div className="flex gap-2" role="radiogroup" aria-label="Question count">
-          {PAPER_COUNT_CHOICES.map((c) => (
+          {[...PAPER_COUNT_CHOICES, ...(allAvailable ? (['all'] as const) : [])].map((c) => (
             <button
               key={c}
               type="button"
@@ -416,7 +424,7 @@ function ComposeCard({
                   : 'border-ink-200 bg-surface text-ink-600 hover:text-ink-900',
               )}
             >
-              {c}
+              {c === 'all' ? 'All' : c}
             </button>
           ))}
         </div>
@@ -430,7 +438,7 @@ function ComposeCard({
         <Printer className="h-4 w-4" />
         Create sheet
         <span className="text-sm font-normal opacity-80">
-          · {Math.min(count, bank.length)} of {bank.length} available
+          · {count === 'all' ? `all ${bank.length}, in order` : `${sheetSize} of ${bank.length} available`}
         </span>
       </Button>
     </section>
