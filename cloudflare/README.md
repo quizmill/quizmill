@@ -133,3 +133,36 @@ never interprets them; merge semantics live in the client
 (`src/lib/storage.ts` `mergeRemote`). The client half of the protocol is
 `src/lib/backends/httpBackend.ts`; the validation/SQL rules are pure and
 unit-tested (`tests/worker-sync.test.ts`).
+
+## Usage report (read-only, Markdown)
+
+Every learner with a sync key mirrors their sessions, attempts and app
+events here, so the database can answer "is this pack being used?"
+without anyone building a dashboard. From the engine repo:
+
+```sh
+npm run sync:report -- --remote                 # production, via your wrangler login
+npm run sync:report -- --local                  # the `wrangler dev` database
+npm run sync:report -- --remote --out report.md
+```
+
+prints, per pack: learners, active learners (last 7 / 30 days), sessions,
+attempts, mistakes rescued and still open (the engine's own rescue rule),
+and events by type — with the definitions at the foot of the report.
+Nothing leaves your machine: it is `wrangler d1 execute --json` running
+one `SELECT` (`npm run sync:report -- --sql` prints it; save its output
+and replay it with `--from rows.json`) and a pure aggregation
+(`src/report.ts`, unit-tested in `tests/events-report.test.ts`). The
+output is aggregate only — no user ids, hashed or otherwise — and there
+is deliberately **no endpoint** for it: the rows are learners' practice
+histories and stay behind wrangler's login.
+
+Workers deployed with the anonymous funnel analytics route also get a
+"Funnel" table per pack from `GET /v1/analytics/summary`:
+
+```sh
+ANALYTICS_READ_TOKEN=… npm run sync:report -- --remote --analytics https://sync.quizmill.dev
+```
+
+On a worker without that route the section says "not available" rather
+than showing zeros.

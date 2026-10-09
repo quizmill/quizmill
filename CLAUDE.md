@@ -86,7 +86,13 @@ offline.
   canonical deployment answers on **sync.quizmill.dev** and is shared by
   the personal pack apps; a key can carry an optional readable name —
   "Leo", "Dad's key" — mirrored per hashed user id via `GET/POST
-  /v1/profile` so a household with several keys knows which is which)
+  /v1/profile` so a household with several keys knows which is which;
+  `npm run sync:report` — `cloudflare/scripts/events-report.ts` over the
+  pure `cloudflare/src/report.ts` — is the operator's read-only Markdown
+  view of that database: per pack learners, 7d/30d active, sessions,
+  attempts, mistakes rescued/open, events by type, plus the funnel
+  summary where the analytics route is deployed; runs through
+  `wrangler d1 execute`, aggregate-only output, deliberately no endpoint)
   and `supabase` (`NEXT_PUBLIC_SUPABASE_URL`/`_PUBLISHABLE_KEY`,
   email-OTP auth — `otp.ts`); `NEXT_PUBLIC_SYNC_BACKEND` picks
   explicitly; dormant without any. Sessions, attempts, achievements,
@@ -249,6 +255,7 @@ npm run test:e2e                 # build + Puppeteer vs demo pack
 npm run pack:validate <dir>      # schema + cross-ref checks
 npm run pack:use <dir|owner/repo># validate + activate a pack (local or GitHub)
 npm run pack:list                # published packs from the registry
+npm run sync:report -- --remote  # Markdown usage report over the sync D1 (wrangler login)
 ```
 
 ## Lineage & boundaries
