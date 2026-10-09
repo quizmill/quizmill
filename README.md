@@ -234,6 +234,28 @@ backends register in code via `registerSyncBackendProvider`. Without
 any backend, Settings → "Move progress" exports/imports progress
 as a JSON file for device moves and offline backups.
 
+### Usage analytics (optional, anonymous)
+
+A hosted app has no way of telling its author whether anyone opens it.
+Build with
+
+```
+NEXT_PUBLIC_ANALYTICS_URL=https://<your sync worker>/v1/analytics
+NEXT_PUBLIC_PRIVACY_URL=https://example.com/privacy   # optional, linked from Settings
+```
+
+and the app beacons a handful of funnel events — `app_open`,
+`first_answer`, `session_10` (tenth completed session), `upsell_seen`,
+`upsell_clicked`, `bundle_inserted` — as
+`{ event, packId, deviceId, appBuild, ts }`. That is the whole payload:
+no answers, no progress, no sync key, no user agent. `deviceId` is a
+random UUID the learner can regenerate (or switch the beacon off) in
+Settings → Usage analytics; the card only exists in builds that set the
+URL, and without it nothing leaves the device. The sync worker in
+`cloudflare/` receives the beacons and answers
+`GET /v1/analytics/summary?pack=<id>&days=30` with per-event totals,
+distinct devices and a per-day series — see `cloudflare/README.md`.
+
 ## Upgrading
 
 The CLI pins the cached engine to its own version, so the simplest

@@ -127,9 +127,48 @@ any language) lives in `docs/sync-protocol.md`.
 | `POST /v1/ops` | Bearer sync key | apply `{ pack, ops: [...] }` idempotent mutations |
 | `GET /v1/profile` | Bearer sync key | this key's name, `{ name }` (`null` when unnamed) |
 | `POST /v1/profile` | Bearer sync key | name this key, `{ name }` (empty string clears it) |
+| `POST /v1/analytics` | none | one anonymous funnel beacon, `{ event, packId, deviceId, appBuild, ts }` → 204 |
+| `GET /v1/analytics/summary?pack=<id>&days=<n>` | Bearer `ANALYTICS_READ_TOKEN` if set | per-event totals + distinct devices, per-day series |
 
 Rows are opaque JSON keyed by `(user_id, pack_id, tbl, id)` — the worker
 never interprets them; merge semantics live in the client
 (`src/lib/storage.ts` `mergeRemote`). The client half of the protocol is
 `src/lib/backends/httpBackend.ts`; the validation/SQL rules are pure and
 unit-tested (`tests/worker-sync.test.ts`).
+
+## Usage analytics (anonymous funnel beacons)
+
+The same worker can receive the app's optional usage analytics — a
+separate table, a separate trust model. A hosted app built with
+
+```sh
+NEXT_PUBLIC_ANALYTICS_URL=https://sync.quizmill.dev/v1/analytics   # or your own worker
+NEXT_PUBLIC_PRIVACY_URL=https://example.com/privacy                 # optional
+```
+
+sends `navigator.sendBeacon` posts for six funnel events (`app_open`,
+`first_answer`, `session_10`, `upsell_seen`, `upsell_clicked`,
+`bundle_inserted`) carrying exactly `{ event, packId, deviceId, appBuild,
+ts }`. There is deliberately no auth on the ingest route — devices hold
+no credential, and a sync key must never travel with a beacon — so the
+worker validates the body against a closed event list and tight size
+limits, stores it in `analytics_events`, and never looks at the request's
+IP or user agent. `deviceId` is a random UUID the learner can regenerate
+or switch off in Settings; nothing joins it to the `rows` or `profiles`
+tables.
+
+Read it back with
+
+```sh
+curl 'https://sync.quizmill.dev/v1/analytics/summary?pack=solar-system-demo&days=30'
+# {"pack":"solar-system-demo","days":30,"since":"…",
+#  "events":{"app_open":{"count":42,"devices":17},"first_answer":{…},…},
+#  "daily":[{"day":"2026-10-09","event":"app_open","devices":5},…]}
+```
+
+The summary is aggregate counts only, so it is open by default; to gate
+it, `npx wrangler secret put ANALYTICS_READ_TOKEN` and send the value as
+a bearer token. **Upgrading an existing deployment:** the table lives in
+`schema.sql` (idempotent) — re-run it, then `npx wrangler deploy`. Until
+the worker is redeployed the apps' beacons simply 404 and nothing is
+lost that matters (they are fire-and-forget).

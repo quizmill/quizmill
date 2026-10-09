@@ -26,6 +26,11 @@ name: Deploy pack (reusable)
 #                                           can also be passed as the `sync_url` input instead
 #   NEXT_PUBLIC_SUPABASE_URL                (optional) enables cloud sync via Supabase
 #   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY    (optional) public-safe; RLS is the guard
+#   NEXT_PUBLIC_ANALYTICS_URL               (optional) enables the anonymous funnel beacon
+#                                           (src/lib/analytics.ts); like the sync URL it is
+#                                           public, so the `analytics_url` input works too
+#   NEXT_PUBLIC_PRIVACY_URL                 (optional) privacy page linked from Settings;
+#                                           or the `privacy_url` input
 
 on:
   workflow_call:
@@ -51,6 +56,19 @@ on:
           Sync server URL baked into the build (NEXT_PUBLIC_SYNC_URL) —
           public by design, it ships in the client bundle. The
           NEXT_PUBLIC_SYNC_URL secret wins when both are set.
+        type: string
+        default: ''
+      analytics_url:
+        description: >-
+          Anonymous funnel-analytics endpoint baked into the build
+          (NEXT_PUBLIC_ANALYTICS_URL), e.g. the sync worker's
+          /v1/analytics. Public by design. The secret wins when both are set.
+        type: string
+        default: ''
+      privacy_url:
+        description: >-
+          Privacy page the Settings analytics note links to
+          (NEXT_PUBLIC_PRIVACY_URL). The secret wins when both are set.
         type: string
         default: ''
 
@@ -104,6 +122,8 @@ jobs:
           NEXT_PUBLIC_SYNC_URL: ${{ secrets.NEXT_PUBLIC_SYNC_URL || inputs.sync_url }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_ANALYTICS_URL: ${{ secrets.NEXT_PUBLIC_ANALYTICS_URL || inputs.analytics_url }}
+          NEXT_PUBLIC_PRIVACY_URL: ${{ secrets.NEXT_PUBLIC_PRIVACY_URL || inputs.privacy_url }}
         run: |
           # Carry THIS pack's commit in the Build tag (not the visible
           # version). finalise-build folds NEXT_PUBLIC_APP_BUILD into the SW
