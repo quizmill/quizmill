@@ -33,6 +33,8 @@ supabase/.temp/
 # authoring workspace for your own packs.
 /content/pack/
 /packs/
+# one-file pack hand-overs written by `quizmill bundle` / npm run pack:bundle
+*.bundle.json
 # generated from the active pack's manifest by scripts/pack-assets.ts
 /public/manifest.webmanifest
 /public/icon.svg

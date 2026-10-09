@@ -8,7 +8,9 @@
  *    optional scenarios.json / concepts.json) picked together or fetched
  *    from a base URL;
  *  - a single BUNDLE .json: `{ manifest, questions, scenarios?, concepts? }`
- *    — the same shape the runtime handoff uses.
+ *    — the same shape the runtime handoff uses. `quizmill bundle` writes
+ *    one with an extra `assets` map (image path → data URL) so a v2
+ *    pack's images travel inside the file; see tools/pack/bundle.ts.
  */
 
 export interface NamedText {
@@ -23,6 +25,8 @@ export type PackCandidate = {
   concepts?: unknown;
   /** Absolute base URL of the pack's `assets/` dir — see ActivePack. */
   assetsBase?: string;
+  /** Images embedded by `quizmill bundle` — see ActivePack. */
+  assets?: unknown;
 };
 
 export type ParseOutcome =

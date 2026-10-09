@@ -61,6 +61,15 @@ describe('collectPackImageUrls', () => {
     ]);
   });
 
+  it('skips images embedded in the pack itself — nothing to fetch for those', () => {
+    expect(
+      collectPackImageUrls(pack({ assets: { 'note-g4.svg': 'data:image/svg+xml;base64,' } })),
+    ).toEqual([
+      'https://host.example.com/pack/assets/rest-whole.svg',
+      'https://cdn.example.com/abs.png',
+    ]);
+  });
+
   it('keeps absolute urls but skips relative ones when there is no assetsBase', () => {
     expect(collectPackImageUrls(pack({ assetsBase: undefined }))).toEqual([
       'https://cdn.example.com/abs.png',

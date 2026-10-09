@@ -20,7 +20,8 @@ export const PACK_ASSETS_CACHE = 'quizmill-pack-assets';
  * Every image URL a pack references, deduped in first-seen order:
  * absolute http(s) image paths as-is, relative ones resolved against the
  * pack's assetsBase — or skipped when it has none (a file-picker insert;
- * nothing to prefetch from).
+ * nothing to prefetch from). Images a bundle embedded in the pack itself
+ * (`pack.assets`) are skipped too: they're already on the device.
  */
 export function collectPackImageUrls(pack: ActivePack): string[] {
   const base = pack.assetsBase?.replace(/\/+$/, '');
@@ -28,7 +29,11 @@ export function collectPackImageUrls(pack: ActivePack): string[] {
   const add = (src: string | undefined) => {
     if (!src) return;
     if (/^https?:\/\//i.test(src)) urls.add(src);
-    else if (base) urls.add(`${base}/${src.replace(/^\/+/, '')}`);
+    else {
+      const relative = src.replace(/^\/+/, '');
+      if (pack.assets?.[relative]) return;
+      if (base) urls.add(`${base}/${relative}`);
+    }
   };
   for (const q of pack.questions) {
     add(q.image);

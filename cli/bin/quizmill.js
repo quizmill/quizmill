@@ -12,6 +12,7 @@
  *   npx quizmill run my-topic        activate a pack and start the app
  *   npx quizmill run owner/repo      ...straight from a GitHub pack repo
  *   npx quizmill build my-topic      static site in <pack-id>-app/
+ *   npx quizmill bundle my-topic     one <pack-id>.bundle.json to hand over
  *   npx quizmill list                published packs
  *   npx quizmill upgrade             update the cached engine
  */
@@ -203,6 +204,40 @@ function cmdValidate(arg) {
   engineNpm(['run', 'pack:validate', src]);
 }
 
+/** The pack id from <dir>/pack.json, for naming the default bundle file;
+ *  null when the manifest can't be read (the engine's validator will
+ *  explain why, so don't die here). */
+function packIdOf(dir) {
+  try {
+    const id = JSON.parse(fs.readFileSync(path.join(dir, 'pack.json'), 'utf8')).id;
+    return typeof id === 'string' && id ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+function cmdBundle(arg, rest) {
+  if (!arg) die('usage: quizmill bundle <pack-dir> [--out file]');
+  const src = packSource(arg);
+  if (!fs.existsSync(src)) die(`not a directory: ${arg}`);
+  let out = null;
+  for (let i = 0; i < rest.length; i++) {
+    const a = rest[i];
+    if (a === '--out' || a === '-o') {
+      out = rest[++i];
+      if (!out) die('--out needs a file path');
+    } else if (a.startsWith('--out=')) {
+      out = a.slice('--out='.length);
+    } else {
+      die(`unknown option "${a}" — usage: quizmill bundle <pack-dir> [--out file]`);
+    }
+  }
+  // The engine runs from its own checkout, so hand it an absolute target
+  // (default: <pack-id>.bundle.json where the user typed the command).
+  const target = path.resolve(out || `${packIdOf(src) || path.basename(src)}.bundle.json`);
+  engineNpm(['run', 'pack:bundle', '--', src, '--out', target]);
+}
+
 function cmdUpgrade() {
   if (process.env.QUIZMILL_ENGINE) {
     ensureEngine();
@@ -227,6 +262,7 @@ usage:
   quizmill validate <dir>       schema + cross-reference checks
   quizmill run [dir|owner/repo] activate a pack (default: current/demo) and start the app
   quizmill build [dir|owner/repo]  build a static app into <pack-id>-app/
+  quizmill bundle <dir> [--out file]  one <pack-id>.bundle.json, images inside — insert it at /packs
   quizmill list                 published packs you can install
   quizmill upgrade              update the cached engine (~/.quizmill)
   quizmill --version            print the CLI version (stamped into builds)
@@ -235,13 +271,14 @@ A learning pack is three JSON files. You can write them, but the
 intended author is your AI agent — see the create-learning-pack skill
 in the engine repo.`;
 
-const [cmd, arg] = process.argv.slice(2);
+const [cmd, arg, ...rest] = process.argv.slice(2);
 try {
   switch (cmd) {
     case 'new':       cmdNew(arg); break;
     case 'validate':  cmdValidate(arg); break;
     case 'run':       cmdRun(arg); break;
     case 'build':     cmdBuild(arg); break;
+    case 'bundle':    cmdBundle(arg, rest); break;
     case 'list':      engineNpm(['run', 'pack:list']); break;
     case 'upgrade':   cmdUpgrade(); break;
     case 'version':

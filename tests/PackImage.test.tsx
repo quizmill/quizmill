@@ -29,11 +29,12 @@ afterEach(async () => {
   globalThis.__QUIZMILL_PACK__ = undefined;
 });
 
-function runtimePack(assetsBase?: string): ActivePack {
+function runtimePack(assetsBase?: string, assets?: Record<string, string>): ActivePack {
   return {
     manifest: { id: 'rt-pack' } as ActivePack['manifest'],
     questions: [],
     ...(assetsBase ? { assetsBase } : {}),
+    ...(assets ? { assets } : {}),
   };
 }
 
@@ -58,6 +59,17 @@ describe('PackImage src resolution', () => {
   it('falls back to /pack-assets/ for a runtime pack without assetsBase', async () => {
     globalThis.__QUIZMILL_PACK__ = runtimePack();
     expect(await renderImage('note.svg')).toBe('/pack-assets/note.svg');
+  });
+
+  it('serves an image embedded in a bundle straight from the pack, before any assetsBase', async () => {
+    const data = 'data:image/svg+xml;base64,PHN2Zy8+';
+    globalThis.__QUIZMILL_PACK__ = runtimePack('https://example.com/mt/assets', {
+      'note.svg': data,
+    });
+    expect(await renderImage('note.svg')).toBe(data);
+    expect(await renderImage('/note.svg')).toBe(data);
+    // Not embedded → the usual assetsBase resolution.
+    expect(await renderImage('rest.svg')).toBe('https://example.com/mt/assets/rest.svg');
   });
 
   it('passes absolute http(s) image URLs through untouched, override or not', async () => {

@@ -31,6 +31,7 @@ npx quizmill build my-topic      # static app in my-topic-app/ — deploy anywhe
 | `validate <dir>` | schema + cross-reference checks (agents loop on this) |
 | `run [dir\|owner/repo]` | activate a pack and start the app |
 | `build [dir\|owner/repo]` | emit a deployable static app in `<pack-id>-app/` |
+| `bundle <dir> [--out file]` | validate + write one `<pack-id>.bundle.json` to hand over (see [Share a pack as one file](#share-a-pack-as-one-file)) |
 | `list` | published packs you can install |
 | `upgrade` | re-align the cached engine (see [Upgrading](#upgrading)) |
 
@@ -95,6 +96,25 @@ If your questions build on someone else's bank, keep the upstream
 license, record provenance in each question's `sourceRef` (the app
 links to it in the answer panel), and reproduce upstream notices —
 again, pack-claude-cert is the worked example.
+
+## Share a pack as one file
+
+Not every pack wants to be a git repo. `bundle` validates a pack and
+writes it as a single `.json` — the pack files verbatim, plus every
+image from `assets/` embedded as a data URL, plus `schemaVersion`, the
+pack id, a `bundledAt` stamp and (in a git checkout) the pack's
+revision:
+
+```
+npx quizmill bundle my-topic                 # → my-topic.bundle.json
+npx quizmill bundle my-topic --out ~/Desktop/topic.json
+```
+
+Any quizmill app inserts the file at `/packs` (pick it, or paste a URL
+it's hosted at) — no CLI needed on the receiving end, and the pack
+works offline there because its images travel inside the file. Browsers
+keep an inserted pack in about 5 MiB of storage, so the bundler warns
+when the images push a bundle past 4 MiB.
 
 ## Pack format
 

@@ -39,6 +39,14 @@ export type ActivePack = {
    * for packs whose source had no reachable URL (e.g. picked files).
    */
   assetsBase?: string;
+  /**
+   * Images carried INSIDE the pack: pack-relative `image` path →
+   * `data:image/…;base64,…`, as written by `quizmill bundle`. Resolved
+   * ahead of `assetsBase` (see PackImage), so a bundled pack renders
+   * offline with nothing to fetch. Absent for packs inserted from a
+   * directory or URL — those prefetch into CacheStorage instead.
+   */
+  assets?: Record<string, string>;
 };
 
 declare global {

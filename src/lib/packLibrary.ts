@@ -107,6 +107,31 @@ export function getActivePackPointer(): string | null {
 }
 
 /**
+ * The images a bundle carries inline (`quizmill bundle`), kept only when
+ * they are what they claim: a plain relative image path mapped to a
+ * `data:image/…` URL. Anything else (a script URL, a remote URL, a path
+ * that climbs out of assets/) is dropped rather than stored — the map
+ * ends up in <img src>, so it gets the same scrutiny as assetsBase.
+ * Undefined when nothing survives, so the stored pack has no `assets`
+ * key at all.
+ */
+function embeddedAssets(raw: unknown): Record<string, string> | undefined {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return undefined;
+  const kept: Record<string, string> = {};
+  for (const [rel, src] of Object.entries(raw as Record<string, unknown>)) {
+    if (
+      typeof src === 'string' &&
+      /^data:image\/[a-z0-9.+-]+;base64,/i.test(src) &&
+      /^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(rel) &&
+      !rel.includes('..')
+    ) {
+      kept[rel] = src;
+    }
+  }
+  return Object.keys(kept).length > 0 ? kept : undefined;
+}
+
+/**
  * Validate and store a pack in the library. `raw` is the ActivePack shape
  * (`{ manifest, questions, scenarios?, concepts? }`) parsed from user
  * input — full schema + cross-file validation runs before anything is
@@ -148,12 +173,14 @@ export function insertPack(
     typeof candidate.assetsBase === 'string' && /^https?:\/\//i.test(candidate.assetsBase)
       ? candidate.assetsBase.replace(/\/+$/, '')
       : undefined;
+  const assets = embeddedAssets(candidate.assets);
   const pack: ActivePack = {
     manifest,
     questions: candidate.questions as ActivePack['questions'],
     scenarios: candidate.scenarios as ActivePack['scenarios'],
     concepts: candidate.concepts as ActivePack['concepts'],
     ...(assetsBase ? { assetsBase } : {}),
+    ...(assets ? { assets } : {}),
   };
   const entry: PackLibraryEntry = {
     id: manifest.id,
