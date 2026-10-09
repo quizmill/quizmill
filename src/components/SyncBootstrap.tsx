@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { startAnalytics } from '@/lib/analytics';
 import { recordEvent } from '@/lib/storage';
 import { startSync } from '@/lib/sync';
 import { deviceContext } from '@/pack/runner';
@@ -12,11 +13,14 @@ let openRecorded = false;
  * Kicks off the cloud-sync engine once, on the client, for the whole app.
  * No-ops when sync isn't configured. Renders nothing. Also the home of the
  * app-level analytics events: one app_open per load, and pwa_install when
- * the browser reports an Add-to-Home-Screen.
+ * the browser reports an Add-to-Home-Screen. The funnel beacon
+ * (src/lib/analytics.ts) subscribes here too, BEFORE app_open is recorded
+ * so the opening event is the first thing it sees.
  */
 export function SyncBootstrap() {
   useEffect(() => {
     startSync();
+    startAnalytics();
     if (!openRecorded) {
       openRecorded = true;
       recordEvent('app_open', { ...deviceContext() });

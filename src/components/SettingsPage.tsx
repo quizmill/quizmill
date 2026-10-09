@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
+  Activity,
   ArrowLeft,
   Boxes,
   Car,
@@ -39,6 +40,14 @@ import {
   saveProgressionShown,
 } from '@/lib/progressionPref';
 import { loadPaperModeEnabled, savePaperModeEnabled } from '@/lib/paper';
+import {
+  analyticsConfigured,
+  loadAnalyticsEnabled,
+  loadDeviceId,
+  privacyUrl,
+  regenerateDeviceId,
+  saveAnalyticsEnabled,
+} from '@/lib/analytics';
 import { packDefaultLook } from '@/lib/look';
 import type { LookPref } from '@/lib/look';
 import {
@@ -82,7 +91,8 @@ const LOOK_CHOICES: { value: LookPref; label: string }[] = [
  *                       declares one), question sources, `extras` slot
  *                       (e.g. the downvote browser)
  *  - Progress & sync  — SyncSettings, TransferSettings, the two resets
- *  - This device      — appearance, drive mode, coach mode
+ *  - This device      — appearance, drive mode, coach mode, paper, XP,
+ *                       usage analytics (only in builds that configure it)
  *  - About            — version + build (tap the version to reveal games)
  */
 export interface SettingsPageProps {
@@ -155,6 +165,25 @@ export function SettingsPage({ extras }: SettingsPageProps) {
     setPaperMode(next);
     savePaperModeEnabled(next);
   };
+
+  // Usage analytics (device-level) — the anonymous funnel beacon a hosted
+  // app sends its author. The card exists only in builds that configure
+  // an endpoint; the id is read after mount so it is never minted during
+  // the static render.
+  const analyticsOn = analyticsConfigured();
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
+  const [deviceId, setDeviceId] = useState('');
+  useEffect(() => {
+    if (!analyticsOn) return;
+    setAnalyticsEnabled(loadAnalyticsEnabled());
+    setDeviceId(loadDeviceId());
+  }, [analyticsOn]);
+  const toggleAnalytics = () => {
+    const next = !analyticsEnabled;
+    setAnalyticsEnabled(next);
+    saveAnalyticsEnabled(next);
+  };
+  const newDeviceId = () => setDeviceId(regenerateDeviceId());
 
   // Hidden games easter egg — revealed by tapping the version pill.
   const [versionTaps, setVersionTaps] = useState(0);
@@ -526,6 +555,77 @@ export function SettingsPage({ extras }: SettingsPageProps) {
                     progressionShown ? 'translate-x-6' : 'translate-x-1',
                   )}
                 />
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {analyticsOn ? (
+          <div
+            data-testid="analytics-card"
+            className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
+                  <Activity className="h-5 w-5 text-ink-500" />
+                  Usage analytics
+                </h3>
+                <p className="mt-1 text-sm text-ink-600">
+                  Tells whoever hosts this app that it is being used: a
+                  handful of anonymous events (opened, first answer, tenth
+                  session…) tagged with a random device id. No account, no
+                  cookies, no names, and nothing about what you answered.
+                  {privacyUrl() ? (
+                    <>
+                      {' '}
+                      <a
+                        href={privacyUrl() ?? undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-testid="analytics-privacy"
+                        className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-900"
+                      >
+                        Privacy policy
+                      </a>
+                    </>
+                  ) : null}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={analyticsEnabled}
+                aria-label="Usage analytics"
+                data-testid="analytics-toggle"
+                onClick={toggleAnalytics}
+                className={cn(
+                  'tap-feedback relative mt-1 inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors',
+                  analyticsEnabled ? 'bg-brand-500' : 'bg-ink-200',
+                )}
+              >
+                <span
+                  className={cn(
+                    'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
+                    analyticsEnabled ? 'translate-x-6' : 'translate-x-1',
+                  )}
+                />
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-500">
+              <span>
+                Device id{' '}
+                <code data-testid="analytics-device-id" className="font-mono text-ink-700">
+                  {deviceId ? `${deviceId.slice(0, 8)}…` : '—'}
+                </code>
+              </span>
+              <button
+                type="button"
+                data-testid="analytics-new-id"
+                onClick={newDeviceId}
+                className="tap-feedback rounded-lg border border-ink-200 bg-surface px-2.5 py-1 font-semibold text-ink-700 hover:bg-ink-50 dark:hover:bg-ink-100"
+              >
+                New device id
               </button>
             </div>
           </div>

@@ -39,3 +39,23 @@ CREATE TABLE IF NOT EXISTS profiles (
   name       TEXT NOT NULL,
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
+
+-- Anonymous funnel analytics (POST /v1/analytics, src/analytics.ts): one
+-- row per beacon a hosted app sends — an event from a closed list, the
+-- pack, a random device id the learner can regenerate, the app build, the
+-- client's timestamp and the server's receipt time (both unix ms; the
+-- summary windows on received_at). Deliberately NOT joined to `rows` or
+-- `profiles`: a device id never meets a sync key.
+CREATE TABLE IF NOT EXISTS analytics_events (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  event       TEXT NOT NULL,
+  pack_id     TEXT NOT NULL,
+  device_id   TEXT NOT NULL,
+  app_build   TEXT NOT NULL DEFAULT '',
+  ts          INTEGER NOT NULL,
+  received_at INTEGER NOT NULL
+);
+
+-- The summary reads one pack over a time window.
+CREATE INDEX IF NOT EXISTS analytics_by_pack
+  ON analytics_events (pack_id, received_at);

@@ -29,6 +29,7 @@ import {
 } from '@/lib/packLibrary';
 import { cachePackAssets } from '@/lib/packAssets';
 import { fetchPackFromUrl, parsePackFiles, type ParseOutcome } from '@/lib/packInsert';
+import { recordEvent } from '@/lib/storage';
 import {
   loadRegistry,
   registryRepoUrl,
@@ -198,6 +199,9 @@ export function PacksPage() {
       return;
     }
     setErrors([]);
+    // Funnel event (src/lib/analytics.ts) — recorded under the ACTIVE pack,
+    // naming the one that arrived.
+    recordEvent('bundle_inserted', { pack: result.entry.id });
     const base = `Inserted “${result.entry.title}” (${result.entry.questionCount} questions). Make it active to start practising.`;
     setMessage(base);
     refresh();
