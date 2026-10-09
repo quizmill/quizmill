@@ -20,6 +20,7 @@ npx quizmill build my-topic      # static app in my-topic-app/ — deploy anywhe
 | `validate <dir>` | schema + cross-reference checks (agents loop on this) |
 | `run [dir\|owner/repo]` | activate a pack and start the app |
 | `build [dir\|owner/repo]` | emit a deployable static app in `<pack-id>-app/` |
+| `bundle <dir> [--out file]` | validate + write one `<pack-id>.bundle.json` (images inside) that any quizmill app inserts at `/packs` |
 | `list` | published packs you can install |
 | `upgrade` | update the cached engine in `~/.quizmill` |
 
