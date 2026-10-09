@@ -6,6 +6,11 @@
  *
  * Exit 0 when the pack is valid (warnings allowed), 1 otherwise.
  * Agents authoring packs should loop on this until it passes.
+ *
+ * Checks the per-file Zod schemas (manifest incl. the optional `exam`,
+ * `games`, `progression` and `upgrade` blocks — an `upgrade.url` must be
+ * https), then the cross-file references: unique ids, category / scenario
+ * / concept / level keys, image paths, category weights.
  */
 import fs from 'node:fs';
 import path from 'node:path';

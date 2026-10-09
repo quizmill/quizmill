@@ -462,6 +462,66 @@ describe('validatePack', () => {
     expect(validatePack(input).ok).toBe(false);
   });
 
+  // ——— upgrade card (opt-in, pack-generic) ———
+
+  it('accepts a full upgrade block', () => {
+    const input = loadDemo();
+    (input.manifest as { upgrade?: unknown }).upgrade = {
+      title: 'Get the full course',
+      url: 'https://example.com/course',
+      price: '£15',
+      blurb: '600 more questions, every exam domain, and mock papers.',
+    };
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('accepts a minimal upgrade block (title + url) on a v1 manifest', () => {
+    const input = loadDemo();
+    (input.manifest as { schemaVersion: number }).schemaVersion = 1;
+    (input.manifest as { upgrade?: unknown }).upgrade = {
+      title: 'Get the full course',
+      url: 'https://example.com/course',
+    };
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('rejects an upgrade url that is not https', () => {
+    const http = loadDemo();
+    (http.manifest as { upgrade?: unknown }).upgrade = {
+      title: 'Get the full course',
+      url: 'http://example.com/course',
+    };
+    const result = validatePack(http);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.includes('upgrade.url') && e.includes('https'))).toBe(true);
+
+    const junk = loadDemo();
+    (junk.manifest as { upgrade?: unknown }).upgrade = {
+      title: 'Get the full course',
+      url: 'javascript:alert(1)',
+    };
+    expect(validatePack(junk).ok).toBe(false);
+  });
+
+  it('rejects an upgrade block missing its title or url', () => {
+    const noTitle = loadDemo();
+    (noTitle.manifest as { upgrade?: unknown }).upgrade = { url: 'https://example.com' };
+    expect(validatePack(noTitle).ok).toBe(false);
+
+    const noUrl = loadDemo();
+    (noUrl.manifest as { upgrade?: unknown }).upgrade = { title: 'Get the full course' };
+    expect(validatePack(noUrl).ok).toBe(false);
+  });
+
+  it('keeps the demo pack free of an upgrade block', () => {
+    const input = loadDemo();
+    expect((input.manifest as { upgrade?: unknown }).upgrade).toBeUndefined();
+  });
+
   // The demo pack itself carries generatedFrom examples (demo-planets-012/013),
   // so the "accepts the committed demo pack" test covers the happy path.
   it('accepts a dangling generatedFrom reference (soft — original may be culled)', () => {

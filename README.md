@@ -104,7 +104,7 @@ v1 packs still load unchanged):
 
 | File | What |
 |---|---|
-| `pack.json` | manifest — title, description, theme colour, categories, optional `levels` + `sources` |
+| `pack.json` | manifest — title, description, theme colour, categories, optional `levels` + `sources`, optional `upgrade` |
 | `questions.json` | the bank: multiple-choice (2–6 options keyed A–F), explanation, difficulty 1–5, provenance |
 | `scenarios.json` | optional shared scenario stems for case-study style questions |
 | `concepts.json` | optional concept cards surfaced in the answer panel (`conceptId` on a question) |
@@ -123,6 +123,15 @@ Schema v2 adds, all optional and backward-compatible:
 - **source legend** — manifest `sources` (`[{label,name,blurb,url}]`)
   renders a "Question sources" card in Settings; questions reference an
   entry by `sourceRef`
+
+Optional for any schema version:
+
+- **upgrade card** — manifest `upgrade` (`{title, url, price?, blurb?}`)
+  for a free sampler pointing at its paid course or fuller bank: one
+  card on Home (below the practice loop) and one in Settings, linking
+  to the https `url` with `?ref=<packId>-home` / `-settings` appended
+  so the destination can tell where the tap came from. The engine
+  carries no shop or price of its own — the pack supplies the words.
 
 The validator (`npx quizmill validate <dir>`) cross-checks ids,
 category / scenario / concept / level references, image paths, and
