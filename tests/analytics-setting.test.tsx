@@ -10,12 +10,14 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { webcrypto } from 'node:crypto';
 import { SettingsPage } from '@/components/SettingsPage';
+import { SyncBootstrap } from '@/components/SyncBootstrap';
 import { UpgradeCard } from '@/pack/UpgradeCard';
 import {
   ANALYTICS_URL_ENV,
   DEVICE_ID_KEY,
   loadAnalyticsEnabled,
   loadDeviceId,
+  stopAnalyticsForTests,
 } from '@/lib/analytics';
 import { loadEvents } from '@/lib/storage';
 
@@ -74,6 +76,35 @@ async function click(el: Element | null) {
     el!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 }
+
+// First in the file: UpgradeCard's once-per-load guard is module-level, so
+// this must see the `settings` placement before any SettingsPage render does.
+describe('funnel beacon on a direct page load', () => {
+  it('beacons upsell_seen on a direct page load, where the page mounts before SyncBootstrap', async () => {
+    const sent: string[] = [];
+    Object.defineProperty(navigator, 'sendBeacon', {
+      configurable: true,
+      value: (_url: string, body: string) => {
+        sent.push(body);
+        return true;
+      },
+    });
+    try {
+      // The layout's order: the page subtree (and its effects) first, the
+      // bootstrap after. The subscriber must still see the impression.
+      await render(
+        <>
+          <UpgradeCard placement="settings" />
+          <SyncBootstrap />
+        </>,
+      );
+      const events = sent.map((b) => JSON.parse(b).event);
+      expect(events).toContain('upsell_seen');
+    } finally {
+      stopAnalyticsForTests();
+    }
+  });
+});
 
 describe('Usage analytics card in Settings', () => {
   it('is absent in a build without an analytics endpoint', async () => {
