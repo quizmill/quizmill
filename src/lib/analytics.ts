@@ -127,8 +127,17 @@ export function regenerateDeviceId(): string {
 
 // ── Preference ──────────────────────────────────────────────────────────
 
+/**
+ * The preference as last set on THIS page when localStorage refused to
+ * persist it (quota, storage policy). Without it the off switch would
+ * flip the toggle and nothing else: the next beacon re-reads the absent
+ * key as "on". Null = storage holds the truth.
+ */
+let unpersistedPref: boolean | null = null;
+
 export function loadAnalyticsEnabled(): boolean {
   if (!browser()) return true;
+  if (unpersistedPref !== null) return unpersistedPref;
   try {
     return window.localStorage.getItem(ANALYTICS_PREF_KEY) !== '0';
   } catch {
@@ -141,8 +150,10 @@ export function saveAnalyticsEnabled(on: boolean): void {
   try {
     if (on) window.localStorage.removeItem(ANALYTICS_PREF_KEY);
     else window.localStorage.setItem(ANALYTICS_PREF_KEY, '0');
+    unpersistedPref = null;
   } catch {
-    // storage unavailable — the in-page state still applies
+    // storage unavailable — honour the choice in memory for this page
+    unpersistedPref = on;
   }
   window.dispatchEvent(new Event(ANALYTICS_EVENT));
 }
@@ -164,13 +175,20 @@ export function beaconFor(event: AppEvent, deviceId: string, appBuild: string): 
  * Fire-and-forget POST. `navigator.sendBeacon` is the right tool: it
  * survives the page unloading (upsell_clicked opens a new tab) and never
  * blocks the UI. The body is a plain string so the request stays a CORS
- * "simple" request — no preflight for the worker to answer. Older
- * browsers without sendBeacon get a keepalive fetch instead.
+ * "simple" request — no preflight for the worker to answer. The keepalive
+ * fetch is the fallback for browsers without sendBeacon AND for the cases
+ * where sendBeacon declines (returns false: its per-page queue is full)
+ * or throws (an extension or policy blocks it) — otherwise the event
+ * would be silently dropped.
  */
 function post(url: string, body: string): boolean {
   const nav = globalThis.navigator as Navigator | undefined;
   if (nav && typeof nav.sendBeacon === 'function') {
-    return nav.sendBeacon(url, body);
+    try {
+      if (nav.sendBeacon(url, body)) return true;
+    } catch {
+      // fall through to fetch
+    }
   }
   if (typeof fetch === 'function') {
     void fetch(url, { method: 'POST', body, keepalive: true, mode: 'cors' }).catch(() => {});
@@ -270,4 +288,5 @@ export function startAnalytics(): void {
 export function stopAnalyticsForTests(): void {
   unsubscribe?.();
   unsubscribe = null;
+  unpersistedPref = null;
 }

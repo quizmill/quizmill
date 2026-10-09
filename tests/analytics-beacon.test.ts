@@ -173,11 +173,59 @@ describe('sendFunnelEvent', () => {
     expect(init.keepalive).toBe(true);
   });
 
-  it('never throws when the transport does', () => {
+  it('falls back to fetch when sendBeacon declines to queue the payload', () => {
+    vi.stubGlobal('navigator', { sendBeacon: () => false });
+    const fetchMock = vi.fn(() => Promise.resolve(new Response(null, { status: 204 })));
+    vi.stubGlobal('fetch', fetchMock);
+    expect(sendFunnelEvent({ id: 'e1', type: 'app_open', at: 1 })).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).event).toBe('app_open');
+  });
+
+  it('falls back to fetch when sendBeacon throws', () => {
+    vi.stubGlobal('navigator', {
+      sendBeacon: () => {
+        throw new Error('blocked');
+      },
+    });
+    const fetchMock = vi.fn(() => Promise.resolve(new Response(null, { status: 204 })));
+    vi.stubGlobal('fetch', fetchMock);
+    expect(sendFunnelEvent({ id: 'e1', type: 'app_open', at: 1 })).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('honours the off switch for the rest of the page when storage refuses the write', () => {
+    const store = fakeLocalStorage();
+    vi.stubGlobal('window', {
+      localStorage: {
+        ...store,
+        setItem: () => {
+          throw new Error('QuotaExceededError');
+        },
+      },
+      dispatchEvent: () => true,
+    });
+    // Can't persist the device id either, so seed one the read path finds.
+    store.setItem(DEVICE_ID_KEY, '33333333-3333-4333-8333-333333333333');
+    saveAnalyticsEnabled(false);
+    expect(loadAnalyticsEnabled()).toBe(false);
+    expect(sendFunnelEvent({ id: 'e1', type: 'app_open', at: 1 })).toBe(false);
+    expect(sent).toHaveLength(0);
+    saveAnalyticsEnabled(true);
+    expect(loadAnalyticsEnabled()).toBe(true);
+    expect(sendFunnelEvent({ id: 'e2', type: 'app_open', at: 2 })).toBe(true);
+    expect(sent).toHaveLength(1);
+  });
+
+  it('never throws when both transports do', () => {
     vi.stubGlobal('navigator', {
       sendBeacon: () => {
         throw new Error('boom');
       },
+    });
+    vi.stubGlobal('fetch', () => {
+      throw new Error('boom');
     });
     expect(() => sendFunnelEvent({ id: 'e1', type: 'app_open', at: 5 })).not.toThrow();
   });
