@@ -156,21 +156,30 @@ export function buildPackBundle(
   const questions = input.questions as PackQuestion[];
 
   const assets: Record<string, string> = {};
-  const missing: string[] = [];
+  const errors: string[] = [];
+  const assetsDir = path.join(dir, 'assets');
+  // The schema already forbids `..` and absolute paths, so the only way a
+  // reference can leave assets/ is a symlink. A bundle is SHARED, so
+  // embed nothing whose real location is outside the pack's own assets/
+  // directory — otherwise a stray link would ship a local file as an
+  // "image" to whoever receives the bundle.
+  const assetsRoot = fs.existsSync(assetsDir) ? fs.realpathSync(assetsDir) : undefined;
   for (const rel of referencedImages(questions)) {
-    const file = path.join(dir, 'assets', rel);
-    if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {
-      missing.push(`assets/${rel}`);
+    const file = path.join(assetsDir, rel);
+    if (!assetsRoot || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
+      errors.push(`assets/${rel}: referenced by a question but not found in ${dir}`);
       continue;
     }
-    assets[rel] = dataUrl(file);
+    const real = fs.realpathSync(file);
+    if (!real.startsWith(assetsRoot + path.sep)) {
+      errors.push(
+        `assets/${rel}: resolves to ${real}, outside the pack's assets/ directory — a bundle only embeds the pack's own files`,
+      );
+      continue;
+    }
+    assets[rel] = dataUrl(real);
   }
-  if (missing.length > 0) {
-    return {
-      ok: false,
-      errors: missing.map((m) => `${m}: referenced by a question but not found in ${dir}`),
-    };
-  }
+  if (errors.length > 0) return { ok: false, errors };
 
   const bundle: PackBundle = {
     format: BUNDLE_FORMAT,

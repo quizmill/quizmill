@@ -111,6 +111,35 @@ describe('buildPackBundle', () => {
     if (!out.ok) expect(out.errors.join('\n')).toContain('assets/gone.svg');
   });
 
+  // A bundle is shared, so what it embeds must come from the pack itself:
+  // a symlink in assets/ pointing elsewhere (a stray ~/.ssh/id_ed25519,
+  // a file on another drive) would otherwise ride along as "an image".
+  it('refuses an asset that is a symlink to a file outside assets/', () => {
+    const secret = path.join(tmp, 'secret.svg');
+    fs.writeFileSync(secret, '<svg>not yours</svg>');
+    const dir = writeMiniPack({ image: 'link.svg', assetBytes: null });
+    fs.symlinkSync(secret, path.join(dir, 'assets', 'link.svg'));
+    const out = buildPackBundle(dir);
+    expect(out.ok).toBe(false);
+    if (!out.ok) {
+      expect(out.errors.join('\n')).toContain('assets/link.svg');
+      expect(out.errors.join('\n')).toContain('outside');
+    }
+  });
+
+  it('still embeds a symlink that stays inside assets/', () => {
+    const dir = writeMiniPack({ image: 'alias.svg', assetBytes: null });
+    fs.writeFileSync(path.join(dir, 'assets', 'real.svg'), '<svg/>');
+    fs.symlinkSync('real.svg', path.join(dir, 'assets', 'alias.svg'));
+    const out = buildPackBundle(dir);
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.bundle.assets?.['alias.svg']).toBe(
+        `data:image/svg+xml;base64,${Buffer.from('<svg/>').toString('base64')}`,
+      );
+    }
+  });
+
   it('refuses an invalid pack with the validator’s own errors', () => {
     const dir = writeMiniPack();
     fs.writeFileSync(path.join(dir, 'questions.json'), '[]');
