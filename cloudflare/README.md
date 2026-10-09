@@ -151,11 +151,19 @@ sends `navigator.sendBeacon` posts for six funnel events (`app_open`,
 `bundle_inserted`) carrying exactly `{ event, packId, deviceId, appBuild,
 ts }`. There is deliberately no auth on the ingest route — devices hold
 no credential, and a sync key must never travel with a beacon — so the
-worker validates the body against a closed event list and tight size
-limits, stores it in `analytics_events`, and never looks at the request's
-IP or user agent. `deviceId` is a random UUID the learner can regenerate
-or switch off in Settings; nothing joins it to the `rows` or `profiles`
-tables.
+worker refuses any body over 1 KiB before parsing it (413; a real beacon
+is ~170 bytes), validates the rest against a closed event list and
+per-field length limits, stores it in `analytics_events`, and never
+looks at the request's IP or user agent. `deviceId` is a random UUID the
+learner can regenerate or switch off in Settings; nothing joins it to
+the `rows` or `profiles` tables.
+
+The ingest route is not rate-limited in the worker: the counts are
+aggregate and advisory, each accepted beacon costs one D1 row write
+inside the free tier's daily quota, and a limiter keyed on the client
+address would have the worker reading IPs. If an app ever draws abuse,
+put a Cloudflare rate-limiting rule on `/v1/analytics` at the zone (no
+worker change needed) — it drops the excess before the worker runs.
 
 Read it back with
 

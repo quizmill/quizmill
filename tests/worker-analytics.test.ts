@@ -11,6 +11,7 @@ import path from 'node:path';
 import worker from '../cloudflare/src/worker';
 import {
   FUNNEL_EVENTS as WORKER_FUNNEL_EVENTS,
+  MAX_BEACON_BYTES,
   parseBeacon,
   parseSummaryQuery,
   statementsForBeacon,
@@ -244,6 +245,37 @@ describe('analytics end-to-end (client beacon ↔ real worker ↔ real SQLite)',
       expect(res.status).toBe(400);
     }
     expect(db.prepare('SELECT COUNT(*) AS n FROM analytics_events').get()).toEqual({ n: 0 });
+  });
+
+  it('rejects an oversized body before parsing it, declared or actual', async () => {
+    const padded = JSON.stringify({ ...beacon, pad: 'x'.repeat(MAX_BEACON_BYTES) });
+    const res = await worker.fetch(
+      new Request('https://sync.test/v1/analytics', { method: 'POST', body: padded }),
+      env as never,
+    );
+    expect(res.status).toBe(413);
+
+    // A declared length over the cap is refused without reading the body.
+    const declared = await worker.fetch(
+      new Request('https://sync.test/v1/analytics', {
+        method: 'POST',
+        body: JSON.stringify(beacon),
+        headers: { 'content-length': String(MAX_BEACON_BYTES + 1) },
+      }),
+      env as never,
+    );
+    expect(declared.status).toBe(413);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM analytics_events').get()).toEqual({ n: 0 });
+
+    // A real beacon sits well under the cap.
+    const ok = await worker.fetch(
+      new Request('https://sync.test/v1/analytics', {
+        method: 'POST',
+        body: JSON.stringify(beacon),
+      }),
+      env as never,
+    );
+    expect(ok.status).toBe(204);
   });
 
   it('the summary is gated by ANALYTICS_READ_TOKEN when one is configured', async () => {

@@ -42,6 +42,13 @@ export interface SqlStatement {
   params: (string | number | null)[];
 }
 
+/**
+ * Hard cap on a beacon body, checked BEFORE JSON.parse: a real beacon is
+ * ~170 bytes, so anything past this is not one and is refused unread
+ * (413) rather than parsed into Worker memory.
+ */
+export const MAX_BEACON_BYTES = 1024;
+
 const MAX_ID_LENGTH = 200;
 const MAX_DEVICE_ID_LENGTH = 64;
 const MAX_BUILD_LENGTH = 100;

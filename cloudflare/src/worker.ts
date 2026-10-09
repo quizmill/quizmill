@@ -34,6 +34,7 @@ import {
 } from './ops';
 import type { TableName } from './ops';
 import {
+  MAX_BEACON_BYTES,
   buildSummary,
   parseBeacon,
   parseSummaryQuery,
@@ -166,11 +167,22 @@ async function handlePutProfile(request: Request, env: Env, userId: string): Pro
  * empty 204 — `navigator.sendBeacon` never reads it anyway. The body
  * arrives as text/plain (a CORS-simple request, no preflight), so it is
  * parsed by hand rather than via request.json()'s content-type sniffing.
+ * Size is bounded before anything is parsed: a declared Content-Length
+ * over the cap is refused without reading the body at all, and the read
+ * body is measured again (the header is optional and unverified).
  */
 async function handleBeacon(request: Request, env: Env): Promise<Response> {
+  const declared = Number(request.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > MAX_BEACON_BYTES) {
+    return json({ error: 'beacon too large' }, 413);
+  }
+  const text = await request.text();
+  if (text.length > MAX_BEACON_BYTES) {
+    return json({ error: 'beacon too large' }, 413);
+  }
   let body: unknown;
   try {
-    body = JSON.parse(await request.text());
+    body = JSON.parse(text);
   } catch {
     return json({ error: 'invalid JSON' }, 400);
   }
