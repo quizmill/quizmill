@@ -52,6 +52,15 @@ export type PackGames = {
  *  deliberately no options yet. */
 export type PackProgression = Record<string, never>;
 
+/** Optional upgrade pitch declared by the pack — a sampler's link to the
+ *  paid course / full bank. Rendered as a card on Home and in Settings. */
+export type PackUpgrade = {
+  title: string;
+  url: string;
+  price?: string;
+  blurb?: string;
+};
+
 /** Option keys, A–F (v2 allows 2–6 options; v1 packs use A–D). */
 export type OptionKey = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
@@ -69,6 +78,7 @@ export type PackManifest = {
   exam?: PackExam;
   games?: PackGames;
   progression?: PackProgression;
+  upgrade?: PackUpgrade;
   /** Default visual look; 'poster' = the loud campaign style. */
   look?: 'classic' | 'poster';
 };

@@ -45,6 +45,7 @@ import {
 } from '@/pack/data';
 import { ExamReadinessTile } from '@/pack/ExamReadiness';
 import { ProgressCard } from '@/pack/ProgressCard';
+import { UpgradeCard } from '@/pack/UpgradeCard';
 
 /** Runtime-pack mode (quizmill-cloud's served engine): the pack is injected at
  *  boot from the browser, so it differs from the build-time pack baked into the
@@ -466,6 +467,10 @@ export default function PackHome() {
           })}
         </div>
       </section>
+
+      {/* The pack's upgrade pitch, if it has one — last, below the practice
+          loop: a sampler sells itself by being practised, not by a banner. */}
+      <UpgradeCard placement="home" />
     </main>
   );
 }

@@ -49,6 +49,16 @@ export interface GamesConfig {
  *  `progression` block. Presence enables; absent → no XP anywhere. */
 export type ProgressionConfig = Record<string, never>;
 
+/** Optional upgrade pitch, mirrored from the manifest `upgrade` block —
+ *  a sampler pack pointing at its paid course. Absent → no card anywhere. */
+export interface UpgradeConfig {
+  title: string;
+  /** https destination; the card appends `?ref=<packId>-<placement>`. */
+  url: string;
+  price?: string;
+  blurb?: string;
+}
+
 export interface AppConfig {
   /** Pack identifier — also namespaces localStorage. */
   packId: string;
@@ -69,6 +79,8 @@ export interface AppConfig {
   games?: GamesConfig;
   /** XP/levels progression, when the pack opts in. */
   progression?: ProgressionConfig;
+  /** Upgrade pitch card, when the pack declares one. */
+  upgrade?: UpgradeConfig;
 }
 
 export const APP_CONFIG: AppConfig = {
@@ -82,6 +94,7 @@ export const APP_CONFIG: AppConfig = {
   exam: (manifest as { exam?: ExamConfig }).exam,
   games: (manifest as { games?: GamesConfig }).games,
   progression: (manifest as { progression?: ProgressionConfig }).progression,
+  upgrade: (manifest as { upgrade?: UpgradeConfig }).upgrade,
 };
 
 /**
