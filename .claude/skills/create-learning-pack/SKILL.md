@@ -35,13 +35,13 @@ example.
      emoji that fits the category — e.g. `"🪐"`, `"🚀"`); it appears on
      the category card and its mastery sticker. Omit it and the app
      falls back to a generic emoji by order.
-     Optional `upgrade: { title, url, price?, blurb? }` — only for a
-     free sampler that points at a paid course or fuller bank. The app
-     renders it as a card on Home (below the categories) and in
-     Settings, linking to `url` (must be `https://`) with
-     `?ref=<pack-id>-home` / `-settings` appended so the destination
-     can tell where the tap came from. Leave it out otherwise — most
-     packs have nothing to upsell, and the demo pack never carries one.
+    Optional `upgrade: { title, url, price?, blurb? }` — for a pack that
+    points learners at a fuller edition, companion pack, course, app, or
+    related site. The app renders it as a card on Home (below the
+    categories) and in Settings, linking to `url` (must be `https://`)
+    with `?ref=<pack-id>-home` / `-settings` appended so the destination
+    can tell where the tap came from. Leave it out when the pack has no
+    related offering, and never add one to the demo pack.
    - `questions.json` — array of questions: slug `id` (unique,
      prefix with the pack id), `categoryKey` (must match a manifest
      category), `difficulty` 1–5, `prompt` (≥20 chars), 2–6
