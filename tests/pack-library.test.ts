@@ -224,6 +224,37 @@ describe('insertPack — image assetsBase', () => {
   });
 });
 
+describe('insertPack — embedded bundle assets', () => {
+  it('keeps the assets map a bundle carries so images render offline', () => {
+    const assets = { 'note.svg': 'data:image/svg+xml;base64,PHN2Zy8+' };
+    const result = insertPack({ ...validPack(), assets }, { buildPackId: BUILD_PACK_ID });
+    expect(result.ok).toBe(true);
+    expect(getInsertedPack('capitals-mini')?.assets).toEqual(assets);
+  });
+
+  it('keeps only data:image/… entries under plain relative paths', () => {
+    const assets = {
+      'ok.svg': 'data:image/svg+xml;base64,PHN2Zy8+',
+      'script.svg': 'javascript:alert(1)',
+      'remote.png': 'https://example.com/x.png',
+      '../escape.svg': 'data:image/svg+xml;base64,PHN2Zy8+',
+      'text.svg': 'data:text/html;base64,PHN2Zy8+',
+    };
+    const result = insertPack({ ...validPack(), assets }, { buildPackId: BUILD_PACK_ID });
+    expect(result.ok).toBe(true);
+    expect(getInsertedPack('capitals-mini')?.assets).toEqual({
+      'ok.svg': 'data:image/svg+xml;base64,PHN2Zy8+',
+    });
+  });
+
+  it('stores no assets key at all when the map is empty or junk', () => {
+    expect(insertPack({ ...validPack(), assets: {} }, { buildPackId: BUILD_PACK_ID }).ok).toBe(true);
+    expect(getInsertedPack('capitals-mini')?.assets).toBeUndefined();
+    expect(insertPack({ ...validPack(), assets: 'nope' }, { buildPackId: BUILD_PACK_ID }).ok).toBe(true);
+    expect(getInsertedPack('capitals-mini')?.assets).toBeUndefined();
+  });
+});
+
 describe('ejectPack — cached image cleanup', () => {
   it('drops the pack’s cached images along with the pack', async () => {
     const deleted: string[] = [];

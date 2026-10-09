@@ -6,17 +6,22 @@ const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 /**
  * Resolve a pack-relative image path to a URL, exported for tests.
  *
- * Absolute http(s) URLs pass through untouched. Relative paths resolve
- * against the RUNTIME pack's recorded `assetsBase` when one is active
- * (a runtime-inserted pack ships no files in this deployment, so its
- * images live wherever the pack was inserted from), and otherwise
- * against the app's own `/pack-assets/` — the build-time pack's assets,
- * mirrored there by scripts/pack-assets.ts.
+ * Absolute http(s) URLs pass through untouched. A relative path is
+ * served straight from the RUNTIME pack's embedded `assets` when a
+ * bundle carried the image inside (a data URL — nothing to fetch);
+ * otherwise it resolves against the pack's recorded `assetsBase` when
+ * one is active (a runtime-inserted pack ships no files in this
+ * deployment, so its images live wherever the pack was inserted from),
+ * and otherwise against the app's own `/pack-assets/` — the build-time
+ * pack's assets, mirrored there by scripts/pack-assets.ts.
  */
 export function resolvePackImageSrc(src: string): string {
   if (src.startsWith('http')) return src;
   const relative = src.replace(/^\/+/, '');
-  const assetsBase = getActivePackOverride()?.assetsBase;
+  const pack = getActivePackOverride();
+  const embedded = pack?.assets?.[relative];
+  if (embedded) return embedded;
+  const assetsBase = pack?.assetsBase;
   if (assetsBase) return `${assetsBase.replace(/\/+$/, '')}/${relative}`;
   return `${BASE_PATH}/pack-assets/${relative}`;
 }
