@@ -48,6 +48,7 @@ import {
   progressionEnabled,
 } from '@/pack/data';
 import { enabledGames } from '@/lib/games/registry';
+import { UpgradeCard } from '@/pack/UpgradeCard';
 
 /** Taps on the version pill that reveal the hidden games panel — the
  *  Android-style "tap the build number" easter egg. Games are a treat, so
@@ -77,8 +78,9 @@ const LOOK_CHOICES: { value: LookPref; label: string }[] = [
  * Settings page, grouped into labelled sections so it stays scannable as
  * cards accumulate:
  *  - (top)            — InstallCard, a self-hiding call-to-action banner
- *  - Packs            — pack library entry, question sources, `extras`
- *                       slot (e.g. the downvote browser)
+ *  - Packs            — pack library entry, the pack's upgrade card (if it
+ *                       declares one), question sources, `extras` slot
+ *                       (e.g. the downvote browser)
  *  - Progress & sync  — SyncSettings, TransferSettings, the two resets
  *  - This device      — appearance, drive mode, coach mode
  *  - About            — version + build (tap the version to reveal games)
@@ -241,6 +243,8 @@ export function SettingsPage({ extras }: SettingsPageProps) {
             Manage packs
           </Link>
         </div>
+
+        <UpgradeCard placement="settings" />
 
         {packSources.length > 0 ? (
           <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">

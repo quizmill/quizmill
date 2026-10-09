@@ -137,6 +137,30 @@ export const packGamesSchema = z.object({
  */
 export const packProgressionSchema = z.object({});
 
+/**
+ * Optional upgrade pitch (additive; valid for v1 and v2 packs). A free or
+ * sampler pack points at the paid course / full bank it is a taste of: the
+ * app renders one card on Home (below the practice loop) and one in
+ * Settings, linking out to `url` with `?ref=<packId>-<home|settings>`
+ * appended so the destination can tell where the tap came from.
+ * Deliberately generic — the engine knows no shop or price list; the pack
+ * supplies the words. Absent → no card anywhere, exactly as today.
+ */
+export const packUpgradeSchema = z.object({
+  /** Card headline, e.g. "Get the full course". */
+  title: z.string().min(3).max(80),
+  /** Where the card links. Must be https — it opens in a new tab and the
+   *  ref param is appended, so a bare or non-web URL is an authoring slip. */
+  url: z
+    .string()
+    .url()
+    .refine((u) => u.startsWith('https://'), { message: 'must be an https URL' }),
+  /** Free-form price label shown as a pill, e.g. "£15", "$29/yr", "Free trial". */
+  price: z.string().min(1).max(24).optional(),
+  /** One or two sentences on what the upgrade adds. */
+  blurb: z.string().min(1).max(240).optional(),
+});
+
 export const packManifestSchema = z
   .object({
     schemaVersion: z.union([z.literal(1), z.literal(2)]),
@@ -172,6 +196,8 @@ export const packManifestSchema = z
     games: packGamesSchema.optional(),
     /** Optional XP/levels progression — see packProgressionSchema. */
     progression: packProgressionSchema.optional(),
+    /** Optional upgrade pitch card — see packUpgradeSchema. */
+    upgrade: packUpgradeSchema.optional(),
   })
   .superRefine((m, ctx) => {
     const keys = m.categories.map((c) => c.key);
@@ -335,6 +361,7 @@ export const packQuestionSchema = z
 export type PackCategory = z.infer<typeof packCategorySchema>;
 export type PackExam = z.infer<typeof packExamSchema>;
 export type PackGames = z.infer<typeof packGamesSchema>;
+export type PackUpgrade = z.infer<typeof packUpgradeSchema>;
 export type GameId = z.infer<typeof gameIdSchema>;
 export type PackLevel = z.infer<typeof packLevelSchema>;
 export type PackSource = z.infer<typeof packSourceSchema>;
