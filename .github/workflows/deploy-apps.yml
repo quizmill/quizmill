@@ -22,7 +22,10 @@ name: Deploy apps
 # Scope: ONLY the engine's own showcase apps — the demo ("try", built
 # from the in-repo content/pack-demo) and the public showcase pack
 # world-capitals. These carry no secrets and have no cloud sync, so they
-# can be built here from an anonymous clone.
+# can be built here from an anonymous clone. They DO carry the anonymous
+# funnel beacon (src/lib/analytics.ts): the two NEXT_PUBLIC_* values on the
+# build step are public by design and mirror the `analytics_url` /
+# `privacy_url` inputs the pack repos pass to deploy-pack.yml.
 #
 # Deliberately NOT here: any app that needs its own secrets (Cloudflare +
 # per-app Supabase) or is a private pack. Those are "personal apps"
@@ -117,7 +120,18 @@ jobs:
           echo "::error::quizmill@$version never appeared on npm after ~10 min."
           exit 1
 
+      # The CLI spreads its own process.env into the engine's `npm run
+      # build` (cli/bin/quizmill.js → engineNpm), and next.config.ts inlines
+      # both variables, so a step-level env is all the beacon needs — same
+      # shape as deploy-pack.yml's build step, minus the sync/Supabase lines.
       - name: Build "${{ matrix.name }}" on quizmill@${{ steps.engine.outputs.spec }}
+        env:
+          # Anonymous funnel beacon (six events, random device id, off switch
+          # in Settings) -> the sync worker's analytics route. Public by
+          # design; unset would leave the beacon dormant.
+          NEXT_PUBLIC_ANALYTICS_URL: https://sync.quizmill.dev/v1/analytics
+          # Privacy page the Settings analytics card links to.
+          NEXT_PUBLIC_PRIVACY_URL: https://quizmill.dev/privacy
         run: npx --yes quizmill@${{ steps.engine.outputs.spec }} build ${{ matrix.pack }}
 
       - name: Deploy to Cloudflare Pages
