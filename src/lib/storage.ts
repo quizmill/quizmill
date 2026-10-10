@@ -291,14 +291,6 @@ export function amendAttempt(id: string, patch: Partial<Attempt>): void {
   notify({ table: 'attempts', row: amended });
 }
 
-export function attemptsForSession(sessionId: string): Attempt[] {
-  return loadAttempts().filter((a) => a.sessionId === sessionId);
-}
-
-export function attemptsForCategory(categoryKey: string): Attempt[] {
-  return loadAttempts().filter((a) => a.subject === categoryKey);
-}
-
 // ---- achievements ----
 
 export function loadAchievements(): EarnedAchievement[] {
@@ -374,10 +366,6 @@ export function recordVote(
   else all.push(entry);
   saveVotes(all);
   notify({ table: 'votes', row: entry });
-}
-
-export function getVote(questionId: string): QuestionVote | undefined {
-  return loadVotes().find((v) => v.questionId === questionId);
 }
 
 // ---- question notes ----
