@@ -76,7 +76,7 @@ export function SyncIndicator() {
 
   const isError = status.state === 'error';
   const className = cn(
-    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium shadow-sm backdrop-blur',
+    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium shadow-xs backdrop-blur-sm',
     content.tone,
   );
 

@@ -402,7 +402,7 @@ export function PaperMarkPage() {
         </div>
         {footnote.length > 0 ? (
           <p
-            className="self-center rounded-full border border-ink-200 bg-surface px-3 py-0.5 text-center text-xs text-ink-600 shadow-sm"
+            className="self-center rounded-full border border-ink-200 bg-surface px-3 py-0.5 text-center text-xs text-ink-600 shadow-xs"
             data-testid="save-footnote"
           >
             {footnote.join(' · ')}
@@ -461,7 +461,7 @@ function MarkRow({
     );
   }
   const number = (
-    <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-ink-100 text-xs font-bold text-ink-700">
+    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink-100 text-xs font-bold text-ink-700">
       {index + 1}
     </span>
   );
@@ -482,7 +482,7 @@ function MarkRow({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-flex flex-shrink-0 items-center gap-1 rounded-full bg-success-100 px-2 py-0.5 text-xs font-semibold text-success-700">
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-success-100 px-2 py-0.5 text-xs font-semibold text-success-700">
             <CheckCircle2 className="h-3.5 w-3.5" />
             Answered previously
           </span>
@@ -500,7 +500,7 @@ function MarkRow({
             type="button"
             aria-label={`Question ${index + 1}: change answer`}
             onClick={() => onReopen(true)}
-            className="tap-feedback inline-flex flex-shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-ink-600 hover:bg-ink-100"
+            className="tap-feedback inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-ink-600 hover:bg-ink-100"
           >
             <Pencil className="h-3.5 w-3.5" />
             Change
@@ -515,7 +515,7 @@ function MarkRow({
   return (
     <li
       className={cn(
-        'flex flex-col gap-2.5 rounded-2xl border bg-surface p-4 shadow-sm',
+        'flex flex-col gap-2.5 rounded-2xl border bg-surface p-4 shadow-xs',
         status === 'changed' ? 'border-warn-500/60' : 'border-ink-200',
       )}
       data-testid={`mark-row-${index + 1}`}
@@ -543,7 +543,7 @@ function MarkRow({
               className={cn(
                 'tap-feedback flex h-11 w-11 items-center justify-center rounded-xl border text-base font-bold',
                 active
-                  ? 'border-brand-600 bg-brand-600 text-white shadow-sm'
+                  ? 'border-brand-600 bg-brand-600 text-white shadow-xs'
                   : 'border-ink-200 bg-surface text-ink-700 hover:border-ink-300',
               )}
             >
@@ -564,7 +564,7 @@ function MarkRow({
             type="button"
             aria-label={`Question ${index + 1}: keep the saved answer`}
             onClick={() => onReopen(false)}
-            className="tap-feedback inline-flex flex-shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-ink-600 hover:bg-ink-100"
+            className="tap-feedback inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-ink-600 hover:bg-ink-100"
           >
             <Undo2 className="h-3.5 w-3.5" />
             Keep {saved.keys.join(' ')}
@@ -614,7 +614,7 @@ function SavedView({ sheet, outcome }: { sheet: PaperSheet; outcome: SaveOutcome
   return (
     <main className="flex flex-col gap-5" data-testid="mark-saved">
       <Header />
-      <div className="flex flex-col items-center gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-6 text-center shadow-sm">
+      <div className="flex flex-col items-center gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-6 text-center shadow-xs">
         <CheckCircle2 className="h-10 w-10 text-brand-600" />
         <div>
           <div className="text-2xl font-bold text-ink-900">

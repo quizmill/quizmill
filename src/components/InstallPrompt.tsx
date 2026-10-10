@@ -69,7 +69,7 @@ export function InstallCard() {
   return (
     <div
       data-testid="install-card"
-      className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm"
+      className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs"
     >
       <h3 className="text-lg font-semibold text-ink-900">Add to Home Screen</h3>
       <p className="mt-1 text-sm text-ink-600">
@@ -118,12 +118,12 @@ export function InstallBanner() {
   return (
     <div
       data-testid="install-banner"
-      className="flex items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-3 pl-4 shadow-sm"
+      className="flex items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-3 pl-4 shadow-xs"
     >
       <div className="text-sm font-medium text-brand-800">
         ⊕ Add to Home Screen — works offline
       </div>
-      <div className="flex flex-shrink-0 items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         <Button size="sm" onClick={promptInstall}>
           Install
         </Button>

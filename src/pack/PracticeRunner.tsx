@@ -140,7 +140,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
     return (
       <main className="flex flex-col gap-5">
         <BackLink />
-        <div className="rounded-2xl border border-ink-200 bg-surface p-6 text-center shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-6 text-center shadow-xs">
           <h1 className="text-2xl font-bold text-ink-900">
             No {PACK_CATEGORY_LABEL[categoryKey] ?? categoryKey} questions yet
           </h1>
@@ -192,7 +192,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
       <main className="flex flex-col gap-5">
         {celebrations}
         <BackLink />
-        <div className="rounded-2xl border border-ink-200 bg-surface p-8 text-center shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-8 text-center shadow-xs">
           <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
             Practice complete
           </div>
@@ -315,9 +315,9 @@ export function PackPracticeRunner({ categoryKey }: Props) {
           repeatRound && state.currentIndex === 0 ? (
             <div
               data-testid="repeat-round-banner"
-              className="flex items-center gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-3 shadow-sm"
+              className="flex items-center gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-3 shadow-xs"
             >
-              <RefreshCw className="h-4 w-4 flex-shrink-0 text-brand-600" />
+              <RefreshCw className="h-4 w-4 shrink-0 text-brand-600" />
               <p className="text-sm text-ink-700">
                 You&apos;ve answered every question in this set — this round
                 revisits your mistakes and the ones you&apos;ve not seen for

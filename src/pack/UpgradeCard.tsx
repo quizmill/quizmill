@@ -40,10 +40,10 @@ export function UpgradeCard({ placement }: { placement: UpgradePlacement }) {
       rel="noopener noreferrer"
       onClick={() => recordEvent('upsell_clicked', { placement })}
       data-testid={`upgrade-card-${placement}`}
-      className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-4 shadow-sm transition hover:border-brand-500/50 hover:shadow-md"
+      className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-4 shadow-xs transition hover:border-brand-500/50 hover:shadow-md"
     >
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-brand-700">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-brand-700">
           <Sparkles className="h-5 w-5" />
         </div>
         <div className="min-w-0">
@@ -60,7 +60,7 @@ export function UpgradeCard({ placement }: { placement: UpgradePlacement }) {
           ) : null}
         </div>
       </div>
-      <ArrowUpRight className="h-5 w-5 flex-shrink-0 text-brand-500" aria-hidden />
+      <ArrowUpRight className="h-5 w-5 shrink-0 text-brand-500" aria-hidden />
     </a>
   );
 }

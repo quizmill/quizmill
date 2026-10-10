@@ -168,7 +168,7 @@ function OptInCard({
   return (
     <div
       data-testid={cardTestId}
-      className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm"
+      className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs"
     >
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -186,13 +186,13 @@ function OptInCard({
           data-testid={testId}
           onClick={onToggle}
           className={cn(
-            'tap-feedback relative mt-1 inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors',
+            'tap-feedback relative mt-1 inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors',
             checked ? 'bg-brand-500' : 'bg-ink-200',
           )}
         >
           <span
             className={cn(
-              'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
+              'inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform',
               checked ? 'translate-x-6' : 'translate-x-1',
             )}
           />
@@ -202,7 +202,7 @@ function OptInCard({
         <Link
           href={link.href}
           data-testid={link.testId}
-          className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50 dark:hover:bg-ink-100"
+          className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-xs hover:bg-ink-50 dark:hover:bg-ink-100"
         >
           <Icon className="h-4 w-4" />
           {link.label}
@@ -327,7 +327,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
       <InstallCard />
 
       <SettingsSection title="Packs">
-        <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs">
           <h3 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
             <Boxes className="h-5 w-5 text-ink-500" />
             Pack library
@@ -340,7 +340,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
           <Link
             href="/packs/"
             data-testid="open-packs"
-            className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50 dark:hover:bg-ink-100"
+            className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-xs hover:bg-ink-50 dark:hover:bg-ink-100"
           >
             <Boxes className="h-4 w-4" />
             Manage packs
@@ -350,7 +350,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
         <UpgradeCard placement="settings" />
 
         {packSources.length > 0 ? (
-          <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
+          <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs">
             <h3 className="text-lg font-semibold text-ink-900">Question sources</h3>
             <p className="mt-1 text-sm text-ink-600">
               Where this pack&apos;s questions come from.
@@ -398,7 +398,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
       </SettingsSection>
 
       <SettingsSection title="This device">
-        <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs">
           <h3 className="text-lg font-semibold text-ink-900">Appearance</h3>
           <p className="mt-1 text-sm text-ink-600">
             Auto follows your device&apos;s light/dark setting.
@@ -419,7 +419,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
                 className={cn(
                   'tap-feedback flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold',
                   theme === value
-                    ? 'bg-surface text-ink-900 shadow-sm'
+                    ? 'bg-surface text-ink-900 shadow-xs'
                     : 'text-ink-500 hover:text-ink-700',
                 )}
               >
@@ -450,7 +450,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
                 className={cn(
                   'tap-feedback flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold',
                   look === value
-                    ? 'bg-surface text-ink-900 shadow-sm'
+                    ? 'bg-surface text-ink-900 shadow-xs'
                     : 'text-ink-500 hover:text-ink-700',
                 )}
               >
@@ -555,7 +555,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
       </SettingsSection>
 
       <SettingsSection title="Reset">
-        <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs">
           <h3 className="text-lg font-semibold text-ink-900">
             Reset today&apos;s progress
           </h3>
@@ -577,7 +577,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
           </Button>
         </div>
 
-        <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs">
           <h3 className="text-lg font-semibold text-ink-900">
             Reset all local progress
           </h3>
@@ -604,7 +604,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
       </SettingsSection>
 
       <SettingsSection title="About">
-        <div className="rounded-2xl border border-ink-200 bg-surface p-5 text-sm text-ink-600 shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-5 text-sm text-ink-600 shadow-xs">
           <div className="flex items-center justify-between">
             <span>App version</span>
             <button
@@ -612,7 +612,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
               data-testid="app-version"
               aria-label="App version"
               onClick={() => setVersionTaps((n) => n + 1)}
-              className="tap-feedback select-none rounded bg-ink-100 px-2 py-0.5 font-mono text-xs text-ink-700"
+              className="tap-feedback select-none rounded-sm bg-ink-100 px-2 py-0.5 font-mono text-xs text-ink-700"
             >
               v{process.env.NEXT_PUBLIC_APP_VERSION ?? 'dev'}
             </button>
@@ -635,7 +635,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
         {gamesRevealed ? (
           <div
             data-testid="games-easter-egg"
-            className="rounded-2xl border border-brand-300 bg-brand-50 p-5 shadow-sm"
+            className="rounded-2xl border border-brand-300 bg-brand-50 p-5 shadow-xs"
           >
             <h3 className="text-lg font-semibold text-ink-900">
               🎮 You found the games!
@@ -649,7 +649,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
             </p>
             <Link
               href="/games/"
-              className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50 dark:hover:bg-ink-100"
+              className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-xs hover:bg-ink-50 dark:hover:bg-ink-100"
             >
               <Gamepad2 className="h-4 w-4" />
               Open the arcade

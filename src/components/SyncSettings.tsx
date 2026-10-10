@@ -142,7 +142,7 @@ function SupabaseSyncSettings() {
   }
 
   return (
-    <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
+    <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs">
       <div className="flex items-center gap-2">
         {signedInAs ? (
           <Cloud className="h-5 w-5 text-brand-600" />
@@ -181,7 +181,7 @@ function SupabaseSyncSettings() {
                 placeholder="parent@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="flex-1 rounded-xl border border-ink-200 px-3 py-2 text-sm text-ink-800 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                className="flex-1 rounded-xl border border-ink-200 px-3 py-2 text-sm text-ink-800 outline-hidden focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
               />
               <Button onClick={sendCode} disabled={sending || !email.trim()}>
                 <Mail className="h-4 w-4" />
@@ -202,7 +202,7 @@ function SupabaseSyncSettings() {
                   data-testid="otp-input"
                   value={code}
                   onChange={(e) => setCode(sanitiseOtpInput(e.target.value))}
-                  className="flex-1 rounded-xl border border-ink-200 px-3 py-2 text-center font-mono text-lg tracking-[0.35em] text-ink-800 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                  className="flex-1 rounded-xl border border-ink-200 px-3 py-2 text-center font-mono text-lg tracking-[0.35em] text-ink-800 outline-hidden focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
                 />
                 <Button onClick={verifyCode} disabled={verifying || !isOtpLongEnough(code)}>
                   {verifying ? 'Verifying…' : 'Verify'}

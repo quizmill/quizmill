@@ -74,7 +74,7 @@ export function RunnerLoading({ back = <BackLink /> }: { back?: ReactNode }) {
   return (
     <main className="flex flex-col gap-5">
       {back}
-      <div className="rounded-2xl border border-ink-200 bg-surface p-6 text-center text-ink-500 shadow-sm">
+      <div className="rounded-2xl border border-ink-200 bg-surface p-6 text-center text-ink-500 shadow-xs">
         Loading…
       </div>
     </main>
@@ -172,7 +172,7 @@ export function QuestionPanel({
 
       {/* Only show the scenario card when there's a real shared stem. */}
       {scenario?.stem ? (
-        <section className="rounded-2xl border border-ink-200 bg-ink-50/60 p-4 shadow-sm">
+        <section className="rounded-2xl border border-ink-200 bg-ink-50/60 p-4 shadow-xs">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">
             Scenario
           </div>
@@ -185,14 +185,14 @@ export function QuestionPanel({
         </section>
       ) : null}
 
-      <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
+      <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs">
         <div className="text-[15px] leading-relaxed text-ink-900">
           <McqMarkdown text={question.prompt} />
         </div>
       </div>
 
       {question.image ? (
-        <div className="flex justify-center rounded-2xl border border-ink-200 bg-surface p-4 shadow-sm">
+        <div className="flex justify-center rounded-2xl border border-ink-200 bg-surface p-4 shadow-xs">
           <PackImage
             src={question.image}
             alt=""

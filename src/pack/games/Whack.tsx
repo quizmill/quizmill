@@ -135,7 +135,7 @@ export function Whack({ onClose }: WhackProps) {
               onClick={() => handleWhack(i)}
               disabled={!running}
               className={cn(
-                'tap-feedback relative flex aspect-square items-center justify-center rounded-2xl border-2 text-4xl shadow-sm transition',
+                'tap-feedback relative flex aspect-square items-center justify-center rounded-2xl border-2 text-4xl shadow-xs transition',
                 hasMole
                   ? 'border-warn-500 bg-warn-100'
                   : 'border-ink-200 bg-ink-100',

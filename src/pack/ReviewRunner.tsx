@@ -147,7 +147,7 @@ export function PackReviewRunner() {
     return (
       <main className="flex flex-col gap-5">
         <BackLink />
-        <div className="rounded-2xl border border-ink-200 bg-surface p-6 text-center shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-6 text-center shadow-xs">
           <h1 className="text-2xl font-bold text-ink-900">
             Nothing to review
           </h1>
@@ -190,7 +190,7 @@ export function PackReviewRunner() {
       <main className="flex flex-col gap-5">
         {celebrations}
         <BackLink />
-        <div className="rounded-2xl border border-ink-200 bg-surface p-8 text-center shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-8 text-center shadow-xs">
           <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
             Review complete
           </div>

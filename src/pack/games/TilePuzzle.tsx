@@ -69,7 +69,7 @@ export function TilePuzzle({ onClose }: TilePuzzleProps) {
               data-value={tile}
               onClick={() => handleTap(i)}
               className={cn(
-                'tap-feedback flex items-center justify-center rounded-lg text-2xl font-bold shadow-sm',
+                'tap-feedback flex items-center justify-center rounded-lg text-2xl font-bold shadow-xs',
                 solved
                   ? 'bg-success-100 text-success-700'
                   : 'bg-brand-500 text-white hover:bg-brand-600',

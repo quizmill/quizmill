@@ -111,7 +111,7 @@ function StickerTile({
   onShowHow,
 }: StickerTileProps) {
   const tileClass = cn(
-    'flex flex-col items-center gap-1.5 rounded-2xl border-2 p-3 text-center shadow-sm',
+    'flex flex-col items-center gap-1.5 rounded-2xl border-2 p-3 text-center shadow-xs',
     isEarned
       ? `bg-surface ${TIER_BORDER[achievement.tier]}`
       : 'border-ink-200 bg-ink-100/40',
@@ -179,7 +179,7 @@ function StickerTile({
       aria-label={`${achievement.name} — locked. See how to unlock it.`}
       className={cn(
         tileClass,
-        'tap-feedback cursor-pointer transition-colors hover:bg-ink-100/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
+        'tap-feedback cursor-pointer transition-colors hover:bg-ink-100/70 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500',
       )}
     >
       {inner}

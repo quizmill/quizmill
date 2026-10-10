@@ -17,11 +17,11 @@ export function PackChip({ className }: { className?: string }) {
       data-testid="pack-chip"
       aria-label={`Active pack: ${APP_CONFIG.title} — manage packs`}
       className={cn(
-        'tap-feedback inline-flex max-w-full items-center gap-1.5 rounded-full border border-ink-200 bg-surface px-2.5 py-1 text-xs font-semibold text-ink-600 shadow-sm hover:bg-ink-50 dark:hover:bg-ink-100',
+        'tap-feedback inline-flex max-w-full items-center gap-1.5 rounded-full border border-ink-200 bg-surface px-2.5 py-1 text-xs font-semibold text-ink-600 shadow-xs hover:bg-ink-50 dark:hover:bg-ink-100',
         className,
       )}
     >
-      <Boxes className="h-3.5 w-3.5 flex-shrink-0 text-brand-600" />
+      <Boxes className="h-3.5 w-3.5 shrink-0 text-brand-600" />
       <span className="truncate">{APP_CONFIG.title}</span>
     </Link>
   );

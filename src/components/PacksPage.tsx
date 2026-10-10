@@ -86,8 +86,8 @@ function PackCard({
       data-testid={`pack-card-${id}`}
       className={
         active
-          ? 'rounded-2xl border-2 border-brand-400 bg-surface p-5 shadow-sm'
-          : 'rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm'
+          ? 'rounded-2xl border-2 border-brand-400 bg-surface p-5 shadow-xs'
+          : 'rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs'
       }
     >
       <div className="flex items-start justify-between gap-3">
@@ -100,7 +100,7 @@ function PackCard({
             ) : null}
           </p>
         </div>
-        <div className="flex flex-shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1.5">
           {builtIn ? (
             <span className="rounded-full border border-ink-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-500">
               Built in
@@ -349,7 +349,7 @@ export function PacksPage() {
 
       <section
         data-testid="registry-browser"
-        className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm"
+        className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs"
       >
         <h2 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
           <Store className="h-5 w-5 text-ink-500" />
@@ -372,7 +372,7 @@ export function PacksPage() {
                 <li key={l.id} className="flex items-start gap-3 py-3">
                   <span
                     aria-hidden
-                    className="mt-1.5 h-3 w-3 flex-shrink-0 rounded-full border border-ink-200"
+                    className="mt-1.5 h-3 w-3 shrink-0 rounded-full border border-ink-200"
                     style={{ backgroundColor: l.themeColor ?? 'transparent' }}
                   />
                   <div className="min-w-0 flex-1">
@@ -389,14 +389,14 @@ export function PacksPage() {
                     <p className="mt-0.5 line-clamp-2 text-xs text-ink-600">{l.description}</p>
                   </div>
                   {builtIn || onShelf ? (
-                    <span className="mt-1 flex-shrink-0 rounded-full border border-ink-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-500">
+                    <span className="mt-1 shrink-0 rounded-full border border-ink-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-500">
                       {builtIn ? 'Built in' : 'On the shelf'}
                     </span>
                   ) : (
                     <Button
                       size="sm"
                       variant="secondary"
-                      className="mt-0.5 flex-shrink-0"
+                      className="mt-0.5 shrink-0"
                       data-testid={`registry-insert-${l.id}`}
                       disabled={busyRepo !== null}
                       onClick={() => void handleRegistryInsert(l)}
@@ -412,7 +412,7 @@ export function PacksPage() {
         )}
       </section>
 
-      <section className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
+      <section className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs">
         <h2 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
           <PackagePlus className="h-5 w-5 text-ink-500" />
           Insert a pack
@@ -434,7 +434,7 @@ export function PacksPage() {
             placeholder="https://github.com/you/your-pack"
             aria-label="Pack URL"
             data-testid="insert-url"
-            className="min-w-0 flex-1 rounded-xl border border-ink-200 bg-surface px-3 py-2 text-sm text-ink-800 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="min-w-0 flex-1 rounded-xl border border-ink-200 bg-surface px-3 py-2 text-sm text-ink-800 placeholder:text-ink-400 focus:outline-hidden focus:ring-2 focus:ring-brand-500"
           />
           <Button
             size="sm"

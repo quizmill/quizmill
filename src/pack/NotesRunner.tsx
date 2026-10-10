@@ -92,7 +92,7 @@ export function PackNotesRunner() {
     return (
       <main className="flex flex-col gap-5">
         {backToNotes}
-        <div className="rounded-2xl border border-ink-200 bg-surface p-6 text-center shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-6 text-center shadow-xs">
           <h1 className="text-2xl font-bold text-ink-900">No note topics yet</h1>
           <p className="mt-2 text-ink-600">
             Add a note to a question while practising, and this round will
@@ -127,7 +127,7 @@ export function PackNotesRunner() {
       <main className="flex flex-col gap-5">
         {celebrations}
         {backToNotes}
-        <div className="rounded-2xl border border-ink-200 bg-surface p-8 text-center shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-8 text-center shadow-xs">
           <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
             Notes round complete
           </div>

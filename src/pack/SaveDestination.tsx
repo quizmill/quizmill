@@ -116,7 +116,7 @@ export function SaveDestination({ phase }: { phase: 'before' | 'after' }) {
     >
       <Icon
         className={cn(
-          'mt-0.5 h-4 w-4 flex-shrink-0',
+          'mt-0.5 h-4 w-4 shrink-0',
           unlinked ? 'text-warn-600' : linked ? 'text-brand-600' : 'text-ink-400',
         )}
       />
