@@ -43,7 +43,9 @@ const MAX_ROW_JSON_BYTES = 32_768;
 const MAX_ID_LENGTH = 200;
 const MAX_SESSION_IDS = 500;
 
-function isId(v: unknown): v is string {
+/** A non-empty string short enough to be a row/pack/device id. Shared
+ *  with analytics.ts so both routes draw the same line. */
+export function isId(v: unknown): v is string {
   return typeof v === 'string' && v.length > 0 && v.length <= MAX_ID_LENGTH;
 }
 

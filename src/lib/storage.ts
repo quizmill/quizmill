@@ -54,6 +54,13 @@ export interface EarnedAchievement {
   earnedAt: number; // unix ms
 }
 
+/**
+ * Name of the window event that tells mounted React hooks (useStorage.ts)
+ * to re-read storage. Writers outside the hooks — the sync engine after a
+ * pull, the paper marker — dispatch it too. Not a storage key.
+ */
+export const STORAGE_EVENT = 'quizmill:storage';
+
 function browser(): boolean {
   return typeof window !== 'undefined';
 }
@@ -61,8 +68,8 @@ function browser(): boolean {
 // ---- mutation bus ----
 //
 // The cloud-sync layer (src/lib/sync.ts) subscribes here to mirror local
-// writes up to Supabase. With no subscribers this is inert, so the
-// pure-local app behaves exactly the same without sync configured.
+// writes up to the configured backend. With no subscribers this is inert,
+// so the pure-local app behaves exactly the same without sync configured.
 
 export type Mutation =
   | { table: 'sessions'; row: Session }
@@ -127,16 +134,21 @@ export function loadPrefs(): PackPrefs {
   return readJson<PackPrefs>(PREFS_KEY, {});
 }
 
+/** Set one pref, or drop it for a falsy value so an "off" pref leaves no key. */
+function patchPrefs<K extends keyof PackPrefs>(key: K, value: PackPrefs[K] | null): void {
+  const prefs = loadPrefs();
+  if (value) prefs[key] = value;
+  else delete prefs[key];
+  writeJson(PREFS_KEY, prefs);
+}
+
 /** The active level-band filter, or null for "All". */
 export function loadLevelFilter(): string | null {
   return loadPrefs().level ?? null;
 }
 
 export function saveLevelFilter(level: string | null): void {
-  const prefs = loadPrefs();
-  if (level) prefs.level = level;
-  else delete prefs.level;
-  writeJson(PREFS_KEY, prefs);
+  patchPrefs('level', level);
 }
 
 /** The level-nudge suggestion the user last dismissed ("from>to"), or null. */
@@ -145,10 +157,7 @@ export function loadDismissedNudge(): string | null {
 }
 
 export function saveDismissedNudge(key: string | null): void {
-  const prefs = loadPrefs();
-  if (key) prefs.dismissedNudge = key;
-  else delete prefs.dismissedNudge;
-  writeJson(PREFS_KEY, prefs);
+  patchPrefs('dismissedNudge', key);
 }
 
 /** Whether Drive Mode is switched on (Settings toggle). Default off. */
@@ -157,10 +166,7 @@ export function loadDriveModeEnabled(): boolean {
 }
 
 export function saveDriveModeEnabled(on: boolean): void {
-  const prefs = loadPrefs();
-  if (on) prefs.driveMode = true;
-  else delete prefs.driveMode;
-  writeJson(PREFS_KEY, prefs);
+  patchPrefs('driveMode', on);
 }
 
 // ---- scratchpad (local-only working notes; deliberately not synced) ----
@@ -291,14 +297,6 @@ export function amendAttempt(id: string, patch: Partial<Attempt>): void {
   notify({ table: 'attempts', row: amended });
 }
 
-export function attemptsForSession(sessionId: string): Attempt[] {
-  return loadAttempts().filter((a) => a.sessionId === sessionId);
-}
-
-export function attemptsForCategory(categoryKey: string): Attempt[] {
-  return loadAttempts().filter((a) => a.subject === categoryKey);
-}
-
 // ---- achievements ----
 
 export function loadAchievements(): EarnedAchievement[] {
@@ -374,10 +372,6 @@ export function recordVote(
   else all.push(entry);
   saveVotes(all);
   notify({ table: 'votes', row: entry });
-}
-
-export function getVote(questionId: string): QuestionVote | undefined {
-  return loadVotes().find((v) => v.questionId === questionId);
 }
 
 // ---- question notes ----
@@ -471,8 +465,11 @@ export function recordEvent(
 // ---- bulk ops ----
 
 /**
- * Wipe ALL stored sessions, attempts, achievements, votes, and notes for
- * the active pack. Use with care.
+ * Wipe the stores this module owns for the active pack — the six synced
+ * tables (sessions, attempts, achievements, votes, notes, events) plus the
+ * device-local prefs and scratchpad. Other `KEY_PREFIX` stores kept by
+ * other modules (paper sheets and ink, for instance) are NOT touched.
+ * Use with care.
  */
 export function clearAll(): void {
   if (!browser()) return;
@@ -538,99 +535,69 @@ export function mergeRemote(remote: {
   if (!browser()) return false;
   let changed = false;
 
-  if (remote.sessions?.length) {
-    const byId = new Map(loadSessions().map((s) => [s.id, s]));
-    for (const r of remote.sessions) {
-      const local = byId.get(r.id);
-      // A session is updated in place (endedAt, counts); prefer the row
-      // that progressed furthest in time.
-      const score = (s: Session) => s.endedAt ?? s.startedAt;
-      if (!local || score(r) > score(local)) {
-        byId.set(r.id, r);
-        changed = true;
+  // One rule per table: a remote row is taken when it is new, or when
+  // `supersedes(remote, local)` says so. Immutable tables never replace.
+  const merge = <T>(
+    rows: T[] | undefined,
+    load: () => T[],
+    save: (rows: T[]) => void,
+    keyOf: (row: T) => string,
+    supersedes: (remote: T, local: T) => boolean,
+  ): void => {
+    if (!rows?.length) return;
+    const byKey = new Map(load().map((row) => [keyOf(row), row]));
+    let tableChanged = false;
+    for (const r of rows) {
+      const local = byKey.get(keyOf(r));
+      if (!local || supersedes(r, local)) {
+        byKey.set(keyOf(r), r);
+        tableChanged = true;
       }
     }
-    if (changed) writeJson(SESSIONS_KEY, [...byId.values()]);
-  }
-
-  if (remote.attempts?.length) {
-    const byId = new Map(loadAttempts().map((a) => [a.id, a]));
-    let attemptsChanged = false;
-    for (const r of remote.attempts) {
-      if (!byId.has(r.id)) {
-        byId.set(r.id, r); // attempts are immutable once written
-        attemptsChanged = true;
-      }
-    }
-    if (attemptsChanged) {
-      writeJson(ATTEMPTS_KEY, [...byId.values()]);
+    if (tableChanged) {
+      save([...byKey.values()]);
       changed = true;
     }
-  }
+  };
+  const never = () => false;
 
-  if (remote.achievements?.length) {
-    const byId = new Map(loadAchievements().map((a) => [a.id, a]));
-    let achChanged = false;
-    for (const r of remote.achievements) {
-      const local = byId.get(r.id);
-      if (!local || r.earnedAt < local.earnedAt) {
-        byId.set(r.id, r); // keep the earliest unlock time
-        achChanged = true;
-      }
-    }
-    if (achChanged) {
-      saveAchievements([...byId.values()]);
-      changed = true;
-    }
-  }
-
-  if (remote.votes?.length) {
-    const byQ = new Map(loadVotes().map((v) => [v.questionId, v]));
-    let votesChanged = false;
-    for (const r of remote.votes) {
-      const local = byQ.get(r.questionId);
-      if (!local || r.votedAt >= local.votedAt) {
-        byQ.set(r.questionId, r);
-        votesChanged = true;
-      }
-    }
-    if (votesChanged) {
-      saveVotes([...byQ.values()]);
-      changed = true;
-    }
-  }
-
-  if (remote.notes?.length) {
-    const byQ = new Map(loadNotes().map((n) => [n.questionId, n]));
-    let notesChanged = false;
-    for (const r of remote.notes) {
-      const local = byQ.get(r.questionId);
-      if (!local || r.updatedAt >= local.updatedAt) {
-        byQ.set(r.questionId, r);
-        notesChanged = true;
-      }
-    }
-    if (notesChanged) {
-      saveNotes([...byQ.values()]);
-      changed = true;
-    }
-  }
-
-  if (remote.events?.length) {
-    const byId = new Map(loadEvents().map((e) => [e.id, e]));
-    let eventsChanged = false;
-    for (const r of remote.events) {
-      if (!byId.has(r.id)) {
-        byId.set(r.id, r); // events are immutable once written
-        eventsChanged = true;
-      }
-    }
-    if (eventsChanged) {
-      // Keep chronological order so the local cap drops the OLDEST.
-      saveEvents([...byId.values()].sort((a, b) => a.at - b.at));
-      changed = true;
-    }
-  }
+  // A session is updated in place (endedAt, counts); prefer the row that
+  // progressed furthest in time.
+  const progress = (s: Session) => s.endedAt ?? s.startedAt;
+  merge(
+    remote.sessions,
+    loadSessions,
+    (rows) => writeJson(SESSIONS_KEY, rows),
+    (s) => s.id,
+    (r, local) => progress(r) > progress(local),
+  );
+  // Attempts are immutable once written.
+  merge(remote.attempts, loadAttempts, (rows) => writeJson(ATTEMPTS_KEY, rows), (a) => a.id, never);
+  // Keep the earliest unlock time.
+  merge(
+    remote.achievements,
+    loadAchievements,
+    saveAchievements,
+    (a) => a.id,
+    (r, local) => r.earnedAt < local.earnedAt,
+  );
+  merge(remote.votes, loadVotes, saveVotes, (v) => v.questionId, (r, local) => r.votedAt >= local.votedAt);
+  merge(
+    remote.notes,
+    loadNotes,
+    saveNotes,
+    (n) => n.questionId,
+    (r, local) => r.updatedAt >= local.updatedAt,
+  );
+  // Events are immutable too; keep chronological order so the local cap
+  // drops the OLDEST.
+  merge(
+    remote.events,
+    loadEvents,
+    (rows) => saveEvents(rows.sort((a, b) => a.at - b.at)),
+    (e) => e.id,
+    never,
+  );
 
   return changed;
 }
