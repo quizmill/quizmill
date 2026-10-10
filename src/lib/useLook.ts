@@ -1,15 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import {
-  applyLook,
-  loadLookPref,
-  LOOK_EVENT,
-  packDefaultLook,
-  resolveLook,
-  saveLookPref,
-  type LookPref,
-} from './look';
+import { applyLook, lookPref, packDefaultLook, resolveLook, type LookPref } from './look';
+import { useDevicePref } from './useDevicePref';
+
+/** Mirror a preference onto <html>, falling back to the pack's default. */
+function applyLookPref(pref: LookPref): void {
+  applyLook(resolveLook(pref, packDefaultLook()));
+}
 
 /**
  * Live look preference. Reads after mount (SSR/first paint stay stable —
@@ -18,28 +15,5 @@ import {
  * Mirrors useTheme.
  */
 export function useLook(): [LookPref, (pref: LookPref) => void] {
-  const [pref, setPrefState] = useState<LookPref>('pack');
-
-  useEffect(() => {
-    const sync = () => {
-      const stored = loadLookPref();
-      setPrefState(stored);
-      applyLook(resolveLook(stored, packDefaultLook()));
-    };
-    sync();
-
-    window.addEventListener(LOOK_EVENT, sync);
-    window.addEventListener('storage', sync);
-    return () => {
-      window.removeEventListener(LOOK_EVENT, sync);
-      window.removeEventListener('storage', sync);
-    };
-  }, []);
-
-  const setPref = useCallback((next: LookPref) => {
-    setPrefState(next);
-    saveLookPref(next);
-  }, []);
-
-  return [pref, setPref];
+  return useDevicePref(lookPref, applyLookPref);
 }

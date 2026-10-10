@@ -1,15 +1,20 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import {
   applyTheme,
   loadThemePref,
   resolveTheme,
-  saveThemePref,
   systemPrefersDark,
-  THEME_EVENT,
+  themePref,
   type ThemePref,
 } from './theme';
+import { useDevicePref } from './useDevicePref';
+
+/** Mirror a preference onto <html> against the OS scheme of the moment. */
+function applyThemePref(pref: ThemePref): void {
+  applyTheme(resolveTheme(pref, systemPrefersDark()));
+}
 
 /**
  * Live theme preference. Reads after mount (SSR/first paint stay stable —
@@ -18,31 +23,15 @@ import {
  * while in 'system' mode, and edits from other tabs.
  */
 export function useTheme(): [ThemePref, (pref: ThemePref) => void] {
-  const [pref, setPrefState] = useState<ThemePref>('system');
+  const [pref, setPref] = useDevicePref(themePref, applyThemePref);
 
+  // The OS scheme flipping doesn't change the stored pref, only what
+  // 'system' resolves to — re-apply, no re-read needed.
   useEffect(() => {
-    const sync = () => {
-      const stored = loadThemePref();
-      setPrefState(stored);
-      applyTheme(resolveTheme(stored, systemPrefersDark()));
-    };
-    sync();
-
     const media = window.matchMedia?.('(prefers-color-scheme: dark)');
-    media?.addEventListener?.('change', sync);
-    window.addEventListener(THEME_EVENT, sync);
-    window.addEventListener('storage', sync);
-    return () => {
-      media?.removeEventListener?.('change', sync);
-      window.removeEventListener(THEME_EVENT, sync);
-      window.removeEventListener('storage', sync);
-    };
-  }, []);
-
-  const setPref = useCallback((next: ThemePref) => {
-    setPrefState(next);
-    applyTheme(resolveTheme(next, systemPrefersDark()));
-    saveThemePref(next); // fires THEME_EVENT → other hooks re-sync
+    const onChange = () => applyThemePref(loadThemePref());
+    media?.addEventListener?.('change', onChange);
+    return () => media?.removeEventListener?.('change', onChange);
   }, []);
 
   return [pref, setPref];

@@ -17,6 +17,7 @@
  * scheme: appearance belongs to the device and survives pack swaps.
  */
 import { APP_CONFIG } from '@/config';
+import { devicePref } from './devicePref';
 
 export type LookPref = 'pack' | 'classic' | 'poster';
 export type ResolvedLook = 'classic' | 'poster';
@@ -31,26 +32,17 @@ export function packDefaultLook(): ResolvedLook {
   return APP_CONFIG.look === 'poster' ? 'poster' : 'classic';
 }
 
-export function loadLookPref(): LookPref {
-  if (typeof window === 'undefined') return 'pack';
-  try {
-    const raw = window.localStorage.getItem(LOOK_KEY);
-    return raw === 'classic' || raw === 'poster' ? raw : 'pack';
-  } catch {
-    return 'pack';
-  }
-}
+export const lookPref = devicePref<LookPref>({
+  key: LOOK_KEY,
+  event: LOOK_EVENT,
+  fallback: 'pack',
+  parse: (raw) => (raw === 'classic' || raw === 'poster' ? raw : undefined),
+  // 'pack' removes the key: the bootstrap then falls back to the manifest.
+  serialise: (pref) => (pref === 'pack' ? null : pref),
+});
 
-export function saveLookPref(pref: LookPref): void {
-  if (typeof window === 'undefined') return;
-  try {
-    if (pref === 'pack') window.localStorage.removeItem(LOOK_KEY);
-    else window.localStorage.setItem(LOOK_KEY, pref);
-  } catch {
-    // storage may be unavailable (private mode); the in-page look still applies
-  }
-  window.dispatchEvent(new Event(LOOK_EVENT));
-}
+export const loadLookPref = lookPref.load;
+export const saveLookPref = lookPref.save;
 
 export function resolveLook(pref: LookPref, packDefault: ResolvedLook): ResolvedLook {
   return pref === 'pack' ? packDefault : pref;

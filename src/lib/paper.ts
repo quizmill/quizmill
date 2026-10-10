@@ -10,28 +10,21 @@
  * Stored app-level (bare `quizmill.` prefix) so it survives pack swaps
  * and never mixes into a pack's synced data.
  */
+import { devicePref } from './devicePref';
 
 export const PAPER_KEY = 'quizmill.paper.v1';
 
 /** Local event fired after savePaperModeEnabled so mounted hooks re-read. */
 export const PAPER_EVENT = 'quizmill:paper';
 
-export function loadPaperModeEnabled(): boolean {
-  if (typeof window === 'undefined') return false;
-  try {
-    return window.localStorage.getItem(PAPER_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
+/** '1' = on; absent = off. */
+export const paperModePref = devicePref<boolean>({
+  key: PAPER_KEY,
+  event: PAPER_EVENT,
+  fallback: false,
+  parse: (raw) => raw === '1',
+  serialise: (on) => (on ? '1' : null),
+});
 
-export function savePaperModeEnabled(on: boolean): void {
-  if (typeof window === 'undefined') return;
-  try {
-    if (on) window.localStorage.setItem(PAPER_KEY, '1');
-    else window.localStorage.removeItem(PAPER_KEY);
-  } catch {
-    // storage unavailable (private mode) — the in-page state still applies
-  }
-  window.dispatchEvent(new Event(PAPER_EVENT));
-}
+export const loadPaperModeEnabled = paperModePref.load;
+export const savePaperModeEnabled = paperModePref.save;

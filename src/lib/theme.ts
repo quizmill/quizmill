@@ -15,8 +15,11 @@
  * must survive swapping packs via the library. It used to be namespaced
  * per pack — `loadThemePref` migrates that legacy key on first read (and
  * the pre-paint bootstrap falls back to it so the migration never flashes).
+ * Storage mechanics (SSR guard, try/catch, event, refused writes) live in
+ * devicePref.ts, shared with every other device-level switch.
  */
 import { APP_CONFIG } from '@/config';
+import { devicePref } from './devicePref';
 
 export type ThemePref = 'system' | 'light' | 'dark';
 export type ResolvedTheme = 'light' | 'dark';
@@ -31,33 +34,18 @@ export const LEGACY_THEME_KEY = `quizmill.${APP_CONFIG.packId}.theme.v1`;
 /** Local event fired after saveThemePref so all mounted hooks re-read. */
 export const THEME_EVENT = 'quizmill:theme';
 
-export function loadThemePref(): ThemePref {
-  if (typeof window === 'undefined') return 'system';
-  try {
-    const raw = window.localStorage.getItem(THEME_KEY);
-    if (raw === 'light' || raw === 'dark') return raw;
-    const legacy = window.localStorage.getItem(LEGACY_THEME_KEY);
-    if (legacy === 'light' || legacy === 'dark') {
-      window.localStorage.setItem(THEME_KEY, legacy);
-      window.localStorage.removeItem(LEGACY_THEME_KEY);
-      return legacy;
-    }
-    return 'system';
-  } catch {
-    return 'system';
-  }
-}
+export const themePref = devicePref<ThemePref>({
+  key: THEME_KEY,
+  legacyKey: LEGACY_THEME_KEY,
+  event: THEME_EVENT,
+  fallback: 'system',
+  parse: (raw) => (raw === 'light' || raw === 'dark' ? raw : undefined),
+  // 'system' removes the key: the bootstrap's default path.
+  serialise: (pref) => (pref === 'system' ? null : pref),
+});
 
-export function saveThemePref(pref: ThemePref): void {
-  if (typeof window === 'undefined') return;
-  try {
-    if (pref === 'system') window.localStorage.removeItem(THEME_KEY);
-    else window.localStorage.setItem(THEME_KEY, pref);
-  } catch {
-    // storage may be unavailable (private mode); the in-page theme still applies
-  }
-  window.dispatchEvent(new Event(THEME_EVENT));
-}
+export const loadThemePref = themePref.load;
+export const saveThemePref = themePref.save;
 
 export function resolveTheme(pref: ThemePref, systemDark: boolean): ResolvedTheme {
   if (pref === 'light' || pref === 'dark') return pref;
