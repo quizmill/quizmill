@@ -64,17 +64,6 @@ export const GAMES: readonly GameDef[] = [
   },
 ];
 
-export function getGame(id: GameId): GameDef {
-  const g = GAMES.find((x) => x.id === id);
-  if (!g) throw new Error(`Unknown game: ${id}`);
-  return g;
-}
-
-/** Pick a random game — used when offering a quick play. */
-export function pickRandomGame(rng: () => number = Math.random): GameId {
-  return GAMES[Math.floor(rng() * GAMES.length)].id;
-}
-
 /**
  * The games this pack actually offers. `include` (a subset of game ids,
  * from the manifest) narrows the set; omit it for all of them. Unknown
