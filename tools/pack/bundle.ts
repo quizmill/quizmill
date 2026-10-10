@@ -170,13 +170,15 @@ export function buildPackBundle(
   }
   if (errors.length > 0) return { ok: false, errors };
 
+  const packVersion = packRevision(dir);
+  const engine = engineVersion();
   const bundle: PackBundle = {
     format: BUNDLE_FORMAT,
     bundleVersion: 1,
     schemaVersion: manifest.schemaVersion,
     id: manifest.id,
-    ...(packRevision(dir) ? { packVersion: packRevision(dir) } : {}),
-    ...(engineVersion() ? { engineVersion: engineVersion() } : {}),
+    ...(packVersion ? { packVersion } : {}),
+    ...(engine ? { engineVersion: engine } : {}),
     bundledAt: (opts.now ?? new Date()).toISOString(),
     manifest: input.manifest,
     questions: input.questions,
