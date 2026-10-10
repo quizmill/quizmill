@@ -99,6 +99,25 @@ export interface SettingsPageProps {
   extras?: ReactNode;
 }
 
+/**
+ * A boolean device pref as live state: read after mount (so SSR and the
+ * first paint stay stable), flipped and persisted by the returned toggle.
+ */
+function useDeviceToggle(
+  load: () => boolean,
+  save: (on: boolean) => void,
+  initial = false,
+): [boolean, () => void] {
+  const [on, setOn] = useState(initial);
+  useEffect(() => setOn(load()), [load]);
+  const toggle = () => {
+    const next = !on;
+    setOn(next);
+    save(next);
+  };
+  return [on, toggle];
+}
+
 /** A labelled group of settings cards. */
 function SettingsSection({
   title,
@@ -204,44 +223,26 @@ export function SettingsPage({ extras }: SettingsPageProps) {
   const [pending, setPending] = useState<'today' | 'all' | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  // Drive Mode opt-in — read after mount so SSR/first paint stay stable.
-  const [driveMode, setDriveMode] = useState(false);
-  useEffect(() => setDriveMode(loadDriveModeEnabled()), []);
-  const toggleDriveMode = () => {
-    const next = !driveMode;
-    setDriveMode(next);
-    saveDriveModeEnabled(next);
-  };
-
-  // Coach mode opt-in (device-level) — the parent's replay of past sessions.
-  const [coachMode, setCoachMode] = useState(false);
-  useEffect(() => setCoachMode(loadCoachModeEnabled()), []);
-  const toggleCoachMode = () => {
-    const next = !coachMode;
-    setCoachMode(next);
-    saveCoachModeEnabled(next);
-  };
-
-  // Levels & XP visibility (device-level) — the parent lever over the
-  // progression layer packs opt into. Hiding never resets anything: XP
-  // is derived from history, so switching back on picks up where the
-  // practice actually is.
-  const [progressionShown, setProgressionShown] = useState(true);
-  useEffect(() => setProgressionShown(loadProgressionShown()), []);
-  const toggleProgressionShown = () => {
-    const next = !progressionShown;
-    setProgressionShown(next);
-    saveProgressionShown(next);
-  };
-
-  // Paper practice opt-in (device-level) — print sheets, mark them back in.
-  const [paperMode, setPaperMode] = useState(false);
-  useEffect(() => setPaperMode(loadPaperModeEnabled()), []);
-  const togglePaperMode = () => {
-    const next = !paperMode;
-    setPaperMode(next);
-    savePaperModeEnabled(next);
-  };
+  // The device-level opt-ins: Drive mode, Coach mode (the parent's replay
+  // of past sessions), Paper practice, and whether Levels & XP show —
+  // hiding those never resets anything, XP is derived from history.
+  const [driveMode, toggleDriveMode] = useDeviceToggle(
+    loadDriveModeEnabled,
+    saveDriveModeEnabled,
+  );
+  const [coachMode, toggleCoachMode] = useDeviceToggle(
+    loadCoachModeEnabled,
+    saveCoachModeEnabled,
+  );
+  const [paperMode, togglePaperMode] = useDeviceToggle(
+    loadPaperModeEnabled,
+    savePaperModeEnabled,
+  );
+  const [progressionShown, toggleProgressionShown] = useDeviceToggle(
+    loadProgressionShown,
+    saveProgressionShown,
+    true,
+  );
 
   // Usage analytics (device-level) — the anonymous funnel beacon a hosted
   // app sends its author. The card exists only in builds that configure
