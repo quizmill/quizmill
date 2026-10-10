@@ -220,7 +220,6 @@ export function SettingsPage({ extras }: SettingsPageProps) {
   const [theme, setTheme] = useTheme();
   const [look, setLook] = useLook();
 
-  const [pending, setPending] = useState<'today' | 'all' | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   // The device-level opt-ins: Drive mode, Coach mode (the parent's replay
@@ -277,30 +276,27 @@ export function SettingsPage({ extras }: SettingsPageProps) {
     (a) => a.answeredAt >= startOfToday.getTime(),
   ).length;
 
+  // Both resets are synchronous (storage writes + one event), so there is
+  // no in-flight state to guard — the buttons only disable on "nothing
+  // to reset".
   function handleResetToday() {
-    if (pending) return;
     const ok = window.confirm(
       `Reset today's progress?\n\nThis will remove ${todaySessions} session(s) and ${todayAttempts} answer(s) from today.`,
     );
     if (!ok) return;
-    setPending('today');
     const result = resetToday();
     setMessage(
       `Removed ${result.sessionsRemoved} session(s) and ${result.attemptsRemoved} answer(s) from today.`,
     );
-    setPending(null);
   }
 
   function handleResetAll() {
-    if (pending) return;
     const ok = window.confirm(
       `Reset ALL local progress?\n\nThis erases every saved session and answer on this device. If you're signed in, the cloud copy stays — sign back in to restore. There is no local undo.`,
     );
     if (!ok) return;
-    setPending('all');
     resetAll();
     setMessage('All local progress erased.');
-    setPending(null);
   }
 
   return (
@@ -574,7 +570,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
             variant="secondary"
             className="mt-4"
             onClick={handleResetToday}
-            disabled={pending !== null || todaySessions === 0}
+            disabled={todaySessions === 0}
           >
             <Trash2 className="h-4 w-4" />
             Reset today
@@ -599,10 +595,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
             variant="danger"
             className="mt-4"
             onClick={handleResetAll}
-            disabled={
-              (pending !== null && pending !== 'all') ||
-              sessions.length + attempts.length === 0
-            }
+            disabled={sessions.length + attempts.length === 0}
           >
             <Trash2 className="h-4 w-4" />
             Reset everything
