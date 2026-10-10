@@ -223,7 +223,7 @@ describe('achievementProgress', () => {
       attempt({ isCorrect: true }),
       attempt({ isCorrect: false }),
     ];
-    const ctx = buildProgressContext([session()], attempts, NOW);
+    const ctx = buildProgressContext(attempts, NOW);
 
     expect(achievementProgress(byId('streak-5'), ctx)).toEqual({
       current: 2, // best run of 2 before the wrong answer
@@ -245,7 +245,7 @@ describe('achievementProgress', () => {
     const attempts = Array.from({ length: 40 }, (_, i) =>
       attempt({ subject: 'alpha', isCorrect: i % 2 === 0 }), // 50%
     );
-    const p = achievementProgress(byId('mastery-alpha'), buildProgressContext([], attempts, NOW));
+    const p = achievementProgress(byId('mastery-alpha'), buildProgressContext(attempts, NOW));
     expect(p).toMatchObject({
       current: MASTERY_MIN_ATTEMPTS, // capped, even though 40 attempted
       target: MASTERY_MIN_ATTEMPTS,
@@ -256,7 +256,7 @@ describe('achievementProgress', () => {
   });
 
   it('returns null for one-off milestones (no count to show)', () => {
-    const ctx = buildProgressContext([], [], NOW);
+    const ctx = buildProgressContext([], NOW);
     expect(achievementProgress(byId('first-session'), ctx)).toBeNull();
     expect(achievementProgress(byId('perfect-session'), ctx)).toBeNull();
   });
