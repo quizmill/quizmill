@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  pickSimilarQuestion,
   sessionMistakeIds,
   unresolvedMistakeIds,
 } from '../src/lib/mistakes';
@@ -127,46 +126,6 @@ describe('unresolvedMistakeIds (topic-based rescue)', () => {
     // m1 rescued at t=500. m3 NOT rescued (no later correct on
     // maths:percentages after t=300). e1 NOT rescued.
     expect(out.sort()).toEqual(['e1', 'm3'].sort());
-  });
-});
-
-describe('pickSimilarQuestion', () => {
-  const bank = [
-    { id: 'q1', subject: 'maths', topic: 'fractions' },
-    { id: 'q2', subject: 'maths', topic: 'fractions' },
-    { id: 'q3', subject: 'maths', topic: 'fractions' },
-    { id: 'q4', subject: 'maths', topic: 'percentages' },
-    { id: 'q5', subject: 'english', topic: 'fractions' }, // wrong subject
-  ];
-
-  it('returns a different question on the same subject + topic', () => {
-    const seq = [0]; // deterministic — picks index 0 of candidates
-    const rng = () => seq.shift() ?? 0;
-    // Candidates for q1: q2, q3 (subject=maths AND topic=fractions AND id!=q1).
-    // q5 excluded (different subject), q4 excluded (different topic).
-    const out = pickSimilarQuestion('q1', bank, new Set(), rng);
-    expect(out?.id).toBe('q2');
-  });
-
-  it('returns null when there are no other same-topic questions', () => {
-    // Only q4 is on maths:percentages.
-    expect(pickSimilarQuestion('q4', bank)).toBeNull();
-  });
-
-  it('returns null when the original ID is not in the bank', () => {
-    expect(pickSimilarQuestion('missing', bank)).toBeNull();
-  });
-
-  it('respects the exclude set', () => {
-    // q1 + exclude q2 + exclude q3 → no candidates left.
-    expect(
-      pickSimilarQuestion('q1', bank, new Set(['q2', 'q3'])),
-    ).toBeNull();
-  });
-
-  it('does not return the original even if it slips into the bank twice', () => {
-    const out = pickSimilarQuestion('q1', bank);
-    expect(out?.id).not.toBe('q1');
   });
 });
 

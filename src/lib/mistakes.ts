@@ -13,16 +13,11 @@
  * the question id as topic; without the question-id fallback such a mistake
  * could never be rescued and would pin itself to the top of every review.
  *
- * The companion `pickSimilarQuestion` picks the recall question to actually
- * show the kid in a review session: a different question on the same topic.
+ * Packs write the question id as the topic, so in practice rescue is
+ * per-question and the review runner re-asks the very question that was
+ * missed (see `buildAttempt` in src/pack/runner.ts).
  */
 import type { Attempt } from '@/data/types';
-
-interface MinimalQuestion {
-  id: string;
-  subject: string;
-  topic: string;
-}
 
 const topicKey = (subject: string, topic: string): string =>
   `${subject}:${topic}`;
@@ -94,30 +89,4 @@ export function sessionMistakeIds(
 
 export function unresolvedMistakeCount(attempts: readonly Attempt[]): number {
   return unresolvedMistakeIds(attempts).length;
-}
-
-/**
- * Pick a question that's "similar" to the original — same subject + topic,
- * but a different question — so the kid actually has to apply the concept
- * rather than recall an answer. Returns null if no such question exists.
- *
- * `excludeIds` lets callers avoid repeats within the current session.
- */
-export function pickSimilarQuestion<Q extends MinimalQuestion>(
-  originalId: string,
-  bank: readonly Q[],
-  excludeIds: ReadonlySet<string> = new Set(),
-  rng: () => number = Math.random,
-): Q | null {
-  const original = bank.find((q) => q.id === originalId);
-  if (!original) return null;
-  const candidates = bank.filter(
-    (q) =>
-      q.subject === original.subject &&
-      q.topic === original.topic &&
-      q.id !== originalId &&
-      !excludeIds.has(q.id),
-  );
-  if (candidates.length === 0) return null;
-  return candidates[Math.floor(rng() * candidates.length)];
 }
