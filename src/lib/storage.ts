@@ -465,9 +465,11 @@ export function recordEvent(
 // ---- bulk ops ----
 
 /**
- * Wipe everything stored for the active pack — the six synced tables
- * (sessions, attempts, achievements, votes, notes, events) plus the
- * device-local prefs and scratchpad. Use with care.
+ * Wipe the stores this module owns for the active pack — the six synced
+ * tables (sessions, attempts, achievements, votes, notes, events) plus the
+ * device-local prefs and scratchpad. Other `KEY_PREFIX` stores kept by
+ * other modules (paper sheets and ink, for instance) are NOT touched.
+ * Use with care.
  */
 export function clearAll(): void {
   if (!browser()) return;
