@@ -532,99 +532,69 @@ export function mergeRemote(remote: {
   if (!browser()) return false;
   let changed = false;
 
-  if (remote.sessions?.length) {
-    const byId = new Map(loadSessions().map((s) => [s.id, s]));
-    for (const r of remote.sessions) {
-      const local = byId.get(r.id);
-      // A session is updated in place (endedAt, counts); prefer the row
-      // that progressed furthest in time.
-      const score = (s: Session) => s.endedAt ?? s.startedAt;
-      if (!local || score(r) > score(local)) {
-        byId.set(r.id, r);
-        changed = true;
+  // One rule per table: a remote row is taken when it is new, or when
+  // `supersedes(remote, local)` says so. Immutable tables never replace.
+  const merge = <T>(
+    rows: T[] | undefined,
+    load: () => T[],
+    save: (rows: T[]) => void,
+    keyOf: (row: T) => string,
+    supersedes: (remote: T, local: T) => boolean,
+  ): void => {
+    if (!rows?.length) return;
+    const byKey = new Map(load().map((row) => [keyOf(row), row]));
+    let tableChanged = false;
+    for (const r of rows) {
+      const local = byKey.get(keyOf(r));
+      if (!local || supersedes(r, local)) {
+        byKey.set(keyOf(r), r);
+        tableChanged = true;
       }
     }
-    if (changed) writeJson(SESSIONS_KEY, [...byId.values()]);
-  }
-
-  if (remote.attempts?.length) {
-    const byId = new Map(loadAttempts().map((a) => [a.id, a]));
-    let attemptsChanged = false;
-    for (const r of remote.attempts) {
-      if (!byId.has(r.id)) {
-        byId.set(r.id, r); // attempts are immutable once written
-        attemptsChanged = true;
-      }
-    }
-    if (attemptsChanged) {
-      writeJson(ATTEMPTS_KEY, [...byId.values()]);
+    if (tableChanged) {
+      save([...byKey.values()]);
       changed = true;
     }
-  }
+  };
+  const never = () => false;
 
-  if (remote.achievements?.length) {
-    const byId = new Map(loadAchievements().map((a) => [a.id, a]));
-    let achChanged = false;
-    for (const r of remote.achievements) {
-      const local = byId.get(r.id);
-      if (!local || r.earnedAt < local.earnedAt) {
-        byId.set(r.id, r); // keep the earliest unlock time
-        achChanged = true;
-      }
-    }
-    if (achChanged) {
-      saveAchievements([...byId.values()]);
-      changed = true;
-    }
-  }
-
-  if (remote.votes?.length) {
-    const byQ = new Map(loadVotes().map((v) => [v.questionId, v]));
-    let votesChanged = false;
-    for (const r of remote.votes) {
-      const local = byQ.get(r.questionId);
-      if (!local || r.votedAt >= local.votedAt) {
-        byQ.set(r.questionId, r);
-        votesChanged = true;
-      }
-    }
-    if (votesChanged) {
-      saveVotes([...byQ.values()]);
-      changed = true;
-    }
-  }
-
-  if (remote.notes?.length) {
-    const byQ = new Map(loadNotes().map((n) => [n.questionId, n]));
-    let notesChanged = false;
-    for (const r of remote.notes) {
-      const local = byQ.get(r.questionId);
-      if (!local || r.updatedAt >= local.updatedAt) {
-        byQ.set(r.questionId, r);
-        notesChanged = true;
-      }
-    }
-    if (notesChanged) {
-      saveNotes([...byQ.values()]);
-      changed = true;
-    }
-  }
-
-  if (remote.events?.length) {
-    const byId = new Map(loadEvents().map((e) => [e.id, e]));
-    let eventsChanged = false;
-    for (const r of remote.events) {
-      if (!byId.has(r.id)) {
-        byId.set(r.id, r); // events are immutable once written
-        eventsChanged = true;
-      }
-    }
-    if (eventsChanged) {
-      // Keep chronological order so the local cap drops the OLDEST.
-      saveEvents([...byId.values()].sort((a, b) => a.at - b.at));
-      changed = true;
-    }
-  }
+  // A session is updated in place (endedAt, counts); prefer the row that
+  // progressed furthest in time.
+  const progress = (s: Session) => s.endedAt ?? s.startedAt;
+  merge(
+    remote.sessions,
+    loadSessions,
+    (rows) => writeJson(SESSIONS_KEY, rows),
+    (s) => s.id,
+    (r, local) => progress(r) > progress(local),
+  );
+  // Attempts are immutable once written.
+  merge(remote.attempts, loadAttempts, (rows) => writeJson(ATTEMPTS_KEY, rows), (a) => a.id, never);
+  // Keep the earliest unlock time.
+  merge(
+    remote.achievements,
+    loadAchievements,
+    saveAchievements,
+    (a) => a.id,
+    (r, local) => r.earnedAt < local.earnedAt,
+  );
+  merge(remote.votes, loadVotes, saveVotes, (v) => v.questionId, (r, local) => r.votedAt >= local.votedAt);
+  merge(
+    remote.notes,
+    loadNotes,
+    saveNotes,
+    (n) => n.questionId,
+    (r, local) => r.updatedAt >= local.updatedAt,
+  );
+  // Events are immutable too; keep chronological order so the local cap
+  // drops the OLDEST.
+  merge(
+    remote.events,
+    loadEvents,
+    (rows) => saveEvents(rows.sort((a, b) => a.at - b.at)),
+    (e) => e.id,
+    never,
+  );
 
   return changed;
 }
