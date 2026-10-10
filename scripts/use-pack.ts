@@ -16,7 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { validatePack, type PackManifest } from '../tools/pack/schema';
-import { readPackDir } from '../tools/pack/validate';
+import { printValidation, readPackDirOrExit } from '../tools/pack/validate';
 import { writePackAssets, syncPackAssets } from './pack-assets';
 import { fetchRemotePack, parsePackSpec } from './remote-pack';
 
@@ -47,19 +47,8 @@ function main(): void {
     process.exit(1);
   }
   const dir = resolveSource(source);
-
-  let input: ReturnType<typeof readPackDir>;
-  try {
-    input = readPackDir(dir);
-  } catch (err) {
-    console.error(`✗ ${(err as Error).message}`);
-    process.exit(1);
-  }
-
-  const result = validatePack(input);
-  for (const w of result.warnings) console.warn(`⚠ ${w}`);
-  if (!result.ok) {
-    for (const e of result.errors) console.error(`✗ ${e}`);
+  const input = readPackDirOrExit(dir);
+  if (!printValidation(validatePack(input))) {
     console.error('\nPack is invalid — fix the errors above, or run pack:validate.');
     process.exit(1);
   }

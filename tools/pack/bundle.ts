@@ -21,6 +21,7 @@ import path from 'node:path';
 import { latestReleaseVersion } from '../../scripts/app-version';
 import {
   validatePack,
+  type PackFiles,
   type PackManifest,
   type PackQuestion,
 } from './schema';
@@ -129,7 +130,7 @@ export function buildPackBundle(
   dir: string,
   opts: { now?: Date } = {},
 ): BundleResult {
-  let input: ReturnType<typeof readPackDir>;
+  let input: PackFiles;
   try {
     input = readPackDir(dir);
   } catch (err) {

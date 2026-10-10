@@ -377,18 +377,23 @@ export interface PackValidationResult {
   warnings: string[];
 }
 
+/** The parsed JSON of a pack's files, before validation — what
+ *  `readPackDir` returns and `validatePack` takes. The optional files
+ *  are `undefined` when absent (not `[]`). */
+export interface PackFiles {
+  manifest: unknown;
+  questions: unknown;
+  scenarios?: unknown;
+  concepts?: unknown;
+}
+
 /**
  * Whole-pack validation: per-file schemas plus the cross-file checks a
  * single Zod schema can't express (unique ids, category/scenario
  * references, weight sanity). Pure function over parsed JSON so it's
  * unit-testable and reusable by both the CLI and the use-pack script.
  */
-export function validatePack(input: {
-  manifest: unknown;
-  questions: unknown;
-  scenarios?: unknown;
-  concepts?: unknown;
-}): PackValidationResult {
+export function validatePack(input: PackFiles): PackValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 

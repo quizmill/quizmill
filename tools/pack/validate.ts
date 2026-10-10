@@ -14,14 +14,9 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { validatePack } from './schema';
+import { validatePack, type PackFiles, type PackValidationResult } from './schema';
 
-export function readPackDir(dir: string): {
-  manifest: unknown;
-  questions: unknown;
-  scenarios?: unknown;
-  concepts?: unknown;
-} {
+export function readPackDir(dir: string): PackFiles {
   const readJson = (name: string, optional = false): unknown => {
     const p = path.join(dir, name);
     if (!fs.existsSync(p)) {
@@ -38,6 +33,26 @@ export function readPackDir(dir: string): {
   };
 }
 
+/** `readPackDir` for a CLI: a missing or unparseable file prints ✗ and
+ *  exits 1 instead of throwing. */
+export function readPackDirOrExit(dir: string): PackFiles {
+  try {
+    return readPackDir(dir);
+  } catch (err) {
+    console.error(`✗ ${(err as Error).message}`);
+    process.exit(1);
+  }
+}
+
+/** Print a validation result the way every pack command does — warnings
+ *  as ⚠, then errors as ✗ — and return whether the pack passed. The
+ *  caller adds its own closing line and exits. */
+export function printValidation(result: PackValidationResult): boolean {
+  for (const w of result.warnings) console.warn(`⚠ ${w}`);
+  for (const e of result.errors) console.error(`✗ ${e}`);
+  return result.ok;
+}
+
 function main(): void {
   const dir = process.argv[2];
   if (!dir) {
@@ -49,18 +64,9 @@ function main(): void {
     process.exit(1);
   }
 
-  let input: ReturnType<typeof readPackDir>;
-  try {
-    input = readPackDir(dir);
-  } catch (err) {
-    console.error(`✗ ${(err as Error).message}`);
-    process.exit(1);
-  }
-
+  const input = readPackDirOrExit(dir);
   const result = validatePack(input);
-  for (const w of result.warnings) console.warn(`⚠ ${w}`);
-  if (!result.ok) {
-    for (const e of result.errors) console.error(`✗ ${e}`);
+  if (!printValidation(result)) {
     console.error(`\n${result.errors.length} error(s) in ${dir}`);
     process.exit(1);
   }
