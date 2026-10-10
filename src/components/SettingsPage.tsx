@@ -40,6 +40,8 @@ import {
   saveProgressionShown,
 } from '@/lib/progressionPref';
 import { loadPaperModeEnabled, savePaperModeEnabled } from '@/lib/paper';
+import { gamesRevealedPref } from '@/lib/gamesReveal';
+import { useDevicePref } from '@/lib/useDevicePref';
 import {
   analyticsConfigured,
   loadAnalyticsEnabled,
@@ -61,7 +63,8 @@ import { UpgradeCard } from '@/pack/UpgradeCard';
 
 /** Taps on the version pill that reveal the hidden games panel — the
  *  Android-style "tap the build number" easter egg. Games are a treat, so
- *  they're discovered, not advertised in the chrome. */
+ *  they're discovered, not advertised in the chrome. A find is remembered
+ *  on the device (gamesRevealedPref) so the card is there next visit. */
 const GAMES_REVEAL_TAPS = 7;
 
 const THEME_CHOICES: {
@@ -262,9 +265,23 @@ export function SettingsPage({ extras }: SettingsPageProps) {
   };
   const newDeviceId = () => setDeviceId(regenerateDeviceId());
 
-  // Hidden games easter egg — revealed by tapping the version pill.
+  // Hidden games easter egg — revealed by tapping the version pill, and
+  // remembered on this device once found. Only for packs with games; the
+  // taps still count on any pack, they just reveal nothing.
   const [versionTaps, setVersionTaps] = useState(0);
-  const gamesRevealed = gamesEnabled && versionTaps >= GAMES_REVEAL_TAPS;
+  const [gamesFound, setGamesFound] = useDevicePref(gamesRevealedPref);
+  const tapVersion = () => {
+    const taps = versionTaps + 1;
+    setVersionTaps(taps);
+    if (taps >= GAMES_REVEAL_TAPS && gamesEnabled && !gamesFound) {
+      setGamesFound(true);
+    }
+  };
+  const hideGames = () => {
+    setVersionTaps(0);
+    setGamesFound(false);
+  };
+  const gamesRevealed = gamesEnabled && gamesFound;
   const gameList = enabledGames(packGames?.include);
 
   const startOfToday = new Date();
@@ -611,7 +628,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
               type="button"
               data-testid="app-version"
               aria-label="App version"
-              onClick={() => setVersionTaps((n) => n + 1)}
+              onClick={tapVersion}
               className="tap-feedback select-none rounded bg-ink-100 px-2 py-0.5 font-mono text-xs text-ink-700"
             >
               v{process.env.NEXT_PUBLIC_APP_VERSION ?? 'dev'}
@@ -647,13 +664,22 @@ export function SettingsPage({ extras }: SettingsPageProps) {
               <strong>{gameList.length}</strong>{' '}
               {gameList.length === 1 ? 'game' : 'games'} to play.
             </p>
-            <Link
-              href="/games/"
-              className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50 dark:hover:bg-ink-100"
-            >
-              <Gamepad2 className="h-4 w-4" />
-              Open the arcade
-            </Link>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Link
+                href="/games/"
+                className="tap-feedback inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50 dark:hover:bg-ink-100"
+              >
+                <Gamepad2 className="h-4 w-4" />
+                Open the arcade
+              </Link>
+              <button
+                type="button"
+                onClick={hideGames}
+                className="tap-feedback rounded-lg px-2 py-1 text-xs font-medium text-ink-500 hover:bg-ink-100"
+              >
+                Hide again
+              </button>
+            </div>
           </div>
         ) : null}
       </SettingsSection>
