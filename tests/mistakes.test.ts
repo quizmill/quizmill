@@ -3,7 +3,6 @@ import {
   pickSimilarQuestion,
   sessionMistakeIds,
   unresolvedMistakeIds,
-  unresolvedMistakes,
 } from '../src/lib/mistakes';
 import type { Attempt } from '../src/data/types';
 
@@ -131,36 +130,6 @@ describe('unresolvedMistakeIds (topic-based rescue)', () => {
   });
 });
 
-describe('unresolvedMistakes (enriched with attempt data)', () => {
-  it('returns the kid\'s most recent wrong attempt for each unresolved question', () => {
-    const out = unresolvedMistakes([
-      att('q1', false, 100, { selectedAnswer: 'first guess' }),
-      att('q1', false, 300, { selectedAnswer: 'second guess' }),
-    ]);
-    expect(out).toHaveLength(1);
-    expect(out[0].questionId).toBe('q1');
-    expect(out[0].wrongAttempt.selectedAnswer).toBe('second guess');
-    expect(out[0].wrongAttempt.answeredAt).toBe(300);
-  });
-
-  it('excludes rescued questions just like unresolvedMistakeIds does', () => {
-    const out = unresolvedMistakes([
-      att('q1', false, 100),
-      att('q2', true, 200), // rescues q1 (same default topic)
-    ]);
-    expect(out).toHaveLength(0);
-  });
-
-  it('returns items sorted most-recent-mistake first', () => {
-    const out = unresolvedMistakes([
-      att('q1', false, 300, { topic: 't1' }),
-      att('q2', false, 100, { topic: 't2' }),
-      att('q3', false, 200, { topic: 't3' }),
-    ]);
-    expect(out.map((x) => x.questionId)).toEqual(['q1', 'q3', 'q2']);
-  });
-});
-
 describe('pickSimilarQuestion', () => {
   const bank = [
     { id: 'q1', subject: 'maths', topic: 'fractions' },
@@ -210,15 +179,6 @@ describe('rescue by question id (migrated attempts)', () => {
   it('unresolvedMistakeIds rescues a wrong attempt whose topic label differs from the later correct one', () => {
     expect(
       unresolvedMistakeIds([
-        att('q1', false, 100, { subject: 'english', topic: 'reading comprehension' }),
-        att('q1', true, 200, { subject: 'english', topic: 'q1' }),
-      ]),
-    ).toEqual([]);
-  });
-
-  it('unresolvedMistakes applies the same rule', () => {
-    expect(
-      unresolvedMistakes([
         att('q1', false, 100, { subject: 'english', topic: 'reading comprehension' }),
         att('q1', true, 200, { subject: 'english', topic: 'q1' }),
       ]),

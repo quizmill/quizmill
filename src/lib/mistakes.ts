@@ -33,8 +33,7 @@ const topicKey = (subject: string, topic: string): string =>
  * timestamp of the wrong attempt, OLDEST first — so the review queue
  * (which takes the first N) resurfaces mistakes made longer ago before
  * recent ones, the spaced-repetition intuition: a stale mistake should not
- * stay buried under today's slip-ups. (The mistakes browser uses
- * `unresolvedMistakes`, which keeps newest-first for list display.)
+ * stay buried under today's slip-ups.
  */
 export function unresolvedMistakeIds(attempts: readonly Attempt[]): string[] {
   // Walk chronologically so we can read off the latest "correct on topic"
@@ -95,46 +94,6 @@ export function sessionMistakeIds(
 
 export function unresolvedMistakeCount(attempts: readonly Attempt[]): number {
   return unresolvedMistakeIds(attempts).length;
-}
-
-/**
- * Like `unresolvedMistakeIds` but each entry is enriched with the kid's
- * most recent wrong attempt at that question — useful for the mistakes
- * browser, which shows what the kid picked alongside the correct answer.
- */
-export function unresolvedMistakes(
-  attempts: readonly Attempt[],
-): { questionId: string; wrongAttempt: Attempt }[] {
-  const sorted = [...attempts].sort((a, b) => a.answeredAt - b.answeredAt);
-
-  const lastCorrectOnTopic = new Map<string, number>();
-  const lastCorrectOnQuestion = new Map<string, number>();
-  const lastWrong = new Map<string, Attempt>();
-
-  for (const a of sorted) {
-    const tk = topicKey(a.subject, a.topic);
-    if (a.isCorrect) {
-      lastCorrectOnTopic.set(tk, a.answeredAt);
-      lastCorrectOnQuestion.set(a.questionId, a.answeredAt);
-    } else {
-      lastWrong.set(a.questionId, a);
-    }
-  }
-
-  const out: { questionId: string; wrongAttempt: Attempt }[] = [];
-  for (const [qid, attempt] of lastWrong) {
-    const tk = topicKey(attempt.subject, attempt.topic);
-    const lastOk = Math.max(
-      lastCorrectOnTopic.get(tk) ?? -Infinity,
-      lastCorrectOnQuestion.get(qid) ?? -Infinity,
-    );
-    if (lastOk < attempt.answeredAt) {
-      out.push({ questionId: qid, wrongAttempt: attempt });
-    }
-  }
-
-  out.sort((a, b) => b.wrongAttempt.answeredAt - a.wrongAttempt.answeredAt);
-  return out;
 }
 
 /**
