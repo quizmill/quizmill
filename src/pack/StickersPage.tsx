@@ -24,7 +24,7 @@ import { cn } from '@/lib/cn';
  *  Tapping a locked tile opens a detail with progress toward unlocking. */
 export default function StickersPage() {
   const { earned, earnedList } = useEarnedAchievements();
-  const { sessions, attempts } = useStorageData();
+  const { attempts } = useStorageData();
   const earnedAtById = new Map(earnedList.map((e) => [e.id, e.earnedAt]));
 
   // Count only stickers that still exist in this pack's cabinet. Stored
@@ -34,10 +34,7 @@ export default function StickersPage() {
   const earnedCount = ACHIEVEMENTS.filter((a) => earned.has(a.id)).length;
 
   // Aggregates for "how am I doing" — computed once, not per tile.
-  const ctx = useMemo(
-    () => buildProgressContext(sessions, attempts),
-    [sessions, attempts],
-  );
+  const ctx = useMemo(() => buildProgressContext(attempts), [attempts]);
 
   // The locked sticker whose progress detail is open (null = closed).
   const [selected, setSelected] = useState<Achievement | null>(null);

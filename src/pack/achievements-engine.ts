@@ -54,7 +54,7 @@ export function evaluateAchievements(
   const earned = new Set<string>();
   // Shared aggregates, computed once — the same ones the cabinet shows
   // progress against, so "earned" and "progress" can never disagree.
-  const ctx = buildProgressContext(sessions, attempts, now);
+  const ctx = buildProgressContext(attempts, now);
 
   for (const a of achievements) {
     switch (a.category) {
@@ -106,7 +106,9 @@ export interface AchievementProgress {
 
 /**
  * Aggregates shared across every achievement's progress, computed once
- * so the cabinet doesn't re-walk the full history per tile.
+ * so the cabinet doesn't re-walk the full history per tile. Every field
+ * derives from attempts alone — milestones are the only session-based
+ * stickers and they have no progress to show, so sessions aren't needed.
  */
 export interface ProgressContext {
   bestRun: number;
@@ -116,7 +118,6 @@ export interface ProgressContext {
 }
 
 export function buildProgressContext(
-  sessions: readonly Session[],
   attempts: readonly Attempt[],
   now: Date = new Date(),
 ): ProgressContext {
