@@ -1,8 +1,8 @@
 import { startStaticServer, type Server } from '../e2e/helpers';
 
 /**
- * Global setup for the pack-variant E2E suite. Mirrors the CCA setup
- * on its own port. Caller must have built the pack variant first:
+ * Global setup for the E2E suite: serves the static export on its own
+ * port. Caller must have built it first:
  *   NEXT_PUBLIC_BASE_PATH= npm run build
  * (the prebuild ensure-pack hook seeds the demo pack when none is
  * active — the specs assert against the demo pack's content).

@@ -1,14 +1,16 @@
 import { z } from 'zod';
 
 /**
- * Learning-pack format (schemaVersion 1).
+ * Learning-pack format (schemaVersion 1 or 2).
  *
- * A pack is a directory of three JSON files that fully describes one
- * deployable practice app for the generic `pack` variant:
+ * A pack is a directory of JSON files that fully describes one
+ * deployable practice app:
  *
  *   pack.json        manifest — identity, branding, categories
  *   questions.json   the MCQ bank
  *   scenarios.json   optional shared scenario stems (may be `[]` / absent)
+ *   concepts.json    optional teaching cards (v2; may be `[]` / absent)
+ *   assets/          optional images referenced by `image` paths (v2)
  *
  * The shape is a generalised MCQ format proven by several hundred
  * imported/generated questions in the engine's ancestor project; categories
