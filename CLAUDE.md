@@ -247,7 +247,12 @@ offline.
   bootstrap in `layout.tsx` and `src/pack/runtime.ts` resolve the active
   pack before the engine bundle evaluates — precedence: `#pack=` hash >
   `quizmill.activePack` handoff blob (quizmill-cloud) > library pointer >
-  build-time pack. Progress is per pack (`quizmill.<packId>.*`) so
+  build-time pack. Every route is still PRERENDERED from the build-time
+  pack, so when a runtime pack wins (`isRuntimePack` in `source.ts`)
+  `RuntimePackBoundary` (wrapped around the layout's children) adopts the
+  prerendered markup verbatim for the hydration pass and swaps the live
+  tree in before paint — otherwise every hard load of a pack-scoped page
+  logged React #418. Progress is per pack (`quizmill.<packId>.*`) so
   swapping is free, and EJECT deliberately keeps progress (re-insert to
   resume). Pack-scoped pages (Progress, Stickers, Notes) carry a
   `PackChip` eyebrow naming the active pack, linking to `/packs`.
@@ -260,7 +265,7 @@ offline.
 
 ```
 npm run dev                      # demo pack at localhost:3000
-npm test                         # vitest unit (507 tests, 44 files)
+npm test                         # vitest unit (736 tests, 63 files)
 npm run test:watch               # same, in watch mode
 npm run lint                     # eslint (flat config) — 0 errors required
 npm run typecheck                # tsc --noEmit
