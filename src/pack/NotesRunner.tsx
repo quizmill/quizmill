@@ -2,45 +2,32 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Home, ListChecks, NotebookPen, RefreshCw } from 'lucide-react';
+import { Home, NotebookPen, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { cn } from '@/lib/cn';
 import {
   useRecordAttempt,
   useStartSession,
   useEndSession,
 } from '@/lib/useStorage';
-import { VoteRow } from '@/components/VoteRow';
-import { NoteRow } from '@/components/NoteRow';
-import { NoteOrigin } from '@/pack/NoteOrigin';
-import { Scratchpad } from '@/components/Scratchpad';
-import { SourceRef } from '@/components/SourceRef';
-import { McqMarkdown } from '@/components/McqMarkdown';
-import { OptionButtons } from '@/pack/OptionButtons';
-import { PackImage } from '@/pack/PackImage';
-import { ConceptCard } from '@/pack/ConceptCard';
-import { QuestionMeta } from '@/pack/QuestionMeta';
-import { Celebration } from '@/components/Celebration';
-import { levelUpCelebration, useLevelUp } from '@/pack/useLevelUp';
+import { useLevelUp } from '@/pack/useLevelUp';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
+import {
+  AnswerPanel,
+  BackLink,
+  QuestionPanel,
+  RunnerCelebrations,
+  RunnerLoading,
+  type Stage,
+} from '@/pack/RunnerPanels';
 import { amendAttempt, loadAttempts, loadNotes, loadSessions } from '@/lib/storage';
 import { notesPracticePool } from '@/pack/notes-practice';
-import {
-  correctKeysOf,
-  isMultiAnswer,
-  packQuestions,
-  packScenarios,
-  PACK_CONCEPT_BY_ID,
-  type OptionKey,
-} from '@/pack/data';
+import { isMultiAnswer, packQuestions, type OptionKey } from '@/pack/data';
 import {
   advanceAfterAnswer,
   buildAttempt,
   buildSessionEnd,
   buildSessionStart,
   feedbackSecondsSince,
-  formatKeyList,
-  gradeSelection,
   isLastQuestion,
   moveToNext,
   nextSelection,
@@ -48,7 +35,8 @@ import {
   type RunnerState,
 } from './runner';
 
-type Stage = 'choosing' | 'feedback';
+/** The runner opens from /notes, so that's where its back link goes. */
+const backToNotes = <BackLink href="/notes/" label="My notes" />;
 
 /**
  * Notes-focused practice runner: a round over the questions "around the
@@ -103,7 +91,7 @@ export function PackNotesRunner() {
   if (nothingToPractice) {
     return (
       <main className="flex flex-col gap-5">
-        <BackLink />
+        {backToNotes}
         <div className="rounded-2xl border border-ink-200 bg-surface p-6 text-center shadow-sm">
           <h1 className="text-2xl font-bold text-ink-900">No note topics yet</h1>
           <p className="mt-2 text-ink-600">
@@ -122,31 +110,23 @@ export function PackNotesRunner() {
     );
   }
 
-  if (!state) {
-    return (
-      <main className="flex flex-col gap-5">
-        <BackLink />
-        <div className="rounded-2xl border border-ink-200 bg-surface p-6 text-center text-ink-500 shadow-sm">
-          Loading…
-        </div>
-      </main>
-    );
-  }
+  if (!state) return <RunnerLoading back={backToNotes} />;
+
+  const celebrations = (
+    <RunnerCelebrations
+      nextUnlock={nextUnlock}
+      clearNextUnlock={clearNextUnlock}
+      nextLevelUp={nextLevelUp}
+      clearNextLevelUp={clearNextLevelUp}
+    />
+  );
 
   if (finished) {
     const { correct, total, pct } = scoreSummary(state);
     return (
       <main className="flex flex-col gap-5">
-        {nextUnlock ? (
-          <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
-        ) : nextLevelUp ? (
-          <Celebration
-            label="Level up!"
-            achievement={levelUpCelebration(nextLevelUp)}
-            onDone={clearNextLevelUp}
-          />
-        ) : null}
-        <BackLink />
+        {celebrations}
+        {backToNotes}
         <div className="rounded-2xl border border-ink-200 bg-surface p-8 text-center shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
             Notes round complete
@@ -185,12 +165,6 @@ export function PackNotesRunner() {
   }
 
   const current = state.questions[state.currentIndex];
-  const scenario = current.scenarioId
-    ? packScenarios.find((s) => s.id === current.scenarioId)
-    : undefined;
-  const scenarioWithStem =
-    scenario && scenario.stem ? { ...scenario, stem: scenario.stem } : null;
-
   const multi = isMultiAnswer(current);
 
   function handleSelect(key: OptionKey) {
@@ -244,174 +218,32 @@ export function PackNotesRunner() {
     setSelected([]);
   }
 
-  const isCorrect = stage === 'feedback' && gradeSelection(current, selected);
-  const answerKeys = correctKeysOf(current);
-  const concept = current.conceptId ? PACK_CONCEPT_BY_ID[current.conceptId] : undefined;
-
   return (
     <main className="flex flex-col gap-5">
-      {nextUnlock ? (
-        <Celebration achievement={nextUnlock} onDone={clearNextUnlock} />
-      ) : nextLevelUp ? (
-        <Celebration
-          label="Level up!"
-          achievement={levelUpCelebration(nextLevelUp)}
-          onDone={clearNextLevelUp}
-        />
-      ) : null}
-      <header className="flex items-center justify-between">
-        <BackLink />
-        <ProgressBar
-          current={state.currentIndex + 1}
-          total={state.questions.length}
-        />
-      </header>
-
-      <div className="flex flex-wrap items-center gap-1.5 text-sm">
-        <span className="rounded-full border border-brand-500/50 bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand-700">
-          From your notes
-        </span>
-        <QuestionMeta question={current} />
-        {scenario ? (
-          <span className="rounded-full border border-ink-300 bg-surface px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-700">
-            {scenario.title}
-          </span>
-        ) : null}
-        <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-600">
-          Q {state.currentIndex + 1} / {state.questions.length}
-        </span>
-      </div>
-
-      {scenarioWithStem ? (
-        <section className="rounded-2xl border border-ink-200 bg-ink-50/60 p-4 shadow-sm">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">
-            Scenario
-          </div>
-          <div className="mt-0.5 text-base font-semibold text-ink-900">
-            {scenarioWithStem.title}
-          </div>
-          <div className="mt-2 text-[15px] leading-relaxed text-ink-800">
-            <McqMarkdown text={scenarioWithStem.stem} />
-          </div>
-        </section>
-      ) : null}
-
-      <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
-        <div className="text-[15px] leading-relaxed text-ink-900">
-          <McqMarkdown text={current.prompt} />
-        </div>
-      </div>
-
-      {current.image ? (
-        <div className="flex justify-center rounded-2xl border border-ink-200 bg-surface p-4 shadow-sm">
-          <PackImage
-            src={current.image}
-            alt=""
-            className="max-h-72 w-auto object-contain"
-          />
-        </div>
-      ) : null}
-
-      <Scratchpad />
-
-      {multi ? (
-        <div className="-mb-1 flex items-center gap-1.5 text-xs font-semibold text-brand-700">
-          <ListChecks className="h-4 w-4" />
-          Select all that apply
-        </div>
-      ) : null}
-
-      <OptionButtons
-        options={current.options}
+      {celebrations}
+      <QuestionPanel
+        question={current}
+        position={state.currentIndex + 1}
+        total={state.questions.length}
         selected={selected}
         stage={stage}
-        correctKeys={answerKeys}
-        multi={multi}
         onSelect={handleSelect}
+        back={backToNotes}
+        badge={
+          <span className="rounded-full border border-brand-500/50 bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand-700">
+            From your notes
+          </span>
+        }
       />
-
-      {stage === 'choosing' ? (
-        <Button
-          size="lg"
-          block
-          onClick={handleCheck}
-          disabled={selected.length === 0}
-        >
-          Check answer
-        </Button>
-      ) : (
-        <div
-          className={cn(
-            'flex flex-col gap-3 rounded-2xl border p-4',
-            isCorrect
-              ? 'border-success-500/30 bg-success-100/60'
-              : 'border-warn-500/30 bg-warn-100/60',
-          )}
-        >
-          <div
-            className={cn(
-              'text-lg font-bold',
-              isCorrect ? 'text-success-700' : 'text-warn-700',
-            )}
-          >
-            {isCorrect ? 'Correct.' : 'Not quite.'}
-          </div>
-          {!isCorrect ? (
-            <div className="text-[15px] text-ink-700">
-              {answerKeys.length > 1 ? 'The answers are ' : 'The answer is '}
-              <span className="font-semibold text-ink-900">
-                {formatKeyList(answerKeys)}
-              </span>
-              .
-            </div>
-          ) : null}
-          <div className="text-[15px] leading-relaxed text-ink-800">
-            <McqMarkdown text={current.explanation} />
-          </div>
-          {concept ? (
-            <ConceptCard concept={concept} defaultOpen={!isCorrect} />
-          ) : null}
-          <SourceRef sourceRef={current.sourceRef} />
-          <NoteOrigin generatedFrom={current.generatedFrom} />
-          {/* keyed so per-question draft state resets when the question advances */}
-          <VoteRow key={`vote-${current.id}`} questionId={current.id} />
-          <NoteRow key={`note-${current.id}`} questionId={current.id} />
-          <Button size="lg" block onClick={handleNext} className="mt-1">
-            {state.currentIndex + 1 === state.questions.length
-              ? 'See results'
-              : 'Next question'}
-          </Button>
-        </div>
-      )}
+      <AnswerPanel
+        question={current}
+        selected={selected}
+        stage={stage}
+        verdict={{ correct: 'Correct.', wrong: 'Not quite.' }}
+        isLast={isLastQuestion(state)}
+        onCheck={handleCheck}
+        onNext={handleNext}
+      />
     </main>
-  );
-}
-
-function BackLink() {
-  return (
-    <Link
-      href="/notes/"
-      className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm font-medium text-ink-600 hover:bg-ink-100"
-    >
-      <ArrowLeft className="h-4 w-4" />
-      My notes
-    </Link>
-  );
-}
-
-function ProgressBar({ current, total }: { current: number; total: number }) {
-  const pct = Math.round((current / total) * 100);
-  return (
-    <div className="flex w-32 items-center gap-2">
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-ink-100">
-        <div
-          className="h-full bg-brand-500 transition-all"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <span className="text-xs font-medium text-ink-500">
-        {current}/{total}
-      </span>
-    </div>
   );
 }

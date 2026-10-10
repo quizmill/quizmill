@@ -4,7 +4,9 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { webcrypto } from 'node:crypto';
 import { PackPracticeRunner } from '@/pack/PracticeRunner';
-import { ATTEMPTS_KEY } from '@/lib/storage';
+import { ATTEMPTS_KEY, saveAchievements } from '@/lib/storage';
+import { STREAK_MIN_QUESTIONS_PER_DAY } from '@/lib/stats';
+import { ACHIEVEMENTS } from '@/pack/achievements';
 import type { Attempt } from '@/data/types';
 
 // React needs this flag to allow act() outside @testing-library.
@@ -138,5 +140,57 @@ describe('PackPracticeRunner', () => {
       (b) => b.type === 'button' && /^[A-F]/.test((b.textContent ?? '').trim()),
     );
     expect(freshOptions.length).toBeGreaterThan(0);
+  });
+
+  it('does not carry the streak toast onto the results screen', async () => {
+    // Every sticker and level already earned, so the streak nod is the only
+    // celebration that can fire; and today's goal is set to cross on the
+    // round's LAST answer (5 seeded today + 5 in the round = the goal).
+    saveAchievements([
+      ...ACHIEVEMENTS.map((a) => ({ id: a.id, earnedAt: 1 })),
+      { id: 'level-999', earnedAt: 1 },
+    ]);
+    const roundSize = 5;
+    const now = Date.now();
+    const seeded: Attempt[] = Array.from(
+      { length: STREAK_MIN_QUESTIONS_PER_DAY - roundSize },
+      (_, i) => ({
+        id: `today-${i}`,
+        sessionId: 'today-session',
+        questionId: `demo-planet-00${i + 1}`,
+        answeredAt: now - 60_000 + i,
+        selectedAnswer: 'A',
+        isCorrect: true,
+        timeTakenSeconds: 5,
+        subject: 'planets',
+        topic: `demo-planet-00${i + 1}`,
+        difficulty: 1,
+      }),
+    );
+    localStorage.setItem(ATTEMPTS_KEY, JSON.stringify(seeded));
+    await render();
+
+    for (let i = 0; i < roundSize; i++) {
+      const option = buttons().find(
+        (b) =>
+          b.type === 'button' &&
+          !b.disabled &&
+          /^[A-F]/.test((b.textContent ?? '').trim()),
+      );
+      await click(option!);
+      await click(control('Check answer')!);
+      if (i < roundSize - 1) await click(control('Next question')!);
+    }
+
+    // The crossing happened on the last answer: the toast is up with the
+    // feedback, as before…
+    expect(container.querySelector('[data-testid="celebration"]')?.textContent).toContain(
+      'day streak',
+    );
+    await click(control('See results')!);
+
+    // …but the results screen only ever showed sticker / level-up toasts.
+    expect(control('Another round')).toBeTruthy();
+    expect(container.querySelector('[data-testid="celebration"]')).toBeNull();
   });
 });

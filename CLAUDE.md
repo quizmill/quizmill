@@ -265,7 +265,7 @@ offline.
 
 ```
 npm run dev                      # demo pack at localhost:3000
-npm test                         # vitest unit (735 tests, 64 files)
+npm test                         # vitest unit (736 tests, 64 files)
 npm run test:watch               # same, in watch mode
 npm run lint                     # eslint (flat config) — 0 errors required
 npm run typecheck                # tsc --noEmit
