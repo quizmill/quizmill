@@ -7,38 +7,6 @@
 import type { Attempt, Session } from '@/data/types';
 import { currentStreak, longestStreak, toDayKey } from './streak';
 
-export interface CategoryAccuracy {
-  key: string;
-  label: string;
-  attempted: number;
-  correct: number;
-  accuracyPct: number;
-}
-
-/** Accuracy per pack category, in the order the categories are given.
- *  Categories with no attempts are included with zeroes. */
-export function accuracyByCategory(
-  attempts: readonly Attempt[],
-  categories: readonly { key: string; label: string; shortLabel?: string }[],
-): CategoryAccuracy[] {
-  return categories.map((cat) => {
-    let attempted = 0;
-    let correct = 0;
-    for (const a of attempts) {
-      if (a.subject !== cat.key) continue;
-      attempted += 1;
-      if (a.isCorrect) correct += 1;
-    }
-    return {
-      key: cat.key,
-      label: cat.shortLabel ?? cat.label,
-      attempted,
-      correct,
-      accuracyPct: attempted === 0 ? 0 : Math.round((correct / attempted) * 100),
-    };
-  });
-}
-
 export interface DailyPoint {
   date: string; // YYYY-MM-DD, local time
   attempted: number;

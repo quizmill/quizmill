@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Attempt, Session } from '@/data/types';
 import {
-  accuracyByCategory,
   accuracyByDay,
   completedSessionDates,
   levelNudge,
@@ -32,36 +31,6 @@ function attempt(over: Partial<Attempt> = {}): Attempt {
     ...over,
   };
 }
-
-const CATEGORIES = [
-  { key: 'alpha', label: 'Alpha' },
-  { key: 'beta', label: 'Beta', shortLabel: 'B' },
-];
-
-describe('accuracyByCategory', () => {
-  it('returns all categories, zeroed when unattempted, in given order', () => {
-    const rows = accuracyByCategory([], CATEGORIES);
-    expect(rows.map((r) => r.key)).toEqual(['alpha', 'beta']);
-    expect(rows[0]).toMatchObject({ attempted: 0, correct: 0, accuracyPct: 0 });
-  });
-
-  it('aggregates and rounds per category, using shortLabel for display', () => {
-    const attempts = [
-      attempt({ subject: 'alpha', isCorrect: true }),
-      attempt({ subject: 'alpha', isCorrect: true }),
-      attempt({ subject: 'alpha', isCorrect: false }),
-      attempt({ subject: 'beta', isCorrect: false }),
-    ];
-    const [alpha, beta] = accuracyByCategory(attempts, CATEGORIES);
-    expect(alpha).toMatchObject({ attempted: 3, correct: 2, accuracyPct: 67 });
-    expect(beta).toMatchObject({ label: 'B', attempted: 1, accuracyPct: 0 });
-  });
-
-  it('ignores attempts for categories not in the pack', () => {
-    const rows = accuracyByCategory([attempt({ subject: 'other' })], CATEGORIES);
-    expect(rows.every((r) => r.attempted === 0)).toBe(true);
-  });
-});
 
 describe('accuracyByDay', () => {
   it('buckets by local day, sorted oldest-first, omitting empty days', () => {
