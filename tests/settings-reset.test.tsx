@@ -31,6 +31,7 @@ afterEach(async () => {
   root = undefined;
   container.remove();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 async function render(el: React.ReactElement) {
@@ -91,7 +92,8 @@ describe('Settings reset buttons', () => {
   it('clears everything after confirming, and reports it', async () => {
     // Seed at "now": a minute ago would fall on yesterday right after midnight.
     seed(Date.now());
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    // happy-dom ships no window.confirm, so stub one in rather than spy.
+    vi.stubGlobal('confirm', vi.fn(() => true));
     await render(<SettingsPage />);
     expect(button('Reset today').disabled).toBe(false);
     await act(async () => {
@@ -105,7 +107,7 @@ describe('Settings reset buttons', () => {
 
   it('does nothing when the confirm is dismissed', async () => {
     seed(Date.now());
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    vi.stubGlobal('confirm', vi.fn(() => false));
     await render(<SettingsPage />);
     await act(async () => {
       button('Reset today').click();
