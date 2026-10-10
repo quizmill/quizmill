@@ -623,6 +623,11 @@ describe('reward mini-games', () => {
     }
     await page.waitForSelector('[data-testid="games-easter-egg"]');
 
+    // The find is remembered on the device: back in Settings, the card
+    // is still there without tapping again.
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForSelector('[data-testid="games-easter-egg"]');
+
     // Follow the revealed link into the arcade — playable straight away,
     // no gate (finding the secret is the unlock).
     await page.click('[data-testid="games-easter-egg"] a[href="/games/"]');
@@ -639,5 +644,34 @@ describe('reward mini-games', () => {
       () => !document.querySelector('[data-testid="game-shell"]'),
     );
     await page.waitForSelector('[data-testid="games-grid"]');
+  });
+
+  it('gates the arcade on the ACTIVE pack, not the pack the build was made from', async () => {
+    // The static export prerenders /games once, from the demo pack (which
+    // has games). A pack handed to the engine at runtime must get its own
+    // answer there: this one has no `games` block, so no grid — a plain
+    // "no games" card instead of a dead link. (The inverse — a games pack
+    // swapped into an app built without games — is the same decision made
+    // in the browser; it can't be staged against this build.)
+    await page.evaluate(() => {
+      const manifest = {
+        schemaVersion: 1,
+        id: 'runtime-no-games',
+        title: 'Runtime pack without games',
+        description: 'Injected at runtime.',
+        homeSubtitle: 'No arcade here',
+        themeColor: '#3b78e0',
+        categories: [{ key: 'basics', label: 'Basics' }],
+      };
+      localStorage.setItem(
+        'quizmill.activePack',
+        JSON.stringify({ manifest, questions: [] }),
+      );
+    });
+    await page.goto(baseUrl() + '/games/');
+    await page.waitForSelector('[data-testid="games-none"]');
+    expect(await page.$('[data-testid="games-grid"]')).toBeNull();
+    expect(await bodyText(page)).toContain('No games in this pack');
+    await page.evaluate(() => localStorage.removeItem('quizmill.activePack'));
   });
 });
