@@ -81,7 +81,7 @@ describe('Settings reset buttons', () => {
     expect(button('Reset everything').disabled).toBe(true);
   });
 
-  it("only enables Reset today for today's practice", async () => {
+  it('enables only Reset everything when the practice is three days old', async () => {
     seed(Date.now() - 3 * 24 * 60 * 60_000);
     await render(<SettingsPage />);
     expect(button('Reset today').disabled).toBe(true);
@@ -89,7 +89,8 @@ describe('Settings reset buttons', () => {
   });
 
   it('clears everything after confirming, and reports it', async () => {
-    seed(Date.now() - 60_000);
+    // Seed at "now": a minute ago would fall on yesterday right after midnight.
+    seed(Date.now());
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     await render(<SettingsPage />);
     expect(button('Reset today').disabled).toBe(false);
@@ -103,7 +104,7 @@ describe('Settings reset buttons', () => {
   });
 
   it('does nothing when the confirm is dismissed', async () => {
-    seed(Date.now() - 60_000);
+    seed(Date.now());
     vi.spyOn(window, 'confirm').mockReturnValue(false);
     await render(<SettingsPage />);
     await act(async () => {
