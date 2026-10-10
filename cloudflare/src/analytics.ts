@@ -17,6 +17,7 @@
  * Nothing links a device id to a sync key, a name, or an address — the
  * worker never looks at request IPs or user agents.
  */
+import { isId, type SqlStatement } from './ops';
 
 /** MUST match FUNNEL_EVENTS in src/lib/analytics.ts (asserted in tests). */
 export const FUNNEL_EVENTS = [
@@ -37,11 +38,6 @@ export interface Beacon {
   ts: number;
 }
 
-export interface SqlStatement {
-  sql: string;
-  params: (string | number | null)[];
-}
-
 /**
  * Hard cap on a beacon body, checked BEFORE JSON.parse: a real beacon is
  * ~170 bytes, so anything past this is not one and is refused unread
@@ -49,15 +45,10 @@ export interface SqlStatement {
  */
 export const MAX_BEACON_BYTES = 1024;
 
-const MAX_ID_LENGTH = 200;
 const MAX_DEVICE_ID_LENGTH = 64;
 const MAX_BUILD_LENGTH = 100;
 const DEFAULT_DAYS = 30;
 const MAX_DAYS = 365;
-
-function isId(v: unknown): v is string {
-  return typeof v === 'string' && v.length > 0 && v.length <= MAX_ID_LENGTH;
-}
 
 function isEvent(v: unknown): v is FunnelEvent {
   return typeof v === 'string' && (FUNNEL_EVENTS as readonly string[]).includes(v);

@@ -140,17 +140,12 @@ export function wilsonInterval(
 }
 
 /**
- * The "latest cold look" outcome per question — the cold-performance signal.
- * For each question we keep one result per session (the FIRST attempt in that
- * session, so a rescue loop re-asking until correct can't inflate it), then
- * take the MOST RECENT session's result (so genuine re-learning later counts).
- * Optionally restricted to in-scope questions.
- */
-/**
  * One attempt per distinct question — that question's most recent "cold
- * look" (the first answer in each session, then the latest session's).
- * The engine's canonical de-duplication of a re-answered question: use it
- * anywhere a count or accuracy must be per-question, not per-attempt.
+ * look": the FIRST answer in each session (so a rescue loop re-asking until
+ * correct can't inflate it), then the MOST RECENT session's result (so
+ * genuine re-learning later counts). The engine's canonical de-duplication
+ * of a re-answered question: use it anywhere a count or accuracy must be
+ * per-question, not per-attempt. Optionally restricted to in-scope questions.
  */
 export function latestColdLook(
   attempts: readonly Attempt[],
@@ -175,6 +170,25 @@ export function latestColdLook(
 
 const pct = (frac: number) => Math.round(frac * 100);
 
+interface Tally {
+  attempted: number;
+  correct: number;
+}
+
+const NO_TALLY: Tally = { attempted: 0, correct: 0 };
+
+/** Cold looks per category key (the attempt's `subject`). */
+function tallyBySubject(looks: readonly Attempt[]): Map<string, Tally> {
+  const bySubject = new Map<string, Tally>();
+  for (const a of looks) {
+    const row = bySubject.get(a.subject) ?? { attempted: 0, correct: 0 };
+    row.attempted += 1;
+    if (a.isCorrect) row.correct += 1;
+    bySubject.set(a.subject, row);
+  }
+  return bySubject;
+}
+
 /** Per-category "latest cold look" accuracy + coverage — the standard
  *  per-category metric for the Progress page (used with or without an exam
  *  goal). Same cold-look basis as the readiness estimate, so the two never
@@ -197,16 +211,9 @@ export function coldLookByCategory(
   opts: { inScope?: (questionId: string) => boolean } = {},
 ): CategoryColdLook[] {
   const inScope = opts.inScope ?? (() => true);
-  const looks = latestColdLook(attempts, inScope);
-  const bySubject = new Map<string, { attempted: number; correct: number }>();
-  for (const a of looks) {
-    const row = bySubject.get(a.subject) ?? { attempted: 0, correct: 0 };
-    row.attempted += 1;
-    if (a.isCorrect) row.correct += 1;
-    bySubject.set(a.subject, row);
-  }
+  const bySubject = tallyBySubject(latestColdLook(attempts, inScope));
   return categories.map((c) => {
-    const agg = bySubject.get(c.key) ?? { attempted: 0, correct: 0 };
+    const agg = bySubject.get(c.key) ?? NO_TALLY;
     return {
       key: c.key,
       label: c.label,
@@ -240,14 +247,7 @@ export function computeReadiness(
     maxNudges = DEFAULT_MAX_NUDGES,
   } = opts;
 
-  const looks = latestColdLook(attempts, inScope);
-  const bySubject = new Map<string, { attempted: number; correct: number }>();
-  for (const a of looks) {
-    const row = bySubject.get(a.subject) ?? { attempted: 0, correct: 0 };
-    row.attempted += 1;
-    if (a.isCorrect) row.correct += 1;
-    bySubject.set(a.subject, row);
-  }
+  const bySubject = tallyBySubject(latestColdLook(attempts, inScope));
 
   // Normalise weights across the domains we were given; if every weight is 0
   // (no blueprint), fall back to bank size so larger domains count for more.
@@ -260,11 +260,15 @@ export function computeReadiness(
   };
 
   const passFrac = goal.passPct / 100;
+  /** First attempts a domain needs before it's judged — the sample floor,
+   *  capped at the bank size so a tiny domain can still be covered. */
+  const gateOf = (d: ReadinessDomainInput): number =>
+    Math.min(minDomainSample, Math.max(1, d.available));
 
+  // Built in `domains` order, so domainReports[i] reports domains[i].
   const domainReports: DomainReadiness[] = domains.map((d) => {
-    const agg = bySubject.get(d.key) ?? { attempted: 0, correct: 0 };
-    const gate = Math.min(minDomainSample, Math.max(1, d.available));
-    const judged = agg.attempted >= gate;
+    const agg = bySubject.get(d.key) ?? NO_TALLY;
+    const judged = agg.attempted >= gateOf(d);
     const accFrac = agg.attempted ? agg.correct / agg.attempted : 0;
     const [lo, hi] = wilsonInterval(agg.correct, agg.attempted, z);
 
@@ -303,13 +307,14 @@ export function computeReadiness(
     let est = 0;
     let lo = 0;
     let hi = 0;
-    for (const d of judged) {
-      const r = domainReports.find((x) => x.key === d.key)!;
+    domains.forEach((d, i) => {
+      const r = domainReports[i];
+      if (!r.judged) return;
       const w = shareOf(d) / judgedWeight; // renormalise to the judged set
       est += w * (r.accuracyPct / 100);
       lo += w * (r.lowPct / 100);
       hi += w * (r.highPct / 100);
-    }
+    });
     estimatePct = pct(est);
     lowPct = pct(lo);
     highPct = pct(hi);
@@ -338,11 +343,11 @@ export function computeReadiness(
   // outranks a lightly-unknown one. Both end up on the same 0..1 scale.
   const COVER_SPECULATION = 0.5;
   const nudges: (ReadinessNudge & { urgency: number })[] = [];
-  for (const d of domains) {
-    const r = domainReports.find((x) => x.key === d.key)!;
+  domains.forEach((d, i) => {
+    const r = domainReports[i];
     const share = shareOf(d);
     if (r.status === 'untested' || r.status === 'thin') {
-      const gate = Math.min(minDomainSample, Math.max(1, d.available));
+      const gate = gateOf(d);
       const deficit = Math.max(0, (gate - r.attempted) / gate);
       nudges.push({
         key: d.key,
@@ -367,7 +372,7 @@ export function computeReadiness(
         urgency: share * Math.max(0, (goal.passPct - r.accuracyPct) / 100),
       });
     }
-  }
+  });
   nudges.sort((a, b) => b.urgency - a.urgency);
 
   return {

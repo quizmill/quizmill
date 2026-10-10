@@ -1,8 +1,8 @@
 /**
- * Pure logic for the pack practice runner — same machinery as the CCA
- * runner (src/variants/claude-cert/runner.ts) over the generic
- * PackQuestion shape. The React components are the I/O shells;
- * everything that can be a function of plain inputs lives here.
+ * Pure logic for the pack practice runner, over the generic PackQuestion
+ * shape. The React components (PracticeRunner, ReviewRunner, DriveRunner,
+ * NotesRunner) are the I/O shells; everything that can be a function of
+ * plain inputs lives here.
  */
 import { APP_BUILD } from '@/config';
 import type { Attempt, Session, SessionMode } from '@/data/types';
@@ -114,9 +114,7 @@ export function isBankFullySeen(
 
 /**
  * Pick the session's questions from the bank. Returns null when there's
- * nothing to pick from (empty bank). Wraps each question in a `topic`
- * field so the engine's SelectableQuestion shape is satisfied; unwraps
- * before returning.
+ * nothing to pick from (empty bank).
  */
 export function pickSessionFromBank(
   bank: PackQuestion[],
@@ -125,19 +123,14 @@ export function pickSessionFromBank(
   count: number = QUESTION_COUNT,
 ): PackQuestion[] | null {
   if (bank.length === 0) return null;
-  const selectable = bank.map((q) => ({ ...q, topic: q.categoryKey }));
-  const picked = pickSessionQuestions(selectable, {
+  const picked = pickSessionQuestions(bank, {
     count: Math.min(count, bank.length),
     historicalAttemptedIds: new Set(history.keys()),
     currentSessionIds: new Set(),
     history,
     rng,
   });
-  if (picked.length === 0) return null;
-  return picked.map((p) => {
-    const { topic: _topic, ...rest } = p;
-    return rest as PackQuestion;
-  });
+  return picked.length === 0 ? null : picked;
 }
 
 export interface BuildAttemptArgs {
@@ -178,10 +171,10 @@ export function buildAttempt(args: BuildAttemptArgs): Attempt {
     timeTakenSeconds: args.timeTakenSeconds ?? measured,
     // Subject is the engine type — packs store the category key here.
     subject: categoryKey,
-    // Per-question rescue, same as CCA: pack questions are
-    // self-contained, so a mistake is only rescued by re-answering
-    // that exact question correctly (see claude-cert/runner.ts for
-    // the contrast with 11+'s per-concept rescue model).
+    // Per-question rescue: pack questions are self-contained, so a
+    // mistake is only rescued by re-answering that exact question
+    // correctly. The mistakes engine rescues per (subject, topic), so
+    // the question id IS the topic (see src/lib/mistakes.ts).
     topic: question.id,
     difficulty: question.difficulty,
     position: state.currentIndex + 1,
@@ -210,23 +203,33 @@ export function deviceContext(): Pick<Session, 'display' | 'platform'> {
   };
 }
 
+function sessionRecord(
+  state: RunnerState,
+  categoryKey: string,
+  mode: SessionMode,
+  endedAt: number | null,
+  correctCount: number,
+): Session {
+  return {
+    id: state.sessionId,
+    subject: categoryKey,
+    startedAt: state.startedAt,
+    endedAt,
+    questionCount: state.questions.length,
+    correctCount,
+    mode,
+    ...(APP_BUILD ? { appBuild: APP_BUILD } : {}),
+    ...deviceContext(),
+  };
+}
+
 /** Persisted "session started" record. endedAt: null while running. */
 export function buildSessionStart(
   state: RunnerState,
   categoryKey: string,
   mode: SessionMode = 'practice',
 ): Session {
-  return {
-    id: state.sessionId,
-    subject: categoryKey,
-    startedAt: state.startedAt,
-    endedAt: null,
-    questionCount: state.questions.length,
-    correctCount: 0,
-    mode,
-    ...(APP_BUILD ? { appBuild: APP_BUILD } : {}),
-    ...deviceContext(),
-  };
+  return sessionRecord(state, categoryKey, mode, null, 0);
 }
 
 /** Persisted "session ended" record. Idempotent — call with the final state. */
@@ -236,17 +239,7 @@ export function buildSessionEnd(
   endedAt: number,
   mode: SessionMode = 'practice',
 ): Session {
-  return {
-    id: state.sessionId,
-    subject: categoryKey,
-    startedAt: state.startedAt,
-    endedAt,
-    questionCount: state.questions.length,
-    correctCount: state.correctCount,
-    mode,
-    ...(APP_BUILD ? { appBuild: APP_BUILD } : {}),
-    ...deviceContext(),
-  };
+  return sessionRecord(state, categoryKey, mode, endedAt, state.correctCount);
 }
 
 /** True when state.currentIndex is on the final question of the session. */

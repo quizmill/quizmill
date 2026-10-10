@@ -18,6 +18,7 @@ import { McqMarkdown } from '@/components/McqMarkdown';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 import {
+  STORAGE_EVENT,
   loadAchievements,
   loadAttempts,
   loadSessions,
@@ -33,7 +34,6 @@ import {
   PACK_CATEGORY_LABEL,
   type OptionKey,
 } from '@/pack/data';
-import { STORAGE_EVENT } from '@/lib/useStorage';
 import { nextSelection } from '@/pack/runner';
 import { SaveDestination } from '@/pack/SaveDestination';
 import {
