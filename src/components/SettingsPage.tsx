@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Activity,
   ArrowLeft,
@@ -26,6 +26,7 @@ import {
   useResetToday,
   useStorageData,
 } from '@/lib/useStorage';
+import { useClientState } from '@/lib/useMounted';
 import { cn } from '@/lib/cn';
 import {
   loadDriveModeEnabled,
@@ -63,6 +64,12 @@ import { UpgradeCard } from '@/pack/UpgradeCard';
  *  Android-style "tap the build number" easter egg. Games are a treat, so
  *  they're discovered, not advertised in the chrome. */
 const GAMES_REVEAL_TAPS = 7;
+
+/** The analytics device id, minted on first read — so only in builds that
+ *  send analytics, and never during the static render. */
+function loadDeviceIdIfConfigured(): string {
+  return analyticsConfigured() ? loadDeviceId() : '';
+}
 
 const THEME_CHOICES: {
   value: ThemePref;
@@ -108,8 +115,7 @@ function useDeviceToggle(
   save: (on: boolean) => void,
   initial = false,
 ): [boolean, () => void] {
-  const [on, setOn] = useState(initial);
-  useEffect(() => setOn(load()), [load]);
+  const [on, setOn] = useClientState(load, initial);
   const toggle = () => {
     const next = !on;
     setOn(next);
@@ -248,13 +254,8 @@ export function SettingsPage({ extras }: SettingsPageProps) {
   // an endpoint; the id is read after mount so it is never minted during
   // the static render.
   const analyticsOn = analyticsConfigured();
-  const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
-  const [deviceId, setDeviceId] = useState('');
-  useEffect(() => {
-    if (!analyticsOn) return;
-    setAnalyticsEnabled(loadAnalyticsEnabled());
-    setDeviceId(loadDeviceId());
-  }, [analyticsOn]);
+  const [analyticsEnabled, setAnalyticsEnabled] = useClientState(loadAnalyticsEnabled, true);
+  const [deviceId, setDeviceId] = useClientState(loadDeviceIdIfConfigured, '');
   const toggleAnalytics = () => {
     const next = !analyticsEnabled;
     setAnalyticsEnabled(next);

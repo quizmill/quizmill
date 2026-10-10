@@ -8,8 +8,26 @@ import {
   type BeforeInstallPromptEvent,
   type InstallSurface,
 } from '@/lib/install';
+import { useClientState } from '@/lib/useMounted';
 
 const DISMISS_KEY = 'quizmill.install-banner-dismissed';
+
+/** Which install surface this browser is — read on the client only. */
+function detectInstallSurface(): InstallSurface {
+  const standalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    // iOS Safari's pre-standard flag.
+    (navigator as unknown as { standalone?: boolean }).standalone === true;
+  return describeInstallSurface(
+    navigator.userAgent,
+    standalone,
+    navigator.maxTouchPoints,
+  );
+}
+
+function loadBannerDismissed(): boolean {
+  return window.localStorage.getItem(DISMISS_KEY) === '1';
+}
 
 /** Shared state for both install UIs: which surface we're on, and the
  *  stashed Chromium prompt event when the app is installable. */
@@ -18,23 +36,14 @@ function useInstallPrompt(): {
   promptEvent: BeforeInstallPromptEvent | null;
   promptInstall: () => void;
 } {
-  const [surface, setSurface] = useState<InstallSurface | null>(null);
+  const [surface, setSurface] = useClientState<InstallSurface | null>(
+    detectInstallSurface,
+    null,
+  );
   const [promptEvent, setPromptEvent] =
     useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
-    const standalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      // iOS Safari's pre-standard flag.
-      (navigator as unknown as { standalone?: boolean }).standalone === true;
-    setSurface(
-      describeInstallSurface(
-        navigator.userAgent,
-        standalone,
-        navigator.maxTouchPoints,
-      ),
-    );
-
     const onPrompt = (e: Event) => {
       e.preventDefault(); // keep the mini-infobar away; we offer our own button
       setPromptEvent(e as BeforeInstallPromptEvent);
@@ -49,7 +58,7 @@ function useInstallPrompt(): {
       window.removeEventListener('beforeinstallprompt', onPrompt);
       window.removeEventListener('appinstalled', onInstalled);
     };
-  }, []);
+  }, [setSurface]);
 
   const promptInstall = () => {
     void promptEvent?.prompt();
@@ -107,11 +116,7 @@ export function InstallCard() {
  */
 export function InstallBanner() {
   const { surface, promptEvent, promptInstall } = useInstallPrompt();
-  const [dismissed, setDismissed] = useState(true);
-
-  useEffect(() => {
-    setDismissed(window.localStorage.getItem(DISMISS_KEY) === '1');
-  }, []);
+  const [dismissed, setDismissed] = useClientState(loadBannerDismissed, true);
 
   if (surface !== 'browser' || !promptEvent || dismissed) return null;
 

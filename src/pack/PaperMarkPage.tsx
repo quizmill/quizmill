@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useMounted } from '@/lib/useMounted';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -130,7 +131,7 @@ async function sourceFromHash(): Promise<Source> {
  * device).
  */
 export function PaperMarkPage() {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [source, setSource] = useState<Source>({ kind: 'none' });
   // Letters picked in THIS visit, by sheet position. A row absent here
   // shows what storage holds for it (or nothing).
@@ -141,7 +142,6 @@ export function PaperMarkPage() {
   const [outcome, setOutcome] = useState<SaveOutcome | null>(null);
 
   useEffect(() => {
-    setMounted(true);
     // Guard against a hashchange landing while an earlier decode is
     // still inflating — only the latest resolution may set state.
     let latest = 0;

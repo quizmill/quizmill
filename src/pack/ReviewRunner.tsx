@@ -10,6 +10,7 @@ import {
   useEndSession,
   useStorageData,
 } from '@/lib/useStorage';
+import { useMounted } from '@/lib/useMounted';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { useLevelUp } from '@/pack/useLevelUp';
 import {
@@ -78,7 +79,7 @@ export function PackReviewRunner() {
   const [scoped, setScoped] = useState(false);
   // XP earned by the just-checked answer — see the practice runner.
   const [xpGained, setXpGained] = useState<number | null>(null);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [stage, setStage] = useState<Stage>('choosing');
   // The chosen option key(s) — one for single-answer, several for
   // multi-answer ("select all") questions.
@@ -89,8 +90,9 @@ export function PackReviewRunner() {
   const lastAttemptRef = useRef<{ id: string; answeredAt: number } | null>(null);
   const [finished, setFinished] = useState(false);
 
-  useEffect(() => setMounted(true), []);
-
+  // Dealing the round records the session start (a storage write) as well
+  // as setting state, so it stays an effect.
+  /* eslint-disable react-hooks/set-state-in-effect -- see above */
   useEffect(() => {
     if (!mounted || state) return;
     const scope = scopeFromHash();
@@ -125,6 +127,7 @@ export function PackReviewRunner() {
     setState(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted, attempts, state]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   /** Results → next batch. Restarts in place: a link back to this same
    *  route wouldn't remount the runner, leaving the results screen up. */

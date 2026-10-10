@@ -30,12 +30,14 @@ export function SyncIndicator() {
 
     // Confirm "caught up" only when we land on 'synced' from a state where
     // there was actually something outstanding — not on first load.
-    if (status.state === 'synced' && (prev === 'syncing' || prev === 'offline')) {
-      setShowSynced(true);
-      const t = setTimeout(() => setShowSynced(false), 2500);
-      return () => clearTimeout(t);
-    }
-    if (status.state !== 'synced') setShowSynced(false);
+    if (status.state !== 'synced' || (prev !== 'syncing' && prev !== 'offline')) return;
+    setShowSynced(true);
+    const t = setTimeout(() => setShowSynced(false), 2500);
+    return () => {
+      // Leaving 'synced' before the tick has faded takes it with it.
+      clearTimeout(t);
+      setShowSynced(false);
+    };
   }, [status.state]);
 
   let content: { icon: React.ReactNode; label: string; tone: string } | null = null;

@@ -9,6 +9,7 @@ import {
   useStartSession,
   useEndSession,
 } from '@/lib/useStorage';
+import { useMounted } from '@/lib/useMounted';
 import { useLevelUp } from '@/pack/useLevelUp';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import {
@@ -55,7 +56,7 @@ export function PackNotesRunner() {
 
   const [state, setState] = useState<RunnerState | null>(null);
   const [nothingToPractice, setNothingToPractice] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [stage, setStage] = useState<Stage>('choosing');
   const [selected, setSelected] = useState<OptionKey[]>([]);
   // First option tapped on the current question (first-instinct signal)
@@ -64,8 +65,9 @@ export function PackNotesRunner() {
   const lastAttemptRef = useRef<{ id: string; answeredAt: number } | null>(null);
   const [finished, setFinished] = useState(false);
 
-  useEffect(() => setMounted(true), []);
-
+  // Dealing the round records the session start (a storage write) as well
+  // as setting state, so it stays an effect.
+  /* eslint-disable react-hooks/set-state-in-effect -- see above */
   useEffect(() => {
     if (!mounted || state) return;
     const picked = notesPracticePool(loadNotes(), packQuestions);
@@ -87,6 +89,7 @@ export function PackNotesRunner() {
     setState(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (nothingToPractice) {
     return (
