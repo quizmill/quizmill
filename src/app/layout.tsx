@@ -5,6 +5,7 @@ import { UpdateNotifier } from '@/components/UpdateNotifier';
 import { SyncBootstrap } from '@/components/SyncBootstrap';
 import { SyncIndicator } from '@/components/SyncIndicator';
 import { ThemeWatcher } from '@/components/ThemeWatcher';
+import { RuntimePackBoundary } from '@/components/RuntimePackBoundary';
 import { LEGACY_THEME_KEY, THEME_KEY } from '@/lib/theme';
 import { LOOK_KEY } from '@/lib/look';
 import {
@@ -130,7 +131,10 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: LOOK_BOOTSTRAP }} />
         <script dangerouslySetInnerHTML={{ __html: PACK_BOOTSTRAP }} />
         <div className="mx-auto w-full max-w-screen-sm px-4 pb-24 pt-4 sm:max-w-screen-md sm:pt-8">
-          {children}
+          {/* When the bootstrap above swapped a runtime pack in, the page was
+              prerendered from a different pack — adopt that markup for the
+              hydration pass instead of reporting the mismatch. */}
+          <RuntimePackBoundary>{children}</RuntimePackBoundary>
           {/* Every pack app declares its engine — packs differ, the
               mill is shared. */}
           <footer className="mt-10 text-center text-xs text-ink-400">
