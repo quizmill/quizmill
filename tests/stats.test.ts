@@ -9,6 +9,7 @@ import {
   sessionSummary,
   weakestQuestions,
 } from '@/lib/stats';
+import { seededRng } from '@/lib/selection';
 import { currentStreak, longestStreak } from '@/lib/streak';
 
 const NOON = new Date('2026-06-10T12:00:00').getTime();
@@ -165,6 +166,54 @@ describe('longestStreak', () => {
 
   it('counts duplicate same-day dates once', () => {
     expect(longestStreak([day(0), day(0), day(1)])).toBe(2);
+  });
+
+  it('does not count a provisionally bridged yesterday', () => {
+    // Missed yesterday, nothing yet today: the live streak reads 3 off a
+    // bridged yesterday, but a grace day enters the permanent record only
+    // once practice resumes after it — the record stays at the 2 real days.
+    expect(currentStreak([day(2), day(3)], today)).toBe(3);
+    expect(longestStreak([day(2), day(3)])).toBe(2);
+  });
+
+  it('spends the grace day where the live streak did when two gaps fall within a week', () => {
+    // Gaps at day 2 and day 4, too close to bridge both. Walking back from
+    // today the live streak bridged day 2 and read 4 (days 0, 1, 2, 3); the
+    // record must agree, not hand the grace to the older gap and read 3.
+    expect(currentStreak([day(0), day(1), day(3), day(5)], today)).toBe(4);
+    expect(longestStreak([day(0), day(1), day(3), day(5)])).toBe(4);
+  });
+
+  it('keeps a run that the live streak once showed even when an earlier gap went unbridged', () => {
+    // Oldest to newest: 1 day, gap, 1 day, gap, 10 days, gap, 10 days. On
+    // the last day the live streak bridged the two most recent gaps (the
+    // ten-day stretch between them unlocks a second grace) and read 23;
+    // only the oldest gap went unbridged. That 23 is the record.
+    const dates = [
+      day(24),
+      day(22),
+      ...[11, 12, 13, 14, 15, 16, 17, 18, 19, 20].map(day),
+      ...[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(day),
+    ];
+    expect(currentStreak(dates, today)).toBe(23);
+    expect(longestStreak(dates)).toBe(23);
+  });
+
+  it('is the biggest live streak the learner was ever shown', () => {
+    // The record is defined by the live number: for any history, it equals
+    // the largest value currentStreak ever took on a practised day.
+    for (let seed = 1; seed <= 200; seed++) {
+      const rng = seededRng(seed);
+      const dates: Date[] = [];
+      for (let offset = 0; offset < 60; offset++) {
+        if (rng() < 0.7) dates.push(day(offset));
+      }
+      const liveMax = dates.reduce(
+        (best, d) => Math.max(best, currentStreak(dates, d)),
+        0,
+      );
+      expect(longestStreak(dates), `seed ${seed}`).toBe(liveMax);
+    }
   });
 });
 
