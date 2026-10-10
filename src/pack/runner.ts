@@ -203,23 +203,33 @@ export function deviceContext(): Pick<Session, 'display' | 'platform'> {
   };
 }
 
+function sessionRecord(
+  state: RunnerState,
+  categoryKey: string,
+  mode: SessionMode,
+  endedAt: number | null,
+  correctCount: number,
+): Session {
+  return {
+    id: state.sessionId,
+    subject: categoryKey,
+    startedAt: state.startedAt,
+    endedAt,
+    questionCount: state.questions.length,
+    correctCount,
+    mode,
+    ...(APP_BUILD ? { appBuild: APP_BUILD } : {}),
+    ...deviceContext(),
+  };
+}
+
 /** Persisted "session started" record. endedAt: null while running. */
 export function buildSessionStart(
   state: RunnerState,
   categoryKey: string,
   mode: SessionMode = 'practice',
 ): Session {
-  return {
-    id: state.sessionId,
-    subject: categoryKey,
-    startedAt: state.startedAt,
-    endedAt: null,
-    questionCount: state.questions.length,
-    correctCount: 0,
-    mode,
-    ...(APP_BUILD ? { appBuild: APP_BUILD } : {}),
-    ...deviceContext(),
-  };
+  return sessionRecord(state, categoryKey, mode, null, 0);
 }
 
 /** Persisted "session ended" record. Idempotent — call with the final state. */
@@ -229,17 +239,7 @@ export function buildSessionEnd(
   endedAt: number,
   mode: SessionMode = 'practice',
 ): Session {
-  return {
-    id: state.sessionId,
-    subject: categoryKey,
-    startedAt: state.startedAt,
-    endedAt,
-    questionCount: state.questions.length,
-    correctCount: state.correctCount,
-    mode,
-    ...(APP_BUILD ? { appBuild: APP_BUILD } : {}),
-    ...deviceContext(),
-  };
+  return sessionRecord(state, categoryKey, mode, endedAt, state.correctCount);
 }
 
 /** True when state.currentIndex is on the final question of the session. */
