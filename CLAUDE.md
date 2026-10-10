@@ -405,6 +405,13 @@ are detected on every commit regardless.
   rules are warn-level on purpose); don't reach for `eslint-disable` to
   silence a real error without a one-line reason. ESLint config lives in
   `eslint.config.mjs` (flat config).
+- **Node is pinned once, in `.nvmrc`** (latest stable; `26` as of
+  2026-10). Version managers (mise/nvm/fnm) pick it up, the root and
+  `cli/` `engines` fields repeat it as `>=26`, and every workflow's
+  setup-node step reads it via `node-version-file` — except the reusable
+  `deploy-pack.yml`, which runs against a pack repo's checkout and
+  therefore spells the major out. `tests/node-version.test.ts` fails if
+  any of these drift, so bump them together.
 - Tests accompany behaviour changes; E2E asserts against the demo pack
   (if a different pack is active locally, `rm -rf content/pack` and
   re-run to reseed before E2E). E2E specs live in `tests/e2e-pack/`
