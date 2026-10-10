@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { act } from 'react';
+import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { webcrypto } from 'node:crypto';
 import {
@@ -71,20 +71,28 @@ function Stickers() {
   );
 }
 
+// The hook handles are exposed to the tests from an effect (never from
+// render scope) so the react-hooks lint rules stay satisfied.
 function Votes() {
-  votesApi = useQuestionVotes();
+  const api = useQuestionVotes();
+  useEffect(() => {
+    votesApi = api;
+  });
   return (
-    <div data-testid="votes" data-count={votesApi.votesList.length}>
-      {[...votesApi.votes.entries()].map(([q, v]) => `${q}:${v.vote}`).join(',')}
+    <div data-testid="votes" data-count={api.votesList.length}>
+      {[...api.votes.entries()].map(([q, v]) => `${q}:${v.vote}`).join(',')}
     </div>
   );
 }
 
 function Notes() {
-  notesApi = useQuestionNotes();
+  const api = useQuestionNotes();
+  useEffect(() => {
+    notesApi = api;
+  });
   return (
-    <div data-testid="notes" data-count={notesApi.notesList.length}>
-      {[...notesApi.notes.entries()].map(([q, n]) => `${q}:${n.text}`).join(',')}
+    <div data-testid="notes" data-count={api.notesList.length}>
+      {[...api.notes.entries()].map(([q, n]) => `${q}:${n.text}`).join(',')}
     </div>
   );
 }
