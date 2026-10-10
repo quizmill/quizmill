@@ -33,6 +33,7 @@ import {
   PACK_CATEGORY_LABEL,
   type OptionKey,
 } from '@/pack/data';
+import { STORAGE_EVENT } from '@/lib/useStorage';
 import { nextSelection } from '@/pack/runner';
 import { SaveDestination } from '@/pack/SaveDestination';
 import {
@@ -52,10 +53,6 @@ import {
   type PaperSheet,
   type SavedMark,
 } from '@/pack/paper';
-
-// Same event bus the storage hooks use (see src/lib/useStorage.ts) — the
-// writes here happen outside those hooks, so re-emit for mounted pages.
-const STORAGE_EVENT = 'quizmill:storage';
 
 /** "earlier today" / "Sat 26 Sept" — when an earlier batch was entered. */
 function whenLabel(ts: number): string {
@@ -281,6 +278,7 @@ export function PaperMarkPage() {
     const earned = new Set(loadAchievements().map((e) => e.id));
     const fresh = newlyEarnedAchievements(loadSessions(), loadAttempts(), earned);
     if (fresh.length > 0) recordEarnedAchievements(fresh);
+    // The writes above bypass the storage hooks — re-emit for mounted pages.
     window.dispatchEvent(new Event(STORAGE_EVENT));
     setOutcome({
       result,

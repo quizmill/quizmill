@@ -12,7 +12,12 @@ import {
 } from './sync';
 import type { Attempt, Session } from '@/data/types';
 
-const EVENT = 'quizmill:storage';
+/** The storage mutation bus: dispatched on window after every local
+ *  write made through these hooks (and by sync after a pull), listened
+ *  to by every reactive reader. Pages that write outside the hooks
+ *  (PaperMarkPage) re-emit it by this name. */
+export const STORAGE_EVENT = 'quizmill:storage';
+const EVENT = STORAGE_EVENT;
 const EMPTY_SESSIONS: Session[] = [];
 const EMPTY_ATTEMPTS: Attempt[] = [];
 
