@@ -330,11 +330,11 @@ export const packQuestionSchema = z
         message: 'a question needs exactly one of correctKey or correctKeys',
       });
     }
-    if (hasSingle && !keys.includes(q.correctKey!)) {
+    if (q.correctKey !== undefined && !keys.includes(q.correctKey)) {
       ctx.addIssue({ code: 'custom', message: 'correctKey must reference one of the options' });
     }
-    if (hasMulti) {
-      const ck = q.correctKeys!;
+    if (q.correctKeys !== undefined) {
+      const ck = q.correctKeys;
       if (new Set(ck).size !== ck.length) {
         ctx.addIssue({ code: 'custom', message: 'correctKeys must not contain duplicates' });
       }
@@ -550,11 +550,12 @@ export function validatePack(input: {
           'pack.json: exam goal set but no category weights — readiness will weight domains by bank size; add weights for an exam-blueprint estimate',
         );
       }
-      if (exam.scope) {
-        const inScope = questions.filter((q) => q.level === exam.scope!.level).length;
+      const scope = exam.scope;
+      if (scope) {
+        const inScope = questions.filter((q) => q.level === scope.level).length;
         if (inScope === 0) {
           warnings.push(
-            `pack.json: exam.scope.level "${exam.scope.level}" matches no questions — readiness will have nothing to measure`,
+            `pack.json: exam.scope.level "${scope.level}" matches no questions — readiness will have nothing to measure`,
           );
         }
       }
