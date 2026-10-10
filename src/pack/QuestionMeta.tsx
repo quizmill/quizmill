@@ -20,18 +20,21 @@ export function QuestionMeta({
    *  (the coach replay shows a parent the question, not its taxonomy). */
   hideTags?: boolean;
 }) {
-  const levelLabel = question.level ? PACK_LEVEL_LABEL[question.level] : undefined;
+  // A level chip only when the pack names the band (a stray level key
+  // on a question that the manifest doesn't declare renders nothing).
+  const level = question.level;
+  const levelLabel = level ? PACK_LEVEL_LABEL[level] : undefined;
   const tags = hideTags ? [] : (question.tags ?? []);
   return (
     <>
       <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand-700">
         {PACK_CATEGORY_LABEL[question.categoryKey] ?? question.categoryKey}
       </span>
-      {levelLabel ? (
+      {level && levelLabel ? (
         <span
           className={cn(
             'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ring-1',
-            question.level ? PACK_LEVEL_TONE[question.level] : '',
+            PACK_LEVEL_TONE[level],
           )}
         >
           {levelLabel}
