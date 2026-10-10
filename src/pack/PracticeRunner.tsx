@@ -157,6 +157,10 @@ export function PackPracticeRunner({ categoryKey }: Props) {
 
   if (!state) return <RunnerLoading />;
 
+  // The streak nod belongs to the question screen only — the results
+  // screen shows sticker and level-up toasts but never carried it, and the
+  // toast lets taps through, so "See results" mid-toast would otherwise
+  // drag it (and restart its dismissal timer) onto the results screen.
   const celebrations = (
     <RunnerCelebrations
       nextUnlock={nextUnlock}
@@ -164,7 +168,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
       nextLevelUp={nextLevelUp}
       clearNextLevelUp={clearNextLevelUp}
       fallback={
-        streakDone !== null ? (
+        !finished && streakDone !== null ? (
           <Celebration
             label={streakDone === 1 ? 'Streak started' : 'Streak kept'}
             achievement={{
