@@ -465,8 +465,9 @@ export function recordEvent(
 // ---- bulk ops ----
 
 /**
- * Wipe ALL stored sessions, attempts, achievements, votes, and notes for
- * the active pack. Use with care.
+ * Wipe everything stored for the active pack — the six synced tables
+ * (sessions, attempts, achievements, votes, notes, events) plus the
+ * device-local prefs and scratchpad. Use with care.
  */
 export function clearAll(): void {
   if (!browser()) return;

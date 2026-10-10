@@ -1,5 +1,5 @@
 /**
- * quizmill sync worker — a ~150-line Cloudflare Worker that mirrors a
+ * quizmill sync worker — a small Cloudflare Worker that mirrors a
  * device's practice history into a D1 (SQLite) database.
  *
  * Why this exists: the engine's original cloud-sync backend is Supabase,

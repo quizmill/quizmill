@@ -204,9 +204,9 @@ bridges with a file instead.
 ## File export/import
 
 `src/lib/transfer.ts` + the Settings "Move progress" card write the same
-five synced tables to a versioned JSON snapshot
+six synced tables to a versioned JSON snapshot
 (`{ format: 'quizmill-progress', version, packId, sessions, attempts,
-achievements, votes, … }` — `buildSnapshot`/`parseSnapshot`/
+achievements, votes, notes, events }` — `buildSnapshot`/`parseSnapshot`/
 `applySnapshot`) and import it through the same last-write-wins merge a
 cloud pull uses — additive, idempotent, refuses files from a different
 pack. Importing while signed in to a backend re-pushes everything so the
