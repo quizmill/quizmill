@@ -46,18 +46,13 @@ import {
   resolveSheetQuestions,
   savedMarksForSheet,
   sheetFromPayload,
+  SHEET_DATE_FORMAT,
   type MarkStatus,
   type PaperMark,
   type PaperResultRows,
   type PaperSheet,
   type SavedMark,
 } from '@/pack/paper';
-
-const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
-  weekday: 'short',
-  day: 'numeric',
-  month: 'short',
-});
 
 /** "earlier today" / "Sat 26 Sept" — when an earlier batch was entered. */
 function whenLabel(ts: number): string {
@@ -67,7 +62,7 @@ function whenLabel(ts: number): string {
     then.getFullYear() === now.getFullYear() &&
     then.getMonth() === now.getMonth() &&
     then.getDate() === now.getDate();
-  return sameDay ? 'earlier today' : DATE_FORMAT.format(ts);
+  return sameDay ? 'earlier today' : SHEET_DATE_FORMAT.format(ts);
 }
 
 function plural(n: number, one: string): string {
@@ -283,6 +278,7 @@ export function PaperMarkPage() {
     const earned = new Set(loadAchievements().map((e) => e.id));
     const fresh = newlyEarnedAchievements(loadSessions(), loadAttempts(), earned);
     if (fresh.length > 0) recordEarnedAchievements(fresh);
+    // The writes above bypass the storage hooks — re-emit for mounted pages.
     window.dispatchEvent(new Event(STORAGE_EVENT));
     setOutcome({
       result,
@@ -332,7 +328,7 @@ export function PaperMarkPage() {
         <p className="mt-1 text-sm text-ink-500">
           {PACK_CATEGORY_LABEL[sheet.categoryKey] ?? sheet.categoryKey} ·{' '}
           {sheet.questionIds.length} questions · printed{' '}
-          {DATE_FORMAT.format(sheet.createdAt)}
+          {SHEET_DATE_FORMAT.format(sheet.createdAt)}
         </p>
         <p className="mt-2 text-sm text-ink-600">
           {previously === 0 ? (

@@ -144,6 +144,14 @@ no server work.
   same sync key entered in Settings. Both are one-time setup a
   household with sync already has.
 
+**As built — where it landed.** The pure half is `src/pack/paper.ts`
+(not the `src/lib/paperSheets.ts` the plan named — it needs the pack's
+question type), with `paperInk.ts` beside it for on-screen writing. The
+sheet's own id doubles as the marked session's id, so there is no
+separate `sessionId` stamp: `markedAt` on the local record, or the
+session's presence in storage, is what makes a sheet read as marked
+(`sheetIsMarked`).
+
 **As built — the two things the marker has to be told** (both came out
 of real use: a sheet marked in two sittings, on a phone that had only
 ever scanned the QR):

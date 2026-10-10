@@ -99,6 +99,25 @@ export interface SettingsPageProps {
   extras?: ReactNode;
 }
 
+/**
+ * A boolean device pref as live state: read after mount (so SSR and the
+ * first paint stay stable), flipped and persisted by the returned toggle.
+ */
+function useDeviceToggle(
+  load: () => boolean,
+  save: (on: boolean) => void,
+  initial = false,
+): [boolean, () => void] {
+  const [on, setOn] = useState(initial);
+  useEffect(() => setOn(load()), [load]);
+  const toggle = () => {
+    const next = !on;
+    setOn(next);
+    save(next);
+  };
+  return [on, toggle];
+}
+
 /** A labelled group of settings cards. */
 function SettingsSection({
   title,
@@ -117,6 +136,83 @@ function SettingsSection({
   );
 }
 
+/**
+ * One device-level opt-in: icon + title + blurb beside a switch, an
+ * optional "Open …" link once it is on, and any extra footer content
+ * (the analytics card's device id). Every "This device" card is one of
+ * these, so the toggles can't drift apart in markup or accessibility.
+ */
+function OptInCard({
+  icon: Icon,
+  title,
+  blurb,
+  checked,
+  onToggle,
+  testId,
+  link,
+  cardTestId,
+  children,
+}: {
+  icon: typeof Car;
+  title: string;
+  blurb: ReactNode;
+  checked: boolean;
+  onToggle: () => void;
+  /** data-testid of the switch (the aria-label is the title). */
+  testId: string;
+  /** Shown under the blurb while the switch is on. */
+  link?: { href: string; label: string; testId?: string };
+  cardTestId?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div
+      data-testid={cardTestId}
+      className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
+            <Icon className="h-5 w-5 text-ink-500" />
+            {title}
+          </h3>
+          <p className="mt-1 text-sm text-ink-600">{blurb}</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={checked}
+          aria-label={title}
+          data-testid={testId}
+          onClick={onToggle}
+          className={cn(
+            'tap-feedback relative mt-1 inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors',
+            checked ? 'bg-brand-500' : 'bg-ink-200',
+          )}
+        >
+          <span
+            className={cn(
+              'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
+              checked ? 'translate-x-6' : 'translate-x-1',
+            )}
+          />
+        </button>
+      </div>
+      {checked && link ? (
+        <Link
+          href={link.href}
+          data-testid={link.testId}
+          className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50 dark:hover:bg-ink-100"
+        >
+          <Icon className="h-4 w-4" />
+          {link.label}
+        </Link>
+      ) : null}
+      {children}
+    </div>
+  );
+}
+
 export function SettingsPage({ extras }: SettingsPageProps) {
   const { sessions, attempts } = useStorageData();
   const resetAll = useResetAll();
@@ -124,47 +220,28 @@ export function SettingsPage({ extras }: SettingsPageProps) {
   const [theme, setTheme] = useTheme();
   const [look, setLook] = useLook();
 
-  const [pending, setPending] = useState<'today' | 'all' | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  // Drive Mode opt-in — read after mount so SSR/first paint stay stable.
-  const [driveMode, setDriveMode] = useState(false);
-  useEffect(() => setDriveMode(loadDriveModeEnabled()), []);
-  const toggleDriveMode = () => {
-    const next = !driveMode;
-    setDriveMode(next);
-    saveDriveModeEnabled(next);
-  };
-
-  // Coach mode opt-in (device-level) — the parent's replay of past sessions.
-  const [coachMode, setCoachMode] = useState(false);
-  useEffect(() => setCoachMode(loadCoachModeEnabled()), []);
-  const toggleCoachMode = () => {
-    const next = !coachMode;
-    setCoachMode(next);
-    saveCoachModeEnabled(next);
-  };
-
-  // Levels & XP visibility (device-level) — the parent lever over the
-  // progression layer packs opt into. Hiding never resets anything: XP
-  // is derived from history, so switching back on picks up where the
-  // practice actually is.
-  const [progressionShown, setProgressionShown] = useState(true);
-  useEffect(() => setProgressionShown(loadProgressionShown()), []);
-  const toggleProgressionShown = () => {
-    const next = !progressionShown;
-    setProgressionShown(next);
-    saveProgressionShown(next);
-  };
-
-  // Paper practice opt-in (device-level) — print sheets, mark them back in.
-  const [paperMode, setPaperMode] = useState(false);
-  useEffect(() => setPaperMode(loadPaperModeEnabled()), []);
-  const togglePaperMode = () => {
-    const next = !paperMode;
-    setPaperMode(next);
-    savePaperModeEnabled(next);
-  };
+  // The device-level opt-ins: Drive mode, Coach mode (the parent's replay
+  // of past sessions), Paper practice, and whether Levels & XP show —
+  // hiding those never resets anything, XP is derived from history.
+  const [driveMode, toggleDriveMode] = useDeviceToggle(
+    loadDriveModeEnabled,
+    saveDriveModeEnabled,
+  );
+  const [coachMode, toggleCoachMode] = useDeviceToggle(
+    loadCoachModeEnabled,
+    saveCoachModeEnabled,
+  );
+  const [paperMode, togglePaperMode] = useDeviceToggle(
+    loadPaperModeEnabled,
+    savePaperModeEnabled,
+  );
+  const [progressionShown, toggleProgressionShown] = useDeviceToggle(
+    loadProgressionShown,
+    saveProgressionShown,
+    true,
+  );
 
   // Usage analytics (device-level) — the anonymous funnel beacon a hosted
   // app sends its author. The card exists only in builds that configure
@@ -199,30 +276,27 @@ export function SettingsPage({ extras }: SettingsPageProps) {
     (a) => a.answeredAt >= startOfToday.getTime(),
   ).length;
 
+  // Both resets are synchronous (storage writes + one event), so there is
+  // no in-flight state to guard — the buttons only disable on "nothing
+  // to reset".
   function handleResetToday() {
-    if (pending) return;
     const ok = window.confirm(
       `Reset today's progress?\n\nThis will remove ${todaySessions} session(s) and ${todayAttempts} answer(s) from today.`,
     );
     if (!ok) return;
-    setPending('today');
     const result = resetToday();
     setMessage(
       `Removed ${result.sessionsRemoved} session(s) and ${result.attemptsRemoved} answer(s) from today.`,
     );
-    setPending(null);
   }
 
   function handleResetAll() {
-    if (pending) return;
     const ok = window.confirm(
       `Reset ALL local progress?\n\nThis erases every saved session and answer on this device. If you're signed in, the cloud copy stays — sign back in to restore. There is no local undo.`,
     );
     if (!ok) return;
-    setPending('all');
     resetAll();
     setMessage('All local progress erased.');
-    setPending(null);
   }
 
   return (
@@ -386,232 +460,80 @@ export function SettingsPage({ extras }: SettingsPageProps) {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h3 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
-                <Car className="h-5 w-5 text-ink-500" />
-                Drive mode
-              </h3>
-              <p className="mt-1 text-sm text-ink-600">
-                Hands-free voice quiz for the car — questions read aloud,
-                answers by voice. Adds a card to the home screen.
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={driveMode}
-              aria-label="Drive mode"
-              data-testid="drive-mode-toggle"
-              onClick={toggleDriveMode}
-              className={cn(
-                'tap-feedback relative mt-1 inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors',
-                driveMode ? 'bg-brand-500' : 'bg-ink-200',
-              )}
-            >
-              <span
-                className={cn(
-                  'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
-                  driveMode ? 'translate-x-6' : 'translate-x-1',
-                )}
-              />
-            </button>
-          </div>
-          {driveMode ? (
-            <Link
-              href="/drive/"
-              className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50 dark:hover:bg-ink-100"
-            >
-              <Car className="h-4 w-4" />
-              Open drive mode
-            </Link>
-          ) : null}
-        </div>
+        <OptInCard
+          icon={Car}
+          title="Drive mode"
+          blurb="Hands-free voice quiz for the car — questions read aloud, answers by voice. Adds a card to the home screen."
+          checked={driveMode}
+          onToggle={toggleDriveMode}
+          testId="drive-mode-toggle"
+          link={{ href: '/drive/', label: 'Open drive mode' }}
+        />
 
-        <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h3 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
-                <GraduationCap className="h-5 w-5 text-ink-500" />
-                Coach mode
-              </h3>
-              <p className="mt-1 text-sm text-ink-600">
-                For parents and tutors: go back through any past session
-                together, question by question, with answers hidden until you
-                reveal them. Nothing is recorded. Adds a card to the home
-                screen.
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={coachMode}
-              aria-label="Coach mode"
-              data-testid="coach-mode-toggle"
-              onClick={toggleCoachMode}
-              className={cn(
-                'tap-feedback relative mt-1 inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors',
-                coachMode ? 'bg-brand-500' : 'bg-ink-200',
-              )}
-            >
-              <span
-                className={cn(
-                  'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
-                  coachMode ? 'translate-x-6' : 'translate-x-1',
-                )}
-              />
-            </button>
-          </div>
-          {coachMode ? (
-            <Link
-              href="/coach/"
-              data-testid="open-coach"
-              className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50 dark:hover:bg-ink-100"
-            >
-              <GraduationCap className="h-4 w-4" />
-              Open coach mode
-            </Link>
-          ) : null}
-        </div>
+        <OptInCard
+          icon={GraduationCap}
+          title="Coach mode"
+          blurb="For parents and tutors: go back through any past session together, question by question, with answers hidden until you reveal them. Nothing is recorded. Adds a card to the home screen."
+          checked={coachMode}
+          onToggle={toggleCoachMode}
+          testId="coach-mode-toggle"
+          link={{ href: '/coach/', label: 'Open coach mode', testId: 'open-coach' }}
+        />
 
-        <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h3 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
-                <Printer className="h-5 w-5 text-ink-500" />
-                Paper practice
-              </h3>
-              <p className="mt-1 text-sm text-ink-600">
-                Print a worksheet — or write on it with a pencil on a tablet
-                — then mark the answers back in. They count like any
-                practice session. Adds a card to the home screen.
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={paperMode}
-              aria-label="Paper practice"
-              data-testid="paper-mode-toggle"
-              onClick={togglePaperMode}
-              className={cn(
-                'tap-feedback relative mt-1 inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors',
-                paperMode ? 'bg-brand-500' : 'bg-ink-200',
-              )}
-            >
-              <span
-                className={cn(
-                  'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
-                  paperMode ? 'translate-x-6' : 'translate-x-1',
-                )}
-              />
-            </button>
-          </div>
-          {paperMode ? (
-            <Link
-              href="/paper/"
-              data-testid="open-paper"
-              className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:bg-ink-50 dark:hover:bg-ink-100"
-            >
-              <Printer className="h-4 w-4" />
-              Open paper practice
-            </Link>
-          ) : null}
-        </div>
+        <OptInCard
+          icon={Printer}
+          title="Paper practice"
+          blurb="Print a worksheet — or write on it with a pencil on a tablet — then mark the answers back in. They count like any practice session. Adds a card to the home screen."
+          checked={paperMode}
+          onToggle={togglePaperMode}
+          testId="paper-mode-toggle"
+          link={{ href: '/paper/', label: 'Open paper practice', testId: 'open-paper' }}
+        />
 
         {/* Only for packs that opt into progression — the parent lever.
             Hiding is display-only: XP stays derived from history. */}
         {progressionEnabled ? (
-          <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
-                  <Wheat className="h-5 w-5 text-ink-500" />
-                  Levels &amp; XP
-                </h3>
-                <p className="mt-1 text-sm text-ink-600">
-                  The level ladder and XP earned from practice. For parents:
-                  turn this off to hide points on this device — nothing is
-                  lost, and switching back on picks up where practice
-                  really is.
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={progressionShown}
-                aria-label="Levels & XP"
-                data-testid="progression-toggle"
-                onClick={toggleProgressionShown}
-                className={cn(
-                  'tap-feedback relative mt-1 inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors',
-                  progressionShown ? 'bg-brand-500' : 'bg-ink-200',
-                )}
-              >
-                <span
-                  className={cn(
-                    'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
-                    progressionShown ? 'translate-x-6' : 'translate-x-1',
-                  )}
-                />
-              </button>
-            </div>
-          </div>
+          <OptInCard
+            icon={Wheat}
+            title="Levels & XP"
+            blurb="The level ladder and XP earned from practice. For parents: turn this off to hide points on this device — nothing is lost, and switching back on picks up where practice really is."
+            checked={progressionShown}
+            onToggle={toggleProgressionShown}
+            testId="progression-toggle"
+          />
         ) : null}
 
         {analyticsOn ? (
-          <div
-            data-testid="analytics-card"
-            className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm"
+          <OptInCard
+            icon={Activity}
+            title="Usage analytics"
+            blurb={
+              <>
+                Tells whoever hosts this app that it is being used: a
+                handful of anonymous events (opened, first answer, tenth
+                session…) tagged with a random device id. No account, no
+                cookies, no names, and nothing about what you answered.
+                {privacyUrl() ? (
+                  <>
+                    {' '}
+                    <a
+                      href={privacyUrl() ?? undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      data-testid="analytics-privacy"
+                      className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-900"
+                    >
+                      Privacy policy
+                    </a>
+                  </>
+                ) : null}
+              </>
+            }
+            checked={analyticsEnabled}
+            onToggle={toggleAnalytics}
+            testId="analytics-toggle"
+            cardTestId="analytics-card"
           >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
-                  <Activity className="h-5 w-5 text-ink-500" />
-                  Usage analytics
-                </h3>
-                <p className="mt-1 text-sm text-ink-600">
-                  Tells whoever hosts this app that it is being used: a
-                  handful of anonymous events (opened, first answer, tenth
-                  session…) tagged with a random device id. No account, no
-                  cookies, no names, and nothing about what you answered.
-                  {privacyUrl() ? (
-                    <>
-                      {' '}
-                      <a
-                        href={privacyUrl() ?? undefined}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        data-testid="analytics-privacy"
-                        className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-900"
-                      >
-                        Privacy policy
-                      </a>
-                    </>
-                  ) : null}
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={analyticsEnabled}
-                aria-label="Usage analytics"
-                data-testid="analytics-toggle"
-                onClick={toggleAnalytics}
-                className={cn(
-                  'tap-feedback relative mt-1 inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors',
-                  analyticsEnabled ? 'bg-brand-500' : 'bg-ink-200',
-                )}
-              >
-                <span
-                  className={cn(
-                    'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
-                    analyticsEnabled ? 'translate-x-6' : 'translate-x-1',
-                  )}
-                />
-              </button>
-            </div>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-500">
               <span>
                 Device id{' '}
@@ -628,7 +550,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
                 New device id
               </button>
             </div>
-          </div>
+          </OptInCard>
         ) : null}
       </SettingsSection>
 
@@ -648,7 +570,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
             variant="secondary"
             className="mt-4"
             onClick={handleResetToday}
-            disabled={pending !== null || todaySessions === 0}
+            disabled={todaySessions === 0}
           >
             <Trash2 className="h-4 w-4" />
             Reset today
@@ -673,10 +595,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
             variant="danger"
             className="mt-4"
             onClick={handleResetAll}
-            disabled={
-              (pending !== null && pending !== 'all') ||
-              sessions.length + attempts.length === 0
-            }
+            disabled={sessions.length + attempts.length === 0}
           >
             <Trash2 className="h-4 w-4" />
             Reset everything

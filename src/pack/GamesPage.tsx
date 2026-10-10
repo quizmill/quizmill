@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ArrowLeft, Gamepad2 } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { enabledGames, type GameId } from '@/lib/games/registry';
 import { recordEvent } from '@/lib/storage';
 import { packGames } from '@/pack/data';
