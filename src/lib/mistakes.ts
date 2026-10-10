@@ -13,16 +13,11 @@
  * the question id as topic; without the question-id fallback such a mistake
  * could never be rescued and would pin itself to the top of every review.
  *
- * The companion `pickSimilarQuestion` picks the recall question to actually
- * show the kid in a review session: a different question on the same topic.
+ * Packs write the question id as the topic, so in practice rescue is
+ * per-question and the review runner re-asks the very question that was
+ * missed (see `buildAttempt` in src/pack/runner.ts).
  */
 import type { Attempt } from '@/data/types';
-
-interface MinimalQuestion {
-  id: string;
-  subject: string;
-  topic: string;
-}
 
 const topicKey = (subject: string, topic: string): string =>
   `${subject}:${topic}`;
@@ -33,8 +28,7 @@ const topicKey = (subject: string, topic: string): string =>
  * timestamp of the wrong attempt, OLDEST first — so the review queue
  * (which takes the first N) resurfaces mistakes made longer ago before
  * recent ones, the spaced-repetition intuition: a stale mistake should not
- * stay buried under today's slip-ups. (The mistakes browser uses
- * `unresolvedMistakes`, which keeps newest-first for list display.)
+ * stay buried under today's slip-ups.
  */
 export function unresolvedMistakeIds(attempts: readonly Attempt[]): string[] {
   // Walk chronologically so we can read off the latest "correct on topic"
@@ -95,70 +89,4 @@ export function sessionMistakeIds(
 
 export function unresolvedMistakeCount(attempts: readonly Attempt[]): number {
   return unresolvedMistakeIds(attempts).length;
-}
-
-/**
- * Like `unresolvedMistakeIds` but each entry is enriched with the kid's
- * most recent wrong attempt at that question — useful for the mistakes
- * browser, which shows what the kid picked alongside the correct answer.
- */
-export function unresolvedMistakes(
-  attempts: readonly Attempt[],
-): { questionId: string; wrongAttempt: Attempt }[] {
-  const sorted = [...attempts].sort((a, b) => a.answeredAt - b.answeredAt);
-
-  const lastCorrectOnTopic = new Map<string, number>();
-  const lastCorrectOnQuestion = new Map<string, number>();
-  const lastWrong = new Map<string, Attempt>();
-
-  for (const a of sorted) {
-    const tk = topicKey(a.subject, a.topic);
-    if (a.isCorrect) {
-      lastCorrectOnTopic.set(tk, a.answeredAt);
-      lastCorrectOnQuestion.set(a.questionId, a.answeredAt);
-    } else {
-      lastWrong.set(a.questionId, a);
-    }
-  }
-
-  const out: { questionId: string; wrongAttempt: Attempt }[] = [];
-  for (const [qid, attempt] of lastWrong) {
-    const tk = topicKey(attempt.subject, attempt.topic);
-    const lastOk = Math.max(
-      lastCorrectOnTopic.get(tk) ?? -Infinity,
-      lastCorrectOnQuestion.get(qid) ?? -Infinity,
-    );
-    if (lastOk < attempt.answeredAt) {
-      out.push({ questionId: qid, wrongAttempt: attempt });
-    }
-  }
-
-  out.sort((a, b) => b.wrongAttempt.answeredAt - a.wrongAttempt.answeredAt);
-  return out;
-}
-
-/**
- * Pick a question that's "similar" to the original — same subject + topic,
- * but a different question — so the kid actually has to apply the concept
- * rather than recall an answer. Returns null if no such question exists.
- *
- * `excludeIds` lets callers avoid repeats within the current session.
- */
-export function pickSimilarQuestion<Q extends MinimalQuestion>(
-  originalId: string,
-  bank: readonly Q[],
-  excludeIds: ReadonlySet<string> = new Set(),
-  rng: () => number = Math.random,
-): Q | null {
-  const original = bank.find((q) => q.id === originalId);
-  if (!original) return null;
-  const candidates = bank.filter(
-    (q) =>
-      q.subject === original.subject &&
-      q.topic === original.topic &&
-      q.id !== originalId &&
-      !excludeIds.has(q.id),
-  );
-  if (candidates.length === 0) return null;
-  return candidates[Math.floor(rng() * candidates.length)];
 }

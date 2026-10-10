@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   pickSessionQuestions,
-  pickNextQuestion,
   seededRng,
   shuffle,
 } from '../src/lib/selection';
@@ -139,25 +138,6 @@ describe('exhausted-bank fallback with attempt history', () => {
       rng: seededRng(3),
     });
     expect(picked.map((q) => q.id)).toEqual([5]);
-  });
-});
-
-describe('pickNextQuestion', () => {
-  it('returns null when nothing is available', () => {
-    const next = pickNextQuestion([], {
-      historicalAttemptedIds: new Set(),
-      currentSessionIds: new Set(),
-    });
-    expect(next).toBeNull();
-  });
-
-  it('returns null when every question is in the current session', () => {
-    const small = bank.slice(0, 3);
-    const next = pickNextQuestion(small, {
-      historicalAttemptedIds: new Set(),
-      currentSessionIds: new Set([1, 2, 3]),
-    });
-    expect(next).toBeNull();
   });
 });
 

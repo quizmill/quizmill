@@ -18,6 +18,15 @@ import type { PackManifest, PackQuestion, PackScenario, PackConcept } from './da
 
 const override = getActivePackOverride();
 
+/**
+ * Whether a runtime pack won over the build-time one on THIS evaluation.
+ * Always false during the static build, so when it's true in the browser
+ * the prerendered HTML was made from a different pack than the one about
+ * to render — see RuntimePackBoundary, which keeps that from surfacing as
+ * a hydration error.
+ */
+export const isRuntimePack = override !== undefined;
+
 /** The manifest COMPILED INTO this deployment, regardless of any runtime
  *  override — the pack library UI lists it as the built-in pack. */
 export const buildTimeManifest = buildManifest as PackManifest;

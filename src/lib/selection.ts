@@ -5,10 +5,10 @@
  * The seeded random generator lets tests be deterministic.
  */
 
+/** All the engine reads of a question is its id — the bank it's handed
+ *  can carry any shape on top (the runner passes PackQuestions as-is). */
 export interface SelectableQuestion {
   id: string | number;
-  topic: string;
-  difficulty: number;
 }
 
 export type Rng = () => number; // returns [0, 1)
@@ -75,29 +75,6 @@ function orderSeen<Q extends SelectableQuestion>(
     if (ia.lastCorrect !== ib.lastCorrect) return ia.lastCorrect ? 1 : -1;
     return ia.lastAnsweredAt - ib.lastAnsweredAt;
   });
-}
-
-/**
- * Pick the next single question for a running session.
- * Returns null only if the bank is exhausted.
- */
-export function pickNextQuestion<Q extends SelectableQuestion>(
-  bank: Q[],
-  options: {
-    historicalAttemptedIds: Set<Q['id']>;
-    currentSessionIds: Set<Q['id']>;
-    history?: ReadonlyMap<Q['id'], AttemptSummary>;
-    rng?: Rng;
-  },
-): Q | null {
-  const [picked] = pickSessionQuestions(bank, {
-    count: 1,
-    historicalAttemptedIds: options.historicalAttemptedIds,
-    currentSessionIds: options.currentSessionIds,
-    history: options.history,
-    rng: options.rng,
-  });
-  return picked ?? null;
 }
 
 export function shuffle<T>(items: readonly T[], rng: Rng = Math.random): T[] {

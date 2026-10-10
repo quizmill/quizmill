@@ -1,5 +1,5 @@
 /**
- * quizmill sync worker — a ~150-line Cloudflare Worker that mirrors a
+ * quizmill sync worker — a small Cloudflare Worker that mirrors a
  * device's practice history into a D1 (SQLite) database.
  *
  * Why this exists: the engine's original cloud-sync backend is Supabase,
@@ -32,7 +32,7 @@ import {
   userIdFromKey,
   TABLES,
 } from './ops';
-import type { TableName } from './ops';
+import type { SqlStatement, TableName } from './ops';
 import {
   MAX_BEACON_BYTES,
   buildSummary,
@@ -76,11 +76,30 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-async function authenticate(request: Request): Promise<string | null> {
+/** The bearer token on a request, or null when the header isn't one. */
+function bearerToken(request: Request): string | null {
   const header = request.headers.get('authorization') ?? '';
   const match = /^Bearer\s+(.+)$/i.exec(header);
-  if (!match) return null;
-  return userIdFromKey(match[1].trim());
+  return match ? match[1].trim() : null;
+}
+
+/** Parse a JSON body; `undefined` when it isn't JSON (the caller 400s). */
+async function jsonBody(request: Request): Promise<unknown> {
+  try {
+    return await request.json();
+  } catch {
+    return undefined;
+  }
+}
+
+/** Bind pure SQL statements (ops.ts / analytics.ts) to the database. */
+function bindAll(env: Env, statements: SqlStatement[]): D1PreparedStatement[] {
+  return statements.map((s) => env.DB.prepare(s.sql).bind(...s.params));
+}
+
+async function authenticate(request: Request): Promise<string | null> {
+  const key = bearerToken(request);
+  return key ? userIdFromKey(key) : null;
 }
 
 async function handlePull(request: Request, env: Env, userId: string): Promise<Response> {
@@ -113,19 +132,13 @@ async function handlePull(request: Request, env: Env, userId: string): Promise<R
 }
 
 async function handleOps(request: Request, env: Env, userId: string): Promise<Response> {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return json({ error: 'invalid JSON' }, 400);
-  }
+  const body = await jsonBody(request);
+  if (body === undefined) return json({ error: 'invalid JSON' }, 400);
   const parsed = parseOpsRequest(body);
   if (!parsed) return json({ error: 'invalid ops request' }, 400);
 
-  const statements = parsed.ops
-    .flatMap((op) => statementsForOp(op, userId, parsed.pack))
-    .map((s) => env.DB.prepare(s.sql).bind(...s.params));
-  await env.DB.batch(statements);
+  const statements = parsed.ops.flatMap((op) => statementsForOp(op, userId, parsed.pack));
+  await env.DB.batch(bindAll(env, statements));
   return json({ ok: true, applied: parsed.ops.length });
 }
 
@@ -142,18 +155,11 @@ async function handleGetProfile(env: Env, userId: string): Promise<Response> {
 }
 
 async function handlePutProfile(request: Request, env: Env, userId: string): Promise<Response> {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return json({ error: 'invalid JSON' }, 400);
-  }
+  const body = await jsonBody(request);
+  if (body === undefined) return json({ error: 'invalid JSON' }, 400);
   const parsed = parseProfileRequest(body);
   if (!parsed) return json({ error: 'invalid profile request' }, 400);
-  const statements = statementsForProfile(parsed.name, userId).map((s) =>
-    env.DB.prepare(s.sql).bind(...s.params),
-  );
-  await env.DB.batch(statements);
+  await env.DB.batch(bindAll(env, statementsForProfile(parsed.name, userId)));
   // Echo the stored (canonicalised) name so the client shows what landed.
   return json({ ok: true, name: parsed.name || null });
 }
@@ -188,20 +194,13 @@ async function handleBeacon(request: Request, env: Env): Promise<Response> {
   }
   const beacon = parseBeacon(body);
   if (!beacon) return json({ error: 'invalid beacon' }, 400);
-  const statements = statementsForBeacon(beacon, Date.now()).map((s) =>
-    env.DB.prepare(s.sql).bind(...s.params),
-  );
-  await env.DB.batch(statements);
+  await env.DB.batch(bindAll(env, statementsForBeacon(beacon, Date.now())));
   return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
 
 async function handleSummary(request: Request, env: Env): Promise<Response> {
-  if (env.ANALYTICS_READ_TOKEN) {
-    const header = request.headers.get('authorization') ?? '';
-    const match = /^Bearer\s+(.+)$/i.exec(header);
-    if (!match || match[1].trim() !== env.ANALYTICS_READ_TOKEN) {
-      return json({ error: 'missing or invalid analytics token' }, 401);
-    }
+  if (env.ANALYTICS_READ_TOKEN && bearerToken(request) !== env.ANALYTICS_READ_TOKEN) {
+    return json({ error: 'missing or invalid analytics token' }, 401);
   }
   const query = parseSummaryQuery(new URL(request.url).searchParams);
   if (!query) return json({ error: 'missing pack' }, 400);

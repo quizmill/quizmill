@@ -52,7 +52,11 @@ import { UpgradeCard } from '@/pack/UpgradeCard';
  *  prerendered HTML. Hold the first paint until mount so the server HTML and the
  *  client's first render agree — no hydration mismatch, no flash of the
  *  build-time pack — then render the injected pack. Off for normal one-pack
- *  deploys, which prerender their own pack exactly as before. */
+ *  deploys, which prerender their own pack exactly as before. (Hydration
+ *  itself is guarded for ANY runtime pack by RuntimePackBoundary in the
+ *  layout — a library pack made active on /packs included; this skeleton
+ *  only exists so a dedicated runtime-pack build never paints the demo
+ *  pack first.) */
 const RUNTIME_PACK_MODE = process.env.NEXT_PUBLIC_RUNTIME_PACK === '1';
 
 function HomeSkeleton() {
