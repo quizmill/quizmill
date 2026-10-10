@@ -284,8 +284,6 @@ const DOMAIN_BG: Record<DomainReadiness['status'], string> = {
 
 interface VerdictMeta {
   label: string;
-  /** Terse verdict for the compact Home tile. */
-  short: string;
   emoji: string;
   tone: Tone;
   pill: string;
@@ -296,7 +294,6 @@ interface VerdictMeta {
 const VERDICT_META: Record<ReadinessVerdict, VerdictMeta> = {
   ready: {
     label: 'Ready to pass',
-    short: 'ready',
     emoji: '🎯',
     tone: 'success',
     pill: 'bg-success-100 text-success-700',
@@ -306,7 +303,6 @@ const VERDICT_META: Record<ReadinessVerdict, VerdictMeta> = {
   },
   likely: {
     label: 'On track',
-    short: 'on track',
     emoji: '📈',
     tone: 'brand',
     pill: 'bg-brand-100 text-brand-700',
@@ -316,7 +312,6 @@ const VERDICT_META: Record<ReadinessVerdict, VerdictMeta> = {
   },
   borderline: {
     label: 'Right on the line',
-    short: 'on the line',
     emoji: '⚖️',
     tone: 'warn',
     pill: 'bg-warn-100 text-warn-700',
@@ -326,7 +321,6 @@ const VERDICT_META: Record<ReadinessVerdict, VerdictMeta> = {
   },
   'not-ready': {
     label: 'Not ready yet',
-    short: 'not yet',
     emoji: '📚',
     tone: 'warn',
     pill: 'bg-warn-100 text-warn-700',
@@ -336,7 +330,6 @@ const VERDICT_META: Record<ReadinessVerdict, VerdictMeta> = {
   },
   'no-data': {
     label: 'Keep practising',
-    short: 'more data',
     emoji: '🌱',
     tone: 'brand',
     pill: 'bg-brand-100 text-brand-700',
