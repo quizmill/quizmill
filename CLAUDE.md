@@ -261,7 +261,7 @@ and short SHA that next.config.ts, finalise-build and the bundler share).
 
 ```
 npm run dev                      # demo pack at localhost:3000
-npm test                         # vitest unit (737 tests, 63 files)
+npm test                         # vitest unit (739 tests, 63 files)
 npm run test:watch               # same, in watch mode
 npm run lint                     # eslint (flat config) — 0 errors required
 npm run typecheck                # tsc --noEmit

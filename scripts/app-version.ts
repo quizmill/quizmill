@@ -36,6 +36,6 @@ export function gitShortSha(cwd?: string): string | undefined {
 /** The visible app version: NEXT_PUBLIC_APP_VERSION when the caller set
  *  it (the CLI stamps its own version), else the latest release tag, else
  *  the package.json sentinel. */
-export function appVersion(): string {
-  return process.env.NEXT_PUBLIC_APP_VERSION || latestReleaseVersion() || pkg.version;
+export function appVersion(cwd?: string): string {
+  return process.env.NEXT_PUBLIC_APP_VERSION || latestReleaseVersion(cwd) || pkg.version;
 }
