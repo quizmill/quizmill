@@ -63,6 +63,31 @@ describe('StickersPage sticker count', () => {
   });
 });
 
+describe('StickersPage earned date', () => {
+  it('formats the earned date in the device locale like every other page', async () => {
+    // 4 Oct 2026 — a date whose short form differs between locales
+    // ("4 Oct 2026" in en-GB, "Oct 4, 2026" in en-US), so a hard-coded
+    // locale shows up. Paper, Coach, Notes and Packs all format with the
+    // device locale (Intl.DateTimeFormat(undefined, …)); the sticker must
+    // agree with them. (On an en-GB device the two forms coincide and this
+    // test is trivially green — it bites on CI and on en-US laptops.)
+    const earnedAt = new Date(2026, 9, 4, 12).getTime();
+    const [first] = ACHIEVEMENTS;
+    storage.saveAchievements([{ id: first.id, earnedAt }]);
+
+    await render();
+
+    const expected = new Intl.DateTimeFormat(undefined, {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(new Date(earnedAt));
+    const tile = container.querySelector('[data-earned="true"]');
+    expect(tile).not.toBeNull();
+    expect(tile?.textContent).toContain(expected);
+  });
+});
+
 describe('StickersPage pack context', () => {
   it('names the active pack and links to the shelf — stickers are per pack', async () => {
     await render();
