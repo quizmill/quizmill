@@ -19,6 +19,7 @@ import {
   QuestionPanel,
   RunnerCelebrations,
   RunnerLoading,
+  RunnerResults,
   type Stage,
 } from '@/pack/RunnerPanels';
 import { amendAttempt, loadAttempts, loadSessions, loadLevelFilter } from '@/lib/storage';
@@ -187,47 +188,33 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   );
 
   if (finished) {
-    const { correct, total, pct } = scoreSummary(state);
     return (
-      <main className="flex flex-col gap-5">
-        {celebrations}
-        <BackLink />
-        <div className="rounded-2xl border border-ink-200 bg-surface p-8 text-center shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
-            Practice complete
-          </div>
-          <h1 className="mt-2 text-4xl font-bold text-ink-900">
-            {correct}/{total}
-          </h1>
-          <p className="mt-1 text-lg font-medium text-ink-600">
-            {pct}% correct
-          </p>
-          <p className="mt-4 text-sm text-ink-500">
-            {PACK_CATEGORY_LABEL[categoryKey] ?? categoryKey}
-          </p>
-          <div className="mt-6 flex flex-col gap-2">
-            <Button
-              size="lg"
-              block
-              onClick={() => {
-                setState(null);
-                setFinished(false);
-                setStage('choosing');
-                setSelected([]);
-              }}
-            >
-              <RefreshCw className="h-4 w-4" />
-              Another round
-            </Button>
-            <Link href="/" className="block">
-              <Button size="lg" variant="secondary" block>
-                <Home className="h-4 w-4" />
-                Back to home
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </main>
+      <RunnerResults
+        eyebrow="Practice complete"
+        score={scoreSummary(state)}
+        note={PACK_CATEGORY_LABEL[categoryKey] ?? categoryKey}
+        celebrations={celebrations}
+      >
+        <Button
+          size="lg"
+          block
+          onClick={() => {
+            setState(null);
+            setFinished(false);
+            setStage('choosing');
+            setSelected([]);
+          }}
+        >
+          <RefreshCw className="h-4 w-4" />
+          Another round
+        </Button>
+        <Link href="/" className="block">
+          <Button size="lg" variant="secondary" block>
+            <Home className="h-4 w-4" />
+            Back to home
+          </Button>
+        </Link>
+      </RunnerResults>
     );
   }
 

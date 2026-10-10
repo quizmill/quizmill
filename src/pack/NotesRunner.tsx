@@ -17,6 +17,7 @@ import {
   QuestionPanel,
   RunnerCelebrations,
   RunnerLoading,
+  RunnerResults,
   type Stage,
 } from '@/pack/RunnerPanels';
 import { amendAttempt, loadAttempts, loadNotes, loadSessions } from '@/lib/storage';
@@ -122,45 +123,33 @@ export function PackNotesRunner() {
   );
 
   if (finished) {
-    const { correct, total, pct } = scoreSummary(state);
     return (
-      <main className="flex flex-col gap-5">
-        {celebrations}
-        {backToNotes}
-        <div className="rounded-2xl border border-ink-200 bg-surface p-8 text-center shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
-            Notes round complete
-          </div>
-          <h1 className="mt-2 text-4xl font-bold text-ink-900">
-            {correct}/{total}
-          </h1>
-          <p className="mt-1 text-lg font-medium text-ink-600">{pct}% correct</p>
-          <p className="mt-4 text-sm text-ink-500">
-            These were the questions around your notes — the ones you flagged
-            and the follow-ups generated from them.
-          </p>
-          <div className="mt-6 flex flex-col gap-2">
-            <Link href="/practice/notes/" className="block">
-              <Button size="lg" block>
-                <RefreshCw className="h-4 w-4" />
-                Another notes round
-              </Button>
-            </Link>
-            <Link href="/notes/" className="block">
-              <Button size="lg" variant="secondary" block>
-                <NotebookPen className="h-4 w-4" />
-                Back to my notes
-              </Button>
-            </Link>
-            <Link href="/" className="block">
-              <Button size="lg" variant="secondary" block>
-                <Home className="h-4 w-4" />
-                Back to home
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </main>
+      <RunnerResults
+        eyebrow="Notes round complete"
+        score={scoreSummary(state)}
+        note="These were the questions around your notes — the ones you flagged and the follow-ups generated from them."
+        back={backToNotes}
+        celebrations={celebrations}
+      >
+        <Link href="/practice/notes/" className="block">
+          <Button size="lg" block>
+            <RefreshCw className="h-4 w-4" />
+            Another notes round
+          </Button>
+        </Link>
+        <Link href="/notes/" className="block">
+          <Button size="lg" variant="secondary" block>
+            <NotebookPen className="h-4 w-4" />
+            Back to my notes
+          </Button>
+        </Link>
+        <Link href="/" className="block">
+          <Button size="lg" variant="secondary" block>
+            <Home className="h-4 w-4" />
+            Back to home
+          </Button>
+        </Link>
+      </RunnerResults>
     );
   }
 
