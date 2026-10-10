@@ -54,6 +54,7 @@ import {
   DEFAULT_PAPER_COUNT,
   PAPER_ALL_MAX,
   PAPER_COUNT_CHOICES,
+  SHEET_DATE_FORMAT,
   type PaperCount,
   type PaperSheet,
 } from '@/pack/paper';
@@ -91,12 +92,6 @@ async function targetFromHash(): Promise<HashTarget> {
   }
   return { kind: 'list' };
 }
-
-const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
-  weekday: 'short',
-  day: 'numeric',
-  month: 'short',
-});
 
 const SCENARIOS_BY_ID = new Map(packScenarios.map((s) => [s.id, s]));
 
@@ -283,7 +278,7 @@ export function PaperPage() {
                     <div className="mt-0.5 truncate text-sm text-ink-500">
                       {PACK_CATEGORY_LABEL[s.categoryKey] ?? s.categoryKey} ·{' '}
                       {s.questionIds.length} questions ·{' '}
-                      {DATE_FORMAT.format(s.createdAt)}
+                      {SHEET_DATE_FORMAT.format(s.createdAt)}
                     </div>
                   </div>
                   <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-400" />
@@ -567,7 +562,7 @@ function SheetView({
         <p className="text-sm text-ink-500">
           {PACK_CATEGORY_LABEL[sheet.categoryKey] ?? sheet.categoryKey}
           {sheet.level ? ` · ${PACK_LEVEL_LABEL[sheet.level] ?? sheet.level}` : ''} ·{' '}
-          {sheet.questionIds.length} questions · {DATE_FORMAT.format(sheet.createdAt)}
+          {sheet.questionIds.length} questions · {SHEET_DATE_FORMAT.format(sheet.createdAt)}
         </p>
         {missing > 0 ? (
           <p className="text-sm text-warn-600">
@@ -839,7 +834,7 @@ function PrintableAnswerKey({ sheet }: { sheet: PaperSheet }) {
               ? ` · ${PACK_LEVEL_LABEL[sheet.level] ?? sheet.level}`
               : ''}{' '}
             · {sheet.questionIds.length} questions ·{' '}
-            {DATE_FORMAT.format(sheet.createdAt)}
+            {SHEET_DATE_FORMAT.format(sheet.createdAt)}
           </div>
         </div>
         <div className="flex flex-col items-end">

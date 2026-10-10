@@ -61,6 +61,14 @@ export const DEFAULT_PAPER_COUNT = 10;
 export const PAPER_ALL_MAX = 60;
 export type PaperCount = number | 'all';
 
+/** How a sheet's date reads on screen ("Sat 26 Sept") — the list, the
+ *  sheet screen, the answer key and the marking page all use it. */
+export const SHEET_DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+});
+
 // Unambiguous letters/digits for the human sheet code — no 0/O, 1/I/L,
 // 5/S, 8/B so a scribbled note or a phone photo can't misread it.
 const CODE_ALPHABET = 'ACDEFHJKMNPQRTUVWXYZ234679';
