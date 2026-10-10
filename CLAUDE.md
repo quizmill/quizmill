@@ -120,7 +120,10 @@ offline.
   below), `packAssets.ts` (offline images for runtime-inserted packs),
   `install.ts` (Add-to-Home-Screen surface detection).
 - `src/pack/` — the app UI: Home, PracticeRunner, ReviewRunner,
-  DriveRunner, NotesRunner, runner.ts (pure session logic), data.ts
+  DriveRunner, NotesRunner (the three visual runners compose the shared
+  question/answer panels in `RunnerPanels.tsx` and own only what differs:
+  what to deal, what to record, the results screen), runner.ts (pure
+  session logic), data.ts
   (typed pack loader), source.ts (resolves build-time vs runtime pack),
   StickersPage + achievements{,-engine}.ts (sticker cabinet; mastery
   stickers generated per pack category), ProgressPage (CSS-only charts
@@ -260,7 +263,7 @@ offline.
 
 ```
 npm run dev                      # demo pack at localhost:3000
-npm test                         # vitest unit (507 tests, 44 files)
+npm test                         # vitest unit (728 tests, 61 files)
 npm run test:watch               # same, in watch mode
 npm run lint                     # eslint (flat config) — 0 errors required
 npm run typecheck                # tsc --noEmit
