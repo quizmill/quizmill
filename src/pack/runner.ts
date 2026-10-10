@@ -1,8 +1,8 @@
 /**
- * Pure logic for the pack practice runner — same machinery as the CCA
- * runner (src/variants/claude-cert/runner.ts) over the generic
- * PackQuestion shape. The React components are the I/O shells;
- * everything that can be a function of plain inputs lives here.
+ * Pure logic for the pack practice runner, over the generic PackQuestion
+ * shape. The React components (PracticeRunner, ReviewRunner, DriveRunner,
+ * NotesRunner) are the I/O shells; everything that can be a function of
+ * plain inputs lives here.
  */
 import { APP_BUILD } from '@/config';
 import type { Attempt, Session, SessionMode } from '@/data/types';
@@ -171,10 +171,10 @@ export function buildAttempt(args: BuildAttemptArgs): Attempt {
     timeTakenSeconds: args.timeTakenSeconds ?? measured,
     // Subject is the engine type — packs store the category key here.
     subject: categoryKey,
-    // Per-question rescue, same as CCA: pack questions are
-    // self-contained, so a mistake is only rescued by re-answering
-    // that exact question correctly (see claude-cert/runner.ts for
-    // the contrast with 11+'s per-concept rescue model).
+    // Per-question rescue: pack questions are self-contained, so a
+    // mistake is only rescued by re-answering that exact question
+    // correctly. The mistakes engine rescues per (subject, topic), so
+    // the question id IS the topic (see src/lib/mistakes.ts).
     topic: question.id,
     difficulty: question.difficulty,
     position: state.currentIndex + 1,
