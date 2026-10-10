@@ -7,7 +7,13 @@
  * (vx, vy) per second.
  *
  * Game state is immutable; `step(state, dtSec)` returns the next state.
+ *
+ * The only randomness is the serve angle (a new game and every re-serve
+ * after a point). Like snake and the tile puzzle, it comes from an
+ * injected `rng` so tests can pin a serve; the default is Math.random.
  */
+
+export type Rng = () => number;
 
 export interface Vec {
   x: number;
@@ -40,12 +46,17 @@ export const AI_MAX_SPEED = 0.45; // board-units per second
 const START_SPEED = 0.55;
 const SPEED_RAMP = 1.05; // multiply ball speed each paddle hit
 
-export function newGame(startDirection: 1 | -1 = 1): PongState {
+/** Serve from the centre toward `direction` at a shallow random angle. */
+function serve(direction: 1 | -1, rng: Rng): Vec {
+  return { x: START_SPEED * direction, y: (rng() - 0.5) * 0.4 };
+}
+
+export function newGame(startDirection: 1 | -1 = 1, rng: Rng = Math.random): PongState {
   return {
     playerY: 0.5,
     aiY: 0.5,
     ball: { x: 0.5, y: 0.5 },
-    vel: { x: START_SPEED * startDirection, y: (Math.random() - 0.5) * 0.4 },
+    vel: serve(startDirection, rng),
     playerScore: 0,
     aiScore: 0,
     paused: false,
@@ -79,7 +90,11 @@ function paddleCollision(
   return dy * 4.5;
 }
 
-export function step(state: PongState, dtSec: number): PongState {
+export function step(
+  state: PongState,
+  dtSec: number,
+  rng: Rng = Math.random,
+): PongState {
   if (state.winner) return state;
   let { ball, vel, aiY, playerY, playerScore, aiScore } = state;
 
@@ -139,12 +154,13 @@ export function step(state: PongState, dtSec: number): PongState {
     Math.min(1 - PADDLE_HALF_H, aiY + aiDelta),
   );
 
-  // If we just scored, recentre and pause until resume() is called.
+  // If we just scored, recentre and pause until resume() is called. The
+  // re-serve heads back the way the ball came — toward whoever just scored.
   if (paused && !winner) {
     return {
       ...state,
       ball: { x: 0.5, y: 0.5 },
-      vel: { x: -nvx > 0 ? START_SPEED : -START_SPEED, y: (Math.random() - 0.5) * 0.4 },
+      vel: serve(nvx < 0 ? 1 : -1, rng),
       playerScore,
       aiScore,
       aiY: 0.5,
