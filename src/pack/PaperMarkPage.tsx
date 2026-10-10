@@ -18,6 +18,7 @@ import { McqMarkdown } from '@/components/McqMarkdown';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 import {
+  STORAGE_EVENT,
   loadAchievements,
   loadAttempts,
   loadSessions,
@@ -51,10 +52,6 @@ import {
   type PaperSheet,
   type SavedMark,
 } from '@/pack/paper';
-
-// Same event bus the storage hooks use (see src/lib/useStorage.ts) — the
-// writes here happen outside those hooks, so re-emit for mounted pages.
-const STORAGE_EVENT = 'quizmill:storage';
 
 const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
   weekday: 'short',

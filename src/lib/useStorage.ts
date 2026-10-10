@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import * as storage from './storage';
-import { SESSIONS_KEY, ATTEMPTS_KEY } from './storage';
+import { SESSIONS_KEY, ATTEMPTS_KEY, STORAGE_EVENT as EVENT } from './storage';
 import { applySnapshot, parseSnapshot } from './transfer';
 import {
   getSyncStatus,
@@ -12,7 +12,6 @@ import {
 } from './sync';
 import type { Attempt, Session } from '@/data/types';
 
-const EVENT = 'quizmill:storage';
 const EMPTY_SESSIONS: Session[] = [];
 const EMPTY_ATTEMPTS: Attempt[] = [];
 
@@ -153,6 +152,22 @@ export function useResetToday() {
 }
 
 /**
+ * A list read from storage on mount and re-read on every storage event
+ * (ours and the cross-tab one) — the shared half of the reactive list
+ * hooks below. Plain state rather than useSyncExternalStore because these
+ * lists are small and only a few pages mount them.
+ */
+function useStorageList<T>(load: () => T[]): T[] {
+  const [list, setList] = useState<T[]>([]);
+  useEffect(() => {
+    const refresh = () => setList(load());
+    refresh();
+    return subscribe(refresh);
+  }, [load]);
+  return list;
+}
+
+/**
  * Earned achievements ("stickers"). Reactive — re-reads from storage on
  * the quizmill:storage event, so the cabinet updates when a runner
  * records an unlock (storage.recordEarnedAchievements emits no event
@@ -163,18 +178,7 @@ export function useEarnedAchievements(): {
   earned: Set<string>;
   earnedList: storage.EarnedAchievement[];
 } {
-  const [list, setList] = useState<storage.EarnedAchievement[]>([]);
-  useEffect(() => {
-    const refresh = () => setList(storage.loadAchievements());
-    refresh();
-    if (typeof window === 'undefined') return;
-    window.addEventListener(EVENT, refresh);
-    window.addEventListener('storage', refresh);
-    return () => {
-      window.removeEventListener(EVENT, refresh);
-      window.removeEventListener('storage', refresh);
-    };
-  }, []);
+  const list = useStorageList(storage.loadAchievements);
   return {
     earned: new Set(list.map((e) => e.id)),
     earnedList: list,
@@ -190,18 +194,7 @@ export function useQuestionVotes(): {
   votesList: storage.QuestionVote[];
   setVote: (questionId: string, vote: storage.VoteDir | null, comment?: string) => void;
 } {
-  const [list, setList] = useState<storage.QuestionVote[]>([]);
-  useEffect(() => {
-    const refresh = () => setList(storage.loadVotes());
-    refresh();
-    if (typeof window === 'undefined') return;
-    window.addEventListener(EVENT, refresh);
-    window.addEventListener('storage', refresh);
-    return () => {
-      window.removeEventListener(EVENT, refresh);
-      window.removeEventListener('storage', refresh);
-    };
-  }, []);
+  const list = useStorageList(storage.loadVotes);
   const setVote = useCallback(
     (questionId: string, vote: storage.VoteDir | null, comment?: string) => {
       storage.recordVote(questionId, vote, comment);
@@ -226,18 +219,7 @@ export function useQuestionNotes(): {
   notesList: storage.QuestionNote[];
   setNote: (questionId: string, text: string | null) => void;
 } {
-  const [list, setList] = useState<storage.QuestionNote[]>([]);
-  useEffect(() => {
-    const refresh = () => setList(storage.loadNotes());
-    refresh();
-    if (typeof window === 'undefined') return;
-    window.addEventListener(EVENT, refresh);
-    window.addEventListener('storage', refresh);
-    return () => {
-      window.removeEventListener(EVENT, refresh);
-      window.removeEventListener('storage', refresh);
-    };
-  }, []);
+  const list = useStorageList(storage.loadNotes);
   const setNote = useCallback((questionId: string, text: string | null) => {
     storage.recordNote(questionId, text);
     emit();
