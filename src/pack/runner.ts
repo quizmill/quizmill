@@ -114,9 +114,7 @@ export function isBankFullySeen(
 
 /**
  * Pick the session's questions from the bank. Returns null when there's
- * nothing to pick from (empty bank). Wraps each question in a `topic`
- * field so the engine's SelectableQuestion shape is satisfied; unwraps
- * before returning.
+ * nothing to pick from (empty bank).
  */
 export function pickSessionFromBank(
   bank: PackQuestion[],
@@ -125,19 +123,14 @@ export function pickSessionFromBank(
   count: number = QUESTION_COUNT,
 ): PackQuestion[] | null {
   if (bank.length === 0) return null;
-  const selectable = bank.map((q) => ({ ...q, topic: q.categoryKey }));
-  const picked = pickSessionQuestions(selectable, {
+  const picked = pickSessionQuestions(bank, {
     count: Math.min(count, bank.length),
     historicalAttemptedIds: new Set(history.keys()),
     currentSessionIds: new Set(),
     history,
     rng,
   });
-  if (picked.length === 0) return null;
-  return picked.map((p) => {
-    const { topic: _topic, ...rest } = p;
-    return rest as PackQuestion;
-  });
+  return picked.length === 0 ? null : picked;
 }
 
 export interface BuildAttemptArgs {

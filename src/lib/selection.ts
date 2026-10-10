@@ -5,10 +5,10 @@
  * The seeded random generator lets tests be deterministic.
  */
 
+/** All the engine reads of a question is its id — the bank it's handed
+ *  can carry any shape on top (the runner passes PackQuestions as-is). */
 export interface SelectableQuestion {
   id: string | number;
-  topic: string;
-  difficulty: number;
 }
 
 export type Rng = () => number; // returns [0, 1)
