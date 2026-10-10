@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { Attempt, Session } from '@/data/types';
 import {
   accuracyByDay,
-  completedSessionDates,
   levelNudge,
   practiceDates,
   streakProgress,
@@ -169,24 +168,6 @@ describe('longestStreak', () => {
   });
 });
 
-describe('completedSessionDates', () => {
-  it('keeps only sessions with an end timestamp', () => {
-    const sessions: Session[] = [
-      {
-        id: 's1', subject: 'alpha', startedAt: NOON, endedAt: NOON + 60_000,
-        questionCount: 10, correctCount: 5,
-      },
-      {
-        id: 's2', subject: 'alpha', startedAt: NOON, endedAt: null,
-        questionCount: 10, correctCount: 0,
-      },
-    ];
-    const dates = completedSessionDates(sessions);
-    expect(dates).toHaveLength(1);
-    expect(dates[0].getTime()).toBe(NOON + 60_000);
-  });
-});
-
 describe('practiceDates', () => {
   const DAY = 24 * 3600_000;
   const today = new Date('2026-06-10T20:00:00');
@@ -211,16 +192,9 @@ describe('practiceDates', () => {
 
   it('keeps the streak alive on days the user practised but never finished a session', () => {
     // Practised three days running — a full round each day — but never clicked
-    // through the final question (so no session has an end record). The
-    // session-only signal reads 0; practice activity shows the real 3-day run.
-    const sessions: Session[] = [
-      session({ id: 'd0', startedAt: today.getTime(), endedAt: null }),
-      session({ id: 'd1', startedAt: today.getTime() - DAY, endedAt: null }),
-      session({ id: 'd2', startedAt: today.getTime() - 2 * DAY, endedAt: null }),
-    ];
+    // through the final question (so no session has an end record). Practice
+    // activity alone shows the real 3-day run.
     const attempts = [...onDay(0, 10), ...onDay(1, 10), ...onDay(2, 10)];
-
-    expect(currentStreak(completedSessionDates(sessions), today)).toBe(0);
     expect(currentStreak(practiceDates(attempts), today)).toBe(3);
   });
 });
