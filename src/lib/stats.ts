@@ -7,38 +7,6 @@
 import type { Attempt, Session } from '@/data/types';
 import { currentStreak, longestStreak, toDayKey } from './streak';
 
-export interface CategoryAccuracy {
-  key: string;
-  label: string;
-  attempted: number;
-  correct: number;
-  accuracyPct: number;
-}
-
-/** Accuracy per pack category, in the order the categories are given.
- *  Categories with no attempts are included with zeroes. */
-export function accuracyByCategory(
-  attempts: readonly Attempt[],
-  categories: readonly { key: string; label: string; shortLabel?: string }[],
-): CategoryAccuracy[] {
-  return categories.map((cat) => {
-    let attempted = 0;
-    let correct = 0;
-    for (const a of attempts) {
-      if (a.subject !== cat.key) continue;
-      attempted += 1;
-      if (a.isCorrect) correct += 1;
-    }
-    return {
-      key: cat.key,
-      label: cat.shortLabel ?? cat.label,
-      attempted,
-      correct,
-      accuracyPct: attempted === 0 ? 0 : Math.round((correct / attempted) * 100),
-    };
-  });
-}
-
 export interface DailyPoint {
   date: string; // YYYY-MM-DD, local time
   attempted: number;
@@ -123,12 +91,6 @@ export function weakestQuestions(
     });
 }
 
-export function completedSessionDates(sessions: readonly Session[]): Date[] {
-  return sessions
-    .filter((s): s is Session & { endedAt: number } => s.endedAt !== null)
-    .map((s) => new Date(s.endedAt));
-}
-
 /**
  * How many questions must be answered in a day for it to count toward the
  * daily-practice streak — one full round (QUESTION_COUNT). The questions don't
@@ -140,12 +102,12 @@ export const STREAK_MIN_QUESTIONS_PER_DAY = 10;
 
 /**
  * Days on which the user answered at least {@link STREAK_MIN_QUESTIONS_PER_DAY}
- * questions — the signal behind the daily-practice streak. Unlike
- * {@link completedSessionDates}, this doesn't require clicking all the way
- * through a session's final question (which is what writes `endedAt`): a day of
- * real practice that was left mid-session still counts. Attempts are recorded
- * per answer and are immutable, so they're also the reliable cross-device
- * signal. A representative Date is returned per qualifying local day.
+ * questions — the signal behind the daily-practice streak. Counting attempts
+ * rather than completed sessions means a day of real practice that was left
+ * mid-session still counts (only tapping through the final question writes a
+ * session's `endedAt`). Attempts are recorded per answer and are immutable,
+ * so they're also the reliable cross-device signal. A representative Date is
+ * returned per qualifying local day.
  */
 export function practiceDates(
   attempts: readonly Attempt[],

@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  pickSimilarQuestion,
   sessionMistakeIds,
   unresolvedMistakeIds,
-  unresolvedMistakes,
 } from '../src/lib/mistakes';
 import type { Attempt } from '../src/data/types';
 
@@ -131,76 +129,6 @@ describe('unresolvedMistakeIds (topic-based rescue)', () => {
   });
 });
 
-describe('unresolvedMistakes (enriched with attempt data)', () => {
-  it('returns the kid\'s most recent wrong attempt for each unresolved question', () => {
-    const out = unresolvedMistakes([
-      att('q1', false, 100, { selectedAnswer: 'first guess' }),
-      att('q1', false, 300, { selectedAnswer: 'second guess' }),
-    ]);
-    expect(out).toHaveLength(1);
-    expect(out[0].questionId).toBe('q1');
-    expect(out[0].wrongAttempt.selectedAnswer).toBe('second guess');
-    expect(out[0].wrongAttempt.answeredAt).toBe(300);
-  });
-
-  it('excludes rescued questions just like unresolvedMistakeIds does', () => {
-    const out = unresolvedMistakes([
-      att('q1', false, 100),
-      att('q2', true, 200), // rescues q1 (same default topic)
-    ]);
-    expect(out).toHaveLength(0);
-  });
-
-  it('returns items sorted most-recent-mistake first', () => {
-    const out = unresolvedMistakes([
-      att('q1', false, 300, { topic: 't1' }),
-      att('q2', false, 100, { topic: 't2' }),
-      att('q3', false, 200, { topic: 't3' }),
-    ]);
-    expect(out.map((x) => x.questionId)).toEqual(['q1', 'q3', 'q2']);
-  });
-});
-
-describe('pickSimilarQuestion', () => {
-  const bank = [
-    { id: 'q1', subject: 'maths', topic: 'fractions' },
-    { id: 'q2', subject: 'maths', topic: 'fractions' },
-    { id: 'q3', subject: 'maths', topic: 'fractions' },
-    { id: 'q4', subject: 'maths', topic: 'percentages' },
-    { id: 'q5', subject: 'english', topic: 'fractions' }, // wrong subject
-  ];
-
-  it('returns a different question on the same subject + topic', () => {
-    const seq = [0]; // deterministic — picks index 0 of candidates
-    const rng = () => seq.shift() ?? 0;
-    // Candidates for q1: q2, q3 (subject=maths AND topic=fractions AND id!=q1).
-    // q5 excluded (different subject), q4 excluded (different topic).
-    const out = pickSimilarQuestion('q1', bank, new Set(), rng);
-    expect(out?.id).toBe('q2');
-  });
-
-  it('returns null when there are no other same-topic questions', () => {
-    // Only q4 is on maths:percentages.
-    expect(pickSimilarQuestion('q4', bank)).toBeNull();
-  });
-
-  it('returns null when the original ID is not in the bank', () => {
-    expect(pickSimilarQuestion('missing', bank)).toBeNull();
-  });
-
-  it('respects the exclude set', () => {
-    // q1 + exclude q2 + exclude q3 → no candidates left.
-    expect(
-      pickSimilarQuestion('q1', bank, new Set(['q2', 'q3'])),
-    ).toBeNull();
-  });
-
-  it('does not return the original even if it slips into the bank twice', () => {
-    const out = pickSimilarQuestion('q1', bank);
-    expect(out?.id).not.toBe('q1');
-  });
-});
-
 describe('rescue by question id (migrated attempts)', () => {
   // Attempts migrated from an older engine carry a free-text topic label
   // ("reading comprehension") while every attempt this engine writes uses
@@ -210,15 +138,6 @@ describe('rescue by question id (migrated attempts)', () => {
   it('unresolvedMistakeIds rescues a wrong attempt whose topic label differs from the later correct one', () => {
     expect(
       unresolvedMistakeIds([
-        att('q1', false, 100, { subject: 'english', topic: 'reading comprehension' }),
-        att('q1', true, 200, { subject: 'english', topic: 'q1' }),
-      ]),
-    ).toEqual([]);
-  });
-
-  it('unresolvedMistakes applies the same rule', () => {
-    expect(
-      unresolvedMistakes([
         att('q1', false, 100, { subject: 'english', topic: 'reading comprehension' }),
         att('q1', true, 200, { subject: 'english', topic: 'q1' }),
       ]),

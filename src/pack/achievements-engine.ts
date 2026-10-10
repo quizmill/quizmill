@@ -52,35 +52,27 @@ export function evaluateAchievements(
   now: Date = new Date(),
 ): Set<string> {
   const earned = new Set<string>();
-
-  // Shared aggregates, computed once.
-  const bestRun = maxConsecutiveCorrect(attempts);
-  const totalAnswered = attempts.length;
-  const dailyStreak = currentStreak(practiceDates(attempts), now);
+  // Shared aggregates, computed once — the same ones the cabinet shows
+  // progress against, so "earned" and "progress" can never disagree.
+  const ctx = buildProgressContext(sessions, attempts, now);
 
   for (const a of achievements) {
     switch (a.category) {
       case 'streak':
-        if (a.threshold !== undefined && bestRun >= a.threshold) earned.add(a.id);
+        if (a.threshold !== undefined && ctx.bestRun >= a.threshold) earned.add(a.id);
         break;
       case 'volume':
-        if (a.threshold !== undefined && totalAnswered >= a.threshold) earned.add(a.id);
+        if (a.threshold !== undefined && ctx.totalAnswered >= a.threshold) earned.add(a.id);
         break;
       case 'daily':
-        if (a.threshold !== undefined && dailyStreak >= a.threshold) earned.add(a.id);
+        if (a.threshold !== undefined && ctx.dailyStreak >= a.threshold) earned.add(a.id);
         break;
       case 'mastery': {
-        if (!a.categoryKey) break;
-        let attempted = 0;
-        let correct = 0;
-        for (const at of attempts) {
-          if (at.subject !== a.categoryKey) continue;
-          attempted += 1;
-          if (at.isCorrect) correct += 1;
-        }
+        const m = a.categoryKey ? ctx.mastery.get(a.categoryKey) : undefined;
         if (
-          attempted >= MASTERY_MIN_ATTEMPTS &&
-          correct / attempted >= MASTERY_MIN_ACCURACY
+          m &&
+          m.attempted >= MASTERY_MIN_ATTEMPTS &&
+          m.correct / m.attempted >= MASTERY_MIN_ACCURACY
         ) {
           earned.add(a.id);
         }
