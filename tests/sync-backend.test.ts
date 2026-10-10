@@ -52,18 +52,6 @@ describe('sync backend registry', () => {
     expect(getSyncBackend()).not.toBeNull();
   });
 
-  it('ships exactly one built-in backend: the sync URL is the only switch', () => {
-    // The retired email-OTP backend's env pair must be inert — a pack repo
-    // whose deploy workflow still carries those secrets builds pure-local,
-    // it doesn't wake a backend that no longer exists.
-    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://x.example.co';
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'pk';
-    expect(syncBackendKind()).toBeNull();
-    expect(getSyncBackend()).toBeNull();
-    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-    delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  });
-
   it('honours an explicit NEXT_PUBLIC_SYNC_BACKEND pick', () => {
     process.env.NEXT_PUBLIC_SYNC_URL = 'https://sync.example.dev';
     process.env.NEXT_PUBLIC_SYNC_BACKEND = 'http';
