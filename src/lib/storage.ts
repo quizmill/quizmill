@@ -134,16 +134,21 @@ export function loadPrefs(): PackPrefs {
   return readJson<PackPrefs>(PREFS_KEY, {});
 }
 
+/** Set one pref, or drop it for a falsy value so an "off" pref leaves no key. */
+function patchPrefs<K extends keyof PackPrefs>(key: K, value: PackPrefs[K] | null): void {
+  const prefs = loadPrefs();
+  if (value) prefs[key] = value;
+  else delete prefs[key];
+  writeJson(PREFS_KEY, prefs);
+}
+
 /** The active level-band filter, or null for "All". */
 export function loadLevelFilter(): string | null {
   return loadPrefs().level ?? null;
 }
 
 export function saveLevelFilter(level: string | null): void {
-  const prefs = loadPrefs();
-  if (level) prefs.level = level;
-  else delete prefs.level;
-  writeJson(PREFS_KEY, prefs);
+  patchPrefs('level', level);
 }
 
 /** The level-nudge suggestion the user last dismissed ("from>to"), or null. */
@@ -152,10 +157,7 @@ export function loadDismissedNudge(): string | null {
 }
 
 export function saveDismissedNudge(key: string | null): void {
-  const prefs = loadPrefs();
-  if (key) prefs.dismissedNudge = key;
-  else delete prefs.dismissedNudge;
-  writeJson(PREFS_KEY, prefs);
+  patchPrefs('dismissedNudge', key);
 }
 
 /** Whether Drive Mode is switched on (Settings toggle). Default off. */
@@ -164,10 +166,7 @@ export function loadDriveModeEnabled(): boolean {
 }
 
 export function saveDriveModeEnabled(on: boolean): void {
-  const prefs = loadPrefs();
-  if (on) prefs.driveMode = true;
-  else delete prefs.driveMode;
-  writeJson(PREFS_KEY, prefs);
+  patchPrefs('driveMode', on);
 }
 
 // ---- scratchpad (local-only working notes; deliberately not synced) ----
