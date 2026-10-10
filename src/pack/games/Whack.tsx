@@ -22,6 +22,16 @@ interface Mole {
   diesAt: number;
 }
 
+/** A fresh mole and the delay before the one after it. Random by design —
+ *  it's a game — so it lives outside the component, where render purity
+ *  isn't in question. */
+function rollMole(): { mole: Mole; nextIn: number } {
+  return {
+    mole: { hole: Math.floor(Math.random() * HOLES), diesAt: Date.now() + MOLE_LIFE_MS },
+    nextIn: SPAWN_MIN_MS + Math.random() * (SPAWN_MAX_MS - SPAWN_MIN_MS),
+  };
+}
+
 export function Whack({ onClose }: WhackProps) {
   const [running, setRunning] = useState(false);
   const [score, setScore] = useState(0);
@@ -41,11 +51,9 @@ export function Whack({ onClose }: WhackProps) {
   }
 
   function spawnMole() {
-    const hole = Math.floor(Math.random() * HOLES);
-    setMole({ hole, diesAt: Date.now() + MOLE_LIFE_MS });
-    const next =
-      SPAWN_MIN_MS + Math.random() * (SPAWN_MAX_MS - SPAWN_MIN_MS);
-    spawnTimerRef.current = setTimeout(spawnMole, next);
+    const { mole, nextIn } = rollMole();
+    setMole(mole);
+    spawnTimerRef.current = setTimeout(spawnMole, nextIn);
   }
 
   function start() {
@@ -72,12 +80,7 @@ export function Whack({ onClose }: WhackProps) {
   // Cull moles that have lived past their diesAt without being whacked.
   useEffect(() => {
     if (!running || !mole) return;
-    const remaining = mole.diesAt - Date.now();
-    if (remaining <= 0) {
-      setMole(null);
-      return;
-    }
-    const t = setTimeout(() => setMole(null), remaining);
+    const t = setTimeout(() => setMole(null), Math.max(0, mole.diesAt - Date.now()));
     return () => clearTimeout(t);
   }, [mole, running]);
 
