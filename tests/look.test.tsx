@@ -1,5 +1,5 @@
 /** The visual-look preference (Poster / Classic) — mirrors theme.test.
- * .tsx so it runs on happy-dom (vitest environmentMatchGlobs). */
+ * .tsx so it runs on happy-dom (the dom project in vitest.config.mts). */
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   applyLook,

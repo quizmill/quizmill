@@ -13,13 +13,16 @@ export default defineConfig({
     testTimeout: 60_000,
     hookTimeout: 60_000,
     globalSetup: ['./tests/e2e-pack/setup.ts'],
+    // One fork, spec files in sequence: they share the static server
+    // from globalSetup and one Chromium at a time keeps CI stable.
+    // (Vitest 4 folded `poolOptions.forks.singleFork` into maxWorkers.)
     pool: 'forks',
-    poolOptions: { forks: { singleFork: true } },
+    maxWorkers: 1,
     fileParallelism: false,
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
     },
   },
 });

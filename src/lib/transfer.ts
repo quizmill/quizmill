@@ -1,9 +1,10 @@
 /**
  * Progress export/import — move local progress between devices as a file.
  *
- * A snapshot is a single JSON file carrying the five synced tables
- * (sessions, attempts, achievements, votes, notes) for ONE pack, stamped with a
- * format marker + version so future builds can keep reading old files.
+ * A snapshot is a single JSON file carrying the six synced tables
+ * (sessions, attempts, achievements, votes, notes, events) for ONE pack,
+ * stamped with a format marker + version so future builds can keep
+ * reading old files.
  * Import merges via storage.mergeRemote — the same last-write-wins rules
  * as a cloud pull — so importing is idempotent and never loses newer
  * local rows. Like a cloud pull, an import does not feed the sync queue.

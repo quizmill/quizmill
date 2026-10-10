@@ -25,7 +25,7 @@ import type { QueueOp, RemoteData, SyncBackend } from '../syncBackend';
 const PACK_ID = APP_CONFIG.packId;
 
 /** Sync-server base URL for this build ('' = backend not configured). */
-export const SYNC_URL = (process.env.NEXT_PUBLIC_SYNC_URL ?? '').replace(/\/+$/, '');
+const SYNC_URL = (process.env.NEXT_PUBLIC_SYNC_URL ?? '').replace(/\/+$/, '');
 
 // APP-level (no pack prefix): the sync key identifies the learner, not the
 // pack — the server already partitions rows by (user, pack), so one key

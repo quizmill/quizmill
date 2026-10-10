@@ -19,14 +19,11 @@
  * app behaves exactly as the pure local-only build.
  */
 import * as storage from './storage';
-import type { Mutation } from './storage';
+import { KEY_PREFIX, STORAGE_EVENT, type Mutation } from './storage';
 import { getSyncBackend, type QueueOp } from './syncBackend';
-
-import { KEY_PREFIX } from './storage';
 
 const QUEUE_KEY = `${KEY_PREFIX}syncQueue.v1`;
 const MIGRATED_PREFIX = `${KEY_PREFIX}sync.migrated.`; // + uid
-const STORAGE_EVENT = 'quizmill:storage'; // event-bus name, not a storage key
 const MAX_TRIES = 6; // drop a poison op after this many failures
 // Hard ceiling on any single remote op. Neither backend client has a
 // built-in timeout, so a request that stalls (common on flaky mobile
@@ -201,8 +198,7 @@ function handleMutation(m: Mutation): void {
 // ── Draining the queue to the backend ────────────────────────────────────
 
 async function drain(): Promise<void> {
-  if (draining || !uid) return;
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+  if (draining || !uid || !isOnline()) return;
   const backend = getSyncBackend();
   if (!backend) return;
 

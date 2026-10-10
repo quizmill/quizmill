@@ -120,10 +120,7 @@ offline.
   below), `packAssets.ts` (offline images for runtime-inserted packs),
   `install.ts` (Add-to-Home-Screen surface detection).
 - `src/pack/` — the app UI: Home, PracticeRunner, ReviewRunner,
-  DriveRunner, NotesRunner (the three visual runners compose the shared
-  question/answer panels in `RunnerPanels.tsx` and own only what differs:
-  what to deal, what to record, the results screen), runner.ts (pure
-  session logic), data.ts
+  DriveRunner, NotesRunner, runner.ts (pure session logic), data.ts
   (typed pack loader), source.ts (resolves build-time vs runtime pack),
   StickersPage + achievements{,-engine}.ts (sticker cabinet; mastery
   stickers generated per pack category), ProgressPage (CSS-only charts
@@ -250,7 +247,12 @@ offline.
   bootstrap in `layout.tsx` and `src/pack/runtime.ts` resolve the active
   pack before the engine bundle evaluates — precedence: `#pack=` hash >
   `quizmill.activePack` handoff blob (quizmill-cloud) > library pointer >
-  build-time pack. Progress is per pack (`quizmill.<packId>.*`) so
+  build-time pack. Every route is still PRERENDERED from the build-time
+  pack, so when a runtime pack wins (`isRuntimePack` in `source.ts`)
+  `RuntimePackBoundary` (wrapped around the layout's children) adopts the
+  prerendered markup verbatim for the hydration pass and swaps the live
+  tree in before paint — otherwise every hard load of a pack-scoped page
+  logged React #418. Progress is per pack (`quizmill.<packId>.*`) so
   swapping is free, and EJECT deliberately keeps progress (re-insert to
   resume). Pack-scoped pages (Progress, Stickers, Notes) carry a
   `PackChip` eyebrow naming the active pack, linking to `/packs`.
@@ -263,7 +265,7 @@ offline.
 
 ```
 npm run dev                      # demo pack at localhost:3000
-npm test                         # vitest unit (729 tests, 61 files)
+npm test                         # vitest unit (753 tests, 64 files)
 npm run test:watch               # same, in watch mode
 npm run lint                     # eslint (flat config) — 0 errors required
 npm run typecheck                # tsc --noEmit
@@ -399,7 +401,7 @@ are detected on every commit regardless.
 - Tests accompany behaviour changes; E2E asserts against the demo pack
   (if a different pack is active locally, `rm -rf content/pack` and
   re-run to reseed before E2E). E2E specs live in `tests/e2e-pack/`
-  and run under `vitest.e2e.config.ts`.
+  and run under `vitest.e2e.config.mts`.
 - **Bug fixes are red→green**: first write a failing test that
   reproduces the bug (confirm it's red), then fix until it's green —
   don't fix first and add a test after. React component bugs (effects,

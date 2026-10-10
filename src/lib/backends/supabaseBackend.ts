@@ -1,7 +1,8 @@
 /**
  * Supabase sync backend — the original cloud mirror, now behind the
  * SyncBackend interface. Auth is Supabase's email OTP; rows live in the
- * four tables created by supabase/migrations/ and are guarded by RLS.
+ * five tables created by supabase/migrations/ (sessions, attempts,
+ * achievements, votes, notes — no events table) and are guarded by RLS.
  *
  * The row-mapping layer (local camelCase ⇄ Postgres snake_case) lives
  * here because it's a Supabase-schema detail — the worker backend ships
