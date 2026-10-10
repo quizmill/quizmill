@@ -25,7 +25,7 @@
     {
       "id": "aws-genai",
       "title": "AWS GenAI Developer Pro",
-      "description": "Practice for the AWS Certified Generative AI Developer – Professional (AIP-C01) exam — foundation model integration, RAG, agents, prompt management, security, and observability on AWS.",
+      "description": "Practice for the AWS Certified Generative AI Developer – Professional (AIP-C01) exam — foundation model integration, RAG, agents, prompt management, security, and observability on AWS. A 30-question sample, three per category across three tiers; the app's upgrade card links to the full 460-question bank, inserted as a separate pack.",
       "repo": "quizmill/pack-aws-genai",
       "url": "https://aws-genai.quizmill.dev"
     },
