@@ -162,6 +162,15 @@ export function getPaperSheet(id: string): PaperSheet | undefined {
   return loadPaperSheets().find((s) => s.id === id);
 }
 
+/** Whether a sheet has been marked: stamped here, or its session is in
+ *  storage — marked on another device and pulled down by sync. */
+export function sheetIsMarked(
+  sheet: Pick<PaperSheet, 'id' | 'markedAt'>,
+  sessions: readonly Pick<Session, 'id'>[],
+): boolean {
+  return sheet.markedAt !== undefined || sessions.some((s) => s.id === sheet.id);
+}
+
 /** Stamp a locally stored sheet as marked. No-op for an unknown id —
  *  the sheet may have been printed on another device. */
 export function recordSheetMarked(id: string, markedAt: number): void {

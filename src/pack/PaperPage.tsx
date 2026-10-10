@@ -50,6 +50,7 @@ import {
   resolveSheetQuestions,
   savePaperSheet,
   sheetFromPayload,
+  sheetIsMarked,
   DEFAULT_PAPER_COUNT,
   PAPER_ALL_MAX,
   PAPER_COUNT_CHOICES,
@@ -178,9 +179,7 @@ export function PaperPage() {
     return (
       <SheetView
         sheet={sheet}
-        marked={
-          sheet.markedAt !== undefined || sessions.some((s) => s.id === sheet.id)
-        }
+        marked={sheetIsMarked(sheet, sessions)}
         onDelete={() => {
           deletePaperSheet(sheet.id);
           deleteSheetInk(sheet.id);
@@ -246,8 +245,7 @@ export function PaperPage() {
           <h2 className="text-lg font-semibold text-ink-700">Your sheets</h2>
           <div className="flex flex-col gap-2.5" data-testid="paper-sheet-list">
             {sheets.map((s) => {
-              const marked =
-                s.markedAt !== undefined || sessions.some((ses) => ses.id === s.id);
+              const marked = sheetIsMarked(s, sessions);
               return (
                 // A plain anchor, NOT next/link: the router navigates
                 // hash-only hrefs via history.pushState, which never fires
