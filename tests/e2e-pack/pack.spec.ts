@@ -455,14 +455,14 @@ describe('progress page', () => {
     await page.waitForSelector('[data-testid="session-summary"]');
 
     // Session dashboard: the seed wrote one completed 60s session of 10
-    // questions, so the tiles read 1 / 1m / 10 and exactly one weekday
+    // questions, so the tiles read 1 / 1 min / 10 and exactly one weekday
     // bar is non-zero.
     const summary = await page.$eval(
       '[data-testid="session-summary"]',
       (el) => el.textContent ?? '',
     );
     expect(summary).toContain('1sessions');
-    expect(summary).toContain('1mtypical length');
+    expect(summary).toContain('1 mintypical length');
     expect(summary).toContain('10questions / session');
 
     const weekdayCounts = await page.$$eval(
