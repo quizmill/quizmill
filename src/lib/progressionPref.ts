@@ -12,28 +12,21 @@
  * mixes into a pack's synced data. XP itself is derived from history,
  * so toggling this hides/reveals; it never resets anything.
  */
+import { devicePref } from './devicePref';
 
 export const PROGRESSION_KEY = 'quizmill.progressionHidden.v1';
 
 /** Local event fired after saveProgressionShown so mounted hooks re-read. */
 export const PROGRESSION_EVENT = 'quizmill:progression';
 
-export function loadProgressionShown(): boolean {
-  if (typeof window === 'undefined') return true;
-  try {
-    return window.localStorage.getItem(PROGRESSION_KEY) !== '1';
-  } catch {
-    return true;
-  }
-}
+/** '1' = hidden; absent = shown (the documented default). */
+export const progressionShownPref = devicePref<boolean>({
+  key: PROGRESSION_KEY,
+  event: PROGRESSION_EVENT,
+  fallback: true,
+  parse: (raw) => raw !== '1',
+  serialise: (on) => (on ? null : '1'),
+});
 
-export function saveProgressionShown(on: boolean): void {
-  if (typeof window === 'undefined') return;
-  try {
-    if (on) window.localStorage.removeItem(PROGRESSION_KEY);
-    else window.localStorage.setItem(PROGRESSION_KEY, '1');
-  } catch {
-    // storage unavailable (private mode) — the in-page state still applies
-  }
-  window.dispatchEvent(new Event(PROGRESSION_EVENT));
-}
+export const loadProgressionShown = progressionShownPref.load;
+export const saveProgressionShown = progressionShownPref.save;
