@@ -27,8 +27,8 @@ name: Deploy apps
 # build step are public by design and mirror the `analytics_url` /
 # `privacy_url` inputs the pack repos pass to deploy-pack.yml.
 #
-# Deliberately NOT here: any app that needs its own secrets (Cloudflare +
-# per-app Supabase) or is a private pack. Those are "personal apps"
+# Deliberately NOT here: any app that needs its own secrets (Cloudflare,
+# a sync URL) or is a private pack. Those are "personal apps"
 # (claude-cert, eleven-plus, …) and each deploys from ITS OWN repo via the
 # reusable workflow (.github/workflows/deploy-pack.yml), so per-app secrets
 # stay in the pack repo and private packs build with their own clone
@@ -123,7 +123,7 @@ jobs:
       # The CLI spreads its own process.env into the engine's `npm run
       # build` (cli/bin/quizmill.js → engineNpm), and next.config.ts inlines
       # both variables, so a step-level env is all the beacon needs — same
-      # shape as deploy-pack.yml's build step, minus the sync/Supabase lines.
+      # shape as deploy-pack.yml's build step, minus the sync URL line.
       - name: Build "${{ matrix.name }}" on quizmill@${{ steps.engine.outputs.spec }}
         env:
           # Anonymous funnel beacon (six events, random device id, off switch

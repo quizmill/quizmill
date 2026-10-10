@@ -33,9 +33,6 @@ A note row is `{ "questionId": "...", "text": "...", "updatedAt": 123 }`.
     "<sync url>/v1/rows?pack=<packId>" | jq '.notes'
   ```
 
-  Supabase builds instead: query the `notes` table filtered to the
-  user + `pack_id` (needs the user's Supabase session or dashboard).
-
 - **No backend / key unavailable:** ask for a progress file from the
   app's Settings → Move progress (`quizmill-progress-<packId>-*.json`)
   — its `notes` array is the same rows. Or let the user paste notes.

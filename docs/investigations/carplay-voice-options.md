@@ -108,7 +108,7 @@ speech APIs:
 - Real costs: Apple developer account, App Store review (as a normal
   education/trivia app — uncontroversial), a pack-distribution story
   (bundle packs, or fetch from `<pack-id>.quizmill.dev`), and a separate
-  progress store (or sync via the existing optional Supabase mirror).
+  progress store (or sync via the existing optional cloud mirror).
 - If built with React Native, `react-native-carplay` keeps option D open
   in the same codebase.
 

@@ -2,12 +2,11 @@
  * quizmill sync worker — a small Cloudflare Worker that mirrors a
  * device's practice history into a D1 (SQLite) database.
  *
- * Why this exists: the engine's original cloud-sync backend is Supabase,
- * whose free-tier projects are PAUSED after a week of inactivity and
- * eventually deleted. Cloudflare's free tier has no such lifecycle —
- * Workers and D1 databases stay up indefinitely — and the daily limits
- * (100k requests, 100k row writes) are far beyond what a family of
- * practice apps generates. Deploy once, forget it.
+ * Why Cloudflare: its free tier has no inactivity lifecycle — Workers and
+ * D1 databases stay up indefinitely, so a practice app picked up again
+ * months later still syncs — and the daily limits (100k requests, 100k
+ * row writes) are far beyond what a family of practice apps generates.
+ * Deploy once, forget it.
  *
  * Trust model: there are no accounts. A client authenticates with a random
  * ~98-bit sync key (Authorization: Bearer QM-…); the worker never stores

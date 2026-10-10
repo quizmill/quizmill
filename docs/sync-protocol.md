@@ -21,7 +21,6 @@ explicitly. Ways to plug in, from least to most work:
 | --- | --- |
 | Free hosted sync, 2-min setup | Deploy the Cloudflare Worker (`cloudflare/`), set `NEXT_PUBLIC_SYNC_URL` |
 | Your own server (any language) | Implement the **HTTP protocol** below, set `NEXT_PUBLIC_SYNC_URL` to it |
-| Supabase | Set the `NEXT_PUBLIC_SUPABASE_*` pair (see `supabase/`) |
 | A different transport entirely | Implement `SyncBackend`, call `registerSyncBackendProvider()` + `registerSyncSettingsCard()` |
 | No server at all | File export/import in Settings (`src/lib/transfer.ts`) — same data contract, JSON file transport |
 
@@ -132,8 +131,8 @@ per request, ≤32 KB per row, ≤200-char ids.
 
 When a release adds a synced table (as `notes` and `events` did), upgrade the server
 BEFORE shipping the client — redeploy the worker (`npx wrangler deploy`
-from `cloudflare/`; the generic rows schema needs no migration) or run
-the new Supabase migration. A client that races ahead gets its new-table
+from `cloudflare/`; the generic rows schema needs no migration), or
+whatever your own server needs. A client that races ahead gets its new-table
 ops rejected with `400` ("Couldn't sync N · retry" in the UI) while every
 other table keeps syncing. The engine retries each rejected op a few
 times, then drops it AND clears its once-per-user bulk-push flag — so on
@@ -160,6 +159,12 @@ registerSyncBackendProvider(
 registerSyncSettingsCard('my-backend', MySignInCard);
 ```
 
+Render the card through `SyncCard` (`src/components/SyncStatusLine.tsx`)
+— it supplies the "Sync across devices" heading with its cloud icon, the
+`Loading…` placeholder, the status/error lines and the backend footer, so
+your card only has to provide the sign-in body in between, exactly like
+the built-in key card (`src/components/SyncKeySettings.tsx`).
+
 Contract notes: `runOp` may be called for the same op more than once
 (make ops idempotent); throwing marks the op for retry, and after 6
 failed tries it is dropped loudly. `pullAll` returns local-shaped rows;
@@ -172,8 +177,8 @@ sign-in.
 
 **Seeing it:** every sync-settings card carries a muted footer naming the
 active backend and its target host — e.g. `Backend: Sync server ·
-quizmill-sync.acme.workers.dev` or `Backend: Supabase · abcd.supabase.co`
-— so any deployed app answers "where does my data go?" from Settings. No
+quizmill-sync.acme.workers.dev` — so any deployed app answers "where
+does my data go?" from Settings. No
 sync card at all means the build has no backend configured (pure-local).
 At build time, the env vars are the source of truth
 (`syncBackendInfo()`/`syncBackendKind()` in code).
@@ -185,13 +190,13 @@ and automatic for data:
 1. Each device keeps its full history in localStorage — the cloud is
    only a mirror, so nothing is lost by switching.
 2. Sign-in state does not carry across backends: users sign in once on
-   the new backend (create/enter a sync key, or the email code for
-   Supabase).
+   the new backend (create/enter a sync key, or whatever a custom
+   backend's card asks for).
 3. On that first sign-in the engine pulls (empty on a fresh backend),
    then bulk-pushes the device's entire local history — the
    once-per-user migration flag is keyed by backend-specific user id, so
    the re-upload happens automatically per device. Multi-device users
-   sign each device in with the same key/email and the merge unions
+   sign each device in with the same key and the merge unions
    their histories, exactly like a normal new-device link.
 4. The old backend's rows just go stale (delete them whenever). Any
    queued-but-unsent writes drain to the new backend — ops are
