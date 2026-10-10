@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Attempt, Session } from '@/data/types';
 import {
-  accuracyByCategory,
   accuracyByDay,
-  completedSessionDates,
   levelNudge,
   practiceDates,
   streakProgress,
@@ -32,36 +30,6 @@ function attempt(over: Partial<Attempt> = {}): Attempt {
     ...over,
   };
 }
-
-const CATEGORIES = [
-  { key: 'alpha', label: 'Alpha' },
-  { key: 'beta', label: 'Beta', shortLabel: 'B' },
-];
-
-describe('accuracyByCategory', () => {
-  it('returns all categories, zeroed when unattempted, in given order', () => {
-    const rows = accuracyByCategory([], CATEGORIES);
-    expect(rows.map((r) => r.key)).toEqual(['alpha', 'beta']);
-    expect(rows[0]).toMatchObject({ attempted: 0, correct: 0, accuracyPct: 0 });
-  });
-
-  it('aggregates and rounds per category, using shortLabel for display', () => {
-    const attempts = [
-      attempt({ subject: 'alpha', isCorrect: true }),
-      attempt({ subject: 'alpha', isCorrect: true }),
-      attempt({ subject: 'alpha', isCorrect: false }),
-      attempt({ subject: 'beta', isCorrect: false }),
-    ];
-    const [alpha, beta] = accuracyByCategory(attempts, CATEGORIES);
-    expect(alpha).toMatchObject({ attempted: 3, correct: 2, accuracyPct: 67 });
-    expect(beta).toMatchObject({ label: 'B', attempted: 1, accuracyPct: 0 });
-  });
-
-  it('ignores attempts for categories not in the pack', () => {
-    const rows = accuracyByCategory([attempt({ subject: 'other' })], CATEGORIES);
-    expect(rows.every((r) => r.attempted === 0)).toBe(true);
-  });
-});
 
 describe('accuracyByDay', () => {
   it('buckets by local day, sorted oldest-first, omitting empty days', () => {
@@ -200,24 +168,6 @@ describe('longestStreak', () => {
   });
 });
 
-describe('completedSessionDates', () => {
-  it('keeps only sessions with an end timestamp', () => {
-    const sessions: Session[] = [
-      {
-        id: 's1', subject: 'alpha', startedAt: NOON, endedAt: NOON + 60_000,
-        questionCount: 10, correctCount: 5,
-      },
-      {
-        id: 's2', subject: 'alpha', startedAt: NOON, endedAt: null,
-        questionCount: 10, correctCount: 0,
-      },
-    ];
-    const dates = completedSessionDates(sessions);
-    expect(dates).toHaveLength(1);
-    expect(dates[0].getTime()).toBe(NOON + 60_000);
-  });
-});
-
 describe('practiceDates', () => {
   const DAY = 24 * 3600_000;
   const today = new Date('2026-06-10T20:00:00');
@@ -242,16 +192,9 @@ describe('practiceDates', () => {
 
   it('keeps the streak alive on days the user practised but never finished a session', () => {
     // Practised three days running — a full round each day — but never clicked
-    // through the final question (so no session has an end record). The
-    // session-only signal reads 0; practice activity shows the real 3-day run.
-    const sessions: Session[] = [
-      session({ id: 'd0', startedAt: today.getTime(), endedAt: null }),
-      session({ id: 'd1', startedAt: today.getTime() - DAY, endedAt: null }),
-      session({ id: 'd2', startedAt: today.getTime() - 2 * DAY, endedAt: null }),
-    ];
+    // through the final question (so no session has an end record). Practice
+    // activity alone shows the real 3-day run.
     const attempts = [...onDay(0, 10), ...onDay(1, 10), ...onDay(2, 10)];
-
-    expect(currentStreak(completedSessionDates(sessions), today)).toBe(0);
     expect(currentStreak(practiceDates(attempts), today)).toBe(3);
   });
 });

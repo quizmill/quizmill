@@ -8,13 +8,7 @@ import {
   SOLVED,
 } from '../src/lib/games/tilePuzzle';
 import { newGame as newSnake, step, steer } from '../src/lib/games/snake';
-import {
-  GAMES,
-  enabledGames,
-  getGame,
-  pickRandomGame,
-  type GameId,
-} from '../src/lib/games/registry';
+import { GAMES, enabledGames } from '../src/lib/games/registry';
 import { GAME_IDS } from '../tools/pack/schema';
 
 // Deterministic LCG for reproducible shuffles.
@@ -118,16 +112,6 @@ describe('game registry', () => {
     const registryIds = GAMES.map((g) => g.id).sort();
     const schemaIds = [...GAME_IDS].sort();
     expect(registryIds).toEqual(schemaIds);
-  });
-
-  it('getGame returns the def, throws on an unknown id', () => {
-    expect(getGame('snake').name).toBe('Snake');
-    expect(() => getGame('nope' as GameId)).toThrow();
-  });
-
-  it('pickRandomGame is deterministic given an rng', () => {
-    expect(pickRandomGame(() => 0)).toBe(GAMES[0].id);
-    expect(pickRandomGame(() => 0.999)).toBe(GAMES[GAMES.length - 1].id);
   });
 
   it('enabledGames returns all when include is omitted/empty', () => {
