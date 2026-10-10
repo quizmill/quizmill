@@ -80,6 +80,35 @@ describe('theme persistence', () => {
     window.removeEventListener(THEME_EVENT, spy);
     expect(spy).toHaveBeenCalledTimes(1);
   });
+
+  // Shared with every other device pref via devicePref: a refused write
+  // (quota, storage policy) must not snap the toggle back on the next
+  // read — the analytics switch learned this first.
+  it('honours the choice for the rest of the page when storage refuses the write', () => {
+    // Replace the window property (happy-dom binds Storage methods on first
+    // use, so a prototype spy would be bypassed); reads keep working.
+    const real = window.localStorage;
+    const desc = Object.getOwnPropertyDescriptor(window, 'localStorage');
+    const refusing = {
+      getItem: (k: string) => real.getItem(k),
+      setItem: () => {
+        throw new Error('QuotaExceededError');
+      },
+      removeItem: () => {
+        throw new Error('QuotaExceededError');
+      },
+    };
+    Object.defineProperty(window, 'localStorage', { configurable: true, get: () => refusing });
+    try {
+      saveThemePref('dark');
+      expect(loadThemePref()).toBe('dark');
+    } finally {
+      if (desc) Object.defineProperty(window, 'localStorage', desc);
+      else delete (window as { localStorage?: unknown }).localStorage;
+    }
+    saveThemePref('light');
+    expect(loadThemePref()).toBe('light');
+  });
 });
 
 describe('applyTheme', () => {
