@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
+import { GameOver } from './GameOver';
 import { GameShell } from './GameShell';
 import { HowToPlay } from './HowToPlay';
 
@@ -170,22 +171,13 @@ export function Whack({ onClose }: WhackProps) {
       ) : null}
 
       {ended ? (
-        <div
-          data-testid="whack-ended"
-          className="mt-3 flex flex-col items-center gap-2 rounded-xl border border-success-500/40 bg-success-100/60 p-3 text-center"
-        >
-          <div className="text-base font-bold text-success-700">
-            Time! You whacked {score} {score === 1 ? 'mole' : 'moles'}.
-          </div>
-          <div className="mt-1 flex gap-2">
-            <Button size="md" variant="secondary" onClick={start}>
-              Play again
-            </Button>
-            <Button size="md" onClick={onClose}>
-              Done
-            </Button>
-          </div>
-        </div>
+        <GameOver
+          tone="win"
+          title={`Time! You whacked ${score} ${score === 1 ? 'mole' : 'moles'}.`}
+          testId="whack-ended"
+          onRestart={start}
+          onClose={onClose}
+        />
       ) : null}
     </GameShell>
   );

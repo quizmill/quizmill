@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Button } from '@/components/ui/Button';
+import { GameOver } from './GameOver';
 import { GameShell } from './GameShell';
 import { HowToPlay } from './HowToPlay';
 import {
@@ -169,35 +169,14 @@ export function Pong({ onClose }: PongProps) {
       />
 
       {state.winner ? (
-        <div
-          data-testid="pong-game-over"
-          className={
-            'mt-3 flex flex-col items-center gap-2 rounded-xl border p-3 text-center ' +
-            (state.winner === 'player'
-              ? 'border-success-500/40 bg-success-100/60'
-              : 'border-warn-500/40 bg-warn-100/60')
-          }
-        >
-          <div
-            className={
-              'text-base font-bold ' +
-              (state.winner === 'player' ? 'text-success-700' : 'text-warn-700')
-            }
-          >
-            {state.winner === 'player' ? 'You win! 🏆' : 'CPU wins. Get them next time.'}
-          </div>
-          <div className="text-sm text-ink-700">
-            {state.playerScore} : {state.aiScore}
-          </div>
-          <div className="mt-1 flex gap-2">
-            <Button size="md" variant="secondary" onClick={handleRestart}>
-              Play again
-            </Button>
-            <Button size="md" onClick={onClose}>
-              Done
-            </Button>
-          </div>
-        </div>
+        <GameOver
+          tone={state.winner === 'player' ? 'win' : 'lose'}
+          title={state.winner === 'player' ? 'You win! 🏆' : 'CPU wins. Get them next time.'}
+          detail={`${state.playerScore} : ${state.aiScore}`}
+          testId="pong-game-over"
+          onRestart={handleRestart}
+          onClose={onClose}
+        />
       ) : null}
     </GameShell>
   );
