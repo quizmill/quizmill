@@ -198,8 +198,7 @@ function handleMutation(m: Mutation): void {
 // ── Draining the queue to the backend ────────────────────────────────────
 
 async function drain(): Promise<void> {
-  if (draining || !uid) return;
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+  if (draining || !uid || !isOnline()) return;
   const backend = getSyncBackend();
   if (!backend) return;
 
