@@ -7,6 +7,23 @@ import { newlyEarnedAchievements } from './achievements-engine';
 import { loadAchievements, recordEarnedAchievements } from '@/lib/storage';
 
 /**
+ * Persist any achievements the history has newly earned and return their
+ * ids (empty when nothing new). The silent half of the hook below, used
+ * on its own where there's no toast to show (Drive Mode) — the sibling
+ * of `recordLevelCrossings` in useLevelUp.ts. Re-reads what's persisted
+ * at call time so it can't race another writer.
+ */
+export function recordNewAchievements(
+  sessions: readonly Session[],
+  attempts: readonly Attempt[],
+): string[] {
+  const alreadyEarned = new Set(loadAchievements().map((e) => e.id));
+  const fresh = newlyEarnedAchievements(sessions, attempts, alreadyEarned);
+  if (fresh.length > 0) recordEarnedAchievements(fresh);
+  return fresh;
+}
+
+/**
  * Helper for the runners: after recording each attempt (and after
  * ending a session), call `checkNow(sessions, attempts)`. If any new
  * achievement was unlocked it gets persisted AND surfaced via
@@ -25,12 +42,8 @@ export function useAchievementUnlock(): {
 
   const checkNow = useCallback(
     (sessions: readonly Session[], attempts: readonly Attempt[]): number => {
-      // Snapshot what's currently persisted — re-read at call time so we
-      // don't race with any other writer.
-      const alreadyEarned = new Set(loadAchievements().map((e) => e.id));
-      const fresh = newlyEarnedAchievements(sessions, attempts, alreadyEarned);
+      const fresh = recordNewAchievements(sessions, attempts);
       if (fresh.length === 0) return 0;
-      recordEarnedAchievements(fresh);
       setQueue((q) => [
         ...q,
         ...fresh
