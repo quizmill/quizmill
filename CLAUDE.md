@@ -423,9 +423,17 @@ are detected on every commit regardless.
   build`, serve `out/` (`npx http-server out -p <port> -s -c-1`), then drive
   Puppeteer at a phone viewport (414×896, `deviceScaleFactor: 2`) seeding
   `localStorage` for the state you want — same harness as `tests/e2e/`.
-  Commit the PNGs under `docs/screenshots/<feature>/` and embed them in the
-  PR via `raw.githubusercontent.com/<owner>/<repo>/<sha>/<path>`. Show each
-  meaningful state (e.g. empty / in-progress / complete), not just one.
+  Show each meaningful state (e.g. empty / in-progress / complete), not
+  just one. Screenshots exist only to review the PR, so they are **never
+  committed**: `docs/screenshots/` is gitignored (write the PNGs there
+  locally if convenient) and the images go on the PR itself — drag them
+  into the PR description so GitHub hosts them (`github.com/user-
+  attachments/…`). GitHub has no API for that upload, so an unattended
+  session that cannot attach an image instead links the PR's Cloudflare
+  preview (the `pr-preview` bot comment), names the routes and the
+  localStorage state to seed, and says so in the PR body. Old PRs keep
+  their images through the historical commit SHAs; don't re-add the
+  directory.
 - Question ids are immutable once published — attempt history points
   at them.
 - Pack schema changes bump `schemaVersion` and must stay
