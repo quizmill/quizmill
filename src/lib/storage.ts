@@ -54,6 +54,13 @@ export interface EarnedAchievement {
   earnedAt: number; // unix ms
 }
 
+/**
+ * Name of the window event that tells mounted React hooks (useStorage.ts)
+ * to re-read storage. Writers outside the hooks — the sync engine after a
+ * pull, the paper marker — dispatch it too. Not a storage key.
+ */
+export const STORAGE_EVENT = 'quizmill:storage';
+
 function browser(): boolean {
   return typeof window !== 'undefined';
 }
@@ -61,8 +68,8 @@ function browser(): boolean {
 // ---- mutation bus ----
 //
 // The cloud-sync layer (src/lib/sync.ts) subscribes here to mirror local
-// writes up to Supabase. With no subscribers this is inert, so the
-// pure-local app behaves exactly the same without sync configured.
+// writes up to the configured backend. With no subscribers this is inert,
+// so the pure-local app behaves exactly the same without sync configured.
 
 export type Mutation =
   | { table: 'sessions'; row: Session }

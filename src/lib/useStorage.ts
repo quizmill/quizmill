@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import * as storage from './storage';
-import { SESSIONS_KEY, ATTEMPTS_KEY } from './storage';
+import { SESSIONS_KEY, ATTEMPTS_KEY, STORAGE_EVENT as EVENT } from './storage';
 import { applySnapshot, parseSnapshot } from './transfer';
 import {
   getSyncStatus,
@@ -12,7 +12,6 @@ import {
 } from './sync';
 import type { Attempt, Session } from '@/data/types';
 
-const EVENT = 'quizmill:storage';
 const EMPTY_SESSIONS: Session[] = [];
 const EMPTY_ATTEMPTS: Attempt[] = [];
 
