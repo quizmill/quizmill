@@ -91,7 +91,21 @@ offline.
   email-OTP auth — `otp.ts`); `NEXT_PUBLIC_SYNC_BACKEND` picks
   explicitly; dormant without any. Sessions, attempts, achievements,
   votes, notes and events all mirror. `transfer.ts` = serverless file
-  export/import of the same data), `useStorage.ts` (React hooks, event
+  export/import of the same data), `analytics.ts` (anonymous first-party
+  FUNNEL beacon — `navigator.sendBeacon` of `{event, packId, deviceId,
+  appBuild, ts}` to `NEXT_PUBLIC_ANALYTICS_URL`, dormant without it like
+  sync; one more subscriber on the storage mutation bus, so it beacons
+  the closed `FUNNEL_EVENTS` subset of whatever `recordEvent` captures
+  and DERIVES `first_answer`/`session_10` from attempts/sessions rows —
+  every answer-producing path counts without instrumentation; `upsell_*`
+  come from UpgradeCard, `bundle_inserted` from PacksPage. `deviceId` is
+  an app-level UUID (`quizmill.deviceId.v1`), regenerable via the
+  Settings → Usage analytics card which also holds the off switch
+  (`quizmill.analytics.v1`, default on) and links
+  `NEXT_PUBLIC_PRIVACY_URL`; the card only renders in configured builds.
+  Receiver = `POST /v1/analytics` + `GET /v1/analytics/summary` on the
+  sync worker, `cloudflare/src/analytics.ts` + the `analytics_events`
+  table — never joined to sync rows), `useStorage.ts` (React hooks, event
   bus `quizmill:storage`), `theme.ts`/`look.ts` (device appearance:
   colour scheme as a `dark` class, visual style as `data-look="poster"`
   — the quizmill.dev campaign look, palette-remapped via the CSS

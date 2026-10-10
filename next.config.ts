@@ -72,6 +72,13 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? '',
+    // Anonymous first-party funnel analytics (optional) — the endpoint a
+    // hosted app beacons `{ event, packId, deviceId, appBuild, ts }` to
+    // (the sync worker serves one at /v1/analytics), and the privacy page
+    // the Settings note links to. Unset → dormant, nothing leaves the
+    // device. See src/lib/analytics.ts.
+    NEXT_PUBLIC_ANALYTICS_URL: process.env.NEXT_PUBLIC_ANALYTICS_URL ?? '',
+    NEXT_PUBLIC_PRIVACY_URL: process.env.NEXT_PUBLIC_PRIVACY_URL ?? '',
   },
 };
 

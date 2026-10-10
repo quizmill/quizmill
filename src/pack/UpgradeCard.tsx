@@ -1,8 +1,14 @@
 'use client';
 
+import { useEffect } from 'react';
 import { ArrowUpRight, Sparkles } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
+import { recordEvent } from '@/lib/storage';
 import { upgradeHref, type UpgradePlacement } from '@/lib/upgrade';
+
+// upsell_seen once per page LOAD per placement — a re-render of Home is
+// not a second impression (and dev strict mode double-mounts).
+const seen = new Set<UpgradePlacement>();
 
 /**
  * The pack's upgrade pitch — a free or sampler pack pointing at the paid
@@ -14,15 +20,25 @@ import { upgradeHref, type UpgradePlacement } from '@/lib/upgrade';
  * Rendered in two places, each stamped into the link's `ref` param so the
  * destination can tell them apart: Home (below the practice loop — the
  * pitch never sits above practising) and Settings (Packs section).
+ *
+ * Records `upsell_seen` / `upsell_clicked` app events ({ placement }) —
+ * the two funnel steps after practising (src/lib/analytics.ts).
  */
 export function UpgradeCard({ placement }: { placement: UpgradePlacement }) {
   const upgrade = APP_CONFIG.upgrade;
+  const present = Boolean(upgrade);
+  useEffect(() => {
+    if (!present || seen.has(placement)) return;
+    seen.add(placement);
+    recordEvent('upsell_seen', { placement });
+  }, [present, placement]);
   if (!upgrade) return null;
   return (
     <a
       href={upgradeHref(upgrade.url, APP_CONFIG.packId, placement)}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={() => recordEvent('upsell_clicked', { placement })}
       data-testid={`upgrade-card-${placement}`}
       className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-4 shadow-sm transition hover:border-brand-500/50 hover:shadow-md"
     >
