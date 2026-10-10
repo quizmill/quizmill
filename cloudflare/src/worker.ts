@@ -33,6 +33,14 @@ import {
   TABLES,
 } from './ops';
 import type { TableName } from './ops';
+import {
+  MAX_BEACON_BYTES,
+  buildSummary,
+  parseBeacon,
+  parseSummaryQuery,
+  statementsForBeacon,
+  summaryStatements,
+} from './analytics';
 
 // Minimal D1 surface, declared locally so the engine repo's `tsc` run
 // doesn't need @cloudflare/workers-types. Matches the real runtime API.
@@ -46,6 +54,10 @@ interface D1Database {
 }
 interface Env {
   DB: D1Database;
+  /** Optional (`wrangler secret put ANALYTICS_READ_TOKEN`): when set, the
+   *  analytics summary needs it as a bearer token. Unset = the aggregate
+   *  counts are readable by anyone who knows a pack id. */
+  ANALYTICS_READ_TOKEN?: string;
 }
 
 const CORS_HEADERS: Record<string, string> = {
@@ -146,6 +158,64 @@ async function handlePutProfile(request: Request, env: Env, userId: string): Pro
   return json({ ok: true, name: parsed.name || null });
 }
 
+// ── Anonymous funnel analytics (no sync key involved) ───────────────────
+
+/**
+ * Ingest one beacon from a hosted app (src/lib/analytics.ts). Devices
+ * hold no credential, so this route is open; the body is validated
+ * against a closed event list and tight size limits, and the reply is an
+ * empty 204 — `navigator.sendBeacon` never reads it anyway. The body
+ * arrives as text/plain (a CORS-simple request, no preflight), so it is
+ * parsed by hand rather than via request.json()'s content-type sniffing.
+ * Size is bounded before anything is parsed: a declared Content-Length
+ * over the cap is refused without reading the body at all, and the read
+ * body is measured again (the header is optional and unverified).
+ */
+async function handleBeacon(request: Request, env: Env): Promise<Response> {
+  const declared = Number(request.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > MAX_BEACON_BYTES) {
+    return json({ error: 'beacon too large' }, 413);
+  }
+  const text = await request.text();
+  if (text.length > MAX_BEACON_BYTES) {
+    return json({ error: 'beacon too large' }, 413);
+  }
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return json({ error: 'invalid JSON' }, 400);
+  }
+  const beacon = parseBeacon(body);
+  if (!beacon) return json({ error: 'invalid beacon' }, 400);
+  const statements = statementsForBeacon(beacon, Date.now()).map((s) =>
+    env.DB.prepare(s.sql).bind(...s.params),
+  );
+  await env.DB.batch(statements);
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
+async function handleSummary(request: Request, env: Env): Promise<Response> {
+  if (env.ANALYTICS_READ_TOKEN) {
+    const header = request.headers.get('authorization') ?? '';
+    const match = /^Bearer\s+(.+)$/i.exec(header);
+    if (!match || match[1].trim() !== env.ANALYTICS_READ_TOKEN) {
+      return json({ error: 'missing or invalid analytics token' }, 401);
+    }
+  }
+  const query = parseSummaryQuery(new URL(request.url).searchParams);
+  if (!query) return json({ error: 'missing pack' }, 400);
+  const sinceMs = Date.now() - query.days * 86_400_000;
+  const [totalsStmt, dailyStmt] = summaryStatements(query.pack, sinceMs);
+  const totals = await env.DB.prepare(totalsStmt.sql)
+    .bind(...totalsStmt.params)
+    .all<{ event: string; count: number; devices: number }>();
+  const daily = await env.DB.prepare(dailyStmt.sql)
+    .bind(...dailyStmt.params)
+    .all<{ day: string; event: string; devices: number }>();
+  return json(buildSummary(query, sinceMs, totals.results, daily.results));
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method === 'OPTIONS') {
@@ -156,6 +226,20 @@ export default {
     if (pathname === '/') {
       // Unauthenticated liveness probe — handy right after `wrangler deploy`.
       return json({ service: 'quizmill-sync', ok: true });
+    }
+
+    // Analytics carries no sync key — it is anonymous by design — so it
+    // is routed before authentication.
+    try {
+      if (pathname === '/v1/analytics' && request.method === 'POST') {
+        return await handleBeacon(request, env);
+      }
+      if (pathname === '/v1/analytics/summary' && request.method === 'GET') {
+        return await handleSummary(request, env);
+      }
+    } catch (err) {
+      console.error('[quizmill-sync]', err);
+      return json({ error: 'internal error' }, 500);
     }
 
     const userId = await authenticate(request);

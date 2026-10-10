@@ -80,7 +80,14 @@ export type AppEventType =
   | 'progress_view'
   | 'export'
   | 'import'
-  | 'sync_sign_in';
+  | 'sync_sign_in'
+  // Funnel milestones (src/lib/analytics.ts) — the ones a hosted app may
+  // also beacon, anonymously, to its author's NEXT_PUBLIC_ANALYTICS_URL.
+  | 'first_answer' // the device's very first recorded answer
+  | 'session_10' // the device's tenth completed session
+  | 'upsell_seen' // the pack's upgrade card was rendered ({ placement })
+  | 'upsell_clicked' // …and tapped
+  | 'bundle_inserted'; // a pack was inserted into the library ({ pack })
 
 export interface AppEvent {
   id: string; // crypto.randomUUID()
