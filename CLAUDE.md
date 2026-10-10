@@ -79,7 +79,7 @@ offline.
   capture surface — `recordEvent`/`loadEvents`/`amendAttempt`),
   `sync.ts` (backend-agnostic mirror engine; pluggable provider registry
   in `syncBackend.ts` + impls in `src/lib/backends/` — see
-  `docs/sync-protocol.md`. Built-ins: `http` (any server speaking the
+  `docs/sync-protocol.md`. Built-in: `http` (any server speaking the
   sync protocol, sync-key auth — `QM-XXXXX-…`, ~98 bits, partitioned by
   SHA-256(key), see `syncKey.ts`; selected by `NEXT_PUBLIC_SYNC_URL`;
   reference server = Cloudflare Worker+D1 in `cloudflare/`, whose
@@ -92,10 +92,11 @@ offline.
   view of that database: per pack learners, 7d/30d active, sessions,
   attempts, mistakes rescued/open, events by type, plus the funnel
   summary where the analytics route is deployed; runs through
-  `wrangler d1 execute`, aggregate-only output, deliberately no endpoint)
-  and `supabase` (`NEXT_PUBLIC_SUPABASE_URL`/`_PUBLISHABLE_KEY`,
-  email-OTP auth — `otp.ts`); `NEXT_PUBLIC_SYNC_BACKEND` picks
-  explicitly; dormant without any. Sessions, attempts, achievements,
+  `wrangler d1 execute`, aggregate-only output, deliberately no endpoint);
+  custom providers register via `registerSyncBackendProvider` and
+  `NEXT_PUBLIC_SYNC_BACKEND` picks explicitly; dormant without any.
+  The Settings card chrome is `SyncCard` in `SyncStatusLine.tsx`, shared
+  by the key card and any custom card. Sessions, attempts, achievements,
   votes, notes and events all mirror. `transfer.ts` = serverless file
   export/import of the same data), `analytics.ts` (anonymous first-party
   FUNNEL beacon — `navigator.sendBeacon` of `{event, packId, deviceId,
@@ -326,7 +327,7 @@ the engine's own showcase apps (try + world-capitals) on the latest
 dispatch — pinning the exact version from the newest tag and waiting out
 npm propagation. Every other pack app deploys **from its own repo** via
 the reusable `.github/workflows/deploy-pack.yml`, so per-app secrets
-(Cloudflare, Supabase/sync URL) and private-pack clone credentials stay
+(Cloudflare, sync URL) and private-pack clone credentials stay
 in the pack repo; Release fans out a `repository_dispatch` carrying the
 new version, and per-repo failures are tolerated (a repo that misses it
 rebuilds on its own cron). Don't move a secret-bearing or private pack
