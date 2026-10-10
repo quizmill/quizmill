@@ -1,4 +1,11 @@
 import { activeManifest as manifest } from '@/pack/source';
+import type {
+  PackCategory,
+  PackExam,
+  PackGames,
+  PackProgression,
+  PackUpgrade,
+} from '@/pack/data';
 
 /**
  * App config — built entirely from the ACTIVE PACK's manifest. The default
@@ -10,54 +17,13 @@ import { activeManifest as manifest } from '@/pack/source';
  * `src/pack/source.ts`.
  *
  * The manifest is validated by tools/pack/schema.ts before activation;
- * by the time it's here we trust the shape.
+ * by the time it's here we trust the shape. The optional blocks are the
+ * pack types themselves (`src/pack/data.ts`), passed through untouched.
  */
 
-export interface CategoryDef {
-  /** Stable string key used in storage rows and URLs. */
-  key: string;
-  /** Full display label. */
-  label: string;
-  /** Shorter chip-friendly label. Falls back to `label`. */
-  shortLabel?: string;
-  /** Optional bespoke emoji icon for the category card / mastery sticker.
-   *  Falls back to a deterministic emoji by declaration order. */
-  icon?: string;
-  /** Optional selection weight (e.g. an exam blueprint percentage). */
-  weight?: number;
-}
-
-/** Optional exam-readiness goal, mirrored from the manifest `exam` block.
- *  Absent → no readiness UI. */
-export interface ExamConfig {
-  label?: string;
-  passPct: number;
-  scaled?: boolean;
-  questionCount?: number;
-  /** Restrict readiness to questions in this level band. */
-  scope?: { level: string };
-}
-
-/** Optional reward mini-games, mirrored from the manifest `games` block.
- *  Absent → no games anywhere. */
-export interface GamesConfig {
-  /** Restrict to a subset of the built-in games (by id). Omit → all. */
-  include?: string[];
-}
-
-/** Optional XP/levels progression, mirrored from the manifest
- *  `progression` block. Presence enables; absent → no XP anywhere. */
-export type ProgressionConfig = Record<string, never>;
-
-/** Optional upgrade pitch, mirrored from the manifest `upgrade` block —
- *  a sampler pack pointing at its paid course. Absent → no card anywhere. */
-export interface UpgradeConfig {
-  title: string;
-  /** https destination; the card appends `?ref=<packId>-<placement>`. */
-  url: string;
-  price?: string;
-  blurb?: string;
-}
+/** A manifest category: stable `key` (storage rows, URLs), `label`,
+ *  optional chip-friendly `shortLabel`, emoji `icon` and blueprint `weight`. */
+export type CategoryDef = PackCategory;
 
 export interface AppConfig {
   /** Pack identifier — also namespaces localStorage. */
@@ -73,14 +39,15 @@ export interface AppConfig {
   /** Pack-declared default look ('poster' = the campaign style). */
   look: 'classic' | 'poster';
   categories: CategoryDef[];
-  /** Exam-readiness goal, when the pack declares one. */
-  exam?: ExamConfig;
-  /** Reward mini-games, when the pack switches them on. */
-  games?: GamesConfig;
-  /** XP/levels progression, when the pack opts in. */
-  progression?: ProgressionConfig;
-  /** Upgrade pitch card, when the pack declares one. */
-  upgrade?: UpgradeConfig;
+  /** Exam-readiness goal, when the pack declares one. Absent → no readiness UI. */
+  exam?: PackExam;
+  /** Reward mini-games, when the pack switches them on. Absent → no games anywhere. */
+  games?: PackGames;
+  /** XP/levels progression, when the pack opts in. Presence enables. */
+  progression?: PackProgression;
+  /** Upgrade pitch card, when the pack declares one (the card appends
+   *  `?ref=<packId>-<placement>` to its url). Absent → no card anywhere. */
+  upgrade?: PackUpgrade;
 }
 
 export const APP_CONFIG: AppConfig = {
@@ -90,11 +57,11 @@ export const APP_CONFIG: AppConfig = {
   homeSubtitle: manifest.homeSubtitle,
   themeColor: manifest.themeColor,
   look: manifest.look === 'poster' ? 'poster' : 'classic',
-  categories: manifest.categories as CategoryDef[],
-  exam: (manifest as { exam?: ExamConfig }).exam,
-  games: (manifest as { games?: GamesConfig }).games,
-  progression: (manifest as { progression?: ProgressionConfig }).progression,
-  upgrade: (manifest as { upgrade?: UpgradeConfig }).upgrade,
+  categories: manifest.categories,
+  exam: manifest.exam,
+  games: manifest.games,
+  progression: manifest.progression,
+  upgrade: manifest.upgrade,
 };
 
 /**
