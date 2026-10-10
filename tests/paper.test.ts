@@ -18,6 +18,7 @@ import {
   savedMarksForSheet,
   savePaperSheet,
   sheetFromPayload,
+  sheetIsMarked,
   MAX_STORED_SHEETS,
   type PaperMark,
   type PaperSheet,
@@ -446,6 +447,16 @@ describe('adoptPaperSheet', () => {
     expect(adopted.markedAt).toBe(1234);
     expect(getPaperSheet(local.id)?.markedAt).toBe(1234);
     expect(loadPaperSheets()).toHaveLength(1);
+  });
+});
+
+describe('sheetIsMarked', () => {
+  it('is true once stamped here, or once the sheet session exists in storage', () => {
+    const s = sheet({ id: 'sheet-1' });
+    expect(sheetIsMarked(s, [])).toBe(false);
+    // Marked on another device: the session arrived by sync, no local stamp.
+    expect(sheetIsMarked(s, [{ id: 'other' }, { id: 'sheet-1' }])).toBe(true);
+    expect(sheetIsMarked({ ...s, markedAt: 1 }, [])).toBe(true);
   });
 });
 

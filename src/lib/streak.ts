@@ -8,6 +8,15 @@
  * child-safety choice, not a growth hack — a hard reset-to-zero is the
  * loss-aversion mechanic behind streak anxiety in kids' apps, and we
  * don't want practice driven by fear of a number.
+ *
+ * One rule, one walk: {@link streakEndingOn} counts a run backwards from
+ * a given day with the grace rule, and both public numbers are that walk
+ * started somewhere — the live streak from today (or yesterday), the
+ * record from every practised day. The two can't be read off one
+ * partition of history into runs: when two single-day gaps fall within a
+ * week of each other only one can be bridged, and which one depends on
+ * where the walk starts. The live streak settles it from today, so the
+ * record is defined as the biggest value the live streak ever showed.
  */
 
 /** Counted days that must pass before another grace day can be spent. */
@@ -19,93 +28,76 @@ export function currentStreak(
 ): number {
   if (completedSessionDates.length === 0) return 0;
 
-  const daySet = new Set(completedSessionDates.map(toDayKey));
-  let streak = 0;
-  // Streak length at the point the last grace day was spent; null while
-  // none has been. A fresh grace unlocks every GRACE_DAY_INTERVAL days.
-  let streakAtLastGrace: number | null = null;
-  const cursor = startOfDay(today);
-
+  const days = new Set(completedSessionDates.map(dayNumber));
+  const todayNo = dayNumber(today);
   // Today doesn't have to be present — if it isn't, we look back from
   // yesterday and accept that as the current streak. This avoids the
   // streak appearing as 0 before today's practice happens. (It is a
   // day still in progress, not a missed one, so no grace is spent.)
-  if (!daySet.has(toDayKey(cursor))) {
-    cursor.setDate(cursor.getDate() - 1);
-  }
-
-  for (;;) {
-    if (daySet.has(toDayKey(cursor))) {
-      streak += 1;
-      cursor.setDate(cursor.getDate() - 1);
-      continue;
-    }
-    // A gap. Bridge it with the grace day when it's a single missed day
-    // (the day beyond it was practised) and a grace is available.
-    const beyond = new Date(cursor);
-    beyond.setDate(beyond.getDate() - 1);
-    const graceAvailable =
-      streakAtLastGrace === null ||
-      streak - streakAtLastGrace >= GRACE_DAY_INTERVAL;
-    if (daySet.has(toDayKey(beyond)) && graceAvailable) {
-      streak += 1; // the bridged day counts like any other
-      streakAtLastGrace = streak;
-      cursor.setDate(cursor.getDate() - 1);
-      continue;
-    }
-    break;
-  }
-  return streak;
+  return streakEndingOn(days.has(todayNo) ? todayNo : todayNo - 1, days);
 }
 
 /**
  * The longest streak anywhere in history — the personal record that a
- * missed day can't erase. Same grace-day bridging as {@link currentStreak}.
+ * missed day can't erase. Exactly the largest value {@link currentStreak}
+ * has taken on a practised day, so the record always agrees with a
+ * number the learner once saw. A yesterday the live streak bridges
+ * provisionally (before today's practice) is deliberately NOT counted
+ * here: a grace day enters the permanent record only once practice
+ * resumes after it, which is why `streakProgress` takes the max of the
+ * two.
  */
 export function longestStreak(completedSessionDates: Date[]): number {
-  if (completedSessionDates.length === 0) return 0;
-
-  // Distinct local days as monotone integers (day numbers via UTC from
-  // local components — immune to DST-length days).
-  const days = [
-    ...new Set(
-      completedSessionDates.map((d) => {
-        const x = startOfDay(d);
-        return Date.UTC(x.getFullYear(), x.getMonth(), x.getDate()) / 86_400_000;
-      }),
-    ),
-  ].sort((a, b) => a - b);
-
+  const days = new Set(completedSessionDates.map(dayNumber));
   let best = 0;
-  let run = 0;
-  let runAtLastGrace: number | null = null;
-  let prev: number | null = null;
   for (const dayNo of days) {
-    if (prev === null || dayNo === prev + 1) {
-      run += 1;
-    } else if (
-      dayNo === prev + 2 &&
-      (runAtLastGrace === null || run - runAtLastGrace >= GRACE_DAY_INTERVAL)
-    ) {
-      run += 2; // the bridged day + this one
-      runAtLastGrace = run - 1;
-    } else {
-      run = 1;
-      runAtLastGrace = null;
-    }
-    if (run > best) best = run;
-    prev = dayNo;
+    // A run can only grow by extending it to the next practised day, so
+    // only the last day of each unbroken stretch needs walking.
+    if (days.has(dayNo + 1)) continue;
+    best = Math.max(best, streakEndingOn(dayNo, days));
   }
   return best;
 }
 
-function startOfDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
+/**
+ * Length of the run ending on `end`, walking backwards through `days`.
+ * Each practised day counts one; a single missed day whose far side was
+ * practised is bridged by a grace day (counting one, like any other day)
+ * when the previous grace is at least GRACE_DAY_INTERVAL counted days
+ * back; anything else ends the run. `end` itself may be unpractised —
+ * that's how a missed yesterday is bridged before today's practice.
+ */
+function streakEndingOn(end: number, days: ReadonlySet<number>): number {
+  let streak = 0;
+  // Streak length at the point the last grace day was spent; null while
+  // none has been. A fresh grace unlocks every GRACE_DAY_INTERVAL days.
+  let streakAtLastGrace: number | null = null;
+  for (let cursor = end; ; cursor -= 1) {
+    if (days.has(cursor)) {
+      streak += 1;
+      continue;
+    }
+    const graceAvailable =
+      streakAtLastGrace === null ||
+      streak - streakAtLastGrace >= GRACE_DAY_INTERVAL;
+    if (days.has(cursor - 1) && graceAvailable) {
+      streak += 1; // the bridged day counts like any other
+      streakAtLastGrace = streak;
+      continue;
+    }
+    return streak;
+  }
+}
+
+/**
+ * Local calendar day as a monotone integer (day numbers via UTC from the
+ * local components — immune to DST-length days), so "the day before" is
+ * plain subtraction.
+ */
+function dayNumber(d: Date): number {
+  return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86_400_000;
 }
 
 export function toDayKey(d: Date): string {
-  const x = startOfDay(d);
-  return `${x.getFullYear()}-${x.getMonth() + 1}-${x.getDate()}`;
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }

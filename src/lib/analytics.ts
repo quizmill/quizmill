@@ -27,6 +27,7 @@
  */
 import type { AppEvent, AppEventType } from '@/data/types';
 import { APP_BUILD, APP_CONFIG } from '@/config';
+import { devicePref } from './devicePref';
 import { KEY_PREFIX, loadAttempts, loadSessions, onMutation, recordEvent } from './storage';
 import type { Mutation } from './storage';
 
@@ -128,35 +129,21 @@ export function regenerateDeviceId(): string {
 // ── Preference ──────────────────────────────────────────────────────────
 
 /**
- * The preference as last set on THIS page when localStorage refused to
- * persist it (quota, storage policy). Without it the off switch would
- * flip the toggle and nothing else: the next beacon re-reads the absent
- * key as "on". Null = storage holds the truth.
+ * '0' = off; absent = on. When localStorage refuses the write (quota,
+ * storage policy) devicePref honours the choice in memory for the rest
+ * of the page — without that the off switch would flip the toggle and
+ * nothing else: the next beacon would re-read the absent key as "on".
  */
-let unpersistedPref: boolean | null = null;
+export const analyticsEnabledPref = devicePref<boolean>({
+  key: ANALYTICS_PREF_KEY,
+  event: ANALYTICS_EVENT,
+  fallback: true,
+  parse: (raw) => raw !== '0',
+  serialise: (on) => (on ? null : '0'),
+});
 
-export function loadAnalyticsEnabled(): boolean {
-  if (!browser()) return true;
-  if (unpersistedPref !== null) return unpersistedPref;
-  try {
-    return window.localStorage.getItem(ANALYTICS_PREF_KEY) !== '0';
-  } catch {
-    return true;
-  }
-}
-
-export function saveAnalyticsEnabled(on: boolean): void {
-  if (!browser()) return;
-  try {
-    if (on) window.localStorage.removeItem(ANALYTICS_PREF_KEY);
-    else window.localStorage.setItem(ANALYTICS_PREF_KEY, '0');
-    unpersistedPref = null;
-  } catch {
-    // storage unavailable — honour the choice in memory for this page
-    unpersistedPref = on;
-  }
-  window.dispatchEvent(new Event(ANALYTICS_EVENT));
-}
+export const loadAnalyticsEnabled = analyticsEnabledPref.load;
+export const saveAnalyticsEnabled = analyticsEnabledPref.save;
 
 // ── Beacon ──────────────────────────────────────────────────────────────
 
@@ -288,5 +275,5 @@ export function startAnalytics(): void {
 export function stopAnalyticsForTests(): void {
   unsubscribe?.();
   unsubscribe = null;
-  unpersistedPref = null;
+  analyticsEnabledPref.resetForTests();
 }

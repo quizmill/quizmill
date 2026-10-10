@@ -4,7 +4,7 @@ import { getActivePackOverride } from '@/pack/runtime';
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
 /**
- * Resolve a pack-relative image path to a URL, exported for tests.
+ * Resolve a pack-relative image path to a URL.
  *
  * Absolute http(s) URLs pass through untouched. A relative path is
  * served straight from the RUNTIME pack's embedded `assets` when a

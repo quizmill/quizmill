@@ -119,7 +119,14 @@ and short SHA that next.config.ts, finalise-build and the bundler share).
   variables in globals.css; packs default it with `look` in pack.json,
   Settings → Style overrides), `speech.ts`/`voice.ts` (Drive Mode — see
   below), `packAssets.ts` (offline images for runtime-inserted packs),
-  `install.ts` (Add-to-Home-Screen surface detection).
+  `install.ts` (Add-to-Home-Screen surface detection), `devicePref.ts`
+  (the one load/save/notify engine behind every device-level switch —
+  theme, look, progressionPref, coach, paper, the analytics off switch:
+  SSR guard, try/catch, change event, legacy-key promotion, and a refused
+  write honoured in memory for the rest of the page; a new switch
+  declares key/event/parse/serialise/fallback and nothing else, and its
+  hook is `useDevicePref(pref, apply?)` from `useDevicePref.ts`, which
+  `useTheme`/`useLook` share).
 - `src/pack/` — the app UI: Home, PracticeRunner, ReviewRunner,
   DriveRunner, NotesRunner, runner.ts (pure session logic), data.ts
   (typed pack loader), source.ts (resolves build-time vs runtime pack),
@@ -266,7 +273,7 @@ and short SHA that next.config.ts, finalise-build and the bundler share).
 
 ```
 npm run dev                      # demo pack at localhost:3000
-npm test                         # vitest unit (746 tests, 66 files)
+npm test                         # vitest unit (770 tests, 68 files)
 npm run test:watch               # same, in watch mode
 npm run lint                     # eslint (flat config) — 0 errors required
 npm run typecheck                # tsc --noEmit
