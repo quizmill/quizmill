@@ -5,12 +5,6 @@ import { Fragment, useMemo, type ReactNode } from 'react';
 /**
  * Minimal markdown for MCQ prompts / options / explanations: fenced
  * code blocks, inline backticks, and auto-linkified bare URLs.
- *
- * Lifted from the copies in the claude-cert runners (which carry a
- * "lift to a shared component if a third caller appears" note — the
- * pack variant is that third caller). The CCA runners still hold their
- * own copies; migrating them here is a small follow-up. Keep the
- * behaviour in sync until then.
  */
 export function McqMarkdown({ text }: { text: string }) {
   const segments = useMemo(() => splitMarkdown(text), [text]);
