@@ -19,7 +19,7 @@
     "pretest": "tsx scripts/ensure-pack.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "NEXT_PUBLIC_BASE_PATH= npm run build && vitest run --config vitest.e2e.config.ts",
+    "test:e2e": "NEXT_PUBLIC_BASE_PATH= npm run build && vitest run --config vitest.e2e.config.mts",
     "test:e2e:watch": "E2E_HEADED=1 npm run test:e2e"
   },
   "dependencies": {
@@ -41,13 +41,13 @@
     "autoprefixer": "^10.6.1",
     "eslint": "^9.39.5",
     "eslint-config-next": "16.4.0",
-    "happy-dom": "^15.11.7",
+    "happy-dom": "^20.14.6",
     "jsqr": "^1.4.0",
     "postcss": "^8.5.29",
     "puppeteer": "^25.13.0",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.23.15",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^5.0.3"
   }
 }

@@ -396,7 +396,7 @@ are detected on every commit regardless.
 - Tests accompany behaviour changes; E2E asserts against the demo pack
   (if a different pack is active locally, `rm -rf content/pack` and
   re-run to reseed before E2E). E2E specs live in `tests/e2e-pack/`
-  and run under `vitest.e2e.config.ts`.
+  and run under `vitest.e2e.config.mts`.
 - **Bug fixes are red→green**: first write a failing test that
   reproduces the bug (confirm it's red), then fix until it's green —
   don't fix first and add a test after. React component bugs (effects,

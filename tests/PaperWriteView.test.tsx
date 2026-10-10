@@ -36,6 +36,7 @@ afterEach(async () => {
   await unmount();
   container.remove();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 async function unmount() {
@@ -279,7 +280,8 @@ describe('writing on a sheet on screen', () => {
       q('[data-testid="write-done"]').click();
     });
     await settle();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    // happy-dom ships no window.confirm, so stub one in rather than spy.
+    vi.stubGlobal('confirm', vi.fn(() => true));
     await act(async () => {
       q('[aria-label="Delete sheet"]').click();
     });
