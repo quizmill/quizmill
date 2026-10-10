@@ -77,29 +77,6 @@ function orderSeen<Q extends SelectableQuestion>(
   });
 }
 
-/**
- * Pick the next single question for a running session.
- * Returns null only if the bank is exhausted.
- */
-export function pickNextQuestion<Q extends SelectableQuestion>(
-  bank: Q[],
-  options: {
-    historicalAttemptedIds: Set<Q['id']>;
-    currentSessionIds: Set<Q['id']>;
-    history?: ReadonlyMap<Q['id'], AttemptSummary>;
-    rng?: Rng;
-  },
-): Q | null {
-  const [picked] = pickSessionQuestions(bank, {
-    count: 1,
-    historicalAttemptedIds: options.historicalAttemptedIds,
-    currentSessionIds: options.currentSessionIds,
-    history: options.history,
-    rng: options.rng,
-  });
-  return picked ?? null;
-}
-
 export function shuffle<T>(items: readonly T[], rng: Rng = Math.random): T[] {
   const a = items.slice();
   for (let i = a.length - 1; i > 0; i--) {
