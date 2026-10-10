@@ -24,12 +24,7 @@ function stubBackend(): SyncBackend {
   };
 }
 
-const ENV_KEYS = [
-  'NEXT_PUBLIC_SYNC_URL',
-  'NEXT_PUBLIC_SUPABASE_URL',
-  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
-  'NEXT_PUBLIC_SYNC_BACKEND',
-] as const;
+const ENV_KEYS = ['NEXT_PUBLIC_SYNC_URL', 'NEXT_PUBLIC_SYNC_BACKEND'] as const;
 const saved: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {};
 
 beforeEach(() => {
@@ -51,31 +46,31 @@ describe('sync backend registry', () => {
     expect(getSyncBackend()).toBeNull();
   });
 
-  it('selects http when a sync URL is set, and it beats supabase', () => {
+  it('selects http when a sync URL is set', () => {
     process.env.NEXT_PUBLIC_SYNC_URL = 'https://sync.example.dev';
     expect(syncBackendKind()).toBe('http');
-    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://x.supabase.co';
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'pk';
-    expect(syncBackendKind()).toBe('http');
+    expect(getSyncBackend()).not.toBeNull();
   });
 
-  it('selects supabase when only its pair is set', () => {
-    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://x.supabase.co';
+  it('ships exactly one built-in backend: the sync URL is the only switch', () => {
+    // The retired email-OTP backend's env pair must be inert — a pack repo
+    // whose deploy workflow still carries those secrets builds pure-local,
+    // it doesn't wake a backend that no longer exists.
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://x.example.co';
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'pk';
-    expect(syncBackendKind()).toBe('supabase');
+    expect(syncBackendKind()).toBeNull();
+    expect(getSyncBackend()).toBeNull();
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   });
 
   it('honours an explicit NEXT_PUBLIC_SYNC_BACKEND pick', () => {
     process.env.NEXT_PUBLIC_SYNC_URL = 'https://sync.example.dev';
-    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://x.supabase.co';
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'pk';
-    process.env.NEXT_PUBLIC_SYNC_BACKEND = 'supabase';
-    expect(syncBackendKind()).toBe('supabase');
+    process.env.NEXT_PUBLIC_SYNC_BACKEND = 'http';
+    expect(syncBackendKind()).toBe('http');
   });
 
   it('treats a forced-but-unconfigured backend as dormant, never a fallback', () => {
-    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://x.supabase.co';
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'pk';
     process.env.NEXT_PUBLIC_SYNC_BACKEND = 'http'; // no NEXT_PUBLIC_SYNC_URL
     expect(syncBackendKind()).toBeNull();
     expect(getSyncBackend()).toBeNull();
@@ -87,13 +82,6 @@ describe('sync backend registry', () => {
     expect(syncBackendInfo()).toEqual({
       kind: 'http',
       label: 'Sync server · quizmill-sync.acme.workers.dev',
-    });
-    delete process.env.NEXT_PUBLIC_SYNC_URL;
-    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://abcd.supabase.co';
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'pk';
-    expect(syncBackendInfo()).toEqual({
-      kind: 'supabase',
-      label: 'Supabase · abcd.supabase.co',
     });
   });
 
