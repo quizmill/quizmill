@@ -6,7 +6,6 @@ import {
   getStoredSyncKey,
   reconcileKeyName,
 } from '@/lib/backends/httpBackend';
-import { getSupabase } from '@/lib/supabase';
 import { getSyncBackend, syncBackendKind } from '@/lib/syncBackend';
 import { normalizeKeyName, syncKeyLabel } from '@/lib/syncKey';
 import { useSyncStatus } from '@/lib/useStorage';
@@ -21,7 +20,7 @@ import { useSyncStatus } from '@/lib/useStorage';
  *  - `unlinked` sync exists, but this device holds no key / session.
  *  - `linked`   writes mirror to `label` — the key's name ("Leo"), a
  *               short fingerprint of an unnamed key (never the key
- *               itself), or the signed-in email.
+ *               itself), or "your account" on a custom backend.
  */
 export type SyncIdentity =
   | { kind: 'off' }
@@ -59,18 +58,6 @@ export function useSyncIdentity(): SyncIdentity | null {
           if (live) setIdentity(keyIdentity(key, name));
         });
       }
-    } else if (kind === 'supabase') {
-      void getSupabase()
-        ?.auth.getSession()
-        .then(({ data }) => {
-          if (!live) return;
-          const email = data.session?.user.email;
-          setIdentity(
-            data.session
-              ? { kind: 'linked', label: email ?? 'your account', via: 'account' }
-              : { kind: 'unlinked' },
-          );
-        });
     } else {
       // A custom backend: all the contract offers is "is someone signed in".
       void getSyncBackend()

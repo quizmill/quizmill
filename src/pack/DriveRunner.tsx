@@ -70,8 +70,7 @@ import {
  * option tiles. Sessions mix all categories and record through the
  * same storage as the normal runner — attempts carry each question's
  * real category, the session carries the 'drive' pseudo-subject and
- * mode 'drive' (the legacy Supabase mirror clamps unknown modes to
- * 'practice' at its mapping layer — see supabaseBackend.ts).
+ * mode 'drive'.
  *
  * The screen is deliberately dark, huge, and low-information: it's a
  * status display, not a reading surface. Anything visual is for the

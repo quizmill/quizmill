@@ -1,8 +1,7 @@
 /**
  * Analytics capture — app events, attempt amendment, and (crucially)
  * backwards compatibility: rows written by pre-analytics builds must keep
- * flowing through storage, merge, transfer, and the Supabase mapper
- * without loss or error.
+ * flowing through storage, merge and transfer without loss or error.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppEvent, Attempt, Session } from '@/data/types';
@@ -19,7 +18,6 @@ import {
   type Mutation,
 } from '@/lib/storage';
 import { applySnapshot, buildSnapshot, parseSnapshot } from '@/lib/transfer';
-import { sessionToRow, supabaseBackend } from '@/lib/backends/supabaseBackend';
 import { APP_CONFIG } from '@/config';
 
 // Minimal localStorage so the storage module (node test env) has a window.
@@ -168,46 +166,3 @@ describe('backwards compatibility', () => {
     expect(loadEvents().map((e) => e.type)).toEqual(['progress_view']);
   });
 });
-
-describe('supabase backend never fails on analytics data', () => {
-  it("clamps the newer session modes to the schema's pair and drops new fields", () => {
-    const row = sessionToRow(
-      {
-        id: 's',
-        subject: 'drive',
-        startedAt: 0,
-        endedAt: null,
-        questionCount: 5,
-        correctCount: 0,
-        mode: 'drive',
-        appBuild: 'abc1234',
-        display: 'standalone',
-        platform: 'touch',
-      },
-      'u1',
-    );
-    expect(row.mode).toBe('practice');
-    expect('app_build' in row || 'appBuild' in row).toBe(false);
-    expect(sessionToRow({ ...legacyish(), mode: 'review' }, 'u1').mode).toBe('review');
-  });
-
-  it('swallows events ops entirely — even with no client configured', async () => {
-    await expect(
-      supabaseBackend.runOp(
-        { t: 'events', op: 'upsert', row: { id: 'e', type: 'app_open', at: 1 } },
-        'u1',
-      ),
-    ).resolves.toBeUndefined();
-  });
-});
-
-function legacyish(): Session {
-  return {
-    id: 's',
-    subject: 'c',
-    startedAt: 0,
-    endedAt: null,
-    questionCount: 5,
-    correctCount: 0,
-  };
-}

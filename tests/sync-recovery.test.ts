@@ -1,7 +1,7 @@
 /**
  * Reproduces the "Couldn't sync N · retry" report: a client that ships
- * the notes table before the sync server knows it (stale worker / old
- * Supabase schema). The server 400s every notes op; the engine burns
+ * the notes table before the sync server knows it (a stale worker). The
+ * server 400s every notes op; the engine burns
  * MAX_TRIES retries and then DROPS the op — and because the once-per-user
  * bulk-push flag stays set, the note never reaches the cloud even after
  * the server is upgraded. The fix: dropping an op clears the bulk-push
@@ -14,12 +14,7 @@ import * as storage from '@/lib/storage';
 import { startSync, retrySync, getSyncStatus } from '@/lib/sync';
 import type { QuestionNote } from '@/lib/storage';
 
-const ENV_KEYS = [
-  'NEXT_PUBLIC_SYNC_URL',
-  'NEXT_PUBLIC_SUPABASE_URL',
-  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
-  'NEXT_PUBLIC_SYNC_BACKEND',
-] as const;
+const ENV_KEYS = ['NEXT_PUBLIC_SYNC_URL', 'NEXT_PUBLIC_SYNC_BACKEND'] as const;
 
 function fakeLocalStorage() {
   const map = new Map<string, string>();

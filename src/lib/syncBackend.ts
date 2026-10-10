@@ -7,7 +7,7 @@
  * first configured provider wins, or `NEXT_PUBLIC_SYNC_BACKEND` names one
  * explicitly when several are configured.
  *
- * Built-in providers (registered below, in priority order):
+ * Built-in provider (registered below):
  *
  *   • "http"     — any server speaking the quizmill sync protocol
  *                  (docs/sync-protocol.md): two endpoints + bearer
@@ -16,8 +16,6 @@
  *                  paused/deleted for inactivity), but anything that
  *                  implements the protocol works — roll your own in
  *                  express/Deno/PHP/… Selected by NEXT_PUBLIC_SYNC_URL.
- *   • "supabase" — the original Supabase mirror (email-OTP auth, RLS).
- *                  Selected by the NEXT_PUBLIC_SUPABASE_* pair.
  *
  * Rolling your own CLIENT backend (different transport, e2e encryption,
  * WebDAV, …): implement SyncBackend, call registerSyncBackendProvider()
@@ -33,10 +31,9 @@
  */
 import type { AppEvent, Attempt, Session } from '@/data/types';
 import type { EarnedAchievement, QuestionNote, QuestionVote } from './storage';
-// The impl modules import only *types* from this file, so these imports
-// don't create a runtime cycle.
+// The impl module imports only *types* from this file, so this import
+// doesn't create a runtime cycle.
 import { httpBackend } from './backends/httpBackend';
-import { supabaseBackend } from './backends/supabaseBackend';
 
 // ── Queue ops (produced by the engine, executed by a backend) ───────────
 
@@ -157,22 +154,11 @@ function hostOf(url: string): string {
   }
 }
 
-// ── Built-ins ───────────────────────────────────────────────────────────
+// ── Built-in ────────────────────────────────────────────────────────────
 
 registerSyncBackendProvider({
   kind: 'http',
   isConfigured: () => Boolean(process.env.NEXT_PUBLIC_SYNC_URL),
   create: () => httpBackend,
   describe: () => `Sync server · ${hostOf(process.env.NEXT_PUBLIC_SYNC_URL ?? '')}`,
-});
-
-registerSyncBackendProvider({
-  kind: 'supabase',
-  isConfigured: () =>
-    Boolean(
-      process.env.NEXT_PUBLIC_SUPABASE_URL &&
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-    ),
-  create: () => supabaseBackend,
-  describe: () => `Supabase · ${hostOf(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '')}`,
 });
