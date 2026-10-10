@@ -15,6 +15,7 @@
     "pack:bundle": "tsx tools/pack/bundle.ts",
     "pack:use": "tsx scripts/use-pack.ts",
     "pack:list": "tsx scripts/list-packs.ts",
+    "sync:report": "tsx cloudflare/scripts/events-report.ts",
     "pretest": "tsx scripts/ensure-pack.ts",
     "test": "vitest run",
     "test:watch": "vitest",
