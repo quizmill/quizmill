@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { GameOver } from './GameOver';
 import { GameShell } from './GameShell';
 import { HowToPlay } from './HowToPlay';
 
@@ -201,22 +202,13 @@ export function Dodger({ onClose }: DodgerProps) {
       ) : null}
 
       {gameOver ? (
-        <div
-          data-testid="dodger-game-over"
-          className="mt-3 flex flex-col items-center gap-2 rounded-xl border border-warn-500/30 bg-warn-100/60 p-3 text-center"
-        >
-          <div className="text-base font-bold text-warn-700">
-            You scored {score}
-          </div>
-          <div className="mt-1 flex gap-2">
-            <Button size="md" variant="secondary" onClick={start}>
-              Play again
-            </Button>
-            <Button size="md" onClick={onClose}>
-              Done
-            </Button>
-          </div>
-        </div>
+        <GameOver
+          tone="lose"
+          title={`You scored ${score}`}
+          testId="dodger-game-over"
+          onRestart={start}
+          onClose={onClose}
+        />
       ) : null}
     </GameShell>
   );

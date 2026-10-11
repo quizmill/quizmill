@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Button } from '@/components/ui/Button';
+import { GameOver } from './GameOver';
 import { GameShell } from './GameShell';
 import { HowToPlay } from './HowToPlay';
 import {
@@ -196,22 +196,13 @@ export function Snake({ onClose }: SnakeProps) {
         />
 
         {state.gameOver ? (
-          <div
-            data-testid="snake-game-over"
-            className="mt-1 flex flex-col items-center gap-2 rounded-xl border border-warn-500/30 bg-warn-100/60 px-3 py-3 text-center"
-          >
-            <div className="font-semibold text-warn-700">
-              You scored {state.score}
-            </div>
-            <div className="flex gap-2">
-              <Button size="md" variant="secondary" onClick={handleRestart}>
-                Play again
-              </Button>
-              <Button size="md" onClick={onClose}>
-                Done
-              </Button>
-            </div>
-          </div>
+          <GameOver
+            tone="lose"
+            title={`You scored ${state.score}`}
+            testId="snake-game-over"
+            onRestart={handleRestart}
+            onClose={onClose}
+          />
         ) : null}
       </div>
     </GameShell>

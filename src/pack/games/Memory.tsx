@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 import { shuffle } from '@/lib/selection';
+import { GameOver } from './GameOver';
 import { GameShell } from './GameShell';
 import { HowToPlay } from './HowToPlay';
 
@@ -144,23 +144,14 @@ export function Memory({ onClose }: MemoryProps) {
       />
 
       {won ? (
-        <div
-          data-testid="memory-won"
-          className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-success-500/40 bg-success-100/60 p-3 text-center"
-        >
-          <div className="text-base font-bold text-success-700">
-            All pairs found! 🎉
-          </div>
-          <div className="text-sm text-ink-700">in {moves} moves</div>
-          <div className="mt-1 flex gap-2">
-            <Button size="md" variant="secondary" onClick={handleRestart}>
-              Play again
-            </Button>
-            <Button size="md" onClick={onClose}>
-              Done
-            </Button>
-          </div>
-        </div>
+        <GameOver
+          tone="win"
+          title="All pairs found! 🎉"
+          detail={`in ${moves} moves`}
+          testId="memory-won"
+          onRestart={handleRestart}
+          onClose={onClose}
+        />
       ) : null}
     </GameShell>
   );
