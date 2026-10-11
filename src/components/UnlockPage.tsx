@@ -28,7 +28,8 @@ export function resetUnlockPageForTests(): void {
 /**
  * `/unlock#key=…` — the one-tap path for a learner holding a licence key:
  * the key is read from the FRAGMENT (never the query string: fragments
- * reach no server and no log), wiped from the address bar at once, and
+ * reach no server and no log; a `?key=` is scrubbed from the address bar
+ * but not used), wiped from the address bar at once, and
  * submitted for them; a success lands on Home with the unlocked pack
  * active, a refusal stays here with the endpoint's words and the file
  * fallback.
@@ -50,7 +51,9 @@ export function UnlockPage() {
   const [copied, setCopied] = useState(false);
 
   // A second link tapped while this page is open is a fragment-only
-  // navigation (no load) — pick its key up the same way.
+  // navigation (no load) — pick its key up the same way. The new key
+  // remounts the form below (keyed on it), and the old form's unmount
+  // abandons any request still in flight for the previous key.
   useEffect(() => {
     const onHash = () => {
       const next = readKeyFromHash(window.location.hash);

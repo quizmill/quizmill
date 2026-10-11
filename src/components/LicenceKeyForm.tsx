@@ -42,19 +42,28 @@ export function LicenceKeyForm({
   const [failure, setFailure] = useState<Extract<UnlockOutcome, { ok: false }> | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const started = useRef(false);
+  // The request in flight, if any. Unmounting (a newer key remounts the
+  // form on /unlock; leaving the page) abandons it: whatever the endpoint
+  // answers afterwards must not insert or activate anything.
+  const inflight = useRef<AbortController | null>(null);
+  useEffect(() => () => inflight.current?.abort(), []);
 
   async function submit(candidate: string) {
     const trimmed = candidate.trim();
     if (!trimmed || busy) return;
     setBusy(true);
     setFailure(null);
+    const controller = new AbortController();
+    inflight.current = controller;
     try {
       const outcome = await unlockPack(trimmed, {
         config,
         buildPackId: buildTimeManifest.id,
+        signal: controller.signal,
       });
       if (!outcome.ok) {
-        setFailure(outcome);
+        // Abandoned, not failed: the newer form has the learner's attention.
+        if (outcome.reason !== 'cancelled') setFailure(outcome);
         return;
       }
       // Prefetch any images the bundle points at — fire-and-forget, as the
@@ -69,6 +78,7 @@ export function LicenceKeyForm({
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- deliberate full load, see above
       window.location.assign(`${BASE_PATH}/`);
     } finally {
+      if (inflight.current === controller) inflight.current = null;
       setBusy(false);
     }
   }

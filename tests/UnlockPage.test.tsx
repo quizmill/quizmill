@@ -276,7 +276,7 @@ describe('/unlock#key=…', () => {
     expect(assign).toHaveBeenCalledWith('/');
   });
 
-  it('a key in the QUERY string is not honoured', async () => {
+  it('a key in the QUERY string is not honoured — but is scrubbed from the address bar', async () => {
     setLocation('');
     Object.defineProperty(window, 'location', {
       configurable: true,
@@ -285,6 +285,62 @@ describe('/unlock#key=…', () => {
     await render(<UnlockPage />);
     expect(fetched).toEqual([]);
     expect(byTestId('unlock-key')).toBeNull();
+    expect(replaceState).toHaveBeenCalledWith(null, '', '/unlock/');
+  });
+
+  it('a second link while the first is still being answered: only the latest key counts', async () => {
+    // GOOD answers only when told to; BAD is refused at once.
+    let releaseGood: (() => void) | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        fetched.push(url);
+        const key = new URL(url).searchParams.get('key');
+        if (key === GOOD) {
+          await new Promise<void>((r) => {
+            releaseGood = r;
+          });
+          return new Response(JSON.stringify(bundle()), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ error: 'That key has been revoked.' }), {
+          status: 403,
+          headers: { 'content-type': 'application/json' },
+        });
+      }),
+    );
+    setLocation(`#key=${GOOD}`);
+    await render(<UnlockPage />);
+    expect(fetched).toHaveLength(1);
+
+    window.location.hash = `#key=${BAD}`;
+    await act(async () => {
+      window.dispatchEvent(new Event('hashchange'));
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    // Now the slow GOOD answer lands — after the learner moved on to BAD.
+    releaseGood?.();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    await act(async () => {});
+
+    expect(fetched).toHaveLength(2);
+    expect(byTestId('licence-key-error')?.textContent).toContain('That key has been revoked.');
+    expect(byTestId<HTMLInputElement>('licence-key-input')?.value).toBe(BAD);
+    // The stale GOOD request changed nothing: no pack, no key, no navigation.
+    expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBeNull();
+    expect(localStorage.getItem(licenceKeyStorageKey('solar-system-full'))).toBeNull();
+    expect(sessionStorage.getItem(UNLOCKED_TOAST_KEY)).toBeNull();
+    expect(assign).not.toHaveBeenCalled();
+    expect(loadEvents().map((e) => [e.type, e.data])).toEqual([
+      ['unlock_failed', { pack: 'solar-system-full', reason: 'denied' }],
+    ]);
   });
 });
 
