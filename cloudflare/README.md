@@ -1,16 +1,15 @@
 # quizmill sync worker (Cloudflare Workers + D1)
 
-The recommended cloud-sync backend: a tiny Cloudflare Worker in front of a
+The built-in cloud-sync backend: a tiny Cloudflare Worker in front of a
 D1 (SQLite) database that mirrors each device's practice history.
 
-**Why this over Supabase?** Supabase free-tier projects are paused after ~a
-week of inactivity and eventually deleted — a practice app you pick up
-again after the summer holidays comes back to a dead backend. Cloudflare's
-free tier has no inactivity lifecycle: Workers and D1 databases stay up
-indefinitely, and the daily allowances (100,000 requests, 100,000 row
-writes, 5 GB storage) are orders of magnitude beyond what practice apps
-generate. There is also no email/auth service to configure — sign-in is a
-**sync key** the app generates locally (see below).
+**Why Cloudflare?** Its free tier has no inactivity lifecycle: Workers and
+D1 databases stay up indefinitely — a practice app you pick up again after
+the summer holidays still syncs — and the daily allowances (100,000
+requests, 100,000 row writes, 5 GB storage) are orders of magnitude beyond
+what practice apps generate. There is also no email/auth service to
+configure — sign-in is a **sync key** the app generates locally (see
+below).
 
 ## Setup (~2 minutes, free Cloudflare account)
 
@@ -33,9 +32,8 @@ NEXT_PUBLIC_SYNC_URL=https://quizmill-sync.<account>.workers.dev npm run build
 Opening the printed URL in a browser should answer
 `{"service":"quizmill-sync","ok":true}`.
 
-When `NEXT_PUBLIC_SYNC_URL` is set it takes precedence over the Supabase
-env vars; when neither is set the sync layer stays dormant and the app is
-pure-local.
+When `NEXT_PUBLIC_SYNC_URL` is unset the sync layer stays dormant and the
+app is pure-local.
 
 ## Try it locally first (no Cloudflare account needed)
 

@@ -169,8 +169,8 @@ it until the pack is clean, so malformed content can't reach the app.
 - **Local-first storage** — everything in localStorage, namespaced per
   pack; works fully offline (PWA with a versioned service worker)
 - **Optional cloud sync** — a retry-on-reconnect queue mirroring to a
-  Cloudflare Worker + D1 (sync-key auth) or Supabase (email OTP);
-  dormant unless configured (see below)
+  Cloudflare Worker + D1 (sync-key auth), or any server speaking the
+  same protocol; dormant unless configured (see below)
 - **Static export** — `npx quizmill build` produces a plain static site,
   deployable to any static host (Cloudflare Pages, GitHub Pages,
   Netlify…)
@@ -199,14 +199,14 @@ of the deployed app*.
 
 ## Cloud sync (optional)
 
-Two interchangeable backends; with neither configured, the sync layer
-stays dormant and the app is pure-local. (Set env vars for an `npx`
-build by exporting them in the same shell — the CLI passes your
-environment through to the engine.)
+One env var switches it on; without it, the sync layer stays dormant
+and the app is pure-local. (Set env vars for an `npx` build by
+exporting them in the same shell — the CLI passes your environment
+through to the engine.)
 
-**Cloudflare Worker + D1 (recommended).** Deploy the tiny worker in
-`cloudflare/` to a free Cloudflare account (~2 minutes, see
-`cloudflare/README.md`) and build with:
+**Cloudflare Worker + D1.** Deploy the tiny worker in `cloudflare/` to
+a free Cloudflare account (~2 minutes, see `cloudflare/README.md`) and
+build with:
 
 ```
 NEXT_PUBLIC_SYNC_URL=https://quizmill-sync.<account>.workers.dev
@@ -218,28 +218,15 @@ never pauses or deletes inactive Workers/D1 databases, so a practice
 app you return to months later still syncs. One worker serves every
 pack — rows are partitioned per pack and per key.
 
-**Supabase.** The original backend (email-OTP sign-in, Row Level
-Security). Run the migration in `supabase/migrations/` against your
-own free-tier project and build with:
-
-```
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
-```
-
-Note that Supabase pauses free-tier projects after ~a week of
-inactivity (and eventually deletes them) — fine for daily-driver apps,
-frustrating for occasional ones. If both backends are configured,
-`NEXT_PUBLIC_SYNC_URL` wins (or set `NEXT_PUBLIC_SYNC_BACKEND` to pick
-explicitly).
-
 **Roll your own, or no server at all.** The backend layer is pluggable
 (`docs/sync-protocol.md`): `NEXT_PUBLIC_SYNC_URL` speaks a tiny
 two-endpoint protocol any server can implement — the Cloudflare Worker
 is just the reference implementation — and entirely custom client
-backends register in code via `registerSyncBackendProvider`. Without
-any backend, Settings → "Move progress" exports/imports progress
-as a JSON file for device moves and offline backups.
+backends register in code via `registerSyncBackendProvider` (set
+`NEXT_PUBLIC_SYNC_BACKEND` to pick one explicitly when several are
+configured). Without any backend, Settings → "Move progress"
+exports/imports progress as a JSON file for device moves and offline
+backups.
 
 ### Usage analytics (optional, anonymous)
 

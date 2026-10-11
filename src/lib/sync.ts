@@ -10,10 +10,10 @@
  *     time only) PUSH everything local up so a new device's history lands
  *     in the cloud.
  *
- * The cloud side is pluggable (src/lib/syncBackend.ts): a Cloudflare
- * Worker + D1 mirror with sync-key auth, or the original Supabase mirror
- * with email-OTP auth. This engine is backend-agnostic — it owns only the
- * queue, drain, and merge machinery.
+ * The cloud side is pluggable (src/lib/syncBackend.ts): the built-in
+ * backend is the Cloudflare Worker + D1 mirror with sync-key auth (or any
+ * server speaking the same protocol). This engine is backend-agnostic — it
+ * owns only the queue, drain, and merge machinery.
  *
  * Sync only runs while signed in. Signed out, the queue is dormant and the
  * app behaves exactly as the pure local-only build.
@@ -25,7 +25,7 @@ import { getSyncBackend, type QueueOp } from './syncBackend';
 const QUEUE_KEY = `${KEY_PREFIX}syncQueue.v1`;
 const MIGRATED_PREFIX = `${KEY_PREFIX}sync.migrated.`; // + uid
 const MAX_TRIES = 6; // drop a poison op after this many failures
-// Hard ceiling on any single remote op. Neither backend client has a
+// Hard ceiling on any single remote op. The backend client has no
 // built-in timeout, so a request that stalls (common on flaky mobile
 // networks) would otherwise hang `await runOp` forever, latch
 // `draining = true`, and wedge the whole sync engine until a page reload.
@@ -346,8 +346,8 @@ export function startSync(): void {
   window.addEventListener('offline', () => notifyStatus());
   setInterval(() => void drain(), 30_000); // safety net for missed reconnects
 
-  // Pick up an already-present identity (a restored Supabase session, or a
-  // sync key stored on this device), then track future auth changes.
+  // Pick up an already-present identity (a sync key stored on this
+  // device), then track future auth changes.
   void backend.getUserId().then((userId) => {
     if (userId) void handleSignedIn(userId);
   });

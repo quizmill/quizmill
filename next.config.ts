@@ -33,16 +33,13 @@ const nextConfig: NextConfig = {
     // engine) rather than one baked-in pack — defers Home's first paint to
     // the client so the injected pack doesn't clash with the prerender.
     NEXT_PUBLIC_RUNTIME_PACK: process.env.NEXT_PUBLIC_RUNTIME_PACK ?? '',
-    // Cloud sync (optional). Two backends — the Cloudflare Worker URL wins
-    // when both are set; with neither, the sync layer stays dormant and the
-    // app runs pure-local. See src/lib/syncBackend.ts + cloudflare/README.md.
+    // Cloud sync (optional): the URL of a server speaking the sync protocol
+    // (the Cloudflare Worker in cloudflare/); unset, the sync layer stays
+    // dormant and the app runs pure-local. See src/lib/syncBackend.ts.
     NEXT_PUBLIC_SYNC_URL: process.env.NEXT_PUBLIC_SYNC_URL ?? '',
-    // Optional explicit backend pick ('http' | 'supabase' | a custom kind)
-    // for builds where several are configured.
+    // Optional explicit backend pick ('http' | a custom kind) for builds
+    // where several are configured.
     NEXT_PUBLIC_SYNC_BACKEND: process.env.NEXT_PUBLIC_SYNC_BACKEND ?? '',
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? '',
     // Anonymous first-party funnel analytics (optional) — the endpoint a
     // hosted app beacons `{ event, packId, deviceId, appBuild, ts }` to
     // (the sync worker serves one at /v1/analytics), and the privacy page

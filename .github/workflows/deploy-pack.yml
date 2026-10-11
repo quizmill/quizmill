@@ -21,11 +21,9 @@ name: Deploy pack (reusable)
 #   CLOUDFLARE_API_TOKEN                    token with "Cloudflare Pages — Edit"
 #   CLOUDFLARE_ACCOUNT_ID                   70b494550992cda97e893fab035f7e9a
 #   NEXT_PUBLIC_SYNC_URL                    (optional) enables cloud sync via the
-#                                           Cloudflare Worker (cloudflare/); wins over Supabase.
+#                                           Cloudflare Worker (cloudflare/).
 #                                           Not sensitive (baked into the client bundle), so it
 #                                           can also be passed as the `sync_url` input instead
-#   NEXT_PUBLIC_SUPABASE_URL                (optional) enables cloud sync via Supabase
-#   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY    (optional) public-safe; RLS is the guard
 #   NEXT_PUBLIC_ANALYTICS_URL               (optional) enables the anonymous funnel beacon
 #                                           (src/lib/analytics.ts); like the sync URL it is
 #                                           public, so the `analytics_url` input works too
@@ -123,8 +121,6 @@ jobs:
       - name: Build "${{ inputs.pack }}" on quizmill@${{ steps.engine.outputs.spec }}
         env:
           NEXT_PUBLIC_SYNC_URL: ${{ secrets.NEXT_PUBLIC_SYNC_URL || inputs.sync_url }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_ANALYTICS_URL: ${{ secrets.NEXT_PUBLIC_ANALYTICS_URL || inputs.analytics_url }}
           NEXT_PUBLIC_PRIVACY_URL: ${{ secrets.NEXT_PUBLIC_PRIVACY_URL || inputs.privacy_url }}
         run: |

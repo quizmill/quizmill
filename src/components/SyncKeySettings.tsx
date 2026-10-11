@@ -3,8 +3,6 @@
 import { useEffect, useState } from 'react';
 import {
   Check,
-  Cloud,
-  CloudOff,
   Copy,
   Eye,
   EyeOff,
@@ -15,7 +13,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import { Button, buttonStyles } from '@/components/ui/Button';
-import { SyncBackendFooter, SyncStatusLine } from '@/components/SyncStatusLine';
+import { SyncCard, SyncStatusLine } from '@/components/SyncStatusLine';
 import { APP_CONFIG } from '@/config';
 import { useSyncStatus } from '@/lib/useStorage';
 import { useClientState, useMounted } from '@/lib/useMounted';
@@ -187,19 +185,8 @@ export function SyncKeySettings() {
   }
 
   return (
-    <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs">
-      <div className="flex items-center gap-2">
-        {key ? (
-          <Cloud className="h-5 w-5 text-brand-600" />
-        ) : (
-          <CloudOff className="h-5 w-5 text-ink-400" />
-        )}
-        <h3 className="text-lg font-semibold text-ink-900">Sync across devices</h3>
-      </div>
-
-      {!ready ? (
-        <p className="mt-2 text-sm text-ink-500">Loading…</p>
-      ) : key ? (
+    <SyncCard connected={Boolean(key)} loading={!ready} status={status} error={error}>
+      {key ? (
         <>
           <p className="mt-1 text-sm text-ink-600">
             Sync is on. Enter this key in the same app on another device to
@@ -346,18 +333,6 @@ export function SyncKeySettings() {
           </div>
         </>
       )}
-
-      {status && (
-        <p className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-800">
-          {status}
-        </p>
-      )}
-      {error && (
-        <p className="mt-3 rounded-lg bg-warn-100/60 px-3 py-2 text-sm text-warn-700">
-          {error}
-        </p>
-      )}
-      <SyncBackendFooter />
-    </div>
+    </SyncCard>
   );
 }
