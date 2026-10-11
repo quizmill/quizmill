@@ -221,10 +221,18 @@ export function PacksPage() {
     feedback.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
   }, [feedbackSeq]);
 
-  function beginInsert(kind: InsertBusy) {
-    setBusy(kind);
+  // A new insert owns the feedback area: the previous result OR failure
+  // goes before the busy label shows, so a stale verdict never sits under
+  // "Reading…" as if it belonged to the file being read.
+  function clearFeedback() {
     setMessage(null);
     setInserted(null);
+    setErrors([]);
+  }
+
+  function beginInsert(kind: InsertBusy) {
+    setBusy(kind);
+    clearFeedback();
   }
 
   function finishInsert(outcome: ParseOutcome, origin: string) {
@@ -275,7 +283,9 @@ export function PacksPage() {
   }
 
   async function handleUrl() {
-    if (!url.trim()) return;
+    // Same guard as the Fetch button: Enter in the field must not start a
+    // second insert while one is reading or fetching.
+    if (busy !== null || !url.trim()) return;
     beginInsert('url');
     try {
       finishInsert(await fetchPackFromUrl(url), url.trim());
@@ -288,8 +298,7 @@ export function PacksPage() {
   async function handleRegistryInsert(listing: PackListing) {
     if (busyRepo) return;
     setBusyRepo(listing.repo);
-    setMessage(null);
-    setInserted(null);
+    clearFeedback();
     try {
       finishInsert(await fetchPackFromUrl(registryRepoUrl(listing)), registryRepoUrl(listing));
     } finally {
