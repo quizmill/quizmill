@@ -1,7 +1,7 @@
 /**
  * Activate a learning pack: validate it, then copy it into
- * `content/pack/` (gitignored) where the `pack` variant's static
- * imports pick it up at build time.
+ * `content/pack/` (gitignored) where the app's static imports
+ * (`src/pack/source.ts`) pick it up at build time.
  *
  *   npm run pack:use packs/my-topic                 # local directory
  *   npm run pack:use quizmill/pack-claude-cert      # GitHub repo
@@ -16,7 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { validatePack, type PackManifest } from '../tools/pack/schema';
-import { readPackDir } from '../tools/pack/validate';
+import { printValidation, readPackDirOrExit } from '../tools/pack/validate';
 import { writePackAssets, syncPackAssets } from './pack-assets';
 import { fetchRemotePack, parsePackSpec } from './remote-pack';
 
@@ -47,43 +47,24 @@ function main(): void {
     process.exit(1);
   }
   const dir = resolveSource(source);
-
-  let input: ReturnType<typeof readPackDir>;
-  try {
-    input = readPackDir(dir);
-  } catch (err) {
-    console.error(`✗ ${(err as Error).message}`);
-    process.exit(1);
-  }
-
-  const result = validatePack(input);
-  for (const w of result.warnings) console.warn(`⚠ ${w}`);
-  if (!result.ok) {
-    for (const e of result.errors) console.error(`✗ ${e}`);
+  const input = readPackDirOrExit(dir);
+  if (!printValidation(validatePack(input))) {
     console.error('\nPack is invalid — fix the errors above, or run pack:validate.');
     process.exit(1);
   }
 
   fs.mkdirSync(TARGET, { recursive: true });
-  fs.writeFileSync(
-    path.join(TARGET, 'pack.json'),
-    JSON.stringify(input.manifest, null, 2) + '\n',
-  );
-  fs.writeFileSync(
-    path.join(TARGET, 'questions.json'),
-    JSON.stringify(input.questions, null, 2) + '\n',
-  );
-  // scenarios.json is imported statically by the variant, so always
-  // materialise it — an absent file would break the build.
-  fs.writeFileSync(
-    path.join(TARGET, 'scenarios.json'),
-    JSON.stringify(input.scenarios ?? [], null, 2) + '\n',
-  );
-  // concepts.json is imported statically too — always materialise it.
-  fs.writeFileSync(
-    path.join(TARGET, 'concepts.json'),
-    JSON.stringify(input.concepts ?? [], null, 2) + '\n',
-  );
+  // All four files are imported statically by the app, so the optional
+  // ones are always materialised — an absent file would break the build.
+  const files = {
+    'pack.json': input.manifest,
+    'questions.json': input.questions,
+    'scenarios.json': input.scenarios ?? [],
+    'concepts.json': input.concepts ?? [],
+  };
+  for (const [name, data] of Object.entries(files)) {
+    fs.writeFileSync(path.join(TARGET, name), JSON.stringify(data, null, 2) + '\n');
+  }
 
   // Carry over the pack's image assets (NVR figures, etc.) so the active
   // pack is self-contained and ensure-pack can re-mirror them on builds.

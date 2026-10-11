@@ -24,7 +24,8 @@ fully static export to `out/`). The PWA icon + webmanifest are generated
 from the manifest by `scripts/pack-assets.ts` (gitignored in `public/`),
 and `scripts/finalise-build.ts` (the `postbuild` hook) stamps `out/sw.js`
 with the cache key + full precache manifest so unvisited routes work
-offline.
+offline (`scripts/app-version.ts` is the one reader of the release tag
+and short SHA that next.config.ts, finalise-build and the bundler share).
 
 - `tools/pack/schema.ts` — Zod pack format (schemaVersion **1 or 2**) +
   `validatePack` cross-file checks (unique ids, category/level/scenario/
@@ -280,7 +281,7 @@ offline.
 
 ```
 npm run dev                      # demo pack at localhost:3000
-npm test                         # vitest unit (736 tests, 64 files)
+npm test                         # vitest unit (770 tests, 68 files)
 npm run test:watch               # same, in watch mode
 npm run lint                     # eslint (flat config) — 0 errors required
 npm run typecheck                # tsc --noEmit

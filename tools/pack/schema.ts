@@ -1,14 +1,16 @@
 import { z } from 'zod';
 
 /**
- * Learning-pack format (schemaVersion 1).
+ * Learning-pack format (schemaVersion 1 or 2).
  *
- * A pack is a directory of three JSON files that fully describes one
- * deployable practice app for the generic `pack` variant:
+ * A pack is a directory of JSON files that fully describes one
+ * deployable practice app:
  *
  *   pack.json        manifest — identity, branding, categories
  *   questions.json   the MCQ bank
  *   scenarios.json   optional shared scenario stems (may be `[]` / absent)
+ *   concepts.json    optional teaching cards (v2; may be `[]` / absent)
+ *   assets/          optional images referenced by `image` paths (v2)
  *
  * The shape is a generalised MCQ format proven by several hundred
  * imported/generated questions in the engine's ancestor project; categories
@@ -377,18 +379,23 @@ export interface PackValidationResult {
   warnings: string[];
 }
 
+/** The parsed JSON of a pack's files, before validation — what
+ *  `readPackDir` returns and `validatePack` takes. The optional files
+ *  are `undefined` when absent (not `[]`). */
+export interface PackFiles {
+  manifest: unknown;
+  questions: unknown;
+  scenarios?: unknown;
+  concepts?: unknown;
+}
+
 /**
  * Whole-pack validation: per-file schemas plus the cross-file checks a
  * single Zod schema can't express (unique ids, category/scenario
  * references, weight sanity). Pure function over parsed JSON so it's
  * unit-testable and reusable by both the CLI and the use-pack script.
  */
-export function validatePack(input: {
-  manifest: unknown;
-  questions: unknown;
-  scenarios?: unknown;
-  concepts?: unknown;
-}): PackValidationResult {
+export function validatePack(input: PackFiles): PackValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
