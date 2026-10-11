@@ -19,7 +19,7 @@ code or in `docs/investigations/`.
   seeds it from the committed demo `content/pack-demo/` (solar system, a
   schema-v2 showcase) via the `predev`/`prebuild`/`pretest` hooks;
   `npm run pack:use <dir | owner/repo | URL>` swaps in a validated pack.
-- `tools/pack/` — `schema.ts` (Zod pack format, schemaVersion 1 or 2, and
+- `tools/pack/` — `schema.ts` (Zod pack format, schemaVersion 2 only, and
   `validatePack` cross-file checks; the validator CLI is the contract an
   authoring agent loops against), `registry.json` (published packs),
   `bundle.ts` (one-file pack export).
@@ -43,9 +43,10 @@ code or in `docs/investigations/`.
 
 - **Question ids are immutable once published**; attempt history points
   at them.
-- **Pack schema changes bump `schemaVersion` and stay backward-readable**;
-  v1 packs stay valid unchanged. New manifest blocks are optional and
-  additive.
+- **The validator accepts exactly one `schemaVersion` (2) and is strict
+  about it**; v1 was dropped, not kept readable. New manifest blocks are
+  optional and additive so the number only moves when a shape has to
+  change — and a bump must then keep reading 2.
 - **Engine records too**: new `Attempt`/`Session`/`AppEvent` fields are
   optional and absent reads as *unknown*, never zero. Rows from older
   builds must flow through storage, merge, transfer and the backends
