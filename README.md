@@ -119,8 +119,9 @@ when the images push a bundle past 4 MiB.
 ## Pack format
 
 A pack is a directory of JSON, specified by the Zod schemas in
-[`tools/pack/schema.ts`](tools/pack/schema.ts) (`schemaVersion: 2`;
-v1 packs still load unchanged):
+[`tools/pack/schema.ts`](tools/pack/schema.ts) (`schemaVersion: 2` — the
+only version the validator accepts; a manifest still saying `1` just
+needs the number changed, nothing else):
 
 | File | What |
 |---|---|
@@ -130,9 +131,9 @@ v1 packs still load unchanged):
 | `concepts.json` | optional concept cards surfaced in the answer panel (`conceptId` on a question) |
 | `assets/` | optional images referenced by `image` on a question or option |
 
-Schema v2 adds, all optional and backward-compatible:
+Beyond the required fields, all optional:
 
-- **2–6 options** keyed `A`–`F` (v1's fixed 4 is just the common case)
+- **2–6 options** keyed `A`–`F` (a fixed 4 is just the common case)
 - **images** — `image` on a question prompt and/or on individual
   options, resolved from the pack's `assets/` directory
 - **concept cards** — a `concepts.json` of short explainers; a question
@@ -143,8 +144,6 @@ Schema v2 adds, all optional and backward-compatible:
 - **source legend** — manifest `sources` (`[{label,name,blurb,url}]`)
   renders a "Question sources" card in Settings; questions reference an
   entry by `sourceRef`
-
-Optional for any schema version:
 
 - **upgrade card** — manifest `upgrade` (`{title, url, price?, blurb?}`)
   for a free sampler pointing at its paid course or fuller bank: one
