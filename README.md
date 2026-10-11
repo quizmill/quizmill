@@ -248,9 +248,11 @@ NEXT_PUBLIC_PRIVACY_URL=https://example.com/privacy   # optional, linked from Se
 
 and the app beacons a handful of funnel events — `app_open`,
 `first_answer`, `session_10` (tenth completed session), `upsell_seen`,
-`upsell_clicked`, `bundle_inserted` — as
-`{ event, packId, deviceId, appBuild, ts }`. That is the whole payload:
-no answers, no progress, no sync key, no user agent. `deviceId` is a
+`upsell_clicked`, `bundle_inserted`, `pack_unlocked`, `unlock_failed` — as
+`{ event, packId, deviceId, appBuild, ts }`; the last three add `pack`,
+the id of the pack that arrived (or was refused), since `packId` is the
+one that was active at the time. That is the whole payload: no answers,
+no progress, no sync key, no licence key, no user agent. `deviceId` is a
 random UUID the learner can regenerate (or switch the beacon off) in
 Settings → Usage analytics; the card only exists in builds that set the
 URL, and without it nothing leaves the device. The sync worker in

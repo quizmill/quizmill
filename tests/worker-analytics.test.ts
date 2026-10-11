@@ -51,6 +51,17 @@ describe('parseBeacon', () => {
     expect([...WORKER_FUNNEL_EVENTS]).toEqual([...FUNNEL_EVENTS]);
   });
 
+  it('accepts an optional arriving-pack id and rejects a malformed one', () => {
+    expect(parseBeacon({ ...beacon, event: 'bundle_inserted', pack: 'full-pack' })).toEqual({
+      ...beacon,
+      event: 'bundle_inserted',
+      pack: 'full-pack',
+    });
+    expect(parseBeacon({ ...beacon, pack: '' })).toBeNull();
+    expect(parseBeacon({ ...beacon, pack: 42 })).toBeNull();
+    expect(parseBeacon({ ...beacon, pack: 'x'.repeat(300) })).toBeNull();
+  });
+
   it('rejects unknown events, bad ids, bad timestamps and junk', () => {
     expect(parseBeacon({ ...beacon, event: 'game_open' })).toBeNull();
     expect(parseBeacon({ ...beacon, event: 'x'.repeat(50) })).toBeNull();
@@ -76,7 +87,17 @@ describe('statementsForBeacon', () => {
       'abc1234',
       beacon.ts,
       1_700_000_005_000,
+      null,
     ]);
+  });
+
+  it('stores the arriving pack id when the beacon names one', () => {
+    const [stmt] = statementsForBeacon(
+      parseBeacon({ ...beacon, event: 'pack_unlocked', pack: 'full-pack' })!,
+      1_700_000_005_000,
+    );
+    expect(stmt.sql).toContain('target_pack_id');
+    expect(stmt.params.at(-1)).toBe('full-pack');
   });
 });
 
