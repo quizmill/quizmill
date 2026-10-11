@@ -22,8 +22,15 @@ import {
   type Stage,
 } from '@/pack/RunnerPanels';
 import { amendAttempt, loadAttempts, loadNotes, loadSessions } from '@/lib/storage';
+import { totalXp } from '@/lib/xp';
+import { loadProgressionShown } from '@/lib/progressionPref';
 import { notesPracticePool } from '@/pack/notes-practice';
-import { isMultiAnswer, packQuestions, type OptionKey } from '@/pack/data';
+import {
+  isMultiAnswer,
+  packQuestions,
+  progressionEnabled,
+  type OptionKey,
+} from '@/pack/data';
 import {
   advanceAfterAnswer,
   buildAttempt,
@@ -60,6 +67,8 @@ export function PackNotesRunner() {
   const mounted = useMounted();
   const [stage, setStage] = useState<Stage>('choosing');
   const [selected, setSelected] = useState<OptionKey[]>([]);
+  // XP earned by the just-checked answer — see the practice runner.
+  const [xpGained, setXpGained] = useState<number | null>(null);
   // First option tapped on the current question (first-instinct signal)
   // and the just-recorded attempt (to stamp feedbackSeconds on Next).
   const firstSelectedRef = useRef<OptionKey | null>(null);
@@ -167,6 +176,10 @@ export function PackNotesRunner() {
 
   function handleCheck() {
     if (!state || selected.length === 0) return;
+    // Snapshot XP before the write so the chip shows what this answer
+    // earned (first-correct/rescue bonuses included).
+    const showXp = progressionEnabled && loadProgressionShown();
+    const xpBefore = showXp ? totalXp(loadAttempts()) : 0;
     const attempt = buildAttempt({
       state,
       question: current,
@@ -183,6 +196,7 @@ export function PackNotesRunner() {
     lastAttemptRef.current = { id: attempt.id, answeredAt: attempt.answeredAt };
     // Same re-read rationale as the practice runner — see there.
     const freshAttempts = loadAttempts();
+    if (showXp) setXpGained(totalXp(freshAttempts) - xpBefore);
     checkNow(loadSessions(), freshAttempts);
     checkLevelNow(freshAttempts);
     setState(advanceAfterAnswer(state, attempt.isCorrect));
@@ -199,6 +213,7 @@ export function PackNotesRunner() {
       lastAttemptRef.current = null;
     }
     firstSelectedRef.current = null;
+    setXpGained(null);
     if (isLastQuestion(state)) {
       endSession(buildSessionEnd(state, state.questions[0].categoryKey, Date.now(), 'notes'));
       checkNow(loadSessions(), loadAttempts());
@@ -232,6 +247,7 @@ export function PackNotesRunner() {
         selected={selected}
         stage={stage}
         verdict={{ correct: 'Correct.', wrong: 'Not quite.' }}
+        xpGained={xpGained}
         isLast={isLastQuestion(state)}
         onCheck={handleCheck}
         onNext={handleNext}
