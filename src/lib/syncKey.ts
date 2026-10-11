@@ -118,9 +118,12 @@ function isControl(ch: string): boolean {
  * unit, so a trailing emoji is kept whole rather than split into half a
  * surrogate pair). `''` means "no name".
  *
- * MUST match normalizeKeyName in cloudflare/src/ops.ts — client and
- * server canonicalise identically, so what you type is what comes back
- * on the other device (asserted in tests/worker-sync.test.ts).
+ * The sync worker (cloudflare/src/ops.ts) imports THIS function rather
+ * than keeping a copy — client and server canonicalise identically, so
+ * what you type is what comes back on the other device
+ * (tests/worker-sync.test.ts asserts they are the same function). Keep
+ * this module import-free and runtime-neutral: it is bundled into the
+ * worker.
  */
 export function normalizeKeyName(raw: string): string {
   const flattened = Array.from(raw)

@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Attempt, Session } from '../src/data/types';
 import { toWireOp } from '../src/lib/backends/httpBackend';
-import { hashSyncKey, generateSyncKey } from '../src/lib/syncKey';
-import { normalizeKeyName } from '../src/lib/syncKey';
+import {
+  hashSyncKey,
+  generateSyncKey,
+  MAX_KEY_NAME_LENGTH as ENGINE_MAX_KEY_NAME_LENGTH,
+  normalizeKeyName,
+} from '../src/lib/syncKey';
 import {
   MAX_KEY_NAME_LENGTH,
   normalizeKeyName as workerNormalizeKeyName,
@@ -318,6 +322,14 @@ describe('backwards compatibility (pre-analytics clients)', () => {
 });
 
 describe('key names (profiles)', () => {
+  it('the worker canonicalises names with the engine function, not a copy', () => {
+    // Tripwire: a rule that must be identical on both ends is ONE function.
+    // Re-introducing a worker-side copy breaks this even if the copy is
+    // character-identical today.
+    expect(workerNormalizeKeyName).toBe(normalizeKeyName);
+    expect(MAX_KEY_NAME_LENGTH).toBe(ENGINE_MAX_KEY_NAME_LENGTH);
+  });
+
   it('client and worker canonicalise names identically', () => {
     const samples = [
       'Leo',
