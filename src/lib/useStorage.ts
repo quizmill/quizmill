@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useMounted } from './useMounted';
 import * as storage from './storage';
 import { SESSIONS_KEY, ATTEMPTS_KEY, STORAGE_EVENT as EVENT } from './storage';
 import { applySnapshot, parseSnapshot } from './transfer';
@@ -65,8 +66,7 @@ function getAttemptsServerSnapshot(): Attempt[] {
 }
 
 export function useStorageData(): { sessions: Session[]; attempts: Attempt[] } {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useMounted();
   const sessions = useSyncExternalStore(
     subscribe,
     getSessionsSnapshot,

@@ -39,6 +39,9 @@ export function RuntimePackBoundary({ children }: { children: ReactNode }) {
       : null,
   );
   useLayoutEffect(() => {
+    // The hand-over itself: a state change in a layout effect is the one
+    // way to swap the tree after hydration and before paint.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the hand-over is the point, see above
     setAdopted(null);
   }, []);
 

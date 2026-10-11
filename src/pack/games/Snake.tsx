@@ -22,9 +22,6 @@ const SWIPE_MIN_PX = 24;
 
 export function Snake({ onClose }: SnakeProps) {
   const [state, setState] = useState<State>(() => newGame(GRID));
-  // Refs for touch handling so listeners don't see stale state.
-  const stateRef = useRef(state);
-  stateRef.current = state;
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   // Game loop.

@@ -12,6 +12,8 @@ import {
   Undo2,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { useLatest } from '@/lib/useLatest';
+import { useClientState } from '@/lib/useMounted';
 import {
   DEFAULT_PEN_COLOR,
   EMPTY_SCRATCHPAD,
@@ -45,15 +47,14 @@ const PEN_WIDTH = 2.5;
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
 export function Scratchpad() {
-  const [data, setData] = useState<ScratchpadData>(EMPTY_SCRATCHPAD);
+  const [data, setData] = useClientState(loadScratchpad, EMPTY_SCRATCHPAD);
   // Full-screen view of the open panel — a transient view preference, so it's
   // kept in component state only (not persisted with the pad's contents).
   const [expanded, setExpanded] = useState(false);
 
-  // Mirror the latest data so the canvas pointer handlers (which don't
-  // re-render mid-stroke) always commit against current state.
-  const dataRef = useRef(data);
-  dataRef.current = data;
+  // The strokes as of the latest commit, for the canvas replay that runs
+  // from an effect registered once per tab/size change.
+  const strokesRef = useLatest(data.strokes);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -61,10 +62,6 @@ export function Scratchpad() {
   // Canvas box, captured on pointerdown — it can't change mid-stroke, so we
   // avoid a layout read on every pointermove.
   const rectRef = useRef<DOMRect | null>(null);
-
-  useEffect(() => {
-    setData(loadScratchpad());
-  }, []);
 
   function commit(next: ScratchpadData) {
     setData(next);
@@ -86,13 +83,13 @@ export function Scratchpad() {
       canvas.width = Math.round(rect.width * dpr);
       canvas.height = Math.round(rect.height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      replay(ctx, rect.width, rect.height, dataRef.current.strokes);
+      replay(ctx, rect.width, rect.height, strokesRef.current);
     };
     fit();
     window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
     // `expanded` changes the canvas box, so re-fit and replay when it toggles.
-  }, [data.open, data.mode, expanded]);
+  }, [data.open, data.mode, expanded, strokesRef]);
 
   // While full-screen: lock background scroll and let Escape exit.
   useEffect(() => {
@@ -135,7 +132,7 @@ export function Scratchpad() {
     }
     const rect = canvas.getBoundingClientRect();
     rectRef.current = rect;
-    const penColor = dataRef.current.color;
+    const penColor = data.color;
     const p = normPoint(e.clientX, e.clientY, rect);
     strokeRef.current = { color: penColor, points: [p] };
     const ctx = canvas.getContext('2d');
@@ -173,44 +170,44 @@ export function Scratchpad() {
       }
     }
     if (!stroke) return;
-    const strokes = [...dataRef.current.strokes, stroke];
-    commit({ ...dataRef.current, strokes });
+    const strokes = [...data.strokes, stroke];
+    commit({ ...data, strokes });
     // A tap is a single point — replay so it shows as a dot.
     if (stroke.points.length === 1) redrawNow(strokes);
   }
 
   function undo() {
-    const strokes = dataRef.current.strokes.slice(0, -1);
-    commit({ ...dataRef.current, strokes });
+    const strokes = data.strokes.slice(0, -1);
+    commit({ ...data, strokes });
     redrawNow(strokes);
   }
 
   function clearDrawing() {
-    commit({ ...dataRef.current, strokes: [] });
+    commit({ ...data, strokes: [] });
     redrawNow([]);
   }
 
   function handleText(text: string) {
-    commit({ ...dataRef.current, text });
+    commit({ ...data, text });
   }
 
   function clearText() {
-    commit({ ...dataRef.current, text: '' });
+    commit({ ...data, text: '' });
     textareaRef.current?.focus();
   }
 
   function setMode(mode: ScratchpadMode) {
-    commit({ ...dataRef.current, mode });
+    commit({ ...data, mode });
   }
 
   function setColor(color: string) {
-    commit({ ...dataRef.current, color });
+    commit({ ...data, color });
   }
 
   function toggleOpen() {
-    const open = !dataRef.current.open;
+    const open = !data.open;
     if (!open) setExpanded(false); // don't re-open straight into full screen
-    commit({ ...dataRef.current, open });
+    commit({ ...data, open });
   }
 
   const hasNotes = data.text.trim().length > 0 || data.strokes.length > 0;

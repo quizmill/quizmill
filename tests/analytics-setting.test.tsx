@@ -6,13 +6,14 @@
  * host's privacy page. Plus the upgrade card's upsell_seen / clicked.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act } from 'react';
+import { StrictMode, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { webcrypto } from 'node:crypto';
 import { SettingsPage } from '@/components/SettingsPage';
 import { SyncBootstrap } from '@/components/SyncBootstrap';
 import { UpgradeCard } from '@/pack/UpgradeCard';
 import {
+  ANALYTICS_EVENT,
   ANALYTICS_URL_ENV,
   DEVICE_ID_KEY,
   loadAnalyticsEnabled,
@@ -139,6 +140,33 @@ describe('Usage analytics card in Settings', () => {
 
     const link = container.querySelector<HTMLAnchorElement>('[data-testid="analytics-privacy"]');
     expect(link?.getAttribute('href')).toBe('https://example.com/privacy');
+  });
+
+  it('mints the device id after commit, so a discarded render never writes one', async () => {
+    // StrictMode double-invokes render-phase work (memos, initialisers)
+    // and throws one result away. Minting during render would mint on
+    // each pass; minting after commit mints exactly once. Every mint
+    // announces itself on the analytics event, so count those.
+    let mints = 0;
+    const onMint = () => {
+      mints += 1;
+    };
+    window.addEventListener(ANALYTICS_EVENT, onMint);
+    try {
+      await render(
+        <StrictMode>
+          <SettingsPage />
+        </StrictMode>,
+      );
+      expect(mints).toBe(1);
+      const stored = localStorage.getItem(DEVICE_ID_KEY);
+      expect(stored).toMatch(/^[0-9a-f-]{36}$/);
+      expect(
+        container.querySelector('[data-testid="analytics-device-id"]')?.textContent,
+      ).toContain(stored?.slice(0, 8));
+    } finally {
+      window.removeEventListener(ANALYTICS_EVENT, onMint);
+    }
   });
 
   it('omits the privacy link when the host configures none', async () => {

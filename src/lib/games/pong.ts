@@ -81,7 +81,8 @@ function paddleCollision(
 
 export function step(state: PongState, dtSec: number): PongState {
   if (state.winner) return state;
-  let { ball, vel, aiY, playerY, playerScore, aiScore } = state;
+  const { ball, vel, aiY, playerY } = state;
+  let { playerScore, aiScore } = state;
 
   // Move ball.
   let nx = ball.x + vel.x * dtSec;

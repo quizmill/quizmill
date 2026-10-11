@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
@@ -20,6 +20,7 @@ import { APP_CONFIG } from '@/config';
 import { StatTile } from '@/components/StatTile';
 import { InstallBanner } from '@/components/InstallPrompt';
 import { useStorageData } from '@/lib/useStorage';
+import { useClientState, useMounted } from '@/lib/useMounted';
 import { unresolvedMistakeCount } from '@/lib/mistakes';
 import {
   loadLevelFilter,
@@ -82,25 +83,19 @@ export default function PackHome() {
   const { attempts } = useStorageData();
   // Active level-band filter (a manifest level key) or null = All. Read
   // from localStorage after mount so SSR/first paint stay stable.
-  const [level, setLevelState] = useState<string | null>(null);
-  const [dismissedNudge, setDismissedNudge] = useState<string | null>(null);
+  const [level, setLevelState] = useClientState(loadLevelFilter, null);
+  const [dismissedNudge, setDismissedNudge] = useClientState(loadDismissedNudge, null);
   // Drive Mode is opt-in (Settings toggle) — the Home card only shows
   // once it's switched on. Read after mount like the other prefs.
-  const [driveMode, setDriveMode] = useState(false);
+  const [driveMode] = useClientState(loadDriveModeEnabled, false);
   // Coach mode is the same kind of opt-in, for the parent's device.
-  const [coachMode, setCoachMode] = useState(false);
+  const [coachMode] = useClientState(loadCoachModeEnabled, false);
   // Paper practice too — print sheets, mark them back in.
-  const [paperMode, setPaperMode] = useState(false);
+  const [paperMode] = useClientState(loadPaperModeEnabled, false);
   // In runtime-pack mode, hold the first paint until mount (see RUNTIME_PACK_MODE).
-  const [mounted, setMounted] = useState(!RUNTIME_PACK_MODE);
+  const mounted = useMounted() || !RUNTIME_PACK_MODE;
   useEffect(() => {
-    setMounted(true);
     if (RUNTIME_PACK_MODE) document.title = APP_CONFIG.title;
-    setLevelState(loadLevelFilter());
-    setDismissedNudge(loadDismissedNudge());
-    setDriveMode(loadDriveModeEnabled());
-    setCoachMode(loadCoachModeEnabled());
-    setPaperMode(loadPaperModeEnabled());
   }, []);
   const setLevel = (next: string | null) => {
     setLevelState(next);
@@ -416,7 +411,8 @@ export default function PackHome() {
         </div>
         <div className="flex flex-col gap-2.5">
           {APP_CONFIG.categories.map((cat) => {
-            const s = statsByCategory.get(cat.key)!;
+            const s = statsByCategory.get(cat.key);
+            if (!s) return null;
             const pct =
               s.answered === 0 ? 0 : Math.round((s.correct / s.answered) * 100);
             const weight = cat.weight ? `${Math.round(cat.weight * 100)}%` : null;
