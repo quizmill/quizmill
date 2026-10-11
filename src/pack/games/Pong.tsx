@@ -18,14 +18,16 @@ import {
 
 interface PongProps {
   onClose: () => void;
+  /** Serve-angle randomness; injectable so a test can pin a rally. */
+  rng?: () => number;
 }
 
 const TICK_MS = 30; // ~33 fps — gentle on phones, plenty smooth visually
 const BOARD_W = 600;
 const BOARD_H = 400;
 
-export function Pong({ onClose }: PongProps) {
-  const [state, setState] = useState<PongState>(() => newGame());
+export function Pong({ onClose, rng = Math.random }: PongProps) {
+  const [state, setState] = useState<PongState>(() => newGame(1, rng));
   const boardRef = useRef<HTMLDivElement | null>(null);
 
   // Game loop.
@@ -33,10 +35,10 @@ export function Pong({ onClose }: PongProps) {
     if (state.winner) return;
     if (state.paused) return;
     const id = setInterval(() => {
-      setState((s) => step(s, TICK_MS / 1000));
+      setState((s) => step(s, TICK_MS / 1000, rng));
     }, TICK_MS);
     return () => clearInterval(id);
-  }, [state.winner, state.paused]);
+  }, [state.winner, state.paused, rng]);
 
   // Resume after a 1s between-point pause.
   useEffect(() => {
@@ -74,7 +76,7 @@ export function Pong({ onClose }: PongProps) {
   }, []);
 
   function handleRestart() {
-    setState(newGame());
+    setState(newGame(1, rng));
   }
 
   return (

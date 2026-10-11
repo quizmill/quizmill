@@ -222,11 +222,19 @@ offline.
   pong}.ts`, components `src/pack/games/` (GameShell/HowToPlay/GameModal +
   6 games), route `/games`. The heavy game components are
   `next/dynamic`-imported in GamesPage (loaded only when a game is opened)
-  and live only in the /games route chunk — packs without games 404 the
-  route and pay nothing. Games are ephemeral (don't touch stats/stickers),
+  and live only in the /games route chunk. The route exists in EVERY
+  build and GamesPage gates on the ACTIVE pack's `games` block at render
+  time (a pack without games gets a "No games in this pack" card) — the
+  static export prerenders once, so a build-time `notFound()` left the
+  route dead for a pack with games swapped in at runtime via the pack
+  library. Games are ephemeral (don't touch stats/stickers),
   free to play, and a deliberately HIDDEN easter egg — nothing on Home;
   reached by tapping the version pill in Settings 7× (`GAMES_REVEAL_TAPS`),
-  which reveals a panel linking to `/games`. Ported from
+  which reveals a panel linking to `/games`; the find is remembered on the
+  device (`quizmill.gamesRevealed.v1`, `src/lib/gamesReveal.ts`, with a
+  "Hide again" on the panel) so the arcade is there on the next visit.
+  Pong's serve angle, like snake's food and the puzzle shuffle, comes from
+  an injected `rng` (default `Math.random`) so tests can pin it. Ported from
   `~/code/personal/learning` (original engine code, not exam content).
 - Engine never imports question *shapes* — it sees only the
   denormalised `Attempt`/`Session` fields (`src/data/types.ts`). Those
