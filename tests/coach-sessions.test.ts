@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { Attempt, Session } from '@/data/types';
 import {
   dayReplay,
-  formatSpan,
   isTimed,
   groupSessionsByDay,
   priorAttempts,
@@ -148,15 +147,6 @@ describe('selectedKeys', () => {
     expect(selectedKeys({ selectedAnswer: 'A' })).toEqual(['A']);
     expect(selectedKeys({ selectedAnswer: 'A,C' })).toEqual(['A', 'C']);
     expect(selectedKeys({ selectedAnswer: '' })).toEqual([]);
-  });
-});
-
-describe('formatSpan', () => {
-  it('formats seconds, minutes and hours', () => {
-    expect(formatSpan(0)).toBe('0 s');
-    expect(formatSpan(45)).toBe('45 s');
-    expect(formatSpan(130)).toBe('2 min');
-    expect(formatSpan(3900)).toBe('1 h 05 min');
   });
 });
 

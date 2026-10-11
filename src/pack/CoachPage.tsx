@@ -18,10 +18,10 @@ import { SourceRef } from '@/components/SourceRef';
 import { Button } from '@/components/ui/Button';
 import { useStorageData } from '@/lib/useStorage';
 import { cn } from '@/lib/cn';
+import { formatSpan } from '@/lib/duration';
 import type { Attempt } from '@/data/types';
 import {
   dayReplay,
-  formatSpan,
   groupSessionsByDay,
   isTimed,
   priorAttempts,
