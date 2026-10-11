@@ -655,7 +655,7 @@ describe('reward mini-games', () => {
     // in the browser; it can't be staged against this build.)
     await page.evaluate(() => {
       const manifest = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         id: 'runtime-no-games',
         title: 'Runtime pack without games',
         description: 'Injected at runtime.',

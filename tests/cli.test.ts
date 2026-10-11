@@ -36,7 +36,7 @@ describe('quizmill new', () => {
     const manifest = read('pack.json');
     const questions = read('questions.json');
     expect(manifest.id).toBe('my-topic');
-    expect(manifest.schemaVersion).toBe(1);
+    expect(manifest.schemaVersion).toBe(2);
     expect(manifest.categories).toEqual([{ key: 'basics', label: 'Basics' }]);
     expect(questions).toHaveLength(1);
     expect(questions[0].id).toBe('my-topic-basics-001');

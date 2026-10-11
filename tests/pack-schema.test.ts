@@ -253,6 +253,37 @@ describe('validatePack', () => {
     expect(result.errors).toEqual([]);
   });
 
+  // The format is v2 only: a manifest that still says 1 is an authoring
+  // slip to fix (set it to 2), not a compatibility mode. Nothing else
+  // about the pack has to change — a 4-option A–D bank is v2 too.
+  it('rejects schemaVersion 1 and points at 2', () => {
+    const input = loadDemo();
+    (input.manifest as { schemaVersion: number }).schemaVersion = 1;
+    const result = validatePack(input);
+    expect(result.ok).toBe(false);
+    const issue = result.errors.find((e) => e.startsWith('pack.json: schemaVersion:'));
+    expect(issue).toBeDefined();
+    expect(issue).toContain('2');
+  });
+
+  it('rejects a manifest with no schemaVersion', () => {
+    const input = loadDemo();
+    delete (input.manifest as { schemaVersion?: number }).schemaVersion;
+    const result = validatePack(input);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.startsWith('pack.json: schemaVersion:'))).toBe(true);
+  });
+
+  it('rejects any other schemaVersion (3, a string)', () => {
+    for (const bad of [3, '2']) {
+      const input = loadDemo();
+      (input.manifest as { schemaVersion: unknown }).schemaVersion = bad;
+      const result = validatePack(input);
+      expect(result.ok).toBe(false);
+      expect(result.errors.some((e) => e.startsWith('pack.json: schemaVersion:'))).toBe(true);
+    }
+  });
+
   // ——— schema v2: image questions ———
 
   it('accepts a prompt image on a question', () => {
@@ -450,7 +481,7 @@ describe('validatePack', () => {
     expect(result.errors).toEqual([]);
   });
 
-  it('accepts a manifest without progression (v1 packs stay valid)', () => {
+  it('accepts a manifest without progression (opt-in, absent is fine)', () => {
     const input = loadDemo();
     delete (input.manifest as { progression?: unknown }).progression;
     expect(validatePack(input).ok).toBe(true);
@@ -477,9 +508,8 @@ describe('validatePack', () => {
     expect(result.errors).toEqual([]);
   });
 
-  it('accepts a minimal upgrade block (title + url) on a v1 manifest', () => {
+  it('accepts a minimal upgrade block (title + url)', () => {
     const input = loadDemo();
-    (input.manifest as { schemaVersion: number }).schemaVersion = 1;
     (input.manifest as { upgrade?: unknown }).upgrade = {
       title: 'Get the full course',
       url: 'https://example.com/course',

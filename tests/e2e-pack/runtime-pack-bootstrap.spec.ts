@@ -12,7 +12,7 @@ import { baseUrl, bodyText, launchBrowser, newPage, resetOrigin, waitForText } f
 
 const INJECTED = {
   manifest: {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: 'injected-bootstrap-demo',
     title: 'Photosynthesis Crash Course',
     description: 'Injected at runtime.',
