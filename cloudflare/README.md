@@ -180,6 +180,11 @@ curl 'https://sync.quizmill.dev/v1/analytics/summary?pack=solar-system-demo&days
 #  "daily":[{"day":"2026-10-09","event":"app_open","devices":5},…]}
 ```
 
+A pack's summary covers the events that happened in it (`packId`) and
+the ones about it (`pack`, the arriving pack of an insert / unlock): a
+sampler keeps its whole funnel through `pack_unlocked`, and the pack a
+key unlocked sees its own arrivals.
+
 The summary is aggregate counts only, so it is open by default; to gate
 it, `npx wrangler secret put ANALYTICS_READ_TOKEN` and send the value as
 a bearer token. **Upgrading an existing deployment:** the table lives in

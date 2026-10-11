@@ -63,6 +63,9 @@ CREATE TABLE IF NOT EXISTS analytics_events (
   target_pack_id TEXT
 );
 
--- The summary reads one pack over a time window.
+-- The summary reads one pack over a time window — the events in it, plus
+-- the inserts / unlocks about it (the second index serves the OR).
 CREATE INDEX IF NOT EXISTS analytics_by_pack
   ON analytics_events (pack_id, received_at);
+CREATE INDEX IF NOT EXISTS analytics_by_target
+  ON analytics_events (target_pack_id, received_at);

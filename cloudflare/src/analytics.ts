@@ -12,7 +12,8 @@
  *                                 unlock_failed (packId is the active pack)
  *   GET  /v1/analytics/summary?pack=<id>&days=<n>
  *                                 per-event totals + distinct devices, and
- *                                 a per-day device series; bearer
+ *                                 a per-day device series, over the events
+ *                                 in that pack OR about it (`pack`); bearer
  *                                 ANALYTICS_READ_TOKEN when one is set
  *
  * What is stored is exactly what arrives: an event name from a closed
@@ -130,25 +131,29 @@ export function parseSummaryQuery(params: URLSearchParams): SummaryQuery | null 
 
 /**
  * The two reads behind a summary, scoped to one pack and a window
- * starting at `sinceMs` (server receipt time). Index-friendly: both hit
- * analytics_by_pack.
+ * starting at `sinceMs` (server receipt time). A pack's summary holds
+ * the events that happened IN it (pack_id) plus the ones ABOUT it
+ * (target_pack_id: inserts and unlocks that brought it in), so a sampler
+ * keeps its whole funnel — upsell_seen → upsell_clicked → pack_unlocked —
+ * and the pack that arrived sees its own arrival. Index-friendly: the OR
+ * splits over analytics_by_pack and analytics_by_target.
  */
 export function summaryStatements(pack: string, sinceMs: number): SqlStatement[] {
   return [
     {
       sql: `SELECT event, COUNT(*) AS count, COUNT(DISTINCT device_id) AS devices
 FROM analytics_events
-WHERE pack_id = ? AND received_at >= ?
+WHERE (pack_id = ? OR target_pack_id = ?) AND received_at >= ?
 GROUP BY event`,
-      params: [pack, sinceMs],
+      params: [pack, pack, sinceMs],
     },
     {
       sql: `SELECT date(received_at / 1000, 'unixepoch') AS day, event, COUNT(DISTINCT device_id) AS devices
 FROM analytics_events
-WHERE pack_id = ? AND received_at >= ?
+WHERE (pack_id = ? OR target_pack_id = ?) AND received_at >= ?
 GROUP BY day, event
 ORDER BY day, event`,
-      params: [pack, sinceMs],
+      params: [pack, pack, sinceMs],
     },
   ];
 }
