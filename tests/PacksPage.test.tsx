@@ -17,6 +17,15 @@ vi.mock('@/lib/packRegistry', async (importOriginal) => {
 vi.mock('@/lib/packAssets', () => ({
   cachePackAssets: vi.fn(async () => ({ total: 0, cached: 0 })),
 }));
+// The URL path is only ever asserted NOT to run here (it must never touch
+// the network), so the fetch is a spy that would hang if it were called.
+const fetchPackFromUrl = vi.hoisted(() =>
+  vi.fn<(url: string) => Promise<never>>(() => new Promise<never>(() => {})),
+);
+vi.mock('@/lib/packInsert', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@/lib/packInsert')>();
+  return { ...mod, fetchPackFromUrl };
+});
 
 // React needs this flag to allow act() outside @testing-library.
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -207,5 +216,80 @@ describe('PacksPage insert feedback', () => {
     expect(errors).toBeTruthy();
     expect(scrollIntoView.mock.instances).toContain(errors);
     expect(insertCard().querySelector('[data-testid="insert-result"]')).toBeNull();
+  });
+
+  it('clears the previous errors as soon as the next insert starts', async () => {
+    await render();
+    await pickFile(async () => '{"manifest":{},"questions":[]}');
+    await act(async () => {});
+    expect(insertCard().querySelector('[data-testid="insert-errors"]')).toBeTruthy();
+
+    // The next pick is still being read: the old failure must not sit under
+    // "Reading…" as if it were this file's verdict.
+    let release!: (text: string) => void;
+    await pickFile(
+      () =>
+        new Promise<string>((resolve) => {
+          release = resolve;
+        }),
+    );
+    expect(button('Reading…').disabled).toBe(true);
+    expect(insertCard().querySelector('[data-testid="insert-errors"]')).toBeNull();
+
+    await act(async () => {
+      release(bundleJson());
+    });
+    await act(async () => {});
+    expect(insertCard().querySelector('[data-testid="insert-result"]')).toBeTruthy();
+    expect(insertCard().querySelector('[data-testid="insert-errors"]')).toBeNull();
+  });
+
+  it('ignores Enter in the URL field while another insert is busy', async () => {
+    await render();
+    let release!: (text: string) => void;
+    await pickFile(
+      () =>
+        new Promise<string>((resolve) => {
+          release = resolve;
+        }),
+    );
+    expect(button('Reading…').disabled).toBe(true);
+
+    const urlInput = container.querySelector<HTMLInputElement>('[data-testid="insert-url"]');
+    if (!urlInput) throw new Error('no url input');
+    const pressEnter = () =>
+      act(async () => {
+        urlInput.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+        );
+      });
+    await act(async () => {
+      // Through the prototype setter: React's value tracker swallows a change
+      // made through the element's own property.
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+        urlInput,
+        'https://github.com/you/your-pack',
+      );
+      urlInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await pressEnter();
+    // The Fetch button is disabled; Enter must honour the same guard.
+    expect(fetchPackFromUrl).not.toHaveBeenCalled();
+    expect(button('Reading…').disabled).toBe(true);
+
+    await act(async () => {
+      release(bundleJson());
+    });
+    await act(async () => {});
+    expect(insertCard().querySelector('[data-testid="insert-result"]')).toBeTruthy();
+    // Nothing started once the file finished either — Enter was dropped, not queued.
+    expect(fetchPackFromUrl).not.toHaveBeenCalled();
+
+    // Control: the same keypress on an idle card does start the fetch, so the
+    // assertions above tested the guard and not a dead key handler.
+    await pressEnter();
+    expect(fetchPackFromUrl).toHaveBeenCalledTimes(1);
+    expect(fetchPackFromUrl).toHaveBeenCalledWith('https://github.com/you/your-pack');
+    expect(button('Fetching…').disabled).toBe(true);
   });
 });
