@@ -45,6 +45,7 @@ import {
   PACK_LEVEL_BY_QUESTION_ID,
 } from '@/pack/data';
 import { ExamReadinessTile } from '@/pack/ExamReadiness';
+import { HomeCard } from '@/pack/HomeCard';
 import { ProgressCard } from '@/pack/ProgressCard';
 import { UpgradeCard } from '@/pack/UpgradeCard';
 
@@ -233,91 +234,50 @@ export default function PackHome() {
       </section>
 
       {driveMode ? (
-        <Link
+        <HomeCard
           href="/drive/"
-          data-testid="drive-card"
-          className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-night-700 bg-night-800 p-4 shadow-sm"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-[#8bb8ff]">
-              <Car className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="text-base font-semibold text-white">Drive mode</div>
-              <div className="text-sm text-night-300">
-                Hands-free voice quiz for the car — eyes on the road.
-              </div>
-            </div>
-          </div>
-          <ArrowRight className="h-5 w-5 flex-shrink-0 text-night-400" />
-        </Link>
+          testid="drive-card"
+          tone="night"
+          icon={Car}
+          title="Drive mode"
+          blurb="Hands-free voice quiz for the car — eyes on the road."
+        />
       ) : null}
 
       {coachMode ? (
-        <Link
+        <HomeCard
           href="/coach/"
-          data-testid="coach-card"
-          className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-4 shadow-sm"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-brand-700">
-              <GraduationCap className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="text-base font-semibold text-ink-900">Coach</div>
-              <div className="text-sm text-ink-600">
-                Go back through a session together — answers hidden until you say.
-              </div>
-            </div>
-          </div>
-          <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-400" />
-        </Link>
+          testid="coach-card"
+          tone="brand"
+          icon={GraduationCap}
+          title="Coach"
+          blurb="Go back through a session together — answers hidden until you say."
+        />
       ) : null}
 
       {paperMode ? (
-        <Link
+        <HomeCard
           href="/paper/"
-          data-testid="paper-card"
-          className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-ink-400/25 bg-ink-50 p-4 shadow-sm"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-ink-200 text-ink-700">
-              <Printer className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="text-base font-semibold text-ink-900">
-                Paper practice
-              </div>
-              <div className="text-sm text-ink-600">
-                Print a sheet or write on it on screen, then mark it back in.
-              </div>
-            </div>
-          </div>
-          <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-400" />
-        </Link>
+          testid="paper-card"
+          tone="ink"
+          icon={Printer}
+          title="Paper practice"
+          blurb="Print a sheet or write on it on screen, then mark it back in."
+        />
       ) : null}
 
       {mistakeCount > 0 ? (
-        <Link
+        <HomeCard
           href="/practice/review/"
-          className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-warn-500/40 bg-warn-100/60 p-4 shadow-sm"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-warn-500/20 text-warn-700">
-              <RefreshCw className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="text-base font-semibold text-ink-900">
-                Review {mistakeCount}{' '}
-                {mistakeCount === 1 ? 'mistake' : 'mistakes'}
-              </div>
-              <div className="text-sm text-ink-600">
-                Retry the questions you got wrong.
-              </div>
-            </div>
-          </div>
-          <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-500" />
-        </Link>
+          tone="warn"
+          icon={RefreshCw}
+          title={
+            <>
+              Review {mistakeCount} {mistakeCount === 1 ? 'mistake' : 'mistakes'}
+            </>
+          }
+          blurb="Retry the questions you got wrong."
+        />
       ) : null}
 
       {packLevels.length > 0 ? (
