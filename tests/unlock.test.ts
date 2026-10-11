@@ -11,6 +11,7 @@ import {
   licenceKeyStorageKey,
   readKeyFromHash,
   stashUnlockedToast,
+  stripKeyFromLocation,
   takeUnlockedToast,
   unlockEndpoint,
   unlockPack,
@@ -106,6 +107,42 @@ describe('readKeyFromHash', () => {
     expect(readKeyFromHash('#key=')).toBeNull();
     expect(readKeyFromHash('#pack=eyJ9')).toBeNull();
     expect(readKeyFromHash('?key=in-the-query-string')).toBeNull();
+  });
+});
+
+describe('stripKeyFromLocation', () => {
+  function locate(search: string, hash: string) {
+    const replaceState = vi.fn();
+    vi.stubGlobal('window', {
+      localStorage: storage,
+      sessionStorage: fakeStorage(),
+      dispatchEvent: () => true,
+      location: { pathname: '/unlock/', search, hash },
+      history: { replaceState },
+    });
+    return replaceState;
+  }
+
+  it('drops the fragment', () => {
+    const replaceState = locate('', '#key=ABC');
+    stripKeyFromLocation();
+    expect(replaceState).toHaveBeenCalledWith(null, '', '/unlock/');
+  });
+
+  it('scrubs a query-string key too — never honoured, but not left in the address bar either', () => {
+    const replaceState = locate('?key=SECRET', '');
+    stripKeyFromLocation();
+    expect(replaceState).toHaveBeenCalledWith(null, '', '/unlock/');
+    // Other parameters survive; only `key` goes.
+    const kept = locate('?utm=x&key=SECRET&b=2', '#key=ALSO');
+    stripKeyFromLocation();
+    expect(kept).toHaveBeenCalledWith(null, '', '/unlock/?utm=x&b=2');
+  });
+
+  it('does nothing when there is nothing to scrub', () => {
+    const replaceState = locate('?utm=x', '');
+    stripKeyFromLocation();
+    expect(replaceState).not.toHaveBeenCalled();
   });
 });
 
@@ -240,6 +277,66 @@ describe('unlockPack', () => {
     expect(loadEvents().map((e) => e.data)).toEqual([
       { pack: 'solar-system-full', reason: 'invalid-pack' },
     ]);
+  });
+
+  it('refuses a bundle whose manifest id is not the pack the key is for — before anything is stored', async () => {
+    const r = await unlockPack(KEY, {
+      config: CONFIG,
+      buildPackId: 'solar-system-demo',
+      fetchImpl: respond(200, bundle('some-other-pack')),
+    });
+    expect(r).toEqual({
+      ok: false,
+      reason: 'wrong-pack',
+      message: 'The unlock service sent a different pack than this key is for.',
+    });
+    expect(listInsertedPacks()).toEqual([]);
+    expect(getActivePackPointer()).toBeNull();
+    expect(storage.dump()).not.toContain(KEY);
+    expect(loadEvents().map((e) => [e.type, e.data])).toEqual([
+      ['unlock_failed', { pack: 'solar-system-full', reason: 'wrong-pack' }],
+    ]);
+  });
+
+  it('a request abandoned before the bundle arrives stores nothing and records nothing', async () => {
+    const controller = new AbortController();
+    // The endpoint answers only after the caller has given up on it.
+    const late = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), init });
+      controller.abort();
+      return new Response(JSON.stringify(bundle()), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+    const r = await unlockPack(KEY, {
+      config: CONFIG,
+      buildPackId: 'solar-system-demo',
+      fetchImpl: late,
+      signal: controller.signal,
+    });
+    expect(r).toEqual({ ok: false, reason: 'cancelled', message: '' });
+    expect(calls[0].init?.signal).toBe(controller.signal);
+    expect(listInsertedPacks()).toEqual([]);
+    expect(getActivePackPointer()).toBeNull();
+    expect(storage.getItem(licenceKeyStorageKey('solar-system-full'))).toBeNull();
+    expect(loadEvents()).toEqual([]);
+  });
+
+  it('a fetch the signal aborted mid-flight is cancelled, not "offline"', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const aborted = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      throw init?.signal?.reason ?? new DOMException('aborted', 'AbortError');
+    }) as typeof fetch;
+    const r = await unlockPack(KEY, {
+      config: CONFIG,
+      buildPackId: 'solar-system-demo',
+      fetchImpl: aborted,
+      signal: controller.signal,
+    });
+    expect(r).toMatchObject({ ok: false, reason: 'cancelled' });
+    expect(loadEvents()).toEqual([]);
   });
 
   it('refuses the pack built into this app, like any insert', async () => {

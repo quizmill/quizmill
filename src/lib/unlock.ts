@@ -21,7 +21,9 @@
  * above, `quizmill.<packId>.licence` in localStorage, and the screen the
  * learner is looking at. Never an event, never a beacon, never a URL
  * after load (the route reads it from the FRAGMENT — which no server or
- * log ever sees — and clears it at once).
+ * log ever sees — and clears it at once; a `?key=` is cleared too, but
+ * never used). The bundle must be the pack the manifest named: any other
+ * id is refused before it touches storage.
  *
  * Pure where it can be: the fetch is injectable, so every outcome is
  * unit-tested without a browser.
@@ -74,11 +76,22 @@ export function readKeyFromHash(hash: string): string | null {
   return key.length > 0 ? key : null;
 }
 
-/** Drop the fragment from the address bar without a navigation, so the
- *  key is gone from the URL (history, share sheet, screenshots) at once. */
+/**
+ * Drop the fragment — and a `?key=` in the query string — from the address
+ * bar without a navigation, so the key is gone from the URL (history,
+ * share sheet, screenshots) at once. A query-string key is never
+ * honoured (see `readKeyFromHash`), but a link spelt that way must not
+ * leave the secret on screen either. Other query parameters survive.
+ */
 export function stripKeyFromLocation(): void {
-  if (typeof window === 'undefined' || !window.location.hash) return;
-  window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  if (typeof window === 'undefined') return;
+  const { pathname, search, hash } = window.location;
+  const params = new URLSearchParams(search);
+  const hadQueryKey = params.has('key');
+  if (!hash && !hadQueryKey) return;
+  params.delete('key');
+  const rest = params.toString();
+  window.history.replaceState(null, '', pathname + (rest ? `?${rest}` : ''));
 }
 
 /** The exact request the contract above describes. */
@@ -94,8 +107,10 @@ export type UnlockFailure =
   | 'denied' // 403 — the key was refused; the message is the endpoint's
   | 'unknown-pack' // 404
   | 'bad-response' // not a pack bundle, or an unexpected status
+  | 'wrong-pack' // a bundle, but not the pack the key is for
   | 'invalid-pack' // a bundle that failed validation
-  | 'storage'; // validated, but could not be stored (quota)
+  | 'storage' // validated, but could not be stored (quota)
+  | 'cancelled'; // the caller gave up before the bundle arrived — not an event
 
 export type UnlockOutcome =
   | { ok: true; entry: PackLibraryEntry }
@@ -123,20 +138,37 @@ function isBundle(value: unknown): value is { manifest: unknown; questions: unkn
   );
 }
 
+/** The id a bundle's manifest claims, or null when it has none. */
+function manifestId(bundle: { manifest: unknown }): string | null {
+  const m = bundle.manifest;
+  if (typeof m !== 'object' || m === null) return null;
+  const id = (m as { id?: unknown }).id;
+  return typeof id === 'string' ? id : null;
+}
+
+const CANCELLED = { ok: false, reason: 'cancelled', message: '' } as const satisfies UnlockOutcome;
+
 /**
  * Fetch the bundle the key unlocks. Every non-200 is turned into a
- * reason + a sentence the learner can act on; nothing throws.
+ * reason + a sentence the learner can act on; nothing throws. An aborted
+ * `signal` ends in `cancelled`, which the caller treats as silence.
  */
 export async function fetchUnlockBundle(
   config: UnlockConfig,
   key: string,
   fetchImpl: typeof fetch = fetch,
+  signal?: AbortSignal,
 ): Promise<{ ok: true; candidate: unknown } | { ok: false; reason: UnlockFailure; message: string }> {
   let res: Response;
   try {
     // No cookies, ever: the key is the credential and travels in the URL.
-    res = await fetchImpl(unlockEndpoint(config, key), { credentials: 'omit', mode: 'cors' });
+    res = await fetchImpl(unlockEndpoint(config, key), {
+      credentials: 'omit',
+      mode: 'cors',
+      ...(signal ? { signal } : {}),
+    });
   } catch {
+    if (signal?.aborted) return CANCELLED;
     return {
       ok: false,
       reason: 'offline',
@@ -178,12 +210,22 @@ export async function fetchUnlockBundle(
  * is recorded with the reason (never the key) and nothing is stored.
  * The caller navigates to Home afterwards — a full load, so every module
  * rebinds to the new pack.
+ *
+ * `signal` lets the caller abandon a request it no longer wants (a newer
+ * key arrived while this one was still being answered): once aborted,
+ * nothing is inserted, activated, kept or recorded, whatever the
+ * endpoint eventually says.
  */
 export async function unlockPack(
   key: string,
-  opts: { config: UnlockConfig; buildPackId: string; fetchImpl?: typeof fetch },
+  opts: {
+    config: UnlockConfig;
+    buildPackId: string;
+    fetchImpl?: typeof fetch;
+    signal?: AbortSignal;
+  },
 ): Promise<UnlockOutcome> {
-  const { config } = opts;
+  const { config, signal } = opts;
   const fail = (
     reason: UnlockFailure,
     message: string,
@@ -193,8 +235,17 @@ export async function unlockPack(
     return { ok: false, reason, message, ...(errors ? { errors } : {}) };
   };
 
-  const fetched = await fetchUnlockBundle(config, key, opts.fetchImpl);
+  const fetched = await fetchUnlockBundle(config, key, opts.fetchImpl, signal);
+  // Checked before any side effect: a response that arrives after the
+  // caller moved on must not touch storage.
+  if (signal?.aborted) return CANCELLED;
   if (!fetched.ok) return fail(fetched.reason, fetched.message);
+
+  // The endpoint serves one pack per key; a bundle for any other pack is
+  // a misconfiguration, not something to install under a surprise id.
+  if (manifestId(fetched.candidate as { manifest: unknown }) !== config.packId) {
+    return fail('wrong-pack', 'The unlock service sent a different pack than this key is for.');
+  }
 
   // `origin` is informational on the shelf and must not be a URL: the
   // runtime derives an assets location from URL-shaped origins, and the
