@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { PackChip } from '@/components/PackChip';
 import { ArrowLeft, NotebookPen, Play, Sparkles, Trash2 } from 'lucide-react';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { APP_CONFIG } from '@/config';
 import { useQuestionNotes } from '@/lib/useStorage';
 import { MAX_NOTE_TEXT_LENGTH } from '@/lib/storage';
+import { useDebouncedNote } from '@/lib/useDebouncedNote';
 import { cn } from '@/lib/cn';
 import {
   packQuestions,
@@ -16,25 +17,25 @@ import {
 } from '@/pack/data';
 import { notesPracticePool } from '@/pack/notes-practice';
 
-const NOTE_SAVE_DEBOUNCE_MS = 600;
-
 /**
  * One note in the list: the question it hangs on (category chip + prompt)
- * with the note text editable in place — same debounce-save behaviour as
- * the NoteRow in the answer panel — a delete button, and a count of the
+ * with the note text editable in place — the same `useDebouncedNote`
+ * save as the NoteRow in the answer panel, except that an emptied note is
+ * deleted on the delete button, not silently on debounce (losing the row
+ * mid-edit would be jarring) — a delete button, and a count of the
  * follow-up questions already generated from it (questions whose
  * `generatedFrom` points back at this note's question).
  */
 function NoteCard({
   questionId,
-  initialText,
+  storedText,
   updatedAt,
   followUps,
   onSave,
   onDelete,
 }: {
   questionId: string;
-  initialText: string;
+  storedText: string;
   updatedAt: number;
   followUps: number;
   onSave: (text: string) => void;
@@ -44,23 +45,9 @@ function NoteCard({
     () => packQuestions.find((q) => q.id === questionId),
     [questionId],
   );
-  const [text, setText] = useState(initialText);
-  const [savedFlash, setSavedFlash] = useState(false);
-  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function handleChange(value: string) {
-    setText(value);
-    if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
-    flushTimerRef.current = setTimeout(() => {
-      // An emptied note is deleted on the delete button, not silently on
-      // debounce — losing the row mid-edit would be jarring.
-      if (value.trim()) {
-        onSave(value);
-        setSavedFlash(true);
-        setTimeout(() => setSavedFlash(false), 800);
-      }
-    }, NOTE_SAVE_DEBOUNCE_MS);
-  }
+  const { text, setText, savedFlash } = useDebouncedNote(storedText, onSave, {
+    keepEmpty: true,
+  });
 
   const categoryLabel = question
     ? (PACK_CATEGORY_LABEL[question.categoryKey] ?? question.categoryKey)
@@ -107,7 +94,7 @@ function NoteCard({
       <textarea
         aria-label="Note text"
         value={text}
-        onChange={(e) => handleChange(e.target.value)}
+        onChange={(e) => setText(e.target.value)}
         maxLength={MAX_NOTE_TEXT_LENGTH}
         rows={2}
         className="w-full resize-y rounded-lg border border-ink-200 bg-surface px-3 py-2 text-sm text-ink-800 focus:border-brand-500 focus:outline-hidden"
@@ -233,7 +220,7 @@ export default function NotesPage() {
               <NoteCard
                 key={n.questionId}
                 questionId={n.questionId}
-                initialText={n.text}
+                storedText={n.text}
                 updatedAt={n.updatedAt}
                 followUps={followUpCounts.get(n.questionId) ?? 0}
                 onSave={(text) => setNote(n.questionId, text)}
