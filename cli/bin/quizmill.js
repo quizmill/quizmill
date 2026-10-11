@@ -113,7 +113,7 @@ function packSource(arg) {
 }
 
 const TEMPLATE_MANIFEST = (id) => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   id,
   title: 'My Topic Practice',
   description: 'Multiple-choice practice on my topic. Edit me.',

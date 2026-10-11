@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Learning-pack format (schemaVersion 1 or 2).
+ * Learning-pack format (schemaVersion 2).
  *
  * A pack is a directory of JSON files that fully describes one
  * deployable practice app:
@@ -9,22 +9,26 @@ import { z } from 'zod';
  *   pack.json        manifest — identity, branding, categories
  *   questions.json   the MCQ bank
  *   scenarios.json   optional shared scenario stems (may be `[]` / absent)
- *   concepts.json    optional teaching cards (v2; may be `[]` / absent)
- *   assets/          optional images referenced by `image` paths (v2)
+ *   concepts.json    optional teaching cards (may be `[]` / absent)
+ *   assets/          optional images referenced by `image` paths
  *
  * The shape is a generalised MCQ format proven by several hundred
  * imported/generated questions in the engine's ancestor project; categories
  * are declared in the manifest and cross-checked by `validatePack`,
  * not hard-coded.
  *
- * schemaVersion 2 relaxes the original v1 (exactly 4 options A–D) to
- * 2–6 options keyed A–F in order — true/false, 5-option exam papers, etc.
- * v1 packs (4 options A–D) remain valid unchanged; the validator stays
- * backward-readable.
+ * There is exactly one accepted `schemaVersion`, 2, and the validator is
+ * strict about it: the original v1 (exactly 4 options A–D, no images,
+ * concepts or levels) is a subset of v2, so a pack that still declares 1
+ * only has to change the number. Nothing is gated on the version beyond
+ * the literal — every block below is optional and additive, which is what
+ * lets v2 stay a single format. A later schema bump must keep reading 2
+ * (`z.union` the literals and gate the new shape on the value).
  *
- * Multi-answer questions ("select all that apply") are additive and valid
- * for both v1 and v2 packs: a question carries either `correctKey` (one
- * answer, as before) or `correctKeys` (two or more), never both.
+ * Questions carry 2–6 options keyed A–F in order — true/false, 5-option
+ * exam papers, etc. Multi-answer questions ("select all that apply") are
+ * additive: a question carries either `correctKey` (one answer) or
+ * `correctKeys` (two or more), never both.
  *
  * Packs are PRIVATE by default: the active pack lives at gitignored
  * `content/pack/`, authored packs under gitignored `packs/`. Only the
@@ -34,7 +38,7 @@ import { z } from 'zod';
 const slug = /^[a-z0-9][a-z0-9-]*$/;
 
 /**
- * A pack-relative image asset path (v2). Lives in the pack's `assets/`
+ * A pack-relative image asset path. Lives in the pack's `assets/`
  * directory and is served from `/pack-assets/` at build time. Must be a
  * plain relative path with an image extension — no leading slash, no URL,
  * no `..` traversal.
@@ -78,7 +82,7 @@ export const packSourceSchema = z.object({
 });
 
 /**
- * Optional exam-readiness goal (additive; valid for v1 and v2 packs). When
+ * Optional exam-readiness goal (additive). When
  * present, the engine estimates "are you ready to sit this?" from the
  * learner's first-attempt accuracy, blueprint-weighted across the pack's
  * categories (their `weight`s), and surfaces it on the Progress page.
@@ -118,7 +122,7 @@ export const GAME_IDS = [
 export const gameIdSchema = z.enum(GAME_IDS);
 
 /**
- * Optional reward mini-games (additive; valid for v1 and v2 packs). When
+ * Optional reward mini-games (additive). When
  * present, the app offers a small arcade of break-time games as a hidden
  * treat — found via the version-pill easter egg in Settings, then free to
  * play. Absent → no games anywhere, exactly as today.
@@ -130,7 +134,7 @@ export const packGamesSchema = z.object({
 });
 
 /**
- * Optional XP/levels progression (additive; valid for v1 and v2 packs).
+ * Optional XP/levels progression (additive).
  * Presence enables the accumulating progression layer — XP derived from
  * the attempt history, a bounded named-level ladder, a level card on
  * Home. Built for kids' packs; deliberately has no options yet (no
@@ -140,7 +144,7 @@ export const packGamesSchema = z.object({
 export const packProgressionSchema = z.object({});
 
 /**
- * Optional upgrade pitch (additive; valid for v1 and v2 packs). A free or
+ * Optional upgrade pitch (additive). A free or
  * sampler pack points at the paid course / full bank it is a taste of: the
  * app renders one card on Home (below the practice loop) and one in
  * Settings, linking out to `url` with `?ref=<packId>-<home|settings>`
@@ -165,7 +169,11 @@ export const packUpgradeSchema = z.object({
 
 export const packManifestSchema = z
   .object({
-    schemaVersion: z.union([z.literal(1), z.literal(2)]),
+    /** The one accepted format version — see the file header. A pack
+     *  still declaring 1 just needs the number changed. */
+    schemaVersion: z.literal(2, {
+      message: 'must be 2 — the only pack format the engine reads (a 4-option A–D bank is v2 too; just change the number)',
+    }),
     /** Pack identifier (slug). Becomes part of file paths — keep stable. */
     id: z.string().regex(slug).max(40),
     /** App title (tab title / home H1). */
@@ -177,7 +185,7 @@ export const packManifestSchema = z
     /** PWA theme colour, e.g. "#1e3a5f". */
     themeColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
     categories: z.array(packCategorySchema).min(1).max(12),
-    /** Optional ordered "level" bands (v2) — a coarse axis above difficulty
+    /** Optional ordered "level" bands — a coarse axis above difficulty
      *  you can filter practice by (Year groups, CEFR levels, …). Questions
      *  tag one via `level`; declare none and there's no filter, as today. */
     levels: z.array(packLevelSchema).min(1).max(8).optional(),
@@ -185,7 +193,7 @@ export const packManifestSchema = z
      *  label (e.g. "Year", "Grade", "CEFR"). Defaults to "Level". The
      *  engine ships no domain terminology — the pack names its own axis. */
     levelsLabel: z.string().min(1).max(24).optional(),
-    /** Optional "Question sources" legend, rendered in Settings (v2) —
+    /** Optional "Question sources" legend, rendered in Settings —
      *  where the bank's questions come from: repos, licences, credits. */
     sources: z.array(packSourceSchema).max(12).optional(),
     /** Optional exam-readiness goal — see packExamSchema. */
@@ -220,7 +228,7 @@ export const packOptionSchema = z.object({
   key: packOptionKeySchema,
   /** Visible label, or — for image-answer questions — the image's alt text. */
   text: z.string().min(1).max(800),
-  /** Optional answer image (v2). When any option has one, all must (an
+  /** Optional answer image. When any option has one, all must (an
    *  image-answer question, e.g. Non-Verbal Reasoning) — see superRefine. */
   image: packImagePathSchema.optional(),
 });
@@ -241,7 +249,7 @@ export const packConceptExampleSchema = z.object({
 });
 
 /**
- * A short teaching card (v2), in optional `concepts.json`. A question
+ * A short teaching card, in optional `concepts.json`. A question
  * links one by `conceptId`; the feedback panel surfaces it after a wrong
  * answer. `body` renders as McqMarkdown (paragraphs, code, links).
  */
@@ -263,7 +271,7 @@ export const packQuestionSchema = z
     /** Optional teaching card shown after a wrong answer — cross-checked
      *  against concepts.json in validatePack. */
     conceptId: z.string().optional(),
-    /** Optional level band (v2) — must reference a manifest level key. */
+    /** Optional level band — must reference a manifest level key. */
     level: z.string().optional(),
     difficulty: z.union([
       z.literal(1),
@@ -275,16 +283,16 @@ export const packQuestionSchema = z
     /** Floor of 10 keeps junk out while allowing legitimately terse
      *  prompts like arithmetic ("What is 7 × 8?"). */
     prompt: z.string().min(10),
-    /** Optional prompt image (v2), shown above the options — e.g. an NVR
+    /** Optional prompt image, shown above the options — e.g. an NVR
      *  figure or a diagram the question refers to. */
     image: packImagePathSchema.optional(),
-    /** 2–6 options keyed A–F in order (v2). True/false → 2; GL papers → 5. */
+    /** 2–6 options keyed A–F in order. True/false → 2; GL papers → 5. */
     options: z.array(packOptionSchema).min(2).max(6),
     /** Single-answer key. Exactly one of `correctKey` / `correctKeys` must
      *  be present — see superRefine. */
     correctKey: packOptionKeySchema.optional(),
     /** Multi-answer key ("select all that apply") — 2–6 distinct option
-     *  keys, all correct (additive; valid for v1 and v2 packs). Grading is
+     *  keys, all correct (additive). Grading is
      *  set-equality: every listed key must be chosen and no other. Use
      *  `correctKey` for a single-answer question, `correctKeys` for two or
      *  more correct answers — never both. */
@@ -301,8 +309,7 @@ export const packQuestionSchema = z
      *  was left on plus the note text at generation time. The app shows
      *  it in the answer panel and counts follow-ups on the Notes page.
      *  Deliberately a SOFT reference — the original question may later
-     *  leave the pack, so it is not cross-validated (additive; valid for
-     *  v1 and v2 packs). */
+     *  leave the pack, so it is not cross-validated (additive). */
     generatedFrom: z
       .object({
         questionId: z.string().min(1),

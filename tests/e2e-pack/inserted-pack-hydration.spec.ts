@@ -13,7 +13,7 @@ import { baseUrl, launchBrowser, newPage, resetOrigin, waitForText } from '../e2
 
 const INSERTED = {
   manifest: {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: 'inserted-hydration-demo',
     title: 'Photosynthesis Crash Course',
     description: 'Inserted from the pack library.',

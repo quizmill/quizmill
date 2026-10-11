@@ -61,11 +61,12 @@ export type PackUpgrade = {
   blurb?: string;
 };
 
-/** Option keys, A–F (v2 allows 2–6 options; v1 packs use A–D). */
+/** Option keys, A–F (a question has 2–6 options; 4 keyed A–D is the common case). */
 export type OptionKey = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
 export type PackManifest = {
-  schemaVersion: 1 | 2;
+  /** The one accepted pack format — see tools/pack/schema.ts. */
+  schemaVersion: 2;
   id: string;
   title: string;
   description: string;

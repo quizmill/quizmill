@@ -19,7 +19,7 @@ import type { ActivePack } from '@/pack/runtime';
 
 const INJECTED: ActivePack = {
   manifest: {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: 'injected-pack',
     title: 'Injected Pack',
     description: 'A pack handed to the engine at runtime.',
