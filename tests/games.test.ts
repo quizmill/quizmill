@@ -8,6 +8,17 @@ import {
   SOLVED,
 } from '../src/lib/games/tilePuzzle';
 import { newGame as newSnake, step, steer } from '../src/lib/games/snake';
+import {
+  newGame as newPong,
+  resume,
+  setPlayerY,
+  step as stepPong,
+  BALL_RADIUS,
+  PADDLE_HALF_H,
+  PADDLE_X,
+  WIN_SCORE,
+  type PongState,
+} from '../src/lib/games/pong';
 import { GAMES, enabledGames } from '../src/lib/games/registry';
 import { GAME_IDS } from '../tools/pack/schema';
 
@@ -104,6 +115,152 @@ describe('snake', () => {
   it('step does nothing once gameOver', () => {
     const s = { ...newSnake(16, () => 0), gameOver: true };
     expect(step(s, () => 0)).toBe(s);
+  });
+});
+
+describe('pong', () => {
+  // Serve angle = (rng() - 0.5) * 0.4, so rng → 1 pins vy to +0.2 and
+  // rng → 0.5 pins it flat; a counting rng checks the serve draws ONCE.
+  function counting(value: number): { rng: () => number; calls: () => number } {
+    let n = 0;
+    return {
+      rng: () => {
+        n++;
+        return value;
+      },
+      calls: () => n,
+    };
+  }
+
+  it('newGame serves from the centre with an rng-chosen angle', () => {
+    const { rng, calls } = counting(1);
+    const s = newPong(1, rng);
+    expect(s.ball).toEqual({ x: 0.5, y: 0.5 });
+    expect(s.vel.x).toBeGreaterThan(0);
+    expect(s.vel.y).toBeCloseTo(0.2);
+    expect(calls()).toBe(1);
+    expect(s.playerScore).toBe(0);
+    expect(s.aiScore).toBe(0);
+    expect(s.paused).toBe(false);
+    expect(s.winner).toBeNull();
+  });
+
+  it('newGame honours the start direction and is reproducible for the same rng', () => {
+    expect(newPong(-1, () => 0.5).vel.x).toBeLessThan(0);
+    expect(newPong(1, () => 0.25)).toEqual(newPong(1, () => 0.25));
+  });
+
+  it('step moves the ball by velocity × dt and chases it with the AI paddle', () => {
+    const s = newPong(1, () => 0.5); // vy = 0: a flat serve to the right
+    const s1 = stepPong(s, 0.1, () => 0.5);
+    expect(s1.ball.x).toBeCloseTo(0.5 + s.vel.x * 0.1);
+    expect(s1.ball.y).toBeCloseTo(0.5);
+    expect(s1.aiY).toBeCloseTo(0.5); // already level with the ball
+    expect(s1.paused).toBe(false);
+  });
+
+  it('bounces off the top and bottom walls', () => {
+    const s: PongState = {
+      ...newPong(1, () => 0.5),
+      ball: { x: 0.5, y: BALL_RADIUS + 0.01 },
+      vel: { x: 0, y: -1 },
+    };
+    const s1 = stepPong(s, 0.1, () => 0.5);
+    expect(s1.ball.y).toBeCloseTo(BALL_RADIUS);
+    expect(s1.vel.y).toBe(1);
+  });
+
+  it('a paddle hit reflects the ball, speeds it up and adds English', () => {
+    // Ball just right of the player paddle, heading left, paddle centred
+    // slightly below the ball so the return angles up.
+    const s: PongState = {
+      ...newPong(-1, () => 0.5),
+      playerY: 0.52,
+      ball: { x: PADDLE_X + BALL_RADIUS + 0.005, y: 0.5 },
+      vel: { x: -0.5, y: 0 },
+    };
+    const s1 = stepPong(s, 0.02, () => 0.5);
+    expect(s1.vel.x).toBeCloseTo(0.5 * 1.05);
+    expect(s1.vel.y).toBeCloseTo((0.5 - 0.52) * 4.5);
+    expect(s1.ball.x).toBeCloseTo(PADDLE_X + BALL_RADIUS);
+    expect(s1.playerScore).toBe(0);
+    expect(s1.aiScore).toBe(0);
+  });
+
+  it('a miss on the left scores for the AI, pauses, and re-serves from the centre with an rng angle', () => {
+    const s: PongState = {
+      ...newPong(-1, () => 0.5),
+      ball: { x: 0.01, y: 0.3 },
+      vel: { x: -1, y: 0.1 },
+      aiY: 0.8,
+    };
+    const { rng, calls } = counting(1);
+    const s1 = stepPong(s, 0.1, rng);
+    expect(s1.aiScore).toBe(1);
+    expect(s1.playerScore).toBe(0);
+    expect(s1.paused).toBe(true);
+    expect(s1.winner).toBeNull();
+    expect(s1.ball).toEqual({ x: 0.5, y: 0.5 });
+    expect(s1.aiY).toBe(0.5);
+    expect(s1.vel.x).toBeGreaterThan(0); // serves back toward the AI side
+    expect(s1.vel.y).toBeCloseTo(0.2);
+    expect(calls()).toBe(1);
+  });
+
+  it('a miss on the right scores for the player and serves toward the player', () => {
+    const s: PongState = {
+      ...newPong(1, () => 0.5),
+      ball: { x: 0.99, y: 0.5 },
+      vel: { x: 1, y: 0 },
+    };
+    const s1 = stepPong(s, 0.1, () => 0.5);
+    expect(s1.playerScore).toBe(1);
+    expect(s1.paused).toBe(true);
+    expect(s1.vel.x).toBeLessThan(0);
+    expect(s1.vel.y).toBeCloseTo(0);
+  });
+
+  it('the same rng gives the same re-serve every time', () => {
+    const s: PongState = {
+      ...newPong(1, () => 0.5),
+      ball: { x: 0.99, y: 0.5 },
+      vel: { x: 1, y: 0 },
+    };
+    expect(stepPong(s, 0.1, () => 0.9)).toEqual(stepPong(s, 0.1, () => 0.9));
+    expect(stepPong(s, 0.1, () => 0.9).vel.y).not.toBeCloseTo(
+      stepPong(s, 0.1, () => 0.1).vel.y,
+    );
+  });
+
+  it('the winning point ends the game without a re-serve', () => {
+    const s: PongState = {
+      ...newPong(1, () => 0.5),
+      playerScore: WIN_SCORE - 1,
+      ball: { x: 0.99, y: 0.5 },
+      vel: { x: 1, y: 0 },
+    };
+    const { rng, calls } = counting(0.5);
+    const s1 = stepPong(s, 0.1, rng);
+    expect(s1.winner).toBe('player');
+    expect(s1.playerScore).toBe(WIN_SCORE);
+    expect(s1.paused).toBe(false);
+    expect(calls()).toBe(0);
+    // A finished game is inert.
+    expect(stepPong(s1, 0.1, rng)).toBe(s1);
+    expect(resume(s1)).toBe(s1);
+    expect(setPlayerY(s1, 0.1)).toBe(s1);
+  });
+
+  it('resume clears the between-point pause', () => {
+    const paused = { ...newPong(1, () => 0.5), paused: true };
+    expect(resume(paused).paused).toBe(false);
+  });
+
+  it('setPlayerY clamps the paddle to the board', () => {
+    const s = newPong(1, () => 0.5);
+    expect(setPlayerY(s, -1).playerY).toBe(PADDLE_HALF_H);
+    expect(setPlayerY(s, 2).playerY).toBe(1 - PADDLE_HALF_H);
+    expect(setPlayerY(s, 0.3).playerY).toBe(0.3);
   });
 });
 

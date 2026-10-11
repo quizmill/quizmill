@@ -138,10 +138,12 @@ jobs:
       - uses: actions/setup-node@v4
         if: steps.version.outputs.version != ''
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           registry-url: https://registry.npmjs.org
 
-      # Trusted publishing needs npm >= 11.5.1; Node 22 ships an older npm.
+      # Trusted publishing needs npm >= 11.5.1. The pinned Node (.nvmrc)
+      # already bundles a newer npm, but the runner's bundled npm is not
+      # ours to pin, so upgrade anyway rather than depend on it.
       - name: Update npm for trusted publishing
         if: steps.version.outputs.version != ''
         run: |

@@ -1,14 +1,16 @@
 import { z } from 'zod';
 
 /**
- * Learning-pack format (schemaVersion 1).
+ * Learning-pack format (schemaVersion 1 or 2).
  *
- * A pack is a directory of three JSON files that fully describes one
- * deployable practice app for the generic `pack` variant:
+ * A pack is a directory of JSON files that fully describes one
+ * deployable practice app:
  *
  *   pack.json        manifest — identity, branding, categories
  *   questions.json   the MCQ bank
  *   scenarios.json   optional shared scenario stems (may be `[]` / absent)
+ *   concepts.json    optional teaching cards (v2; may be `[]` / absent)
+ *   assets/          optional images referenced by `image` paths (v2)
  *
  * The shape is a generalised MCQ format proven by several hundred
  * imported/generated questions in the engine's ancestor project; categories
@@ -330,11 +332,11 @@ export const packQuestionSchema = z
         message: 'a question needs exactly one of correctKey or correctKeys',
       });
     }
-    if (hasSingle && !keys.includes(q.correctKey!)) {
+    if (q.correctKey !== undefined && !keys.includes(q.correctKey)) {
       ctx.addIssue({ code: 'custom', message: 'correctKey must reference one of the options' });
     }
-    if (hasMulti) {
-      const ck = q.correctKeys!;
+    if (q.correctKeys !== undefined) {
+      const ck = q.correctKeys;
       if (new Set(ck).size !== ck.length) {
         ctx.addIssue({ code: 'custom', message: 'correctKeys must not contain duplicates' });
       }
@@ -377,18 +379,23 @@ export interface PackValidationResult {
   warnings: string[];
 }
 
+/** The parsed JSON of a pack's files, before validation — what
+ *  `readPackDir` returns and `validatePack` takes. The optional files
+ *  are `undefined` when absent (not `[]`). */
+export interface PackFiles {
+  manifest: unknown;
+  questions: unknown;
+  scenarios?: unknown;
+  concepts?: unknown;
+}
+
 /**
  * Whole-pack validation: per-file schemas plus the cross-file checks a
  * single Zod schema can't express (unique ids, category/scenario
  * references, weight sanity). Pure function over parsed JSON so it's
  * unit-testable and reusable by both the CLI and the use-pack script.
  */
-export function validatePack(input: {
-  manifest: unknown;
-  questions: unknown;
-  scenarios?: unknown;
-  concepts?: unknown;
-}): PackValidationResult {
+export function validatePack(input: PackFiles): PackValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -550,11 +557,12 @@ export function validatePack(input: {
           'pack.json: exam goal set but no category weights — readiness will weight domains by bank size; add weights for an exam-blueprint estimate',
         );
       }
-      if (exam.scope) {
-        const inScope = questions.filter((q) => q.level === exam.scope!.level).length;
+      const scope = exam.scope;
+      if (scope) {
+        const inScope = questions.filter((q) => q.level === scope.level).length;
         if (inScope === 0) {
           warnings.push(
-            `pack.json: exam.scope.level "${exam.scope.level}" matches no questions — readiness will have nothing to measure`,
+            `pack.json: exam.scope.level "${scope.level}" matches no questions — readiness will have nothing to measure`,
           );
         }
       }

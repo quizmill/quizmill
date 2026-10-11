@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
+import { GameOver } from './GameOver';
 import { GameShell } from './GameShell';
 import { HowToPlay } from './HowToPlay';
 import { isSolved, shuffle, tapTile, type Board } from '@/lib/games/tilePuzzle';
@@ -91,21 +91,14 @@ export function TilePuzzle({ onClose }: TilePuzzleProps) {
       />
 
       {solved ? (
-        <div
-          data-testid="tile-puzzle-solved"
-          className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-success-500/40 bg-success-100/60 p-3 text-center"
-        >
-          <div className="text-base font-bold text-success-700">Solved! ✨</div>
-          <div className="text-sm text-ink-700">in {moves} moves</div>
-          <div className="mt-1 flex gap-2">
-            <Button size="md" variant="secondary" onClick={handleReset}>
-              Play again
-            </Button>
-            <Button size="md" onClick={onClose}>
-              Done
-            </Button>
-          </div>
-        </div>
+        <GameOver
+          tone="win"
+          title="Solved! ✨"
+          detail={`in ${moves} moves`}
+          testId="tile-puzzle-solved"
+          onRestart={handleReset}
+          onClose={onClose}
+        />
       ) : null}
     </GameShell>
   );

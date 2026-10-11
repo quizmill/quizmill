@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   Car,
@@ -24,6 +24,7 @@ import {
   useStorageData,
 } from '@/lib/useStorage';
 import { loadAttempts, loadLevelFilter, loadSessions } from '@/lib/storage';
+import { useClientState } from '@/lib/useMounted';
 import { recordNewAchievements } from '@/pack/useAchievementUnlock';
 import { recordLevelCrossings } from '@/pack/useLevelUp';
 import {
@@ -106,8 +107,7 @@ export function DriveRunner() {
   const [lastHeard, setLastHeard] = useState<string | null>(null);
   // STT support is read after mount: the server render must not depend
   // on browser APIs, and Safari-standalone quirks make it dynamic.
-  const [stt, setStt] = useState(false);
-  useEffect(() => setStt(sttSupported()), []);
+  const [stt] = useClientState(sttSupported, false);
   // Recognition can exist but not work (mic permission denied, no audio
   // device, speech service unreachable). After repeated hard errors the
   // session degrades to tap-to-answer instead of nagging.
@@ -213,9 +213,8 @@ export function DriveRunner() {
   // ── Voice loop effects ──────────────────────────────────────────────
 
   // handleAnswer closes over phase/state; the listening loop lives
-  // across renders, so it calls through a ref to get the fresh one.
-  const handleAnswerRef = useRef(handleAnswer);
-  handleAnswerRef.current = handleAnswer;
+  // across renders, so it calls through an Effect Event to get the fresh one.
+  const onAnswer = useEffectEvent(handleAnswer);
 
   // asking: read the question, then open the answer window.
   useEffect(() => {
@@ -276,7 +275,7 @@ export function DriveRunner() {
           .map((t) => matchAnswer(t, q.options))
           .find((k) => k !== null);
         if (key) {
-          handleAnswerRef.current(key);
+          onAnswer(key);
           return;
         }
 
@@ -340,12 +339,13 @@ export function DriveRunner() {
     const nav = navigator as Navigator & {
       wakeLock?: { request(type: 'screen'): Promise<WakeLockSentinel> };
     };
-    if (!nav.wakeLock) return;
+    const wakeLock = nav.wakeLock;
+    if (!wakeLock) return;
     let lock: WakeLockSentinel | null = null;
     let cancelled = false;
     const acquire = async () => {
       try {
-        const l = await nav.wakeLock!.request('screen');
+        const l = await wakeLock.request('screen');
         if (cancelled) await l.release();
         else lock = l;
       } catch {

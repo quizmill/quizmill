@@ -10,6 +10,7 @@ import {
   useEndSession,
   useStorageData,
 } from '@/lib/useStorage';
+import { useMounted } from '@/lib/useMounted';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { useLevelUp } from '@/pack/useLevelUp';
 import {
@@ -18,6 +19,7 @@ import {
   QuestionPanel,
   RunnerCelebrations,
   RunnerLoading,
+  RunnerResults,
   type Stage,
 } from '@/pack/RunnerPanels';
 import { amendAttempt, loadAttempts, loadSessions } from '@/lib/storage';
@@ -78,7 +80,7 @@ export function PackReviewRunner() {
   const [scoped, setScoped] = useState(false);
   // XP earned by the just-checked answer — see the practice runner.
   const [xpGained, setXpGained] = useState<number | null>(null);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [stage, setStage] = useState<Stage>('choosing');
   // The chosen option key(s) — one for single-answer, several for
   // multi-answer ("select all") questions.
@@ -89,8 +91,9 @@ export function PackReviewRunner() {
   const lastAttemptRef = useRef<{ id: string; answeredAt: number } | null>(null);
   const [finished, setFinished] = useState(false);
 
-  useEffect(() => setMounted(true), []);
-
+  // Dealing the round records the session start (a storage write) as well
+  // as setting state, so it stays an effect.
+  /* eslint-disable react-hooks/set-state-in-effect -- see above */
   useEffect(() => {
     if (!mounted || state) return;
     const scope = scopeFromHash();
@@ -125,6 +128,7 @@ export function PackReviewRunner() {
     setState(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted, attempts, state]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   /** Results → next batch. Restarts in place: a link back to this same
    *  route wouldn't remount the runner, leaving the results screen up. */
@@ -185,39 +189,25 @@ export function PackReviewRunner() {
   );
 
   if (finished) {
-    const { correct, total, pct } = scoreSummary(state);
     return (
-      <main className="flex flex-col gap-5">
-        {celebrations}
-        <BackLink />
-        <div className="rounded-2xl border border-ink-200 bg-surface p-8 text-center shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
-            Review complete
-          </div>
-          <h1 className="mt-2 text-4xl font-bold text-ink-900">
-            {correct}/{total}
-          </h1>
-          <p className="mt-1 text-lg font-medium text-ink-600">
-            {pct}% rescued
-          </p>
-          <p className="mt-4 text-sm text-ink-500">
-            Questions you got right have been removed from your mistake
-            queue.
-          </p>
-          <div className="mt-6 flex flex-col gap-2">
-            <Button size="lg" block onClick={handleReviewMore}>
-              <RefreshCw className="h-4 w-4" />
-              Review more
-            </Button>
-            <Link href="/" className="block">
-              <Button size="lg" variant="secondary" block>
-                <Home className="h-4 w-4" />
-                Back to home
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </main>
+      <RunnerResults
+        eyebrow="Review complete"
+        score={scoreSummary(state)}
+        pctLabel="rescued"
+        note="Questions you got right have been removed from your mistake queue."
+        celebrations={celebrations}
+      >
+        <Button size="lg" block onClick={handleReviewMore}>
+          <RefreshCw className="h-4 w-4" />
+          Review more
+        </Button>
+        <Link href="/" className="block">
+          <Button size="lg" variant="secondary" block>
+            <Home className="h-4 w-4" />
+            Back to home
+          </Button>
+        </Link>
+      </RunnerResults>
     );
   }
 

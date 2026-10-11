@@ -16,6 +16,7 @@ import {
   beaconFor,
   loadAnalyticsEnabled,
   loadDeviceId,
+  peekDeviceId,
   regenerateDeviceId,
   saveAnalyticsEnabled,
   sendFunnelEvent,
@@ -98,6 +99,13 @@ describe('device id', () => {
     const after = regenerateDeviceId();
     expect(after).not.toBe(before);
     expect(loadDeviceId()).toBe(after);
+  });
+
+  it('peeks without minting: empty and storage untouched until an id exists', () => {
+    expect(peekDeviceId()).toBe('');
+    expect(window.localStorage.getItem(DEVICE_ID_KEY)).toBeNull();
+    const id = loadDeviceId();
+    expect(peekDeviceId()).toBe(id);
   });
 });
 

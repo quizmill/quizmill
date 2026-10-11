@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import {
   ArrowLeft,
   ClipboardCheck,
@@ -11,8 +12,10 @@ import {
   Undo2,
 } from 'lucide-react';
 import { QrCode } from '@/components/QrCode';
-import { Button } from '@/components/ui/Button';
+import { buttonStyles } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
+import { useLatest } from '@/lib/useLatest';
+import { useClientState, useMounted } from '@/lib/useMounted';
 import type { PaperSheet } from '@/pack/paper';
 import {
   addInkPoint,
@@ -39,6 +42,15 @@ const MAX_UNDO = 60;
 /** A stroke shorter than this (in samples) is thrown away when a second
  *  finger lands: it was the first finger of a scroll, not writing. */
 const SCROLL_GESTURE_GRACE = 8;
+
+/** The stroke list and the layout width it was written against (null =
+ *  none yet: the page is free to take the viewport's width). */
+interface Ink {
+  strokes: InkStroke[];
+  w: number | null;
+}
+
+const NO_INK: Ink = { strokes: [], w: null };
 
 const InkPath = memo(function InkPath({ stroke }: { stroke: InkStroke }) {
   return <path d={strokePath(stroke.p)} stroke={stroke.c} data-testid="ink-stroke" />;
@@ -80,16 +92,20 @@ export function PaperWriteView({
   /** The worksheet layout the ink goes over. */
   children: React.ReactNode;
 }) {
-  const [strokes, setStrokes] = useState<InkStroke[]>([]);
-  // Layout width the stored strokes were written against (null = none
-  // yet: the page is free to take the viewport's width).
-  const [inkWidth, setInkWidth] = useState<number | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  // This device's ink for the sheet — read on the client, then owned here
+  // (the parent remounts the view per sheet, see WriteSheet).
+  const loadInk = useCallback((): Ink => {
+    const stored = loadSheetInk(sheet.id);
+    return stored ? { strokes: stored.strokes, w: stored.w } : NO_INK;
+  }, [sheet.id]);
+  const [ink, setInk] = useClientState(loadInk, NO_INK);
+  const { strokes, w: inkWidth } = ink;
+  const loaded = useMounted();
   const [available, setAvailable] = useState(0);
   const [pageHeight, setPageHeight] = useState(0);
   const [tool, setTool] = useState<Tool>('pen');
   const [color, setColor] = useState<string>(INK_COLORS[0]);
-  const [fingerWrites, setFingerWrites] = useState(true);
+  const [fingerWrites, setFingerWrites] = useClientState(loadFingerWrites, true);
   const [undoDepth, setUndoDepth] = useState(0);
   const [saveFailed, setSaveFailed] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -101,14 +117,10 @@ export function PaperWriteView({
 
   // Pointer handlers run between renders — they read the latest values
   // through refs rather than closing over a stale render.
-  const strokesRef = useRef(strokes);
-  strokesRef.current = strokes;
-  const toolRef = useRef(tool);
-  toolRef.current = tool;
-  const colorRef = useRef(color);
-  colorRef.current = color;
-  const fingerWritesRef = useRef(fingerWrites);
-  fingerWritesRef.current = fingerWrites;
+  const strokesRef = useLatest(strokes);
+  const toolRef = useLatest(tool);
+  const colorRef = useLatest(color);
+  const fingerWritesRef = useLatest(fingerWrites);
 
   const historyRef = useRef<InkStroke[][]>([]);
   /** The stroke being written right now. */
@@ -125,17 +137,7 @@ export function PaperWriteView({
   const pageWidth = inkWidth ?? choosePageWidth(available);
   const scale = pageScale(pageWidth, available);
 
-  // ── Load, persist ──────────────────────────────────────────────────────
-
-  useEffect(() => {
-    const ink = loadSheetInk(sheet.id);
-    setStrokes(ink?.strokes ?? []);
-    setInkWidth(ink?.w ?? null);
-    historyRef.current = [];
-    setUndoDepth(0);
-    setFingerWrites(loadFingerWrites());
-    setLoaded(true);
-  }, [sheet.id]);
+  // ── Persist ────────────────────────────────────────────────────────────
 
   /** Replace the stroke list: remember the old one for Undo, pin the
    *  layout width on the first stroke, and save. */
@@ -148,11 +150,10 @@ export function PaperWriteView({
       // An emptied sheet lets go of its layout width again.
       const width = next.length === 0 ? null : (inkWidth ?? pageWidth);
       strokesRef.current = next;
-      setStrokes(next);
-      setInkWidth(width);
+      setInk({ strokes: next, w: width });
       setSaveFailed(!saveSheetInk(sheet.id, { v: 1, w: width ?? pageWidth, strokes: next }));
     },
-    [inkWidth, pageWidth, sheet.id],
+    [inkWidth, pageWidth, sheet.id, setInk, strokesRef],
   );
 
   // ── Layout: width available, page height ───────────────────────────────
@@ -225,7 +226,7 @@ export function PaperWriteView({
       surface.removeEventListener('touchstart', onTouchStart);
       surface.removeEventListener('touchmove', onTouchMove);
     };
-  }, []);
+  }, [fingerWritesRef]);
 
   // ── Pointer → ink ──────────────────────────────────────────────────────
 
@@ -572,17 +573,14 @@ export function PaperWriteView({
               </div>
             ) : null}
             <span className="font-mono text-sm font-bold text-ink-700">{sheet.code}</span>
-            <Button
-              variant="secondary"
-              block
+            <Link
+              href={`/paper/mark/#sheet=${encodeURIComponent(sheet.id)}`}
+              className={buttonStyles({ variant: 'secondary', block: true })}
               data-testid="write-mark-here"
-              onClick={() => {
-                window.location.href = `mark/#sheet=${encodeURIComponent(sheet.id)}`;
-              }}
             >
               <ClipboardCheck className="h-4 w-4" />
               Enter the answers on this device
-            </Button>
+            </Link>
             <p className="text-xs text-ink-500">
               What you wrote stays on this device, saved as you go — come
               back to the sheet any time.

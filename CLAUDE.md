@@ -24,7 +24,8 @@ fully static export to `out/`). The PWA icon + webmanifest are generated
 from the manifest by `scripts/pack-assets.ts` (gitignored in `public/`),
 and `scripts/finalise-build.ts` (the `postbuild` hook) stamps `out/sw.js`
 with the cache key + full precache manifest so unvisited routes work
-offline.
+offline (`scripts/app-version.ts` is the one reader of the release tag
+and short SHA that next.config.ts, finalise-build and the bundler share).
 
 - `tools/pack/schema.ts` — Zod pack format (schemaVersion **1 or 2**) +
   `validatePack` cross-file checks (unique ids, category/level/scenario/
@@ -222,11 +223,19 @@ offline.
   pong}.ts`, components `src/pack/games/` (GameShell/HowToPlay/GameModal +
   6 games), route `/games`. The heavy game components are
   `next/dynamic`-imported in GamesPage (loaded only when a game is opened)
-  and live only in the /games route chunk — packs without games 404 the
-  route and pay nothing. Games are ephemeral (don't touch stats/stickers),
+  and live only in the /games route chunk. The route exists in EVERY
+  build and GamesPage gates on the ACTIVE pack's `games` block at render
+  time (a pack without games gets a "No games in this pack" card) — the
+  static export prerenders once, so a build-time `notFound()` left the
+  route dead for a pack with games swapped in at runtime via the pack
+  library. Games are ephemeral (don't touch stats/stickers),
   free to play, and a deliberately HIDDEN easter egg — nothing on Home;
   reached by tapping the version pill in Settings 7× (`GAMES_REVEAL_TAPS`),
-  which reveals a panel linking to `/games`. Ported from
+  which reveals a panel linking to `/games`; the find is remembered on the
+  device (`quizmill.gamesRevealed.v1`, `src/lib/gamesReveal.ts`, with a
+  "Hide again" on the panel) so the arcade is there on the next visit.
+  Pong's serve angle, like snake's food and the puzzle shuffle, comes from
+  an injected `rng` (default `Math.random`) so tests can pin it. Ported from
   `~/code/personal/learning` (original engine code, not exam content).
 - Engine never imports question *shapes* — it sees only the
   denormalised `Attempt`/`Session` fields (`src/data/types.ts`). Those
@@ -272,7 +281,7 @@ offline.
 
 ```
 npm run dev                      # demo pack at localhost:3000
-npm test                         # vitest unit (736 tests, 64 files)
+npm test                         # vitest unit (770 tests, 68 files)
 npm run test:watch               # same, in watch mode
 npm run lint                     # eslint (flat config) — 0 errors required
 npm run typecheck                # tsc --noEmit
@@ -405,6 +414,13 @@ are detected on every commit regardless.
   rules are warn-level on purpose); don't reach for `eslint-disable` to
   silence a real error without a one-line reason. ESLint config lives in
   `eslint.config.mjs` (flat config).
+- **Node is pinned once, in `.nvmrc`** (latest stable; `26` as of
+  2026-10). Version managers (mise/nvm/fnm) pick it up, the root and
+  `cli/` `engines` fields repeat it as `>=26`, and every workflow's
+  setup-node step reads it via `node-version-file` — except the reusable
+  `deploy-pack.yml`, which runs against a pack repo's checkout and
+  therefore spells the major out. `tests/node-version.test.ts` fails if
+  any of these drift, so bump them together.
 - Tests accompany behaviour changes; E2E asserts against the demo pack
   (if a different pack is active locally, `rm -rf content/pack` and
   re-run to reseed before E2E). E2E specs live in `tests/e2e-pack/`
@@ -423,9 +439,17 @@ are detected on every commit regardless.
   build`, serve `out/` (`npx http-server out -p <port> -s -c-1`), then drive
   Puppeteer at a phone viewport (414×896, `deviceScaleFactor: 2`) seeding
   `localStorage` for the state you want — same harness as `tests/e2e/`.
-  Commit the PNGs under `docs/screenshots/<feature>/` and embed them in the
-  PR via `raw.githubusercontent.com/<owner>/<repo>/<sha>/<path>`. Show each
-  meaningful state (e.g. empty / in-progress / complete), not just one.
+  Show each meaningful state (e.g. empty / in-progress / complete), not
+  just one. Screenshots exist only to review the PR, so they are **never
+  committed**: `docs/screenshots/` is gitignored (write the PNGs there
+  locally if convenient) and the images go on the PR itself — drag them
+  into the PR description so GitHub hosts them (`github.com/user-
+  attachments/…`). GitHub has no API for that upload, so an unattended
+  session that cannot attach an image instead links the PR's Cloudflare
+  preview (the `pr-preview` bot comment), names the routes and the
+  localStorage state to seed, and says so in the PR body. Old PRs keep
+  their images through the historical commit SHAs; don't re-add the
+  directory.
 - Question ids are immutable once published — attempt history points
   at them.
 - Pack schema changes bump `schemaVersion` and must stay

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { GameOver } from './GameOver';
 import { GameShell } from './GameShell';
 import { HowToPlay } from './HowToPlay';
 
@@ -29,18 +30,28 @@ export function Dodger({ onClose }: DodgerProps) {
   const [playerX, setPlayerX] = useState(0.5);
   const [rocks, setRocks] = useState<Rock[]>([]);
   const [score, setScore] = useState(0);
-  const [running, setRunning] = useState(false);
-  const [gameOver, setGameOver] = useState(false);
+  const [started, setStarted] = useState(false);
   const startedAtRef = useRef<number>(0);
   const rockIdRef = useRef<number>(0);
   const boardRef = useRef<HTMLDivElement | null>(null);
+
+  // Game over is a fact about the board — a rock on the ship — not a
+  // second flag to keep in step with it. The rocks stay where they were
+  // (the loop stops), so it holds until Start clears them.
+  const gameOver =
+    started &&
+    rocks.some(
+      (r) =>
+        Math.abs(r.x - playerX) < PLAYER_W / 2 + r.size / 2 &&
+        Math.abs(r.y - PLAYER_Y) < PLAYER_H / 2 + r.size / 2,
+    );
+  const running = started && !gameOver;
 
   function start() {
     setPlayerX(0.5);
     setRocks([]);
     setScore(0);
-    setRunning(true);
-    setGameOver(false);
+    setStarted(true);
     startedAtRef.current = Date.now();
     rockIdRef.current = 0;
   }
@@ -74,20 +85,6 @@ export function Dodger({ onClose }: DodgerProps) {
     }, TICK_MS);
     return () => clearInterval(id);
   }, [running]);
-
-  // Collision detection — runs on every render of rocks/playerX in the loop.
-  useEffect(() => {
-    if (!running) return;
-    for (const r of rocks) {
-      const dx = Math.abs(r.x - playerX);
-      const dy = Math.abs(r.y - PLAYER_Y);
-      if (dx < PLAYER_W / 2 + r.size / 2 && dy < PLAYER_H / 2 + r.size / 2) {
-        setRunning(false);
-        setGameOver(true);
-        return;
-      }
-    }
-  }, [rocks, playerX, running]);
 
   // Touch/mouse: player follows the finger horizontally.
   function pointerToX(clientX: number): number {
@@ -205,22 +202,13 @@ export function Dodger({ onClose }: DodgerProps) {
       ) : null}
 
       {gameOver ? (
-        <div
-          data-testid="dodger-game-over"
-          className="mt-3 flex flex-col items-center gap-2 rounded-xl border border-warn-500/30 bg-warn-100/60 p-3 text-center"
-        >
-          <div className="text-base font-bold text-warn-700">
-            You scored {score}
-          </div>
-          <div className="mt-1 flex gap-2">
-            <Button size="md" variant="secondary" onClick={start}>
-              Play again
-            </Button>
-            <Button size="md" onClick={onClose}>
-              Done
-            </Button>
-          </div>
-        </div>
+        <GameOver
+          tone="lose"
+          title={`You scored ${score}`}
+          testId="dodger-game-over"
+          onRestart={start}
+          onClose={onClose}
+        />
       ) : null}
     </GameShell>
   );

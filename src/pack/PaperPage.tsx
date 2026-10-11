@@ -16,9 +16,10 @@ import { APP_CONFIG } from '@/config';
 import { PackChip } from '@/components/PackChip';
 import { McqMarkdown } from '@/components/McqMarkdown';
 import { QrCode } from '@/components/QrCode';
-import { Button } from '@/components/ui/Button';
+import { Button, buttonStyles } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 import { useStorageData } from '@/lib/useStorage';
+import { useClientState, useMounted } from '@/lib/useMounted';
 import { loadLevelFilter } from '@/lib/storage';
 import {
   correctKeysOf,
@@ -32,7 +33,6 @@ import {
   PACK_CATEGORY_TONE,
   PACK_CONCEPT_BY_ID,
   PACK_LEVEL_LABEL,
-  type PackQuestion,
 } from '@/pack/data';
 import { attemptHistory, bankForCategory, filterByLevel } from '@/pack/runner';
 import { PackImage } from '@/pack/PackImage';
@@ -107,7 +107,7 @@ const SCENARIOS_BY_ID = new Map(packScenarios.map((s) => [s.id, s]));
  */
 export function PaperPage() {
   const { attempts, sessions } = useStorageData();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [sheetId, setSheetId] = useState<string | null>(null);
   const [writing, setWriting] = useState(false);
   // Why an `#s=` link couldn't be opened here, shown above the list.
@@ -118,7 +118,6 @@ export function PaperPage() {
   const [sheetsVersion, setSheetsVersion] = useState(0);
 
   useEffect(() => {
-    setMounted(true);
     // Each hash change resolves asynchronously; a stale resolution (the
     // hash moved on while a payload was inflating) must not win.
     let generation = 0;
@@ -305,8 +304,7 @@ function ComposeCard({
   );
   // Default to the practice level filter so paper matches what the
   // learner is working on.
-  const [level, setLevel] = useState<string | null>(null);
-  useEffect(() => setLevel(loadLevelFilter()), []);
+  const [level, setLevel] = useClientState(loadLevelFilter, null);
   const [chosenCount, setCount] = useState<PaperCount>(DEFAULT_PAPER_COUNT);
 
   const bank = filterByLevel(bankForCategory(packQuestions, categoryKey), level);
@@ -466,6 +464,9 @@ function WriteSheet({ sheet }: { sheet: PaperSheet }) {
   const markUrl = useMarkUrl(sheet);
   return (
     <PaperWriteView
+      // A different sheet is a fresh page: its ink, undo history and layout
+      // width all start over.
+      key={sheet.id}
       sheet={sheet}
       markUrl={markUrl}
       onClose={() => {
@@ -590,17 +591,14 @@ function SheetView({
             {hasInk ? 'Continue on screen' : 'Write on screen'}
           </Button>
         </div>
-        <Button
-          variant="secondary"
-          block
+        <Link
+          href={`/paper/mark/#sheet=${encodeURIComponent(sheet.id)}`}
+          className={buttonStyles({ variant: 'secondary', block: true })}
           data-testid="mark-sheet"
-          onClick={() => {
-            window.location.href = `mark/#sheet=${encodeURIComponent(sheet.id)}`;
-          }}
         >
           <ClipboardCheck className="h-4 w-4" />
           Mark answers
-        </Button>
+        </Link>
         <p className="text-center text-xs text-ink-500">
           No printer? <strong>Write on screen</strong> turns the sheet into a
           page to scribble on with a pencil or a finger — best on a tablet.
