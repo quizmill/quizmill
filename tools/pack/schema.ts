@@ -165,6 +165,28 @@ export const packUpgradeSchema = z.object({
   price: z.string().min(1).max(24).optional(),
   /** One or two sentences on what the upgrade adds. */
   blurb: z.string().min(1).max(240).optional(),
+  /** The id of the pack a licence key unlocks — the fuller edition this
+   *  pack is a taste of. With `unlockUrl`, the app's /unlock route and the
+   *  "Have a licence key?" entry on /packs fetch that pack from the
+   *  author's endpoint, insert it and make it active in one step. */
+  packId: z.string().regex(slug).max(40).optional(),
+  /** Base URL of the author's unlock endpoint (https). The app calls
+   *  `<unlockUrl>/v1/unlock?pack=<packId>&key=<licence-key>` and expects a
+   *  pack bundle (200), a refusal text (403 `{ error }`) or 404. How keys
+   *  are issued is the author's business — the engine never learns. */
+  unlockUrl: z
+    .string()
+    .url()
+    .refine((u) => u.startsWith('https://'), { message: 'must be an https URL' })
+    .optional(),
+}).superRefine((u, ctx) => {
+  if (u.unlockUrl && !u.packId) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['packId'],
+      message: 'required with unlockUrl — the id of the pack a licence key unlocks',
+    });
+  }
 });
 
 export const packManifestSchema = z
@@ -219,6 +241,13 @@ export const packManifestSchema = z
       if (new Set(levelKeys).size !== levelKeys.length) {
         ctx.addIssue({ code: 'custom', message: 'level keys must be unique' });
       }
+    }
+    if (m.upgrade?.packId === m.id) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['upgrade', 'packId'],
+        message: 'must name a different pack — a licence key unlocks the fuller edition, not this pack',
+      });
     }
   });
 

@@ -59,6 +59,10 @@ export type PackUpgrade = {
   url: string;
   price?: string;
   blurb?: string;
+  /** The pack a licence key unlocks (see src/lib/unlock.ts). */
+  packId?: string;
+  /** Base URL of the author's unlock endpoint; present only with packId. */
+  unlockUrl?: string;
 };
 
 /** Option keys, A–F (a question has 2–6 options; 4 keyed A–D is the common case). */
