@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import {
   Activity,
   ArrowLeft,
@@ -42,9 +42,10 @@ import {
 } from '@/lib/progressionPref';
 import { loadPaperModeEnabled, savePaperModeEnabled } from '@/lib/paper';
 import {
+  ANALYTICS_EVENT,
   analyticsConfigured,
   loadAnalyticsEnabled,
-  loadDeviceId,
+  peekDeviceId,
   privacyUrl,
   regenerateDeviceId,
   saveAnalyticsEnabled,
@@ -65,10 +66,26 @@ import { UpgradeCard } from '@/pack/UpgradeCard';
  *  they're discovered, not advertised in the chrome. */
 const GAMES_REVEAL_TAPS = 7;
 
-/** The analytics device id, minted on first read — so only in builds that
- *  send analytics, and never during the static render. */
-function loadDeviceIdIfConfigured(): string {
-  return analyticsConfigured() ? loadDeviceId() : '';
+const subscribeToAnalytics = (onChange: () => void) => {
+  window.addEventListener(ANALYTICS_EVENT, onChange);
+  return () => window.removeEventListener(ANALYTICS_EVENT, onChange);
+};
+const noDeviceId = () => '';
+
+/**
+ * The analytics device id as live state. Render only READS the stored id
+ * (empty on the server and until one exists); the mint — randomness plus
+ * a storage write — happens after commit, and only in builds that send
+ * analytics, so a render React repeats or discards never writes one. Each
+ * mint announces itself on the analytics event, which re-reads the store,
+ * so "New device id" needs no state of its own.
+ */
+function useDeviceId(): string {
+  const deviceId = useSyncExternalStore(subscribeToAnalytics, peekDeviceId, noDeviceId);
+  useEffect(() => {
+    if (analyticsConfigured() && !peekDeviceId()) regenerateDeviceId();
+  }, []);
+  return deviceId;
 }
 
 const THEME_CHOICES: {
@@ -251,17 +268,19 @@ export function SettingsPage({ extras }: SettingsPageProps) {
 
   // Usage analytics (device-level) — the anonymous funnel beacon a hosted
   // app sends its author. The card exists only in builds that configure
-  // an endpoint; the id is read after mount so it is never minted during
-  // the static render.
+  // an endpoint; the id is minted after mount so it is never written
+  // during a render.
   const analyticsOn = analyticsConfigured();
   const [analyticsEnabled, setAnalyticsEnabled] = useClientState(loadAnalyticsEnabled, true);
-  const [deviceId, setDeviceId] = useClientState(loadDeviceIdIfConfigured, '');
+  const deviceId = useDeviceId();
   const toggleAnalytics = () => {
     const next = !analyticsEnabled;
     setAnalyticsEnabled(next);
     saveAnalyticsEnabled(next);
   };
-  const newDeviceId = () => setDeviceId(regenerateDeviceId());
+  const newDeviceId = () => {
+    regenerateDeviceId();
+  };
 
   // Hidden games easter egg — revealed by tapping the version pill.
   const [versionTaps, setVersionTaps] = useState(0);
