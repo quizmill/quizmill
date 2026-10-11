@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { NoteRow } from '@/components/NoteRow';
@@ -92,6 +92,59 @@ describe('NoteRow', () => {
       await new Promise((r) => setTimeout(r, 700));
     });
     expect(loadNotes()).toEqual([]);
+  });
+
+  it('flashes Saved ✓ for 800 ms once the debounce fires', async () => {
+    vi.useFakeTimers();
+    try {
+      await render();
+      await click(toggle()!);
+      await type(textarea()!, 'a note');
+
+      await act(async () => {
+        vi.advanceTimersByTime(599);
+      });
+      expect(container.textContent).toContain('Saves when you stop typing');
+      expect(container.textContent).not.toContain('Saved ✓');
+
+      await act(async () => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(loadNotes()).toMatchObject([{ questionId: 'q1', text: 'a note' }]);
+      expect(container.textContent).toContain('Saved ✓');
+
+      await act(async () => {
+        vi.advanceTimersByTime(800);
+      });
+      expect(container.textContent).not.toContain('Saved ✓');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('flushes a pending save when the row unmounts (question advances)', async () => {
+    vi.useFakeTimers();
+    try {
+      await render();
+      await click(toggle()!);
+      await type(textarea()!, 'typed then tapped Next');
+      expect(loadNotes()).toEqual([]);
+
+      await act(async () => {
+        root.unmount();
+      });
+      // Written at unmount, not 600 ms later.
+      expect(loadNotes()).toMatchObject([
+        { questionId: 'q1', text: 'typed then tapped Next' },
+      ]);
+
+      // Re-create a root so afterEach's unmount has something to unmount.
+      await act(async () => {
+        root = createRoot(container);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('stays collapsed for a question without a note', async () => {
