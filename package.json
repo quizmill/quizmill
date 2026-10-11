@@ -2,6 +2,9 @@
   "name": "quizmill",
   "version": "0.0.0-dev",
   "private": true,
+  "engines": {
+    "node": ">=26"
+  },
   "scripts": {
     "predev": "tsx scripts/ensure-pack.ts",
     "dev": "next dev",
@@ -48,6 +51,7 @@
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.0",
     "vitest": "^5.0.3"
   }
 }

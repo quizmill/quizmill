@@ -17,7 +17,7 @@ engine is the wheel; packs are the grist.
 
 You don't clone this repo to use quizmill — you run it with `npx`. The
 CLI keeps the engine in `~/.quizmill/engine` for you and shells out to
-it, so a pack is all you ever edit. Requires Node ≥ 18, git and npm.
+it, so a pack is all you ever edit. Requires Node ≥ 26, git and npm.
 
 ```
 npx quizmill new my-topic        # scaffold a pack (or have your AI agent fill it)

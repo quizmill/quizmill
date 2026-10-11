@@ -82,6 +82,51 @@ export function RunnerLoading({ back = <BackLink /> }: { back?: ReactNode }) {
 }
 
 /**
+ * The results screen: eyebrow ("Practice complete"), the big score, the
+ * percentage line, a note under it, then the runner's own action buttons
+ * as children. `celebrations` is the toast stack, rendered first so a
+ * sticker or level-up earned on the last answer shows over the score.
+ */
+export function RunnerResults({
+  eyebrow,
+  score,
+  pctLabel = 'correct',
+  note,
+  back = <BackLink />,
+  celebrations = null,
+  children,
+}: {
+  eyebrow: string;
+  score: { correct: number; total: number; pct: number };
+  /** Noun after the percentage — "correct", or "rescued" in review. */
+  pctLabel?: string;
+  note: ReactNode;
+  back?: ReactNode;
+  celebrations?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <main className="flex flex-col gap-5">
+      {celebrations}
+      {back}
+      <div className="rounded-2xl border border-ink-200 bg-surface p-8 text-center shadow-xs">
+        <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
+          {eyebrow}
+        </div>
+        <h1 className="mt-2 text-4xl font-bold text-ink-900">
+          {score.correct}/{score.total}
+        </h1>
+        <p className="mt-1 text-lg font-medium text-ink-600">
+          {score.pct}% {pctLabel}
+        </p>
+        <p className="mt-4 text-sm text-ink-500">{note}</p>
+        <div className="mt-6 flex flex-col gap-2">{children}</div>
+      </div>
+    </main>
+  );
+}
+
+/**
  * The toast stack: a sticker unlock outranks a level-up, which outranks
  * whatever the runner passes as `fallback` (the practice runner's streak
  * nod). One toast at a time — the hooks queue the rest.

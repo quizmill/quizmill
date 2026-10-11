@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { webcrypto } from 'node:crypto';
 import { PackNotesRunner } from '@/pack/NotesRunner';
 import { recordNote } from '@/lib/storage';
+import { correctKeysOf, packQuestions } from '@/pack/data';
 
 // React needs this flag to allow act() outside @testing-library.
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -58,5 +59,56 @@ describe('PackNotesRunner (against the demo pack)', () => {
     expect(
       prompt.includes('runaway') || prompt.includes("Mercury's daytime"),
     ).toBe(true);
+  });
+});
+
+function buttons(): HTMLButtonElement[] {
+  return Array.from(container.querySelectorAll('button'));
+}
+
+/** A control button — Button renders without a type attribute; option
+ *  buttons set type="button". */
+function control(text: string): HTMLButtonElement | undefined {
+  return buttons().find(
+    (b) => b.type !== 'button' && (b.textContent ?? '').includes(text),
+  );
+}
+
+async function click(el: Element) {
+  await act(async () => {
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+}
+
+describe('PackNotesRunner results screen', () => {
+  it('renders the results card exactly as before (markup pin)', async () => {
+    // Deterministic score: answer the 3-question round correctly, then
+    // snapshot the results card (the notes variant has three actions).
+    recordNote('demo-planets-003', 'more greenhouse questions please', 100);
+    await render();
+    for (
+      let i = 0;
+      i < 10 && !container.textContent?.includes('Notes round complete');
+      i++
+    ) {
+      const current = packQuestions.find((p) =>
+        container.textContent?.includes(p.prompt),
+      )!;
+      for (const key of correctKeysOf(current)) {
+        const option = buttons().find(
+          (b) => b.type === 'button' && (b.textContent ?? '').trim().startsWith(key),
+        );
+        await click(option!);
+      }
+      await click(control('Check answer')!);
+      await click((control('Next question') ?? control('See results'))!);
+    }
+    const card = Array.from(container.querySelectorAll('main > div')).find((d) =>
+      (d.textContent ?? '').includes('Notes round complete'),
+    );
+    expect(card).toBeTruthy();
+    await expect(card!.outerHTML).toMatchFileSnapshot(
+      './__snapshots__/notes-results.html',
+    );
   });
 });

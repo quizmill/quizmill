@@ -18,8 +18,10 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { latestReleaseVersion } from '../../scripts/app-version';
 import {
   validatePack,
+  type PackFiles,
   type PackManifest,
   type PackQuestion,
 } from './schema';
@@ -116,19 +118,7 @@ function packRevision(dir: string): string | undefined {
  *  NEXT_PUBLIC_APP_VERSION to its own version); otherwise the latest
  *  release tag of this checkout; otherwise unknown. */
 function engineVersion(): string | undefined {
-  if (process.env.NEXT_PUBLIC_APP_VERSION) return process.env.NEXT_PUBLIC_APP_VERSION;
-  try {
-    const tag = execFileSync(
-      'git',
-      ['-C', __dirname, 'describe', '--tags', '--abbrev=0', '--match', 'v[0-9]*'],
-      { stdio: ['ignore', 'pipe', 'ignore'] },
-    )
-      .toString()
-      .trim();
-    return tag ? tag.replace(/^v/, '') : undefined;
-  } catch {
-    return undefined;
-  }
+  return process.env.NEXT_PUBLIC_APP_VERSION || latestReleaseVersion(__dirname);
 }
 
 /**
@@ -140,7 +130,7 @@ export function buildPackBundle(
   dir: string,
   opts: { now?: Date } = {},
 ): BundleResult {
-  let input: ReturnType<typeof readPackDir>;
+  let input: PackFiles;
   try {
     input = readPackDir(dir);
   } catch (err) {
@@ -181,13 +171,15 @@ export function buildPackBundle(
   }
   if (errors.length > 0) return { ok: false, errors };
 
+  const packVersion = packRevision(dir);
+  const engine = engineVersion();
   const bundle: PackBundle = {
     format: BUNDLE_FORMAT,
     bundleVersion: 1,
     schemaVersion: manifest.schemaVersion,
     id: manifest.id,
-    ...(packRevision(dir) ? { packVersion: packRevision(dir) } : {}),
-    ...(engineVersion() ? { engineVersion: engineVersion() } : {}),
+    ...(packVersion ? { packVersion } : {}),
+    ...(engine ? { engineVersion: engine } : {}),
     bundledAt: (opts.now ?? new Date()).toISOString(),
     manifest: input.manifest,
     questions: input.questions,

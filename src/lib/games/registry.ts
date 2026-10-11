@@ -1,8 +1,8 @@
 /**
  * Reward mini-game registry. A pack switches games on via its `games`
- * manifest block; the app then unlocks this little arcade once the learner
- * has answered enough questions — playing one is a treat for keeping the
- * practice wheel turning, not an always-on distraction.
+ * manifest block; the app then keeps this little arcade as a hidden treat
+ * (found by tapping the version pill in Settings, nothing on Home) —
+ * a break between rounds of practice, not an always-on distraction.
  *
  * Pure data, no React — the components in src/pack/games/ render these.
  * The id union here is the engine's source of truth; the pack validator

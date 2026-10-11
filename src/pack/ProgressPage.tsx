@@ -17,6 +17,7 @@ import {
 } from '@/lib/stats';
 import { coldLookByCategory } from '@/lib/readiness';
 import { currentStreak } from '@/lib/streak';
+import { formatSpan } from '@/lib/duration';
 import {
   packQuestions,
   PACK_CATEGORY_LABEL,
@@ -110,7 +111,7 @@ export default function ProgressPage() {
             <div data-testid="session-summary" className="grid grid-cols-3 gap-2.5">
               <SummaryTile value={String(summary.sessions)} label="sessions" />
               <SummaryTile
-                value={formatDuration(summary.medianDurationSeconds)}
+                value={formatSpan(summary.medianDurationSeconds)}
                 label="typical length"
               />
               <SummaryTile
@@ -260,14 +261,6 @@ function SummaryTile({ value, label }: { value: string; label: string }) {
       <div className="mt-0.5 text-xs text-ink-500">{label}</div>
     </div>
   );
-}
-
-/** "45s", "4m", "4m 30s" — session lengths are short, hours never show. */
-function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return s === 0 ? `${m}m` : `${m}m ${s}s`;
 }
 
 /** Bar colour by accuracy band — calm, no neon (matches the palette). */

@@ -1,13 +1,14 @@
-import { notFound } from 'next/navigation';
-import { gamesEnabled } from '@/pack/data';
 import GamesPage from '@/pack/GamesPage';
 
 /**
- * Reward-games arcade. Only a real route for packs that switch games on in
- * their manifest (`games` block); otherwise it 404s, exactly like a pack
- * with no games declared has no games anywhere.
+ * Reward-games arcade. One static route for every build: whether there
+ * is anything to play is decided by the ACTIVE pack when the page
+ * renders (GamesPage), not by the pack this deployment was built from.
+ * The static export is prerendered once, so a build-time `notFound()`
+ * here left the route dead for a pack with games swapped in at runtime
+ * via the pack library, while the Settings easter egg (which reads the
+ * active pack) still linked to it.
  */
 export default function GamesRoute() {
-  if (!gamesEnabled) notFound();
   return <GamesPage />;
 }

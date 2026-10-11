@@ -7,6 +7,7 @@ import { PackPracticeRunner } from '@/pack/PracticeRunner';
 import { ATTEMPTS_KEY, saveAchievements } from '@/lib/storage';
 import { STREAK_MIN_QUESTIONS_PER_DAY } from '@/lib/stats';
 import { ACHIEVEMENTS } from '@/pack/achievements';
+import { correctKeysOf, packQuestions } from '@/pack/data';
 import type { Attempt } from '@/data/types';
 
 // React needs this flag to allow act() outside @testing-library.
@@ -192,5 +193,34 @@ describe('PackPracticeRunner', () => {
     // …but the results screen only ever showed sticker / level-up toasts.
     expect(control('Another round')).toBeTruthy();
     expect(container.querySelector('[data-testid="celebration"]')).toBeNull();
+  });
+});
+
+describe('PackPracticeRunner results screen', () => {
+  it('renders the results card exactly as before (markup pin)', async () => {
+    // Deterministic score: answer every question correctly, then snapshot
+    // the results card. The three runners share one results panel — this
+    // pins the practice variant (eyebrow, score, "% correct", category).
+    await render();
+    for (let i = 0; i < 20 && !control('Another round'); i++) {
+      const current = packQuestions.find((p) =>
+        container.textContent?.includes(p.prompt),
+      )!;
+      for (const key of correctKeysOf(current)) {
+        const option = buttons().find(
+          (b) => b.type === 'button' && (b.textContent ?? '').trim().startsWith(key),
+        );
+        await click(option!);
+      }
+      await click(control('Check answer')!);
+      await click((control('Next question') ?? control('See results'))!);
+    }
+    const card = Array.from(container.querySelectorAll('main > div')).find((d) =>
+      (d.textContent ?? '').includes('Practice complete'),
+    );
+    expect(card).toBeTruthy();
+    await expect(card!.outerHTML).toMatchFileSnapshot(
+      './__snapshots__/practice-results.html',
+    );
   });
 });

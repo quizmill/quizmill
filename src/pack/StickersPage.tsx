@@ -282,12 +282,16 @@ function StickerDetail({ achievement, progress, onClose }: StickerDetailProps) {
   );
 }
 
+/** How a sticker's earned date reads ("4 Oct 2026" / "Oct 4, 2026") — in
+ *  the device locale, like every other date in the app. */
+const EARNED_FORMAT = new Intl.DateTimeFormat(undefined, {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+});
+
 function formatEarned(ms: number): string {
-  return new Date(ms).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  return EARNED_FORMAT.format(new Date(ms));
 }
 
 const TIER_BORDER: Record<AchievementTier, string> = {

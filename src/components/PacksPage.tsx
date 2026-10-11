@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Boxes,
@@ -30,6 +30,7 @@ import {
 import { cachePackAssets } from '@/lib/packAssets';
 import { fetchPackFromUrl, parsePackFiles, type ParseOutcome } from '@/lib/packInsert';
 import { recordEvent } from '@/lib/storage';
+import { useClientState, useMounted } from '@/lib/useMounted';
 import {
   loadRegistry,
   registryRepoUrl,
@@ -41,10 +42,12 @@ import {
  *  600-question bank can produce hundreds. */
 const MAX_ERRORS_SHOWN = 6;
 
+const NO_PACKS: PackLibraryEntry[] = [];
+
 function ProgressLine({ packId }: { packId: string }) {
   // Read after mount: SSG renders with no localStorage.
-  const [progress, setProgress] = useState<ReturnType<typeof packProgress> | null>(null);
-  useEffect(() => setProgress(packProgress(packId)), [packId]);
+  const mounted = useMounted();
+  const progress = useMemo(() => (mounted ? packProgress(packId) : null), [mounted, packId]);
   if (!progress) return null;
   if (progress.attempts === 0) {
     return <p className="mt-2 text-xs text-ink-500">No progress on this device yet.</p>;
@@ -153,8 +156,8 @@ function PackCard({
  * ones from files or a URL.
  */
 export function PacksPage() {
-  const [entries, setEntries] = useState<PackLibraryEntry[]>([]);
-  const [mounted, setMounted] = useState(false);
+  const [entries, setEntries] = useClientState(listInsertedPacks, NO_PACKS);
+  const mounted = useMounted();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
@@ -166,10 +169,8 @@ export function PacksPage() {
   const [registry, setRegistry] = useState<RegistryResult | null>(null);
   const [busyRepo, setBusyRepo] = useState<string | null>(null);
 
-  const refresh = useCallback(() => setEntries(listInsertedPacks()), []);
+  const refresh = useCallback(() => setEntries(listInsertedPacks()), [setEntries]);
   useEffect(() => {
-    refresh();
-    setMounted(true);
     window.addEventListener(PACK_LIBRARY_EVENT, refresh);
     let cancelled = false;
     void loadRegistry().then((r) => {

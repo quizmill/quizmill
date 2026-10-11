@@ -18,6 +18,7 @@ import { Button, buttonStyles } from '@/components/ui/Button';
 import { SyncBackendFooter, SyncStatusLine } from '@/components/SyncStatusLine';
 import { APP_CONFIG } from '@/config';
 import { useSyncStatus } from '@/lib/useStorage';
+import { useClientState, useMounted } from '@/lib/useMounted';
 import {
   clearSyncKey,
   getStoredKeyName,
@@ -50,9 +51,13 @@ import {
  * tell which app is syncing whose history. The name rides along with the
  * key on the server, so it shows up on every device that enters it.
  */
+function canWebShare(): boolean {
+  return typeof navigator !== 'undefined' && Boolean(navigator.share);
+}
+
 export function SyncKeySettings() {
-  const [key, setKey] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
+  const [key, setKey] = useClientState(getStoredSyncKey, null);
+  const ready = useMounted();
   const [justCreated, setJustCreated] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -61,21 +66,17 @@ export function SyncKeySettings() {
   const [status, setStatus] = useState<string | null>(null);
   // The key's optional name: cached locally for instant render, then
   // refreshed from the server (which may know a name this device doesn't).
-  const [name, setName] = useState<string | null>(null);
+  const [name, setName] = useClientState(getStoredKeyName, null);
   const [naming, setNaming] = useState(false);
   const [draft, setDraft] = useState('');
   const [savingName, setSavingName] = useState(false);
   // Web Share API availability — read after mount (SSR renders without it).
-  const [canShare, setCanShare] = useState(false);
+  const [canShare] = useClientState(canWebShare, false);
   const sync = useSyncStatus();
 
   useEffect(() => {
-    const stored = getStoredSyncKey();
-    setKey(stored);
-    setName(getStoredKeyName());
-    setCanShare(typeof navigator !== 'undefined' && Boolean(navigator.share));
-    setReady(true);
-    if (!stored) return;
+    // Once, on mount: the server may know a name this device doesn't.
+    if (!getStoredSyncKey()) return;
     let live = true;
     reconcileKeyName().then((n) => {
       if (live) setName(n);
@@ -83,7 +84,7 @@ export function SyncKeySettings() {
     return () => {
       live = false;
     };
-  }, []);
+  }, [setName]);
 
   async function createKey() {
     const fresh = generateSyncKey();

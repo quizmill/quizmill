@@ -8,51 +8,19 @@
  *    must work for routes never visited online).
  *
  * Why both pieces:
- *  - Semver is the user-visible version (shown in Settings, bumped via
- *    `npm version`).
+ *  - Semver is the user-visible version (shown in Settings; the latest
+ *    release tag, read the same way next.config.ts reads it — see
+ *    scripts/app-version.ts).
  *  - The git SHA suffix guarantees the SW cache name changes on EVERY
  *    commit, so a new SW is picked up and the in-app "new version ready"
  *    banner can fire even between explicit version bumps.
  *
  * Runs automatically after `npm run build` via the `postbuild` hook.
  */
-import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, posix } from 'node:path';
 
-import pkg from '../package.json' with { type: 'json' };
-
-function gitSha(): string {
-  try {
-    return execSync('git rev-parse --short HEAD', {
-      stdio: ['ignore', 'pipe', 'ignore'],
-    })
-      .toString()
-      .trim();
-  } catch {
-    return `t${Date.now()}`;
-  }
-}
-
-/** Match next.config.ts: latest release tag (versions live in git
- *  tags, not package.json — releases are tag-only). The SHA suffix
- *  below keeps per-commit busting either way. */
-function appVersion(): string {
-  if (process.env.NEXT_PUBLIC_APP_VERSION) {
-    return process.env.NEXT_PUBLIC_APP_VERSION;
-  }
-  try {
-    const tag = execSync("git describe --tags --abbrev=0 --match 'v[0-9]*'", {
-      stdio: ['ignore', 'pipe', 'ignore'],
-    })
-      .toString()
-      .trim();
-    if (tag) return tag.replace(/^v/, '');
-  } catch {
-    // not a git checkout, or no release tag yet
-  }
-  return pkg.version;
-}
+import { appVersion, gitShortSha } from './app-version';
 
 /**
  * Every file in the export as a URL relative to the SW (which sits at the
@@ -89,7 +57,7 @@ if (!existsSync(swPath)) {
 }
 
 const semver = appVersion();
-const sha = gitSha();
+const sha = gitShortSha() ?? `t${Date.now()}`;
 // A pack repo's deploy sets NEXT_PUBLIC_APP_BUILD to its own commit (the
 // visible "Build" tag). Fold it into the cache key so a content-only push
 // (engine unchanged → same semver + engine SHA) still changes the SW cache

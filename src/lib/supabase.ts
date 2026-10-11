@@ -25,10 +25,10 @@ let client: SupabaseClient | null = null;
  * callers can no-op cleanly. Never throws.
  */
 export function getSupabase(): SupabaseClient | null {
-  if (!SYNC_CONFIGURED) return null;
+  if (!URL || !KEY) return null; // not configured (= !SYNC_CONFIGURED, narrowed)
   if (typeof window === 'undefined') return null; // browser-only
   if (!client) {
-    client = createClient(URL!, KEY!, {
+    client = createClient(URL, KEY, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,

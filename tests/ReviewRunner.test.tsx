@@ -174,3 +174,19 @@ describe('PackReviewRunner', () => {
     expect(window.location.hash).toBe('');
   });
 });
+
+describe('PackReviewRunner results screen', () => {
+  it('renders the results card exactly as before (markup pin)', async () => {
+    // finishRound answers everything wrongly → a deterministic 0/3 score.
+    seedOldMistakesAndASheet();
+    await render();
+    await finishRound();
+    const card = Array.from(container.querySelectorAll('main > div')).find((d) =>
+      (d.textContent ?? '').includes('Review complete'),
+    );
+    expect(card).toBeTruthy();
+    await expect(card!.outerHTML).toMatchFileSnapshot(
+      './__snapshots__/review-results.html',
+    );
+  });
+});
