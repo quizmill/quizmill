@@ -256,6 +256,26 @@ describe('/unlock#key=…', () => {
     expect(byTestId<HTMLButtonElement>('licence-key-go')?.disabled).toBe(true);
   });
 
+  it('a second link while the page is open (fragment-only navigation) is picked up too', async () => {
+    setLocation('');
+    await render(<UnlockPage />);
+    expect(fetched).toEqual([]);
+
+    window.location.hash = `#key=${GOOD}`;
+    await act(async () => {
+      window.dispatchEvent(new Event('hashchange'));
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    await act(async () => {});
+    expect(replaceState).toHaveBeenCalledWith(null, '', '/unlock/');
+    expect(fetched).toHaveLength(1);
+    expect(byTestId('unlock-key-value')?.textContent).toBe(GOOD);
+    expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('solar-system-full');
+    expect(assign).toHaveBeenCalledWith('/');
+  });
+
   it('a key in the QUERY string is not honoured', async () => {
     setLocation('');
     Object.defineProperty(window, 'location', {

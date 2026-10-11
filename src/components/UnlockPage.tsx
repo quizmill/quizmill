@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowLeft, Check, Copy, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { LicenceKeyForm } from '@/components/LicenceKeyForm';
@@ -46,8 +46,23 @@ export function UnlockPage() {
   const config = unlockConfig();
   // Read after mount: SSG has no location, and the prerender must not
   // differ from the first client paint.
-  const [key] = useClientState(takeUrlKey, null);
+  const [key, setKey] = useClientState(takeUrlKey, null);
   const [copied, setCopied] = useState(false);
+
+  // A second link tapped while this page is open is a fragment-only
+  // navigation (no load) — pick its key up the same way.
+  useEffect(() => {
+    const onHash = () => {
+      const next = readKeyFromHash(window.location.hash);
+      stripKeyFromLocation();
+      if (next) {
+        urlKey = next;
+        setKey(next);
+      }
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, [setKey]);
 
   async function copy() {
     if (!key) return;
