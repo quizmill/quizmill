@@ -1,0 +1,264 @@
+/**
+ * Unlocking a pack with a licence key (src/lib/unlock.ts): the fragment
+ * parser, the request the contract describes, every endpoint outcome,
+ * and — above all — that the key goes nowhere but the request, the
+ * per-pack licence slot and the screen.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  UNLOCKED_TOAST_KEY,
+  fetchUnlockBundle,
+  licenceKeyStorageKey,
+  readKeyFromHash,
+  stashUnlockedToast,
+  takeUnlockedToast,
+  unlockEndpoint,
+  unlockPack,
+  type UnlockConfig,
+} from '@/lib/unlock';
+import { getActivePackPointer, getInsertedPack, listInsertedPacks } from '@/lib/packLibrary';
+import { loadEvents } from '@/lib/storage';
+
+const CONFIG: UnlockConfig = {
+  packId: 'solar-system-full',
+  unlockUrl: 'https://unlock.example.com',
+};
+const KEY = 'QM-7F3A-TEST-KEY';
+
+function fakeStorage() {
+  const map = new Map<string, string>();
+  return {
+    getItem: (k: string) => map.get(k) ?? null,
+    setItem: (k: string, v: string) => void map.set(k, v),
+    removeItem: (k: string) => void map.delete(k),
+    keys: () => [...map.keys()],
+    dump: () => JSON.stringify([...map.entries()]),
+  };
+}
+
+/** A minimal valid v2 bundle for the pack the key unlocks. */
+function bundle(id = CONFIG.packId) {
+  const question = (n: number) => ({
+    id: `${id}-planets-00${n}`,
+    categoryKey: 'planets',
+    difficulty: 1,
+    prompt: `Unlocked question ${n}: which planet is the largest?`,
+    options: [
+      { key: 'A', text: 'Jupiter' },
+      { key: 'B', text: 'Mars' },
+    ],
+    correctKey: 'A',
+    explanation: 'Jupiter is the largest planet in the solar system by far.',
+    source: 'original',
+    reviewStatus: 'draft',
+  });
+  return {
+    manifest: {
+      schemaVersion: 2,
+      id,
+      title: 'Solar System — Full Course',
+      description: 'The fuller edition a licence key unlocks.',
+      homeSubtitle: 'Every planet, every moon.',
+      themeColor: '#123456',
+      categories: [{ key: 'planets', label: 'Planets' }],
+    },
+    questions: [question(1), question(2), question(3)],
+  };
+}
+
+type FetchCall = { url: string; init?: RequestInit };
+let calls: FetchCall[];
+let storage: ReturnType<typeof fakeStorage>;
+
+function respond(status: number, body: unknown): typeof fetch {
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+    calls.push({ url: String(input), init });
+    return new Response(body === undefined ? null : JSON.stringify(body), {
+      status,
+      headers: { 'content-type': 'application/json' },
+    });
+  }) as typeof fetch;
+}
+
+beforeEach(() => {
+  calls = [];
+  storage = fakeStorage();
+  vi.stubGlobal('window', {
+    localStorage: storage,
+    sessionStorage: fakeStorage(),
+    dispatchEvent: () => true,
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('readKeyFromHash', () => {
+  it('reads #key=… and decodes it', () => {
+    expect(readKeyFromHash('#key=ABC-123')).toBe('ABC-123');
+    expect(readKeyFromHash('#utm=x&key=a%20b')).toBe('a b');
+    expect(readKeyFromHash('#key=%20padded%20')).toBe('padded');
+  });
+
+  it('is null for no key, an empty key, or an unrelated fragment', () => {
+    expect(readKeyFromHash('')).toBeNull();
+    expect(readKeyFromHash('#key=')).toBeNull();
+    expect(readKeyFromHash('#pack=eyJ9')).toBeNull();
+    expect(readKeyFromHash('?key=in-the-query-string')).toBeNull();
+  });
+});
+
+describe('unlockEndpoint', () => {
+  it('builds GET <base>/v1/unlock?pack=&key= with both values encoded', () => {
+    expect(unlockEndpoint(CONFIG, 'a b&c')).toBe(
+      'https://unlock.example.com/v1/unlock?pack=solar-system-full&key=a+b%26c',
+    );
+    // A trailing slash or a path on the base is fine either way.
+    expect(unlockEndpoint({ ...CONFIG, unlockUrl: 'https://x.test/api/' }, 'k')).toBe(
+      'https://x.test/api/v1/unlock?pack=solar-system-full&key=k',
+    );
+    expect(unlockEndpoint({ ...CONFIG, unlockUrl: 'https://x.test/api' }, 'k')).toBe(
+      'https://x.test/api/v1/unlock?pack=solar-system-full&key=k',
+    );
+  });
+});
+
+describe('fetchUnlockBundle', () => {
+  it('sends no cookies and returns the bundle on 200', async () => {
+    const r = await fetchUnlockBundle(CONFIG, KEY, respond(200, bundle()));
+    expect(r.ok).toBe(true);
+    expect(calls[0].url).toBe(unlockEndpoint(CONFIG, KEY));
+    expect(calls[0].init?.credentials).toBe('omit');
+  });
+
+  it('shows the endpoint’s refusal text on 403, or a generic line when it is unusable', async () => {
+    const denied = await fetchUnlockBundle(
+      CONFIG,
+      KEY,
+      respond(403, { error: 'This key has been used on too many devices.' }),
+    );
+    expect(denied).toEqual({
+      ok: false,
+      reason: 'denied',
+      message: 'This key has been used on too many devices.',
+    });
+    for (const body of [undefined, { error: 42 }, { error: 'x'.repeat(500) }, 'nope']) {
+      const r = await fetchUnlockBundle(CONFIG, KEY, respond(403, body));
+      expect(r).toEqual({ ok: false, reason: 'denied', message: 'That licence key was not accepted.' });
+    }
+  });
+
+  it('maps 404, other statuses, non-bundles and network failures to reasons', async () => {
+    expect((await fetchUnlockBundle(CONFIG, KEY, respond(404, undefined))).ok).toBe(false);
+    expect(await fetchUnlockBundle(CONFIG, KEY, respond(404, undefined))).toMatchObject({
+      reason: 'unknown-pack',
+    });
+    expect(await fetchUnlockBundle(CONFIG, KEY, respond(500, undefined))).toMatchObject({
+      reason: 'bad-response',
+      message: expect.stringContaining('HTTP 500'),
+    });
+    expect(await fetchUnlockBundle(CONFIG, KEY, respond(200, { hello: 'world' }))).toMatchObject({
+      reason: 'bad-response',
+    });
+    const offline = (async () => {
+      throw new TypeError('Failed to fetch');
+    }) as unknown as typeof fetch;
+    expect(await fetchUnlockBundle(CONFIG, KEY, offline)).toMatchObject({
+      reason: 'offline',
+      message: expect.stringContaining('connection'),
+    });
+  });
+});
+
+describe('unlockPack', () => {
+  it('inserts, activates, keeps the key under the pack and records pack_unlocked', async () => {
+    const r = await unlockPack(KEY, {
+      config: CONFIG,
+      buildPackId: 'solar-system-demo',
+      fetchImpl: respond(200, bundle()),
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.entry.id).toBe('solar-system-full');
+    expect(r.entry.questionCount).toBe(3);
+    expect(r.entry.origin).toBe('licence key · unlock.example.com');
+
+    expect(getInsertedPack('solar-system-full')?.questions).toHaveLength(3);
+    expect(listInsertedPacks().map((e) => e.id)).toEqual(['solar-system-full']);
+    expect(getActivePackPointer()).toBe('solar-system-full');
+    expect(storage.getItem(licenceKeyStorageKey('solar-system-full'))).toBe(KEY);
+
+    const events = loadEvents();
+    expect(events.map((e) => [e.type, e.data])).toEqual([
+      ['pack_unlocked', { pack: 'solar-system-full' }],
+    ]);
+  });
+
+  it('the key appears nowhere in storage but its own slot', async () => {
+    await unlockPack(KEY, {
+      config: CONFIG,
+      buildPackId: 'solar-system-demo',
+      fetchImpl: respond(200, bundle()),
+    });
+    for (const k of storage.keys()) {
+      if (k === licenceKeyStorageKey('solar-system-full')) continue;
+      expect(storage.getItem(k), k).not.toContain(KEY);
+    }
+  });
+
+  it('on a refusal records unlock_failed with the reason only, stores nothing', async () => {
+    const r = await unlockPack(KEY, {
+      config: CONFIG,
+      buildPackId: 'solar-system-demo',
+      fetchImpl: respond(403, { error: 'Key revoked.' }),
+    });
+    expect(r).toEqual({ ok: false, reason: 'denied', message: 'Key revoked.' });
+    expect(listInsertedPacks()).toEqual([]);
+    expect(getActivePackPointer()).toBeNull();
+    expect(storage.getItem(licenceKeyStorageKey('solar-system-full'))).toBeNull();
+    const events = loadEvents();
+    expect(events.map((e) => [e.type, e.data])).toEqual([
+      ['unlock_failed', { pack: 'solar-system-full', reason: 'denied' }],
+    ]);
+    expect(storage.dump()).not.toContain(KEY);
+  });
+
+  it('a bundle that fails validation is refused with its errors', async () => {
+    const broken = bundle();
+    broken.questions[0].correctKey = 'Z';
+    const r = await unlockPack(KEY, {
+      config: CONFIG,
+      buildPackId: 'solar-system-demo',
+      fetchImpl: respond(200, broken),
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.reason).toBe('invalid-pack');
+    expect(r.errors?.length).toBeGreaterThan(0);
+    expect(listInsertedPacks()).toEqual([]);
+    expect(loadEvents().map((e) => e.data)).toEqual([
+      { pack: 'solar-system-full', reason: 'invalid-pack' },
+    ]);
+  });
+
+  it('refuses the pack built into this app, like any insert', async () => {
+    const r = await unlockPack(KEY, {
+      config: CONFIG,
+      buildPackId: 'solar-system-full',
+      fetchImpl: respond(200, bundle()),
+    });
+    expect(r.ok).toBe(false);
+    expect(getActivePackPointer()).toBeNull();
+  });
+});
+
+describe('the unlocked toast', () => {
+  it('is stashed for Home and read exactly once', () => {
+    expect(takeUnlockedToast()).toBeNull();
+    stashUnlockedToast({ title: 'Full Course', count: 3 });
+    expect(window.sessionStorage.getItem(UNLOCKED_TOAST_KEY)).toContain('Full Course');
+    expect(takeUnlockedToast()).toEqual({ title: 'Full Course', count: 3 });
+    expect(takeUnlockedToast()).toBeNull();
+  });
+});
