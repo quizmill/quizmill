@@ -86,9 +86,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Reusable workflow: the checkout above is the CALLER's pack repo, so
+      # there is no engine .nvmrc to read here — repeat its major literally
+      # (tests/node-version.test.ts keeps the two in step).
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
 
       # On a pinned version (post-release dispatch), wait for that exact
       # version to be installable from npm before building — sidesteps the
