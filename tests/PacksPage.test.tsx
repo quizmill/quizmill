@@ -14,9 +14,12 @@ vi.mock('@/lib/packRegistry', async (importOriginal) => {
     loadRegistry: vi.fn(async () => ({ source: 'builtin', listings: [] })),
   };
 });
-vi.mock('@/lib/packAssets', () => ({
-  cachePackAssets: vi.fn(async () => ({ total: 0, cached: 0 })),
-}));
+// The image prefetch is a spy so a test can hold one insert's prefetch open
+// past the next insert.
+const cachePackAssets = vi.hoisted(() =>
+  vi.fn<() => Promise<{ total: number; cached: number }>>(async () => ({ total: 0, cached: 0 })),
+);
+vi.mock('@/lib/packAssets', () => ({ cachePackAssets }));
 // The URL path is only ever asserted NOT to run here (it must never touch
 // the network), so the fetch is a spy that would hang if it were called.
 const fetchPackFromUrl = vi.hoisted(() =>
@@ -242,6 +245,36 @@ describe('PacksPage insert feedback', () => {
     await act(async () => {});
     expect(insertCard().querySelector('[data-testid="insert-result"]')).toBeTruthy();
     expect(insertCard().querySelector('[data-testid="insert-errors"]')).toBeNull();
+  });
+
+  it('lets only an insert’s own image prefetch annotate its result', async () => {
+    await render();
+    // The first insert's prefetch is slow…
+    let releaseFirst!: (r: { total: number; cached: number }) => void;
+    cachePackAssets.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseFirst = resolve;
+        }),
+    );
+    await pickFile(async () => bundleJson());
+    await act(async () => {});
+    expect(insertCard().textContent).toContain('Inserted “Fixture Pack”');
+
+    // …and the same pack is re-inserted (its update path) before it resolves.
+    // This bundle has no images, so its own prefetch has nothing to report.
+    await pickFile(async () => bundleJson('fixture-pack', 'Fixture Pack v2'), 'v2.json');
+    await act(async () => {});
+    expect(insertCard().textContent).toContain('Inserted “Fixture Pack v2”');
+    expect(cachePackAssets).toHaveBeenCalledTimes(2);
+
+    // The stale prefetch must not describe the newer insert.
+    await act(async () => {
+      releaseFirst({ total: 2, cached: 2 });
+    });
+    await act(async () => {});
+    expect(insertCard().textContent).toContain('Inserted “Fixture Pack v2”');
+    expect(insertCard().textContent).not.toContain('images saved');
   });
 
   it('ignores Enter in the URL field while another insert is busy', async () => {

@@ -250,7 +250,8 @@ export function PacksPage() {
     // Funnel event (src/lib/analytics.ts) — recorded under the ACTIVE pack,
     // naming the one that arrived.
     recordEvent('bundle_inserted', { pack: result.entry.id });
-    setInserted({ entry: result.entry });
+    const notice: InsertedNotice = { entry: result.entry };
+    setInserted(notice);
     refresh();
     // Prefetch the pack's images for offline practice — in the background,
     // the insert itself is already done.
@@ -258,8 +259,11 @@ export function PacksPage() {
     if (stored) {
       void cachePackAssets(stored).then(({ total, cached }) => {
         if (total > 0 && cached > 0) {
+          // Only THIS insert's prefetch may annotate the panel: a re-insert
+          // of the same pack id shows a new notice, and a slow prefetch from
+          // the earlier one must not describe it.
           setInserted((cur) =>
-            cur && cur.entry.id === result.entry.id
+            cur && cur.entry === notice.entry
               ? { ...cur, imagesNote: `${cached} of ${total} images saved for offline use.` }
               : cur,
           );
@@ -308,7 +312,7 @@ export function PacksPage() {
 
   function switchTo(id: string | null, title: string) {
     if (!activatePack(id)) return;
-    setMessage(`Switching to “${title}”…`);
+    setMessage(id === activeId ? `Reloading “${title}”…` : `Switching to “${title}”…`);
     // Any #pack= hash would outrank the pointer on reload — drop it first.
     window.history.replaceState(null, '', window.location.pathname + window.location.search);
     window.location.reload();
@@ -557,25 +561,30 @@ export function PacksPage() {
               {inserted.imagesNote ? <> {inserted.imagesNote}</> : null}
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              {inserted.entry.id === activeId ? (
-                <Button
-                  size="sm"
-                  data-testid="insert-result-reload"
-                  onClick={() => window.location.reload()}
-                >
-                  <RotateCw className="h-4 w-4" />
-                  Reload
-                </Button>
-              ) : (
-                <Button
-                  size="sm"
-                  data-testid="insert-result-activate"
-                  onClick={() => switchTo(inserted.entry.id, inserted.entry.title)}
-                >
-                  <Play className="h-4 w-4" />
-                  Make active
-                </Button>
-              )}
+              {/* Both go through switchTo: the active pack may have arrived
+                  from an external handoff (blob or #pack= hash), and either
+                  outranks the library pointer at startup — a raw reload would
+                  bring the OLD questions back. Pointing the library at the
+                  inserted pack and dropping both makes the update stick. */}
+              <Button
+                size="sm"
+                data-testid={
+                  inserted.entry.id === activeId ? 'insert-result-reload' : 'insert-result-activate'
+                }
+                onClick={() => switchTo(inserted.entry.id, inserted.entry.title)}
+              >
+                {inserted.entry.id === activeId ? (
+                  <>
+                    <RotateCw className="h-4 w-4" />
+                    Reload
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4" />
+                    Make active
+                  </>
+                )}
+              </Button>
               <Button size="sm" variant="ghost" onClick={() => setInserted(null)}>
                 Not now
               </Button>

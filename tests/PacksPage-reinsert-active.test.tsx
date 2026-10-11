@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { PacksPage } from '@/components/PacksPage';
-import { ACTIVE_PACK_ID_KEY } from '@/lib/packKeys';
+import { ACTIVE_PACK_ID_KEY, HANDOFF_PACK_KEY } from '@/lib/packKeys';
 
 /**
  * Re-inserting a pack is its update path (a newer bundle of the same id
@@ -117,5 +117,42 @@ describe('PacksPage re-inserting the active pack', () => {
     });
     expect(reload).toHaveBeenCalled();
     expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('fixture-pack');
+  });
+
+  it('reloads onto the stored update, not a handed-off copy of the pack', async () => {
+    // The active pack arrived from an external host (handoff blob and/or a
+    // #pack= hash) — both outrank the library pointer at startup, so a raw
+    // reload would bring the OLD questions back. Reload must point the
+    // library at the inserted pack and drop both before reloading.
+    localStorage.removeItem(ACTIVE_PACK_ID_KEY);
+    localStorage.setItem(HANDOFF_PACK_KEY, '{"manifest":{"id":"fixture-pack"},"questions":[]}');
+    const replaceState = vi.spyOn(window.history, 'replaceState');
+
+    await act(async () => {
+      root = createRoot(container);
+      root.render(<PacksPage />);
+    });
+    await act(async () => {});
+
+    const input = container.querySelector<HTMLInputElement>('[data-testid="insert-files"]')!;
+    const file = new File(['-'], 'fixture.bundle.json', { type: 'application/json' });
+    Object.defineProperty(file, 'text', { value: async () => bundleJson() });
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+    await act(async () => {
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await act(async () => {});
+
+    const reloadButton = container.querySelector<HTMLButtonElement>(
+      '[data-testid="insert-result-reload"]',
+    );
+    expect(reloadButton).toBeTruthy();
+    await act(async () => {
+      reloadButton!.click();
+    });
+    expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('fixture-pack');
+    expect(localStorage.getItem(HANDOFF_PACK_KEY)).toBeNull();
+    expect(replaceState).toHaveBeenCalledWith(null, '', '/packs/');
+    expect(reload).toHaveBeenCalled();
   });
 });
