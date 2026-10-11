@@ -128,6 +128,28 @@ describe('NotesPage note cards', () => {
     expect(card()).toBeNull();
   });
 
+  it('deleting mid-edit does not resurrect the note from the pending draft', async () => {
+    recordNote(QID, 'old note', 100);
+    await render();
+
+    // Type, then tap Delete inside the debounce window: the delete removes
+    // the row and unmounts the card, whose unmount flush must NOT write
+    // the draft back.
+    await type(textarea()!, 'old note, revised');
+    await act(async () => {
+      container
+        .querySelector('button[aria-label="Delete note"]')!
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(loadNotes()).toEqual([]);
+    expect(card()).toBeNull();
+
+    // Nor may the debounce timer fire later and recreate it.
+    await advance(1000);
+    expect(loadNotes()).toEqual([]);
+    expect(card()).toBeNull();
+  });
+
   it('flushes a pending edit when the page unmounts', async () => {
     recordNote(QID, 'old note', 100);
     await render();

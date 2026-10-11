@@ -45,9 +45,17 @@ function NoteCard({
     () => packQuestions.find((q) => q.id === questionId),
     [questionId],
   );
-  const { text, setText, savedFlash } = useDebouncedNote(storedText, onSave, {
-    keepEmpty: true,
-  });
+  const { text, setText, savedFlash, cancel } = useDebouncedNote(
+    storedText,
+    onSave,
+    { keepEmpty: true },
+  );
+  // Drop any draft still waiting on the debounce before the delete removes
+  // this card — otherwise the unmount flush would write it straight back.
+  const handleDelete = () => {
+    cancel();
+    onDelete();
+  };
 
   const categoryLabel = question
     ? (PACK_CATEGORY_LABEL[question.categoryKey] ?? question.categoryKey)
@@ -85,7 +93,7 @@ function NoteCard({
         <button
           type="button"
           aria-label="Delete note"
-          onClick={onDelete}
+          onClick={handleDelete}
           className="tap-feedback inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-400 hover:bg-warn-100 hover:text-warn-700"
         >
           <Trash2 className="h-4 w-4" />

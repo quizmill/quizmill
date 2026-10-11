@@ -27,6 +27,12 @@ export interface DebouncedNote {
   editing: boolean;
   /** True for NOTE_SAVED_FLASH_MS after each write. */
   savedFlash: boolean;
+  /**
+   * Drop the pending draft without writing it — call before an action that
+   * removes the note (the Notes page's delete button), so neither the
+   * debounce timer nor the unmount flush can write the draft back.
+   */
+  cancel: () => void;
 }
 
 /**
@@ -41,7 +47,8 @@ export interface DebouncedNote {
  * timer; when it fires the draft goes to `onSave` and "Saved ✓" flashes
  * for NOTE_SAVED_FLASH_MS. A save still pending when the component
  * unmounts (Next tapped mid-debounce, the page left) is written at once
- * rather than lost.
+ * rather than lost — unless `cancel()` dropped it first, which is what an
+ * explicit delete does so the unmount can't resurrect the note.
  */
 export function useDebouncedNote(
   stored: string | undefined,
@@ -58,15 +65,25 @@ export function useDebouncedNote(
   const latestSave = useLatest(onSave);
   const latestOpts = useLatest(opts);
 
+  /** Stop the debounce timer and take the pending draft (null if none). */
+  const takePending = useCallback((): string | null => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    const value = pending.current;
+    pending.current = null;
+    return value;
+  }, []);
+
+  const cancel = useCallback(() => {
+    takePending();
+  }, [takePending]);
+
   /** Write the pending draft now, if there is one. */
   const flush = useCallback(
     (flash: boolean) => {
-      if (saveTimer.current) {
-        clearTimeout(saveTimer.current);
-        saveTimer.current = null;
-      }
-      const value = pending.current;
-      pending.current = null;
+      const value = takePending();
       if (value === null) return;
       if (latestOpts.current.keepEmpty && value.trim() === '') return;
       latestSave.current(value);
@@ -78,7 +95,7 @@ export function useDebouncedNote(
         setSavedFlash(false);
       }, NOTE_SAVED_FLASH_MS);
     },
-    [latestOpts, latestSave],
+    [latestOpts, latestSave, takePending],
   );
 
   const setText = useCallback(
@@ -106,5 +123,6 @@ export function useDebouncedNote(
     setText,
     editing: draft !== null,
     savedFlash,
+    cancel,
   };
 }
