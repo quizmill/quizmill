@@ -130,7 +130,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
         <script dangerouslySetInnerHTML={{ __html: LOOK_BOOTSTRAP }} />
         <script dangerouslySetInnerHTML={{ __html: PACK_BOOTSTRAP }} />
-        <div className="mx-auto w-full max-w-screen-sm px-4 pb-24 pt-4 sm:max-w-screen-md sm:pt-8">
+        <div className="mx-auto w-full max-w-(--breakpoint-sm) px-4 pb-24 pt-4 sm:max-w-(--breakpoint-md) sm:pt-8">
           {/* When the bootstrap above swapped a runtime pack in, the page was
               prerendered from a different pack — adopt that markup for the
               hydration pass instead of reporting the mismatch. */}

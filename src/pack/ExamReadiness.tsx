@@ -53,7 +53,7 @@ export default function ExamReadiness({ attempts }: { attempts: readonly Attempt
         <span className="text-xs text-ink-400">{examName}</span>
       </div>
 
-      <div className="flex flex-col gap-4 rounded-2xl border border-ink-200 bg-surface p-4 shadow-sm">
+      <div className="flex flex-col gap-4 rounded-2xl border border-ink-200 bg-surface p-4 shadow-xs">
         {/* Verdict + headline number */}
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -71,7 +71,7 @@ export default function ExamReadiness({ attempts }: { attempts: readonly Attempt
             <p className="mt-2 text-sm text-ink-600">{meta.blurb(report, examName)}</p>
           </div>
           {hasReadings ? (
-            <div className="flex-shrink-0 text-right">
+            <div className="shrink-0 text-right">
               <div className={cn('text-3xl font-bold tabular-nums', meta.text)}>
                 {report.estimatePct}%
               </div>
@@ -127,7 +127,7 @@ export default function ExamReadiness({ attempts }: { attempts: readonly Attempt
                   </div>
                   <div className="mt-0.5 text-xs text-ink-500">{n.reason}</div>
                 </div>
-                <span className="flex-shrink-0 text-xs font-semibold text-brand-600 group-hover:underline">
+                <span className="shrink-0 text-xs font-semibold text-brand-600 group-hover:underline">
                   Practise
                 </span>
               </Link>

@@ -63,7 +63,7 @@ export function OptionButtons({
         const keyBubble = (extra?: string) => (
           <span
             className={cn(
-              'inline-flex h-6 w-6 flex-shrink-0 items-center justify-center border text-xs font-bold',
+              'inline-flex h-6 w-6 shrink-0 items-center justify-center border text-xs font-bold',
               bubbleShape,
               extra,
               bubbleState,
@@ -74,9 +74,9 @@ export function OptionButtons({
         );
         const mark =
           stage === 'feedback' && isAnswer ? (
-            <Check className="h-5 w-5 flex-shrink-0 text-success-500" />
+            <Check className="h-5 w-5 shrink-0 text-success-500" />
           ) : stage === 'feedback' && isThis && !isAnswer ? (
-            <X className="h-5 w-5 flex-shrink-0 text-warn-500" />
+            <X className="h-5 w-5 shrink-0 text-warn-500" />
           ) : null;
 
         if (opt.image) {
@@ -87,7 +87,7 @@ export function OptionButtons({
               onClick={() => onSelect(opt.key)}
               disabled={stage === 'feedback'}
               className={cn(
-                'tap-feedback flex flex-col items-center gap-2 rounded-xl border-2 p-3 shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-default',
+                'tap-feedback flex flex-col items-center gap-2 rounded-xl border-2 p-3 shadow-xs transition focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-default',
                 visual,
               )}
             >
@@ -111,7 +111,7 @@ export function OptionButtons({
             onClick={() => onSelect(opt.key)}
             disabled={stage === 'feedback'}
             className={cn(
-              'tap-feedback flex min-h-14 items-start gap-3 rounded-xl border-2 px-4 py-3 text-left text-[15px] font-medium shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-default',
+              'tap-feedback flex min-h-14 items-start gap-3 rounded-xl border-2 px-4 py-3 text-left text-[15px] font-medium shadow-xs transition focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-default',
               visual,
             )}
           >

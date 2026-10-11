@@ -64,12 +64,12 @@ export function ProgressCard({ attempts }: { attempts: readonly Attempt[] }) {
     : null;
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-ink-200 bg-surface p-4 shadow-sm">
+    <div className="flex flex-col gap-3 rounded-2xl border border-ink-200 bg-surface p-4 shadow-xs">
       {p ? (
         <div data-testid="level-card">
           <div className="flex items-center gap-2">
             <span
-              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-brand-500/15 text-base leading-none"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-500/15 text-base leading-none"
               aria-hidden
             >
               {p.level.emoji}
@@ -100,7 +100,7 @@ export function ProgressCard({ attempts }: { attempts: readonly Attempt[] }) {
           <div className="flex items-center gap-2">
             <Flame
               className={cn(
-                'h-4 w-4 flex-shrink-0',
+                'h-4 w-4 shrink-0',
                 goalMet ? 'text-brand-600' : 'text-warn-600',
               )}
             />

@@ -143,7 +143,7 @@ export function CoachPage() {
     return (
       <main className="flex flex-col gap-5">
         <BackLink href="/" label="Home" />
-        <div className="rounded-2xl border border-ink-200 bg-surface p-6 text-center text-ink-500 shadow-sm">
+        <div className="rounded-2xl border border-ink-200 bg-surface p-6 text-center text-ink-500 shadow-xs">
           Loading…
         </div>
       </main>
@@ -211,7 +211,7 @@ export function CoachPage() {
       {days.length === 0 ? (
         <div
           data-testid="coach-empty"
-          className="rounded-2xl border border-ink-200 bg-surface p-6 text-center text-ink-600 shadow-sm"
+          className="rounded-2xl border border-ink-200 bg-surface p-6 text-center text-ink-600 shadow-xs"
         >
           No sessions yet. Once some practice has happened (or synced to this
           device), the days show up here.
@@ -241,10 +241,10 @@ function DayCard({ day, onOpen }: { day: CoachDay; onOpen: (t: Target) => void }
         type="button"
         data-testid="coach-day-review"
         onClick={() => onOpen({ kind: 'day', dayKey: day.dayKey })}
-        className="tap-feedback flex w-full items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-4 text-left shadow-sm"
+        className="tap-feedback flex w-full items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-4 text-left shadow-xs"
       >
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-brand-700">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-brand-700">
             <CalendarDays className="h-5 w-5" />
           </div>
           <div>
@@ -255,7 +255,7 @@ function DayCard({ day, onOpen }: { day: CoachDay; onOpen: (t: Target) => void }
             </div>
           </div>
         </div>
-        <ChevronRight className="h-5 w-5 flex-shrink-0 text-ink-400" />
+        <ChevronRight className="h-5 w-5 shrink-0 text-ink-400" />
       </button>
       <ol className="flex flex-col gap-2">
         {day.sessions.map((cs) => (
@@ -282,7 +282,7 @@ function SessionRow({
         type="button"
         data-testid="coach-session"
         onClick={() => onOpen({ kind: 'session', id: cs.session.id })}
-        className="tap-feedback flex w-full items-center justify-between gap-3 rounded-2xl border border-ink-200 bg-surface p-4 text-left shadow-sm hover:bg-ink-50 dark:hover:bg-ink-100"
+        className="tap-feedback flex w-full items-center justify-between gap-3 rounded-2xl border border-ink-200 bg-surface p-4 text-left shadow-xs hover:bg-ink-50 dark:hover:bg-ink-100"
       >
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -309,7 +309,7 @@ function SessionRow({
             ) : null}
           </div>
         </div>
-        <div className="flex flex-shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <span
             className={cn(
               'rounded-full px-2.5 py-1 text-sm font-bold tabular-nums',
@@ -382,7 +382,7 @@ function ReplayView({
     <main className="flex flex-col gap-5">
       {/* Sticky: a day replay runs to dozens of cards, and reveal-all is
           the control you reach for halfway down. */}
-      <header className="sticky top-0 z-10 -mx-1 flex items-center justify-between bg-ink-50/95 px-1 py-2 backdrop-blur">
+      <header className="sticky top-0 z-10 -mx-1 flex items-center justify-between bg-ink-50/95 px-1 py-2 backdrop-blur-sm">
         <button
           type="button"
           onClick={onBack}
@@ -437,7 +437,7 @@ function ReplayView({
             onClick={() => setFilter(value)}
             className={cn(
               'tap-feedback rounded-lg px-3 py-2 text-sm font-semibold',
-              filter === value ? 'bg-surface text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700',
+              filter === value ? 'bg-surface text-ink-900 shadow-xs' : 'text-ink-500 hover:text-ink-700',
             )}
           >
             {label}
@@ -531,7 +531,7 @@ function ReplayCard({
       <div
         data-testid="coach-step"
         data-revealed={revealed ? '1' : '0'}
-        className="flex flex-col gap-3 rounded-2xl border border-ink-200 bg-surface p-4 shadow-sm"
+        className="flex flex-col gap-3 rounded-2xl border border-ink-200 bg-surface p-4 shadow-xs"
       >
         <div className="flex flex-wrap items-center gap-1.5 text-sm">
           <QuestionMeta question={question} hideTags />
@@ -655,7 +655,7 @@ function ReplayCard({
                     <li key={a.id} className="flex items-center gap-2 tabular-nums">
                       <span
                         className={cn(
-                          'inline-block h-2 w-2 flex-shrink-0 rounded-full',
+                          'inline-block h-2 w-2 shrink-0 rounded-full',
                           a.isCorrect ? 'bg-success-500' : 'bg-warn-500',
                         )}
                         aria-hidden

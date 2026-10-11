@@ -33,7 +33,7 @@ function InlineMarkdown({ text }: { text: string }): ReactNode {
         i % 2 === 1 ? (
           <code
             key={i}
-            className="rounded bg-ink-100 px-1 py-0.5 font-mono text-[12.5px] text-ink-800"
+            className="rounded-sm bg-ink-100 px-1 py-0.5 font-mono text-[12.5px] text-ink-800"
           >
             {p}
           </code>

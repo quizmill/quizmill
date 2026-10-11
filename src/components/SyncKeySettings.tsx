@@ -187,7 +187,7 @@ export function SyncKeySettings() {
   }
 
   return (
-    <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
+    <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs">
       <div className="flex items-center gap-2">
         {key ? (
           <Cloud className="h-5 w-5 text-brand-600" />
@@ -231,7 +231,7 @@ export function SyncKeySettings() {
                   if (e.key === 'Enter') void commitName();
                   if (e.key === 'Escape') setNaming(false);
                 }}
-                className="flex-1 rounded-xl border border-ink-200 px-3 py-2 text-sm text-ink-800 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                className="flex-1 rounded-xl border border-ink-200 px-3 py-2 text-sm text-ink-800 outline-hidden focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
               />
               <div className="flex gap-2">
                 <Button onClick={commitName} disabled={savingName}>
@@ -334,7 +334,7 @@ export function SyncKeySettings() {
               data-testid="sync-key-input"
               value={entering}
               onChange={(e) => setEntering(e.target.value)}
-              className="flex-1 rounded-xl border border-ink-200 px-3 py-2 text-center font-mono text-sm tracking-wider text-ink-800 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+              className="flex-1 rounded-xl border border-ink-200 px-3 py-2 text-center font-mono text-sm tracking-wider text-ink-800 outline-hidden focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
             />
             <Button
               variant="secondary"

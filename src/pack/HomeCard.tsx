@@ -69,11 +69,11 @@ export function HomeCard({
     <Link
       href={href}
       data-testid={testid}
-      className={`tap-feedback flex items-center justify-between gap-3 rounded-2xl border ${t.card} p-4 shadow-sm`}
+      className={`tap-feedback flex items-center justify-between gap-3 rounded-2xl border ${t.card} p-4 shadow-xs`}
     >
       <div className="flex items-center gap-3">
         <div
-          className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${t.bubble}`}
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${t.bubble}`}
         >
           <Icon className="h-5 w-5" />
         </div>
@@ -82,7 +82,7 @@ export function HomeCard({
           <div className={`text-sm ${t.blurb}`}>{blurb}</div>
         </div>
       </div>
-      <ArrowRight className={`h-5 w-5 flex-shrink-0 ${t.arrow}`} />
+      <ArrowRight className={`h-5 w-5 shrink-0 ${t.arrow}`} />
     </Link>
   );
 }

@@ -86,7 +86,7 @@ export function TransferSettings() {
   }
 
   return (
-    <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm">
+    <div className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs">
       <h3 className="text-lg font-semibold text-ink-900">Move progress</h3>
       <p className="mt-1 text-sm text-ink-600">
         Export saves all sessions, answers, stickers and votes to a file you

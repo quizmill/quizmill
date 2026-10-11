@@ -1,9 +1,130 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+/* Dark mode is a class on <html> (set pre-paint by the bootstrap script in
+   layout.tsx), never the OS preference — `dark:` utilities key off it. */
+@custom-variant dark (&:is(.dark *));
+
+/* The design tokens (Tailwind 4 reads its theme from CSS, not a config
+   file). Palette shades resolve through the RGB-triplet variables declared
+   further down so dark mode and the Poster look can re-map every colour in
+   one place — components keep using `bg-ink-50` / `text-brand-700` and the
+   variables decide what that means; opacity modifiers (`bg-warn-100/60`)
+   still work because Tailwind mixes the resolved colour with transparent. */
+@theme {
+  --color-ink-50: rgb(var(--ink-50));
+  --color-ink-100: rgb(var(--ink-100));
+  --color-ink-200: rgb(var(--ink-200));
+  --color-ink-300: rgb(var(--ink-300));
+  --color-ink-400: rgb(var(--ink-400));
+  --color-ink-500: rgb(var(--ink-500));
+  --color-ink-600: rgb(var(--ink-600));
+  --color-ink-700: rgb(var(--ink-700));
+  --color-ink-800: rgb(var(--ink-800));
+  --color-ink-900: rgb(var(--ink-900));
+
+  --color-brand-50: rgb(var(--brand-50));
+  --color-brand-100: rgb(var(--brand-100));
+  --color-brand-200: rgb(var(--brand-200));
+  --color-brand-300: rgb(var(--brand-300));
+  --color-brand-400: rgb(var(--brand-400));
+  --color-brand-500: rgb(var(--brand-500));
+  --color-brand-600: rgb(var(--brand-600));
+  --color-brand-700: rgb(var(--brand-700));
+  --color-brand-800: rgb(var(--brand-800));
+  --color-brand-900: rgb(var(--brand-900));
+
+  --color-success-50: rgb(var(--success-50));
+  --color-success-100: rgb(var(--success-100));
+  --color-success-200: rgb(var(--success-200));
+  --color-success-500: rgb(var(--success-500));
+  --color-success-600: rgb(var(--success-600));
+  --color-success-700: rgb(var(--success-700));
+
+  --color-warn-50: rgb(var(--warn-50));
+  --color-warn-100: rgb(var(--warn-100));
+  --color-warn-200: rgb(var(--warn-200));
+  --color-warn-500: rgb(var(--warn-500));
+  --color-warn-600: rgb(var(--warn-600));
+  --color-warn-700: rgb(var(--warn-700));
+
+  /* Card background: white in light mode, raised panel in dark. */
+  --color-surface: rgb(var(--surface));
+
+  /* Static greys for surfaces that are dark in BOTH themes (drive mode,
+     game canvases, modal scrims, code blocks). Values mirror the
+     light-mode ink ramp and never flip. */
+  --color-night-50: #f6f7f9;
+  --color-night-100: #eceef2;
+  --color-night-200: #d4d8e0;
+  --color-night-300: #aab1bf;
+  --color-night-400: #7c8497;
+  --color-night-500: #535b70;
+  --color-night-600: #3b4255;
+  --color-night-700: #2a2f3d;
+  --color-night-800: #1c2029;
+  --color-night-900: #11141a;
+
+  /* Bigger defaults — he's 9. */
+  --text-base: 1.125rem; /* 18px */
+  --text-base--line-height: 1.6;
+  --text-question: 1.375rem;
+  --text-question--line-height: 1.55;
+  --text-big: 1.75rem;
+  --text-big--line-height: 1.4;
+
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+}
+
+/* Two Tailwind 3 defaults kept on purpose, so the migration changes no
+   pixels. (1) A bare `border` utility used to be gray-200; v4 makes it
+   currentcolor. Many conditional classNames (option buttons, stickers,
+   vote chips) set the colour on one branch only and leaned on the
+   default for the other. (2) v4's Preflight stops giving buttons a
+   pointer cursor; the app is tap-first but it is also used on laptops. */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@utility tap-feedback {
+  transition:
+    transform 80ms ease,
+    background-color 120ms ease;
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+@utility animate-celebration {
+  animation: celebration 2s ease-out forwards;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: celebration-reduced 1.5s ease-out forwards;
+  }
+}
+
+@utility animate-celebration-stay {
+  /* Same pop-in, but HOLDS at full opacity — for the game-offer
+     variant where we wait for the kid to choose. */
+  animation: celebration-pop-in 0.55s ease-out forwards;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: celebration-reduced-stay 0.3s ease-out forwards;
+  }
+}
 
 @layer base {
-  /* Theme palettes as RGB triplets (see tailwind.config.ts). Light is the
+  /* Theme palettes as RGB triplets (see the @theme block above). Light is the
      default; the `.dark` class on <html> (set pre-paint by the bootstrap
      script in layout.tsx) re-maps every shade. Shade roles are stable
      across themes: low = backgrounds/tints, high = text. */
@@ -114,78 +235,54 @@
   }
 }
 
-@layer utilities {
-  .tap-feedback {
-    transition: transform 80ms ease, background-color 120ms ease;
+/* Keyframes behind the `animate-celebration*` utilities above. The
+   `-reduced` pair is what those utilities switch to under
+   prefers-reduced-motion. */
+@keyframes celebration {
+  0% {
+    transform: scale(0.5) rotate(-6deg);
+    opacity: 0;
   }
-  .tap-feedback:active {
-    transform: scale(0.98);
+  15% {
+    transform: scale(1.18) rotate(2deg);
+    opacity: 1;
   }
-
-  .animate-celebration {
-    animation: celebration 2s ease-out forwards;
+  30% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
   }
-  @keyframes celebration {
-    0% {
-      transform: scale(0.5) rotate(-6deg);
-      opacity: 0;
-    }
-    15% {
-      transform: scale(1.18) rotate(2deg);
-      opacity: 1;
-    }
-    30% {
-      transform: scale(1) rotate(0deg);
-      opacity: 1;
-    }
-    85% {
-      transform: scale(1) rotate(0deg);
-      opacity: 1;
-    }
-    100% {
-      transform: scale(1.1) rotate(0deg);
-      opacity: 0;
-    }
+  85% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
   }
-
-  /* Same pop-in, but HOLDS at full opacity — for the game-offer
-     variant where we wait for the kid to choose. */
-  .animate-celebration-stay {
-    animation: celebration-pop-in 0.55s ease-out forwards;
+  100% {
+    transform: scale(1.1) rotate(0deg);
+    opacity: 0;
   }
-  @keyframes celebration-pop-in {
-    0% {
-      transform: scale(0.5) rotate(-6deg);
-      opacity: 0;
-    }
-    65% {
-      transform: scale(1.18) rotate(2deg);
-      opacity: 1;
-    }
-    100% {
-      transform: scale(1) rotate(0deg);
-      opacity: 1;
-    }
+}
+@keyframes celebration-pop-in {
+  0% {
+    transform: scale(0.5) rotate(-6deg);
+    opacity: 0;
   }
-
-  @media (prefers-reduced-motion: reduce) {
-    .animate-celebration {
-      animation: celebration-reduced 1.5s ease-out forwards;
-    }
-    .animate-celebration-stay {
-      animation: celebration-reduced-stay 0.3s ease-out forwards;
-    }
-    @keyframes celebration-reduced {
-      0% { opacity: 0; }
-      10% { opacity: 1; }
-      85% { opacity: 1; }
-      100% { opacity: 0; }
-    }
-    @keyframes celebration-reduced-stay {
-      0% { opacity: 0; }
-      100% { opacity: 1; }
-    }
+  65% {
+    transform: scale(1.18) rotate(2deg);
+    opacity: 1;
   }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+@keyframes celebration-reduced {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes celebration-reduced-stay {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
 }
 
 /* ————— Paper practice: print only the worksheet —————
@@ -352,11 +449,13 @@
   --warn-700: 255 138 106;
 }
 
-/* Structure: in Poster, everything "raised" becomes a slab. shadow-sm is
-   the app's one raised-surface idiom (Card, primary/secondary Button, the
-   selected segment of toggles), so one hook restyles the lot — hard offset
-   shadow, thick ink border, no blur. Unlayered so it beats the utilities. */
-:root[data-look='poster'] .shadow-sm {
+/* Structure: in Poster, everything "raised" becomes a slab. shadow-xs
+   (Tailwind 3's shadow-sm) is the app's one raised-surface idiom (Card,
+   primary/secondary Button, the selected segment of toggles), so one hook
+   restyles the lot — hard offset shadow, thick ink border, no blur.
+   Unlayered so it beats the utilities. tests/poster-look-css.test.ts pins
+   this class to the one Card and Button carry. */
+:root[data-look='poster'] .shadow-xs {
   border: 2.5px solid rgb(var(--ink-900));
   box-shadow: 4px 4px 0 rgb(var(--ink-900));
 }

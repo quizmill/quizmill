@@ -120,7 +120,7 @@ export function Memory({ onClose }: MemoryProps) {
               onClick={() => handleTap(i)}
               disabled={faceUp}
               className={cn(
-                'tap-feedback flex aspect-square items-center justify-center rounded-xl border-2 text-3xl shadow-sm transition',
+                'tap-feedback flex aspect-square items-center justify-center rounded-xl border-2 text-3xl shadow-xs transition',
                 card.matched
                   ? 'border-success-500 bg-success-100'
                   : faceUp

@@ -173,28 +173,28 @@ export default function PackHome() {
           <Link
             href="/progress"
             aria-label="Progress"
-            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-surface text-ink-700 shadow-sm"
+            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-surface text-ink-700 shadow-xs"
           >
             <BarChart3 className="h-4 w-4" />
           </Link>
           <Link
             href="/stickers"
             aria-label="Sticker cabinet"
-            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-surface text-ink-700 shadow-sm"
+            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-surface text-ink-700 shadow-xs"
           >
             <Trophy className="h-4 w-4" />
           </Link>
           <Link
             href="/notes"
             aria-label="My notes"
-            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-surface text-ink-700 shadow-sm"
+            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-surface text-ink-700 shadow-xs"
           >
             <NotebookPen className="h-4 w-4" />
           </Link>
           <Link
             href="/settings"
             aria-label="Settings"
-            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-surface text-ink-700 shadow-sm"
+            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-surface text-ink-700 shadow-xs"
           >
             <Settings className="h-4 w-4" />
           </Link>
@@ -300,7 +300,7 @@ export default function PackHome() {
                   className={cn(
                     'tap-feedback flex-1 rounded-full px-2.5 py-1.5 text-sm font-semibold transition-colors',
                     active
-                      ? 'bg-surface text-ink-900 shadow-sm'
+                      ? 'bg-surface text-ink-900 shadow-xs'
                       : 'text-ink-600 hover:text-ink-900',
                   )}
                 >
@@ -313,7 +313,7 @@ export default function PackHome() {
           {showNudge && nudge ? (
             <div
               className={cn(
-                'flex items-center justify-between gap-3 rounded-2xl border p-3 shadow-sm',
+                'flex items-center justify-between gap-3 rounded-2xl border p-3 shadow-xs',
                 nudge.direction === 'up'
                   ? 'border-brand-500/30 bg-brand-50'
                   : 'border-warn-500/30 bg-warn-50',
@@ -321,9 +321,9 @@ export default function PackHome() {
             >
               <div className="flex min-w-0 items-center gap-2.5">
                 {nudge.direction === 'up' ? (
-                  <TrendingUp className="h-5 w-5 flex-shrink-0 text-brand-600" />
+                  <TrendingUp className="h-5 w-5 shrink-0 text-brand-600" />
                 ) : (
-                  <TrendingDown className="h-5 w-5 flex-shrink-0 text-warn-600" />
+                  <TrendingDown className="h-5 w-5 shrink-0 text-warn-600" />
                 )}
                 <p className="text-sm text-ink-700">
                   {nudge.direction === 'up' ? (
@@ -343,7 +343,7 @@ export default function PackHome() {
                   )}
                 </p>
               </div>
-              <div className="flex flex-shrink-0 items-center gap-1">
+              <div className="flex shrink-0 items-center gap-1">
                 <button
                   type="button"
                   onClick={acceptNudge}
@@ -383,13 +383,13 @@ export default function PackHome() {
                 key={cat.key}
                 href={`/practice/?subject=${cat.key}`}
                 className={cn(
-                  'tap-feedback group flex items-center justify-between gap-3 rounded-2xl border p-4 shadow-sm transition hover:shadow-md',
+                  'tap-feedback group flex items-center justify-between gap-3 rounded-2xl border p-4 shadow-xs transition hover:shadow-md',
                   tone.card,
                 )}
               >
                 <span
                   className={cn(
-                    'flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl text-2xl leading-none',
+                    'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-2xl leading-none',
                     tone.badge,
                   )}
                   aria-hidden
@@ -420,7 +420,7 @@ export default function PackHome() {
                   </div>
                 </div>
                 <ArrowRight
-                  className={cn('h-5 w-5 flex-shrink-0 transition', tone.arrow)}
+                  className={cn('h-5 w-5 shrink-0 transition', tone.arrow)}
                 />
               </Link>
             );
