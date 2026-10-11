@@ -250,7 +250,7 @@ export function PaperPage() {
                   key={s.id}
                   href={`#sheet=${encodeURIComponent(s.id)}`}
                   data-testid={`sheet-row-${s.code}`}
-                  className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-ink-200 bg-surface p-4 shadow-sm"
+                  className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-ink-200 bg-surface p-4 shadow-xs"
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -280,7 +280,7 @@ export function PaperPage() {
                       {SHEET_DATE_FORMAT.format(s.createdAt)}
                     </div>
                   </div>
-                  <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-400" />
+                  <ArrowRight className="h-5 w-5 shrink-0 text-ink-400" />
                 </a>
               );
             })}
@@ -331,7 +331,7 @@ function ComposeCard({
 
   return (
     <section
-      className="flex flex-col gap-4 rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm"
+      className="flex flex-col gap-4 rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs"
       data-testid="paper-compose"
     >
       <h2 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
@@ -355,7 +355,7 @@ function ComposeCard({
                 className={cn(
                   'tap-feedback inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-semibold',
                   active
-                    ? cn('shadow-sm', tone.card, 'text-ink-900')
+                    ? cn('shadow-xs', tone.card, 'text-ink-900')
                     : 'border-ink-200 bg-surface text-ink-600 hover:text-ink-900',
                 )}
               >
@@ -387,7 +387,7 @@ function ComposeCard({
                 className={cn(
                   'tap-feedback flex-1 rounded-full px-2.5 py-1.5 text-sm font-semibold transition-colors',
                   level === lv.key
-                    ? 'bg-surface text-ink-900 shadow-sm'
+                    ? 'bg-surface text-ink-900 shadow-xs'
                     : 'text-ink-600 hover:text-ink-900',
                 )}
               >
@@ -411,7 +411,7 @@ function ComposeCard({
               className={cn(
                 'tap-feedback flex-1 rounded-xl border px-3 py-2 text-sm font-semibold',
                 count === c
-                  ? 'border-brand-500/40 bg-brand-50 text-brand-800 shadow-sm'
+                  ? 'border-brand-500/40 bg-brand-50 text-brand-800 shadow-xs'
                   : 'border-ink-200 bg-surface text-ink-600 hover:text-ink-900',
               )}
             >
@@ -628,7 +628,7 @@ function SheetView({
               className={cn(
                 'tap-feedback inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold',
                 view === value
-                  ? 'bg-surface text-ink-900 shadow-sm'
+                  ? 'bg-surface text-ink-900 shadow-xs'
                   : 'text-ink-500 hover:text-ink-700',
               )}
             >
@@ -681,7 +681,7 @@ function PrintableSheet({
   const screen = variant === 'screen';
   return (
     <div
-      className="paper-sheet rounded-2xl border border-ink-200 bg-white p-6 text-neutral-900 shadow-sm"
+      className="paper-sheet rounded-2xl border border-ink-200 bg-white p-6 text-neutral-900 shadow-xs"
       data-testid="paper-sheet"
     >
       <div className="flex items-start justify-between gap-4 border-b-2 border-neutral-900 pb-4">
@@ -730,7 +730,7 @@ function PrintableSheet({
               className={cn('paper-question flex gap-3', screen ? 'pb-20 pt-5' : 'py-4')}
               data-testid={`sheet-question-${i + 1}`}
             >
-              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border-2 border-neutral-900 text-sm font-bold">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-neutral-900 text-sm font-bold">
                 {i + 1}
               </span>
               {q ? (
@@ -760,7 +760,7 @@ function PrintableSheet({
                           {opt.image ? (
                             <PackImage
                               src={opt.image}
-                              className="mt-1 max-h-24 rounded"
+                              className="mt-1 max-h-24 rounded-sm"
                             />
                           ) : null}
                         </span>
@@ -776,7 +776,7 @@ function PrintableSheet({
               {q ? (
                 <div
                   className={cn(
-                    'flex flex-shrink-0 flex-col items-center gap-1',
+                    'flex shrink-0 flex-col items-center gap-1',
                     screen ? 'w-24' : 'w-16',
                   )}
                 >
@@ -817,7 +817,7 @@ function PrintableAnswerKey({ sheet }: { sheet: PaperSheet }) {
   const marks = resolveSheetQuestions(sheet.questionIds, packQuestions);
   return (
     <div
-      className="paper-sheet rounded-2xl border border-ink-200 bg-white p-6 text-neutral-900 shadow-sm"
+      className="paper-sheet rounded-2xl border border-ink-200 bg-white p-6 text-neutral-900 shadow-xs"
       data-testid="paper-answer-key"
     >
       <div className="flex items-start justify-between gap-4 border-b-2 border-neutral-900 pb-4">
@@ -855,7 +855,7 @@ function PrintableAnswerKey({ sheet }: { sheet: PaperSheet }) {
           const concept = q?.conceptId ? PACK_CONCEPT_BY_ID[q.conceptId] : undefined;
           return (
             <li key={mark.questionId} className="paper-question flex gap-3 py-4">
-              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border-2 border-neutral-900 text-sm font-bold">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-neutral-900 text-sm font-bold">
                 {i + 1}
               </span>
               {q ? (
@@ -896,7 +896,7 @@ function PrintableAnswerKey({ sheet }: { sheet: PaperSheet }) {
                 </div>
               )}
               {q ? (
-                <div className="flex w-16 flex-shrink-0 flex-col items-center gap-1">
+                <div className="flex w-16 shrink-0 flex-col items-center gap-1">
                   <span
                     className="flex h-12 w-14 items-center justify-center rounded-lg border-2 border-neutral-900 font-mono text-lg font-bold"
                     data-testid="key-answer"

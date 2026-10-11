@@ -66,7 +66,7 @@ export function UpdateNotifier() {
   if (!updateReady) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-screen-sm px-4 pb-4">
+    <div className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-(--breakpoint-sm) px-4 pb-4">
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-brand-400 bg-brand-500 px-4 py-3 text-white shadow-lg">
         <div className="flex items-center gap-2 text-sm font-medium">
           <RefreshCw className="h-4 w-4" />
@@ -75,7 +75,7 @@ export function UpdateNotifier() {
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="tap-feedback rounded-full bg-surface px-4 py-1.5 text-sm font-semibold text-brand-700 shadow-sm hover:bg-brand-50"
+          className="tap-feedback rounded-full bg-surface px-4 py-1.5 text-sm font-semibold text-brand-700 shadow-xs hover:bg-brand-50"
         >
           Update
         </button>

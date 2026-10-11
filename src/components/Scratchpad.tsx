@@ -242,7 +242,7 @@ export function Scratchpad() {
           rows={full ? undefined : 4}
           placeholder="Jot down your working, calculations, or notes…"
           className={cn(
-            'w-full rounded-lg border border-ink-200 bg-ink-50/40 px-3 py-2 font-mono text-sm leading-relaxed text-ink-800 placeholder:text-ink-400 focus:border-brand-400 focus:outline-none',
+            'w-full rounded-lg border border-ink-200 bg-ink-50/40 px-3 py-2 font-mono text-sm leading-relaxed text-ink-800 placeholder:text-ink-400 focus:border-brand-400 focus:outline-hidden',
             full ? 'min-h-0 flex-1 resize-none' : 'resize-y',
           )}
         />
@@ -298,7 +298,7 @@ export function Scratchpad() {
                   'h-6 w-6 rounded-full border-2 transition',
                   data.color === c
                     ? 'scale-110 border-ink-500'
-                    : 'border-surface shadow-sm',
+                    : 'border-surface shadow-xs',
                 )}
                 style={{ backgroundColor: c }}
               />
@@ -343,7 +343,7 @@ export function Scratchpad() {
         data-testid="scratchpad-toggle"
         aria-expanded={data.open}
         onClick={toggleOpen}
-        className="tap-feedback inline-flex w-fit items-center gap-1.5 rounded-full border border-ink-200 bg-surface px-3 py-1.5 text-sm font-medium text-ink-600 shadow-sm transition hover:border-brand-300"
+        className="tap-feedback inline-flex w-fit items-center gap-1.5 rounded-full border border-ink-200 bg-surface px-3 py-1.5 text-sm font-medium text-ink-600 shadow-xs transition hover:border-brand-300"
       >
         <NotebookPen className="h-4 w-4" />
         Scratchpad
@@ -360,7 +360,7 @@ export function Scratchpad() {
       </button>
 
       {data.open && !expanded ? (
-        <div className="mt-2 flex flex-col gap-2 rounded-2xl border border-ink-200 bg-surface p-3 shadow-sm">
+        <div className="mt-2 flex flex-col gap-2 rounded-2xl border border-ink-200 bg-surface p-3 shadow-xs">
           <div className="flex items-center gap-2">
             <div className="flex-1">{tabs}</div>
             <button
@@ -460,7 +460,7 @@ function TabButton({
       className={cn(
         'tap-feedback inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
         active
-          ? 'bg-surface text-ink-900 shadow-sm'
+          ? 'bg-surface text-ink-900 shadow-xs'
           : 'text-ink-500 hover:text-ink-700',
       )}
     >

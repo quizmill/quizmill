@@ -379,7 +379,7 @@ export function PaperWriteView({
   };
 
   const toolButton =
-    'tap-feedback inline-flex h-10 min-w-10 flex-shrink-0 items-center justify-center gap-1.5 rounded-full px-2.5 text-sm font-semibold transition disabled:pointer-events-none disabled:opacity-40';
+    'tap-feedback inline-flex h-10 min-w-10 shrink-0 items-center justify-center gap-1.5 rounded-full px-2.5 text-sm font-semibold transition disabled:pointer-events-none disabled:opacity-40';
 
   return (
     <div
@@ -389,7 +389,7 @@ export function PaperWriteView({
       aria-modal="true"
       aria-label={`Sheet ${sheet.code} — write on screen`}
     >
-      <div className="flex flex-shrink-0 flex-col border-b border-ink-200 bg-surface shadow-sm">
+      <div className="flex shrink-0 flex-col border-b border-ink-200 bg-surface shadow-xs">
         <div className="mx-auto flex w-full max-w-[932px] items-center gap-1 px-2 py-1.5">
           <button
             type="button"
@@ -420,13 +420,13 @@ export function PaperWriteView({
                     setTool('pen');
                   }}
                   className={cn(
-                    'tap-feedback flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full',
+                    'tap-feedback flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
                     active ? 'bg-ink-100' : 'hover:bg-ink-100',
                   )}
                 >
                   <span
                     className={cn(
-                      'rounded-full border-2 border-surface shadow-sm transition-all',
+                      'rounded-full border-2 border-surface shadow-xs transition-all',
                       active ? 'h-6 w-6 ring-2 ring-ink-500' : 'h-5 w-5',
                     )}
                     style={{ backgroundColor: c }}
@@ -559,7 +559,7 @@ export function PaperWriteView({
           </div>
 
           <div
-            className="flex w-full max-w-md flex-col items-center gap-3 rounded-2xl border border-ink-200 bg-surface p-5 text-center shadow-sm"
+            className="flex w-full max-w-md flex-col items-center gap-3 rounded-2xl border border-ink-200 bg-surface p-5 text-center shadow-xs"
             data-testid="write-finish"
           >
             <h2 className="text-lg font-semibold text-ink-900">Finished?</h2>

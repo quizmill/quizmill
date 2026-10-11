@@ -186,6 +186,13 @@ Each deployment is one pack. The PWA name, icon, and theme colour are
 generated from the pack manifest, so every pack gets its own
 installable app identity.
 
+**Browser floor.** The engine's stylesheet (Tailwind CSS 4) relies on
+`color-mix()`, `@property` and cascade layers, so learners need Safari
+16.4+ (iOS 16.4+), Chrome 111+ or Firefox 128+. On an older browser the
+app still loads and works, but palette tints render transparent and
+much of the layout loses its styling — an iPad stuck on iOS 15 or
+16.0–16.3 is the device most likely to be affected.
+
 Note that a static export embeds the questions in the served assets —
 "private pack" means *not in a public repo*, not *unreadable by users
 of the deployed app*.

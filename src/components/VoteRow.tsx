@@ -116,7 +116,7 @@ export function VoteRow({ questionId }: VoteRowProps) {
             value={comment}
             onChange={(e) => handleCommentChange(e.target.value)}
             rows={2}
-            className="w-full resize-y rounded-lg border border-ink-200 bg-surface px-3 py-2 text-sm text-ink-800 placeholder:text-ink-400 focus:border-warn-500 focus:outline-none"
+            className="w-full resize-y rounded-lg border border-ink-200 bg-surface px-3 py-2 text-sm text-ink-800 placeholder:text-ink-400 focus:border-warn-500 focus:outline-hidden"
           />
           {savedFlash ? (
             <span className="text-right text-xs text-success-700">Saved ✓</span>

@@ -77,7 +77,7 @@ export function SyncCard({
 }) {
   return (
     <div
-      className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-sm"
+      className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs"
       data-testid="sync-card"
       data-connected={connected ? 'true' : 'false'}
     >

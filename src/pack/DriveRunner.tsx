@@ -530,7 +530,7 @@ export function DriveRunner() {
               >
                 <span
                   className={cn(
-                    'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-lg font-bold',
+                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-bold',
                     showFeedback && isAnswer
                       ? 'bg-success-500 text-white'
                       : showFeedback && isThis
@@ -599,7 +599,7 @@ function IntroItem({
 }) {
   return (
     <li className="flex items-start gap-3">
-      <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-night-800 text-[#8bb8ff]">
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-night-800 text-[#8bb8ff]">
         {icon}
       </span>
       <span className="leading-relaxed">{children}</span>
