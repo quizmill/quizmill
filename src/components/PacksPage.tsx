@@ -14,6 +14,7 @@ import {
   Store,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { LicenceKeyCard } from '@/components/LicenceKeyCard';
 import { APP_CONFIG } from '@/config';
 import { buildTimeManifest, buildTimeQuestionCount } from '@/pack/source';
 import { packQuestions } from '@/pack/data';
@@ -347,6 +348,8 @@ export function PacksPage() {
           />
         ))}
       </section>
+
+      <LicenceKeyCard />
 
       <section
         data-testid="registry-browser"

@@ -19,6 +19,7 @@ import {
 import { APP_CONFIG } from '@/config';
 import { StatTile } from '@/components/StatTile';
 import { InstallBanner } from '@/components/InstallPrompt';
+import { UnlockedToast } from '@/components/UnlockedToast';
 import { useStorageData } from '@/lib/useStorage';
 import { useClientState, useMounted } from '@/lib/useMounted';
 import { unresolvedMistakeCount } from '@/lib/mistakes';
@@ -200,6 +201,8 @@ export default function PackHome() {
           </Link>
         </nav>
       </header>
+
+      <UnlockedToast />
 
       <InstallBanner />
 
