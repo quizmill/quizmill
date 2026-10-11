@@ -17,6 +17,8 @@
  * exactly like the localStorage source of truth it mirrors.
  */
 
+import { MAX_KEY_NAME_LENGTH, normalizeKeyName } from '../../src/lib/syncKey';
+
 export const TABLES = ['sessions', 'attempts', 'achievements', 'votes', 'notes', 'events'] as const;
 export type TableName = (typeof TABLES)[number];
 
@@ -204,36 +206,18 @@ export async function userIdFromKey(bearer: string): Promise<string | null> {
 // for themselves, readable only by someone already holding the key (which
 // is total access anyway) — so it's no new exposure, but it is also no
 // place for a secret.
-
-/** Longest name kept, in code points (so emoji survive whole). */
-export const MAX_KEY_NAME_LENGTH = 40;
+//
+// Canonicalisation is the engine's normalizeKeyName, imported rather than
+// copied: client and server MUST agree so a name survives the round trip
+// unchanged, and one function can't disagree with itself. Re-exported so
+// the worker's surface (and tests/worker-sync.test.ts, which asserts the
+// two are the same function) keeps reading it from here. The engine
+// module is import-free and pure, so wrangler bundles it as-is.
 
 /** Beyond this the request is malformed rather than merely long. */
 const MAX_KEY_NAME_INPUT = 1_000;
 
-function isControl(ch: string): boolean {
-  const cp = ch.codePointAt(0) ?? 0;
-  return cp < 0x20 || cp === 0x7f;
-}
-
-/**
- * Canonicalise a name: control characters become spaces, runs of
- * whitespace collapse, the ends are trimmed, and the result is clamped to
- * MAX_KEY_NAME_LENGTH code points (clamping by code point, not by UTF-16
- * unit, so a trailing emoji is kept whole rather than split into half a
- * surrogate pair). `''` means "no name" — stored as a deletion.
- *
- * MUST match normalizeKeyName in src/lib/syncKey.ts, so a name survives
- * the round trip unchanged (asserted in tests/worker-sync.test.ts).
- */
-export function normalizeKeyName(raw: string): string {
-  const flattened = Array.from(raw)
-    .map((ch) => (isControl(ch) ? ' ' : ch))
-    .join('')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return Array.from(flattened).slice(0, MAX_KEY_NAME_LENGTH).join('').trim();
-}
+export { MAX_KEY_NAME_LENGTH, normalizeKeyName };
 
 /** Validate a `POST /v1/profile` body. Null = reject the request with 400. */
 export function parseProfileRequest(body: unknown): { name: string } | null {
