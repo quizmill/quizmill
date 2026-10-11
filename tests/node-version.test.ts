@@ -22,6 +22,27 @@ function enginesNode(rel: string): string | undefined {
   return pkg.engines?.node;
 }
 
+/** Every `uses: actions/setup-node` step in a workflow, with its indented body. */
+function setupNodeSteps(workflow: string): string[] {
+  return workflow.match(/uses: actions\/setup-node@[^\n]*\n(?:[ \t]+[^\n]*\n)*/g) ?? [];
+}
+
+/**
+ * What a setup-node step pins: `'.nvmrc'` when it reads the file, the
+ * major when it names one literally, `undefined` when neither — a step
+ * whose version lines are commented out pins nothing, so comment lines
+ * are dropped before matching rather than letting `# node-version: 26`
+ * satisfy the guard.
+ */
+function setupNodePin(step: string): string | undefined {
+  const live = step
+    .split('\n')
+    .filter((line) => !/^\s*#/.test(line))
+    .join('\n');
+  if (/^\s+node-version-file:\s*['"]?\.nvmrc\b/m.test(live)) return '.nvmrc';
+  return live.match(/^\s+node-version:\s*['"]?(\d+)/m)?.[1];
+}
+
 const nvmrc = read('.nvmrc').trim();
 
 describe('Node version pin', () => {
@@ -38,20 +59,42 @@ describe('Node version pin', () => {
     const files = fs.readdirSync(WORKFLOWS).filter((f) => /\.ya?ml$/.test(f));
     expect(files.length).toBeGreaterThan(0);
     for (const file of files) {
-      const text = read(path.join('.github', 'workflows', file));
-      const steps = text.match(/uses: actions\/setup-node@[^\n]*\n(?:[ \t]+[^\n]*\n)*/g) ?? [];
+      const steps = setupNodeSteps(read(path.join('.github', 'workflows', file)));
       expect(steps.length, `${file} has no setup-node step`).toBeGreaterThan(0);
       for (const step of steps) {
         // Either read the pin from the file (engine checkouts) or repeat
         // the same major literally (reusable workflows run against the
         // CALLER's checkout, which has no .nvmrc to read).
-        const fromFile = /node-version-file:\s*\.nvmrc\b/.test(step);
-        const literal = step.match(/node-version:\s*['"]?(\d+)/)?.[1];
+        const pin = setupNodePin(step);
         expect(
-          fromFile || literal === nvmrc,
-          `${file}: setup-node pins ${literal ?? '(nothing)'}, expected .nvmrc (${nvmrc})`,
+          pin === '.nvmrc' || pin === nvmrc,
+          `${file}: setup-node pins ${pin ?? '(nothing)'}, expected .nvmrc (${nvmrc})`,
         ).toBe(true);
       }
     }
+  });
+
+  describe('setupNodePin', () => {
+    const step = (body: string) => `uses: actions/setup-node@v4\n${body}`;
+
+    it('reads a live node-version-file or node-version', () => {
+      expect(setupNodePin(step('        with:\n          node-version-file: .nvmrc\n'))).toBe('.nvmrc');
+      expect(setupNodePin(step("        with:\n          node-version-file: '.nvmrc'\n"))).toBe('.nvmrc');
+      expect(setupNodePin(step('        with:\n          node-version: 26\n'))).toBe('26');
+      expect(setupNodePin(step("        with:\n          node-version: '26'\n"))).toBe('26');
+    });
+
+    it('ignores commented-out version properties', () => {
+      expect(setupNodePin(step('        with:\n          # node-version-file: .nvmrc\n'))).toBeUndefined();
+      expect(setupNodePin(step('        # with:\n        #   node-version: 26\n'))).toBeUndefined();
+      expect(
+        setupNodePin(step('        with:\n          # node-version: 22\n          node-version: 26\n')),
+      ).toBe('26');
+    });
+
+    it('does not read a version out of a trailing comment or an unrelated key', () => {
+      expect(setupNodePin(step('        with:\n          cache: npm # node-version: 26\n'))).toBeUndefined();
+      expect(setupNodePin(step('        with:\n          cache: npm\n'))).toBeUndefined();
+    });
   });
 });
