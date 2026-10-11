@@ -8,9 +8,11 @@ import {
   Download,
   FileJson,
   Link as LinkIcon,
+  LoaderCircle,
   PackagePlus,
   PackageX,
   Play,
+  RotateCw,
   Store,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -43,6 +45,23 @@ import {
 const MAX_ERRORS_SHOWN = 6;
 
 const NO_PACKS: PackLibraryEntry[] = [];
+
+/** Which insert control is working — each wears its own "busy" label. */
+type InsertBusy = 'files' | 'url' | null;
+
+/**
+ * The outcome of the last insert, shown INSIDE the Insert card. The card
+ * is the last thing on the page, so on a laptop the file picker is used
+ * scrolled to the bottom: a confirmation at the top of the page went
+ * unseen, and "nothing happened" earned a second insert. Keeping it in
+ * the card (until the next insert, or "Not now") also makes a second
+ * Choose files… a conscious choice rather than a retry.
+ */
+interface InsertedNotice {
+  entry: PackLibraryEntry;
+  /** Set once the background image prefetch has something to report. */
+  imagesNote?: string;
+}
 
 function ProgressLine({ packId }: { packId: string }) {
   // Read after mount: SSG renders with no localStorage.
@@ -158,11 +177,15 @@ function PackCard({
 export function PacksPage() {
   const [entries, setEntries] = useClientState(listInsertedPacks, NO_PACKS);
   const mounted = useMounted();
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<InsertBusy>(null);
+  // Shelf notices (switching, ejected) — the insert's own feedback lives in
+  // the Insert card, see InsertedNotice.
   const [message, setMessage] = useState<string | null>(null);
+  const [inserted, setInserted] = useState<InsertedNotice | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [url, setUrl] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
+  const feedback = useRef<HTMLDivElement>(null);
 
   // The published-pack registry — loaded once on mount, best source wins
   // (website API → raw GitHub → the copy baked into this build).
@@ -189,7 +212,23 @@ export function PacksPage() {
   const externalActive =
     activeId !== buildId && !entries.some((e) => e.id === activeId);
 
+  // Bring whichever feedback just rendered (result or errors) into view: the
+  // card sits at the foot of the page, so a panel appended below the
+  // buttons would otherwise open just under the fold.
+  const [feedbackSeq, setFeedbackSeq] = useState(0);
+  useEffect(() => {
+    if (feedbackSeq === 0) return;
+    feedback.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }, [feedbackSeq]);
+
+  function beginInsert(kind: InsertBusy) {
+    setBusy(kind);
+    setMessage(null);
+    setInserted(null);
+  }
+
   function finishInsert(outcome: ParseOutcome, origin: string) {
+    setFeedbackSeq((n) => n + 1);
     if (!outcome.ok) {
       setErrors(outcome.errors);
       return;
@@ -203,8 +242,7 @@ export function PacksPage() {
     // Funnel event (src/lib/analytics.ts) — recorded under the ACTIVE pack,
     // naming the one that arrived.
     recordEvent('bundle_inserted', { pack: result.entry.id });
-    const base = `Inserted “${result.entry.title}” (${result.entry.questionCount} questions). Make it active to start practising.`;
-    setMessage(base);
+    setInserted({ entry: result.entry });
     refresh();
     // Prefetch the pack's images for offline practice — in the background,
     // the insert itself is already done.
@@ -212,7 +250,11 @@ export function PacksPage() {
     if (stored) {
       void cachePackAssets(stored).then(({ total, cached }) => {
         if (total > 0 && cached > 0) {
-          setMessage(`${base} ${cached} of ${total} images saved for offline use.`);
+          setInserted((cur) =>
+            cur && cur.entry.id === result.entry.id
+              ? { ...cur, imagesNote: `${cached} of ${total} images saved for offline use.` }
+              : cur,
+          );
         }
       });
     }
@@ -220,28 +262,26 @@ export function PacksPage() {
 
   async function handleFiles(list: FileList | null) {
     if (!list || list.length === 0) return;
-    setBusy(true);
-    setMessage(null);
+    beginInsert('files');
     try {
       const files = await Promise.all(
         Array.from(list).map(async (f) => ({ name: f.name, text: await f.text() })),
       );
       finishInsert(parsePackFiles(files), files.map((f) => f.name).join(', '));
     } finally {
-      setBusy(false);
+      setBusy(null);
       if (fileInput.current) fileInput.current.value = '';
     }
   }
 
   async function handleUrl() {
     if (!url.trim()) return;
-    setBusy(true);
-    setMessage(null);
+    beginInsert('url');
     try {
       finishInsert(await fetchPackFromUrl(url), url.trim());
       setUrl('');
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
@@ -249,6 +289,7 @@ export function PacksPage() {
     if (busyRepo) return;
     setBusyRepo(listing.repo);
     setMessage(null);
+    setInserted(null);
     try {
       finishInsert(await fetchPackFromUrl(registryRepoUrl(listing)), registryRepoUrl(listing));
     } finally {
@@ -441,11 +482,20 @@ export function PacksPage() {
             size="sm"
             variant="secondary"
             onClick={() => void handleUrl()}
-            disabled={busy || !url.trim()}
+            disabled={busy !== null || !url.trim()}
             data-testid="insert-url-go"
           >
-            <LinkIcon className="h-4 w-4" />
-            Fetch
+            {busy === 'url' ? (
+              <>
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+                Fetching…
+              </>
+            ) : (
+              <>
+                <LinkIcon className="h-4 w-4" />
+                Fetch
+              </>
+            )}
           </Button>
         </div>
 
@@ -463,15 +513,70 @@ export function PacksPage() {
             size="sm"
             variant="secondary"
             onClick={() => fileInput.current?.click()}
-            disabled={busy}
+            disabled={busy !== null}
+            data-testid="insert-files-button"
           >
-            <FileJson className="h-4 w-4" />
-            Choose files…
+            {busy === 'files' ? (
+              <>
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+                Reading…
+              </>
+            ) : (
+              <>
+                <FileJson className="h-4 w-4" />
+                Choose files…
+              </>
+            )}
           </Button>
         </div>
 
+        {inserted ? (
+          <div
+            ref={feedback}
+            data-testid="insert-result"
+            role="status"
+            className="mt-4 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800"
+          >
+            <p>
+              <strong>
+                Inserted “{inserted.entry.title}” ({inserted.entry.questionCount} question
+                {inserted.entry.questionCount === 1 ? '' : 's'}).
+              </strong>{' '}
+              {inserted.entry.id === activeId
+                ? 'It is the active pack — reload to practise the updated questions.'
+                : 'It is on the shelf above. Make it active to start practising.'}
+              {inserted.imagesNote ? <> {inserted.imagesNote}</> : null}
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {inserted.entry.id === activeId ? (
+                <Button
+                  size="sm"
+                  data-testid="insert-result-reload"
+                  onClick={() => window.location.reload()}
+                >
+                  <RotateCw className="h-4 w-4" />
+                  Reload
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  data-testid="insert-result-activate"
+                  onClick={() => switchTo(inserted.entry.id, inserted.entry.title)}
+                >
+                  <Play className="h-4 w-4" />
+                  Make active
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" onClick={() => setInserted(null)}>
+                Not now
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
         {errors.length > 0 ? (
           <div
+            ref={feedback}
             data-testid="insert-errors"
             className="mt-4 rounded-xl border border-warn-500/40 bg-warn-500/10 px-4 py-3 text-sm text-ink-800"
           >
