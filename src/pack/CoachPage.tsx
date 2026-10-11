@@ -18,10 +18,10 @@ import { SourceRef } from '@/components/SourceRef';
 import { Button } from '@/components/ui/Button';
 import { useStorageData } from '@/lib/useStorage';
 import { cn } from '@/lib/cn';
+import { formatSpan } from '@/lib/duration';
 import type { Attempt } from '@/data/types';
 import {
   dayReplay,
-  formatSpan,
   groupSessionsByDay,
   isTimed,
   priorAttempts,
@@ -48,6 +48,7 @@ import { OptionButtons } from '@/pack/OptionButtons';
 import { PackImage } from '@/pack/PackImage';
 import { QuestionMeta } from '@/pack/QuestionMeta';
 import { gradeSelection, nextSelection, formatKeyList } from '@/pack/runner';
+import { useClientState, useMounted } from '@/lib/useMounted';
 
 /** What the URL hash points at: one session, or a whole day. */
 type Target = { kind: 'session'; id: string } | { kind: 'day'; dayKey: string };
@@ -108,16 +109,14 @@ function BackLink({ href, label }: { href: string; label: string }) {
  */
 export function CoachPage() {
   const { sessions, attempts } = useStorageData();
-  const [mounted, setMounted] = useState(false);
-  const [target, setTarget] = useState<Target | null>(null);
+  const mounted = useMounted();
+  const [target, setTarget] = useClientState(targetFromHash, null);
 
   useEffect(() => {
-    setMounted(true);
-    setTarget(targetFromHash());
     const onHash = () => setTarget(targetFromHash());
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
-  }, []);
+  }, [setTarget]);
 
   const days = useMemo(() => groupSessionsByDay(sessions, attempts), [sessions, attempts]);
   const questionById = useMemo(

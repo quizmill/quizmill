@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
@@ -20,6 +20,7 @@ import { APP_CONFIG } from '@/config';
 import { StatTile } from '@/components/StatTile';
 import { InstallBanner } from '@/components/InstallPrompt';
 import { useStorageData } from '@/lib/useStorage';
+import { useClientState, useMounted } from '@/lib/useMounted';
 import { unresolvedMistakeCount } from '@/lib/mistakes';
 import {
   loadLevelFilter,
@@ -44,6 +45,7 @@ import {
   PACK_LEVEL_BY_QUESTION_ID,
 } from '@/pack/data';
 import { ExamReadinessTile } from '@/pack/ExamReadiness';
+import { HomeCard } from '@/pack/HomeCard';
 import { ProgressCard } from '@/pack/ProgressCard';
 import { UpgradeCard } from '@/pack/UpgradeCard';
 
@@ -82,25 +84,19 @@ export default function PackHome() {
   const { attempts } = useStorageData();
   // Active level-band filter (a manifest level key) or null = All. Read
   // from localStorage after mount so SSR/first paint stay stable.
-  const [level, setLevelState] = useState<string | null>(null);
-  const [dismissedNudge, setDismissedNudge] = useState<string | null>(null);
+  const [level, setLevelState] = useClientState(loadLevelFilter, null);
+  const [dismissedNudge, setDismissedNudge] = useClientState(loadDismissedNudge, null);
   // Drive Mode is opt-in (Settings toggle) — the Home card only shows
   // once it's switched on. Read after mount like the other prefs.
-  const [driveMode, setDriveMode] = useState(false);
+  const [driveMode] = useClientState(loadDriveModeEnabled, false);
   // Coach mode is the same kind of opt-in, for the parent's device.
-  const [coachMode, setCoachMode] = useState(false);
+  const [coachMode] = useClientState(loadCoachModeEnabled, false);
   // Paper practice too — print sheets, mark them back in.
-  const [paperMode, setPaperMode] = useState(false);
+  const [paperMode] = useClientState(loadPaperModeEnabled, false);
   // In runtime-pack mode, hold the first paint until mount (see RUNTIME_PACK_MODE).
-  const [mounted, setMounted] = useState(!RUNTIME_PACK_MODE);
+  const mounted = useMounted() || !RUNTIME_PACK_MODE;
   useEffect(() => {
-    setMounted(true);
     if (RUNTIME_PACK_MODE) document.title = APP_CONFIG.title;
-    setLevelState(loadLevelFilter());
-    setDismissedNudge(loadDismissedNudge());
-    setDriveMode(loadDriveModeEnabled());
-    setCoachMode(loadCoachModeEnabled());
-    setPaperMode(loadPaperModeEnabled());
   }, []);
   const setLevel = (next: string | null) => {
     setLevelState(next);
@@ -238,91 +234,50 @@ export default function PackHome() {
       </section>
 
       {driveMode ? (
-        <Link
+        <HomeCard
           href="/drive/"
-          data-testid="drive-card"
-          className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-night-700 bg-night-800 p-4 shadow-sm"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-[#8bb8ff]">
-              <Car className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="text-base font-semibold text-white">Drive mode</div>
-              <div className="text-sm text-night-300">
-                Hands-free voice quiz for the car — eyes on the road.
-              </div>
-            </div>
-          </div>
-          <ArrowRight className="h-5 w-5 flex-shrink-0 text-night-400" />
-        </Link>
+          testid="drive-card"
+          tone="night"
+          icon={Car}
+          title="Drive mode"
+          blurb="Hands-free voice quiz for the car — eyes on the road."
+        />
       ) : null}
 
       {coachMode ? (
-        <Link
+        <HomeCard
           href="/coach/"
-          data-testid="coach-card"
-          className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-4 shadow-sm"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-brand-700">
-              <GraduationCap className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="text-base font-semibold text-ink-900">Coach</div>
-              <div className="text-sm text-ink-600">
-                Go back through a session together — answers hidden until you say.
-              </div>
-            </div>
-          </div>
-          <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-400" />
-        </Link>
+          testid="coach-card"
+          tone="brand"
+          icon={GraduationCap}
+          title="Coach"
+          blurb="Go back through a session together — answers hidden until you say."
+        />
       ) : null}
 
       {paperMode ? (
-        <Link
+        <HomeCard
           href="/paper/"
-          data-testid="paper-card"
-          className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-ink-400/25 bg-ink-50 p-4 shadow-sm"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-ink-200 text-ink-700">
-              <Printer className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="text-base font-semibold text-ink-900">
-                Paper practice
-              </div>
-              <div className="text-sm text-ink-600">
-                Print a sheet or write on it on screen, then mark it back in.
-              </div>
-            </div>
-          </div>
-          <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-400" />
-        </Link>
+          testid="paper-card"
+          tone="ink"
+          icon={Printer}
+          title="Paper practice"
+          blurb="Print a sheet or write on it on screen, then mark it back in."
+        />
       ) : null}
 
       {mistakeCount > 0 ? (
-        <Link
+        <HomeCard
           href="/practice/review/"
-          className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-warn-500/40 bg-warn-100/60 p-4 shadow-sm"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-warn-500/20 text-warn-700">
-              <RefreshCw className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="text-base font-semibold text-ink-900">
-                Review {mistakeCount}{' '}
-                {mistakeCount === 1 ? 'mistake' : 'mistakes'}
-              </div>
-              <div className="text-sm text-ink-600">
-                Retry the questions you got wrong.
-              </div>
-            </div>
-          </div>
-          <ArrowRight className="h-5 w-5 flex-shrink-0 text-ink-500" />
-        </Link>
+          tone="warn"
+          icon={RefreshCw}
+          title={
+            <>
+              Review {mistakeCount} {mistakeCount === 1 ? 'mistake' : 'mistakes'}
+            </>
+          }
+          blurb="Retry the questions you got wrong."
+        />
       ) : null}
 
       {packLevels.length > 0 ? (
@@ -416,7 +371,8 @@ export default function PackHome() {
         </div>
         <div className="flex flex-col gap-2.5">
           {APP_CONFIG.categories.map((cat) => {
-            const s = statsByCategory.get(cat.key)!;
+            const s = statsByCategory.get(cat.key);
+            if (!s) return null;
             const pct =
               s.answered === 0 ? 0 : Math.round((s.correct / s.answered) * 100);
             const weight = cat.weight ? `${Math.round(cat.weight * 100)}%` : null;

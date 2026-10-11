@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
+import { GameOver } from './GameOver';
 import { GameShell } from './GameShell';
 import { HowToPlay } from './HowToPlay';
 
@@ -20,6 +21,16 @@ interface Mole {
   hole: number; // 0..8
   /** When this mole will auto-disappear. */
   diesAt: number;
+}
+
+/** A fresh mole and the delay before the one after it. Random by design —
+ *  it's a game — so it lives outside the component, where render purity
+ *  isn't in question. */
+function rollMole(): { mole: Mole; nextIn: number } {
+  return {
+    mole: { hole: Math.floor(Math.random() * HOLES), diesAt: Date.now() + MOLE_LIFE_MS },
+    nextIn: SPAWN_MIN_MS + Math.random() * (SPAWN_MAX_MS - SPAWN_MIN_MS),
+  };
 }
 
 export function Whack({ onClose }: WhackProps) {
@@ -41,11 +52,9 @@ export function Whack({ onClose }: WhackProps) {
   }
 
   function spawnMole() {
-    const hole = Math.floor(Math.random() * HOLES);
-    setMole({ hole, diesAt: Date.now() + MOLE_LIFE_MS });
-    const next =
-      SPAWN_MIN_MS + Math.random() * (SPAWN_MAX_MS - SPAWN_MIN_MS);
-    spawnTimerRef.current = setTimeout(spawnMole, next);
+    const { mole, nextIn } = rollMole();
+    setMole(mole);
+    spawnTimerRef.current = setTimeout(spawnMole, nextIn);
   }
 
   function start() {
@@ -72,12 +81,7 @@ export function Whack({ onClose }: WhackProps) {
   // Cull moles that have lived past their diesAt without being whacked.
   useEffect(() => {
     if (!running || !mole) return;
-    const remaining = mole.diesAt - Date.now();
-    if (remaining <= 0) {
-      setMole(null);
-      return;
-    }
-    const t = setTimeout(() => setMole(null), remaining);
+    const t = setTimeout(() => setMole(null), Math.max(0, mole.diesAt - Date.now()));
     return () => clearTimeout(t);
   }, [mole, running]);
 
@@ -170,22 +174,13 @@ export function Whack({ onClose }: WhackProps) {
       ) : null}
 
       {ended ? (
-        <div
-          data-testid="whack-ended"
-          className="mt-3 flex flex-col items-center gap-2 rounded-xl border border-success-500/40 bg-success-100/60 p-3 text-center"
-        >
-          <div className="text-base font-bold text-success-700">
-            Time! You whacked {score} {score === 1 ? 'mole' : 'moles'}.
-          </div>
-          <div className="mt-1 flex gap-2">
-            <Button size="md" variant="secondary" onClick={start}>
-              Play again
-            </Button>
-            <Button size="md" onClick={onClose}>
-              Done
-            </Button>
-          </div>
-        </div>
+        <GameOver
+          tone="win"
+          title={`Time! You whacked ${score} ${score === 1 ? 'mole' : 'moles'}.`}
+          testId="whack-ended"
+          onRestart={start}
+          onClose={onClose}
+        />
       ) : null}
     </GameShell>
   );

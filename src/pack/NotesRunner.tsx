@@ -9,6 +9,7 @@ import {
   useStartSession,
   useEndSession,
 } from '@/lib/useStorage';
+import { useMounted } from '@/lib/useMounted';
 import { useLevelUp } from '@/pack/useLevelUp';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import {
@@ -17,6 +18,7 @@ import {
   QuestionPanel,
   RunnerCelebrations,
   RunnerLoading,
+  RunnerResults,
   type Stage,
 } from '@/pack/RunnerPanels';
 import { amendAttempt, loadAttempts, loadNotes, loadSessions } from '@/lib/storage';
@@ -55,7 +57,7 @@ export function PackNotesRunner() {
 
   const [state, setState] = useState<RunnerState | null>(null);
   const [nothingToPractice, setNothingToPractice] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [stage, setStage] = useState<Stage>('choosing');
   const [selected, setSelected] = useState<OptionKey[]>([]);
   // First option tapped on the current question (first-instinct signal)
@@ -64,8 +66,9 @@ export function PackNotesRunner() {
   const lastAttemptRef = useRef<{ id: string; answeredAt: number } | null>(null);
   const [finished, setFinished] = useState(false);
 
-  useEffect(() => setMounted(true), []);
-
+  // Dealing the round records the session start (a storage write) as well
+  // as setting state, so it stays an effect.
+  /* eslint-disable react-hooks/set-state-in-effect -- see above */
   useEffect(() => {
     if (!mounted || state) return;
     const picked = notesPracticePool(loadNotes(), packQuestions);
@@ -87,6 +90,7 @@ export function PackNotesRunner() {
     setState(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (nothingToPractice) {
     return (
@@ -122,45 +126,33 @@ export function PackNotesRunner() {
   );
 
   if (finished) {
-    const { correct, total, pct } = scoreSummary(state);
     return (
-      <main className="flex flex-col gap-5">
-        {celebrations}
-        {backToNotes}
-        <div className="rounded-2xl border border-ink-200 bg-surface p-8 text-center shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
-            Notes round complete
-          </div>
-          <h1 className="mt-2 text-4xl font-bold text-ink-900">
-            {correct}/{total}
-          </h1>
-          <p className="mt-1 text-lg font-medium text-ink-600">{pct}% correct</p>
-          <p className="mt-4 text-sm text-ink-500">
-            These were the questions around your notes — the ones you flagged
-            and the follow-ups generated from them.
-          </p>
-          <div className="mt-6 flex flex-col gap-2">
-            <Link href="/practice/notes/" className="block">
-              <Button size="lg" block>
-                <RefreshCw className="h-4 w-4" />
-                Another notes round
-              </Button>
-            </Link>
-            <Link href="/notes/" className="block">
-              <Button size="lg" variant="secondary" block>
-                <NotebookPen className="h-4 w-4" />
-                Back to my notes
-              </Button>
-            </Link>
-            <Link href="/" className="block">
-              <Button size="lg" variant="secondary" block>
-                <Home className="h-4 w-4" />
-                Back to home
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </main>
+      <RunnerResults
+        eyebrow="Notes round complete"
+        score={scoreSummary(state)}
+        note="These were the questions around your notes — the ones you flagged and the follow-ups generated from them."
+        back={backToNotes}
+        celebrations={celebrations}
+      >
+        <Link href="/practice/notes/" className="block">
+          <Button size="lg" block>
+            <RefreshCw className="h-4 w-4" />
+            Another notes round
+          </Button>
+        </Link>
+        <Link href="/notes/" className="block">
+          <Button size="lg" variant="secondary" block>
+            <NotebookPen className="h-4 w-4" />
+            Back to my notes
+          </Button>
+        </Link>
+        <Link href="/" className="block">
+          <Button size="lg" variant="secondary" block>
+            <Home className="h-4 w-4" />
+            Back to home
+          </Button>
+        </Link>
+      </RunnerResults>
     );
   }
 

@@ -101,6 +101,20 @@ export function privacyUrl(): string | null {
 
 // ── Device id ───────────────────────────────────────────────────────────
 
+/**
+ * The stored device id, or '' when none has been minted (or outside a
+ * browser). A pure read — safe to call during render, where a mint
+ * (randomness + a storage write) is not.
+ */
+export function peekDeviceId(): string {
+  if (!browser()) return '';
+  try {
+    return window.localStorage.getItem(DEVICE_ID_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
 /** The device's random id, minted on first use. Empty outside a browser. */
 export function loadDeviceId(): string {
   if (!browser()) return '';

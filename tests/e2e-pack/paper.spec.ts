@@ -151,7 +151,7 @@ describe('paper practice', () => {
   it('marks a sheet back in and records a paper session', async () => {
     await clickButtonByText(page, 'Create sheet');
     await page.waitForSelector('[data-testid="paper-sheet"]');
-    await clickButtonByText(page, 'Mark answers');
+    await page.click('[data-testid="mark-sheet"]');
     await page.waitForSelector('[data-testid="mark-rows"]');
 
     await page.click('[aria-label="Question 1: answer A"]');
@@ -245,7 +245,7 @@ describe('paper practice', () => {
       els.map((el) => el.textContent?.trim() ?? ''),
     );
     await page.click('[data-testid="view-sheet"]');
-    await clickButtonByText(page, 'Mark answers');
+    await page.click('[data-testid="mark-sheet"]');
     await page.waitForSelector('[data-testid="mark-rows"]');
 
     // One letter that isn't the whole answer is wrong for single- and

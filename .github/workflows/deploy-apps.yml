@@ -87,7 +87,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
 
       # Pin to the latest vX.Y.Z tag (= the just-published engine) instead
       # of @latest, and wait for that exact version to be installable —

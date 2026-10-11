@@ -10,6 +10,7 @@ import {
   useEndSession,
   useStorageData,
 } from '@/lib/useStorage';
+import { useClientState, useMounted } from '@/lib/useMounted';
 import { Celebration } from '@/components/Celebration';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { useLevelUp } from '@/pack/useLevelUp';
@@ -19,6 +20,7 @@ import {
   QuestionPanel,
   RunnerCelebrations,
   RunnerLoading,
+  RunnerResults,
   type Stage,
 } from '@/pack/RunnerPanels';
 import { amendAttempt, loadAttempts, loadSessions, loadLevelFilter } from '@/lib/storage';
@@ -74,7 +76,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   // set already attempted) — surfaced once so re-served questions read as
   // deliberate revision, not a broken picker.
   const [repeatRound, setRepeatRound] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [stage, setStage] = useState<Stage>('choosing');
   // The chosen option key(s). Single-answer questions hold one entry;
   // multi-answer ("select all") questions accumulate several.
@@ -91,7 +93,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   const [xpGained, setXpGained] = useState<number | null>(null);
   // The active level-band filter (a manifest level key) or null = All.
   // Read from localStorage after mount, so SSR/first paint stay stable.
-  const [levelFilter, setLevelFilter] = useState<string | null>(null);
+  const [levelFilter] = useClientState(loadLevelFilter, null);
   // First option tapped on the current question (first-instinct signal)
   // and the just-recorded attempt (to stamp feedbackSeconds on Next).
   const firstSelectedRef = useRef<OptionKey | null>(null);
@@ -102,16 +104,14 @@ export function PackPracticeRunner({ categoryKey }: Props) {
     [categoryKey, levelFilter],
   );
 
-  useEffect(() => {
-    setMounted(true);
-    setLevelFilter(loadLevelFilter());
-  }, []);
-
   // Pick a session after mount (so localStorage attempts are reflected),
   // and again whenever `state` is cleared — that's how "Another round"
   // restarts: it sets state to null and relies on this effect re-running
   // to deal a fresh round. `state` must stay in the deps or the restart
-  // hangs on the "Loading…" placeholder forever.
+  // hangs on the "Loading…" placeholder forever. Dealing records the
+  // session start (a storage write) as well as setting state, so it
+  // stays an effect.
+  /* eslint-disable react-hooks/set-state-in-effect -- see above */
   useEffect(() => {
     if (!mounted || state) return;
     const history = attemptHistory(attempts, categoryKey);
@@ -135,6 +135,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
     setState(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted, bank, categoryKey, state]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (outOfQuestions) {
     return (
@@ -187,47 +188,33 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   );
 
   if (finished) {
-    const { correct, total, pct } = scoreSummary(state);
     return (
-      <main className="flex flex-col gap-5">
-        {celebrations}
-        <BackLink />
-        <div className="rounded-2xl border border-ink-200 bg-surface p-8 text-center shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
-            Practice complete
-          </div>
-          <h1 className="mt-2 text-4xl font-bold text-ink-900">
-            {correct}/{total}
-          </h1>
-          <p className="mt-1 text-lg font-medium text-ink-600">
-            {pct}% correct
-          </p>
-          <p className="mt-4 text-sm text-ink-500">
-            {PACK_CATEGORY_LABEL[categoryKey] ?? categoryKey}
-          </p>
-          <div className="mt-6 flex flex-col gap-2">
-            <Button
-              size="lg"
-              block
-              onClick={() => {
-                setState(null);
-                setFinished(false);
-                setStage('choosing');
-                setSelected([]);
-              }}
-            >
-              <RefreshCw className="h-4 w-4" />
-              Another round
-            </Button>
-            <Link href="/" className="block">
-              <Button size="lg" variant="secondary" block>
-                <Home className="h-4 w-4" />
-                Back to home
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </main>
+      <RunnerResults
+        eyebrow="Practice complete"
+        score={scoreSummary(state)}
+        note={PACK_CATEGORY_LABEL[categoryKey] ?? categoryKey}
+        celebrations={celebrations}
+      >
+        <Button
+          size="lg"
+          block
+          onClick={() => {
+            setState(null);
+            setFinished(false);
+            setStage('choosing');
+            setSelected([]);
+          }}
+        >
+          <RefreshCw className="h-4 w-4" />
+          Another round
+        </Button>
+        <Link href="/" className="block">
+          <Button size="lg" variant="secondary" block>
+            <Home className="h-4 w-4" />
+            Back to home
+          </Button>
+        </Link>
+      </RunnerResults>
     );
   }
 

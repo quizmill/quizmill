@@ -214,7 +214,7 @@ async function handleSummary(request: Request, env: Env): Promise<Response> {
   return json(buildSummary(query, sinceMs, totals.results, daily.results));
 }
 
-export default {
+const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -261,3 +261,5 @@ export default {
     return json({ error: 'not found' }, 404);
   },
 };
+
+export default worker;

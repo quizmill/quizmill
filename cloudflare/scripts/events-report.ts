@@ -150,7 +150,8 @@ async function main(): Promise<void> {
   let json: string;
   let source: string;
   if (opts.source === 'file') {
-    json = fs.readFileSync(opts.file!, 'utf8');
+    if (!opts.file) throw new Error('--from needs a file');
+    json = fs.readFileSync(opts.file, 'utf8');
     source = `file ${opts.file}`;
   } else {
     json = queryViaWrangler(opts.db, opts.source);

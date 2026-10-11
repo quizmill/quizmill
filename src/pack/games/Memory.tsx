@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 import { shuffle } from '@/lib/selection';
+import { GameOver } from './GameOver';
 import { GameShell } from './GameShell';
 import { HowToPlay } from './HowToPlay';
 
@@ -45,24 +45,12 @@ export function Memory({ onClose }: MemoryProps) {
   );
   const won = matchedCount === deck.length;
 
-  // When two cards are open, evaluate after a short delay.
+  // Two open cards that don't match flip back after a short delay.
   useEffect(() => {
     if (openIdx.length !== 2) return;
-    const [a, b] = openIdx;
-    const ca = deck[a];
-    const cb = deck[b];
-    const match = ca.emoji === cb.emoji;
-    if (match) {
-      const next = deck.slice();
-      next[a] = { ...ca, matched: true };
-      next[b] = { ...cb, matched: true };
-      setDeck(next);
-      setOpenIdx([]);
-      return;
-    }
     const t = setTimeout(() => setOpenIdx([]), FLIP_BACK_MS);
     return () => clearTimeout(t);
-  }, [openIdx, deck]);
+  }, [openIdx]);
 
   function handleTap(i: number) {
     if (won) return;
@@ -70,8 +58,24 @@ export function Memory({ onClose }: MemoryProps) {
     if (openIdx.includes(i)) return;
     if (openIdx.length >= 2) return;
     const next = [...openIdx, i];
-    setOpenIdx(next);
-    if (next.length === 2) setMoves((m) => m + 1);
+    if (next.length < 2) {
+      setOpenIdx(next);
+      return;
+    }
+    setMoves((m) => m + 1);
+    // Second card: a pair is settled on the spot, a miss stays up to be seen.
+    const [a, b] = next;
+    const ca = deck[a];
+    const cb = deck[b];
+    if (ca.emoji !== cb.emoji) {
+      setOpenIdx(next);
+      return;
+    }
+    const matched = deck.slice();
+    matched[a] = { ...ca, matched: true };
+    matched[b] = { ...cb, matched: true };
+    setDeck(matched);
+    setOpenIdx([]);
   }
 
   function handleRestart() {
@@ -140,23 +144,14 @@ export function Memory({ onClose }: MemoryProps) {
       />
 
       {won ? (
-        <div
-          data-testid="memory-won"
-          className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-success-500/40 bg-success-100/60 p-3 text-center"
-        >
-          <div className="text-base font-bold text-success-700">
-            All pairs found! 🎉
-          </div>
-          <div className="text-sm text-ink-700">in {moves} moves</div>
-          <div className="mt-1 flex gap-2">
-            <Button size="md" variant="secondary" onClick={handleRestart}>
-              Play again
-            </Button>
-            <Button size="md" onClick={onClose}>
-              Done
-            </Button>
-          </div>
-        </div>
+        <GameOver
+          tone="win"
+          title="All pairs found! 🎉"
+          detail={`in ${moves} moves`}
+          testId="memory-won"
+          onRestart={handleRestart}
+          onClose={onClose}
+        />
       ) : null}
     </GameShell>
   );

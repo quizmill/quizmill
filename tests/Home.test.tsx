@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import PackHome from '@/pack/Home';
-import { ATTEMPTS_KEY, saveLevelFilter } from '@/lib/storage';
+import { ATTEMPTS_KEY, saveDriveModeEnabled, saveLevelFilter } from '@/lib/storage';
+import { saveCoachModeEnabled } from '@/lib/coach';
+import { savePaperModeEnabled } from '@/lib/paper';
 import { saveProgressionShown } from '@/lib/progressionPref';
 import type { Attempt } from '@/data/types';
 
@@ -166,5 +168,35 @@ describe('PackHome category stats', () => {
     // Accuracy reflects the latest cold look (rescued → correct), and can
     // never read above 100%.
     expect(line).toContain('100% accuracy');
+  });
+});
+
+describe('PackHome mode cards', () => {
+  it('renders the Drive, Coach, Paper and Review cards exactly as before (markup pin)', async () => {
+    // All four opt-in / conditional cards at once: each mode switched on,
+    // plus one unresolved mistake so the Review card shows. The cards share
+    // one component — this snapshot is the proof that extracting it moved
+    // the markup without changing it.
+    saveDriveModeEnabled(true);
+    saveCoachModeEnabled(true);
+    savePaperModeEnabled(true);
+    localStorage.setItem(
+      ATTEMPTS_KEY,
+      JSON.stringify([attempt('demo-planets-001', 'planets', false)]),
+    );
+    await render();
+
+    const cards = [
+      container.querySelector('[data-testid="drive-card"]'),
+      container.querySelector('[data-testid="coach-card"]'),
+      container.querySelector('[data-testid="paper-card"]'),
+      Array.from(container.querySelectorAll('a')).find((a) =>
+        (a.textContent ?? '').includes('Review 1 mistake'),
+      ),
+    ];
+    cards.forEach((card, i) => expect(card, `card ${i}`).toBeTruthy());
+    await expect(cards.map((c) => c!.outerHTML).join('\n')).toMatchFileSnapshot(
+      './__snapshots__/home-mode-cards.html',
+    );
   });
 });

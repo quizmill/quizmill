@@ -2,9 +2,8 @@
  * Make sure `content/pack/` exists before any build / dev / test run.
  *
  * The active pack directory is gitignored (packs are private), but the
- * `pack` variant — and therefore `src/config/index.ts`, which every
- * variant imports — statically imports its JSON files. A fresh clone
- * would fail to compile without them, so this script seeds the
+ * app statically imports its JSON files (`src/pack/source.ts`). A fresh
+ * clone would fail to compile without them, so this script seeds the
  * committed demo pack (`content/pack-demo/`) into place when nothing
  * is active yet. Idempotent: an already-activated pack is left alone.
  *
@@ -28,34 +27,31 @@ function ensurePwaAssets(): void {
   syncPackAssets(TARGET);
 }
 
-function main(): void {
-  if (fs.existsSync(path.join(TARGET, 'pack.json'))) {
-    // Active pack present. Backfill scenarios.json / concepts.json if a
-    // hand-rolled pack omitted them (static imports need the files to
-    // exist), and regenerate the PWA assets in case they were cleaned.
-    for (const optional of ['scenarios.json', 'concepts.json']) {
-      const p = path.join(TARGET, optional);
-      if (!fs.existsSync(p)) fs.writeFileSync(p, '[]\n');
-    }
-    ensurePwaAssets();
-    return;
-  }
+/** The pack files the app may do without — but imports statically, so
+ *  an empty one is written whenever a pack (demo or hand-rolled) omits it. */
+const OPTIONAL_FILES = ['scenarios.json', 'concepts.json'];
 
+function seedDemo(): void {
   fs.mkdirSync(TARGET, { recursive: true });
-  for (const name of ['pack.json', 'questions.json', 'scenarios.json', 'concepts.json']) {
+  for (const name of ['pack.json', 'questions.json', ...OPTIONAL_FILES]) {
     const src = path.join(DEMO, name);
-    const dst = path.join(TARGET, name);
-    if (fs.existsSync(src)) fs.copyFileSync(src, dst);
-    else if (name === 'scenarios.json' || name === 'concepts.json') {
-      fs.writeFileSync(dst, '[]\n');
-    }
+    if (fs.existsSync(src)) fs.copyFileSync(src, path.join(TARGET, name));
   }
   const demoAssets = path.join(DEMO, 'assets');
   if (fs.existsSync(demoAssets)) {
     fs.cpSync(demoAssets, path.join(TARGET, 'assets'), { recursive: true });
   }
-  ensurePwaAssets();
   console.log('[ensure-pack] seeded content/pack/ from the demo pack');
+}
+
+function main(): void {
+  if (!fs.existsSync(path.join(TARGET, 'pack.json'))) seedDemo();
+  for (const name of OPTIONAL_FILES) {
+    const p = path.join(TARGET, name);
+    if (!fs.existsSync(p)) fs.writeFileSync(p, '[]\n');
+  }
+  // Regenerated on every run, in case public/ was cleaned.
+  ensurePwaAssets();
 }
 
 main();

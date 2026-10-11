@@ -40,3 +40,6 @@ npm-debug.log*
 
 # wrangler local dev state (cloudflare/ worker)
 .wrangler/
+
+# review screenshots are attached to the PR, never committed (see CLAUDE.md)
+/docs/screenshots/

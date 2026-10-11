@@ -169,7 +169,7 @@ function cmdNew(dirArg) {
   fs.mkdirSync(dir, { recursive: true });
   const write = (name, data) =>
     fs.writeFileSync(path.join(dir, name), JSON.stringify(data, null, 2) + '\n');
-  write('pack.json', { ...TEMPLATE_MANIFEST(id), id });
+  write('pack.json', TEMPLATE_MANIFEST(id));
   write('questions.json', [TEMPLATE_QUESTION(id)]);
   write('scenarios.json', []);
   fs.writeFileSync(path.join(dir, 'README.md'), AGENT_NOTE(id));

@@ -10,8 +10,9 @@ description: >
 
 # Create a learning pack
 
-A learning pack is a directory of three JSON files that turns this app
-into a practice app for any topic. Packs are **private by default** —
+A learning pack is a directory of JSON files (a manifest and a question
+bank, plus optional scenarios, concept cards and an `assets/` folder of
+images) that turns this app into a practice app for any topic. Packs are **private by default** —
 they live in the gitignored `packs/` workspace and never get committed.
 
 The format is specified by the Zod schemas in `tools/pack/schema.ts`
@@ -28,7 +29,7 @@ example.
    and put the reference in each question's `sourceRef`.
 
 2. **Write the pack** to `packs/<pack-id>/`:
-   - `pack.json` — manifest: `schemaVersion: 1`, `id`, `title`,
+   - `pack.json` — manifest: `schemaVersion: 2`, `id`, `title`,
      `description`, `homeSubtitle`, `themeColor` (hex), `categories`
      (key/label/shortLabel/optional `icon`/optional weight). Keys are
      kebab-case slugs. Give each category a bespoke `icon` (a single
@@ -44,7 +45,7 @@ example.
     related offering, and never add one to the demo pack.
    - `questions.json` — array of questions: slug `id` (unique,
      prefix with the pack id), `categoryKey` (must match a manifest
-     category), `difficulty` 1–5, `prompt` (≥20 chars), 2–6
+     category), `difficulty` 1–5, `prompt` (≥10 chars), 2–6
      `options` keyed A–F, an answer key, `explanation` (≥40 chars),
      `source` (`"generated"` for LLM-authored), optional `sourceRef`,
      `reviewStatus` (`"draft"` until a human has checked it), optional
