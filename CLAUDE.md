@@ -9,10 +9,9 @@ skill. Tagline: *the mill that grinds questions into knowledge* — the
 mill wheel = the practice loop (answer → review → retry).
 
 This file holds only what you can't read off the code: boundaries,
-invariants, workflow. The longer per-module tour and design rationale
-lives in `docs/architecture.md` (a snapshot — code and tests are the
-source of truth). Don't add feature tours here; put rationale next to
-the code or in `docs/investigations/`.
+invariants, workflow. Code and tests are the source of truth for how
+things work. Don't add feature tours here; put rationale next to the
+code or in `docs/investigations/`.
 
 ## Where things live
 
@@ -53,11 +52,16 @@ the code or in `docs/investigations/`.
   untouched. The engine never imports question shapes — only the
   denormalised fields in `src/data/types.ts`.
 - **Everything is derived from attempts.** XP, readiness, streaks, stats
-  and stickers are pure functions over stored attempts — nothing extra is
-  stored or synced. The one persisted derivative is level crossings
-  (`level-N` achievement rows): `recordLevelCrossings` in
-  `src/pack/useLevelUp.ts` is the single recorder and EVERY
-  attempt-producing path must reach it.
+  and sticker eligibility are pure functions over stored attempts —
+  nothing extra is stored or synced, with ONE exception: the achievements
+  store. Earned stickers and `level-N` level crossings persist as rows
+  (synced like attempts) so celebrate-once and sync come free.
+  `recordNewAchievements` (`src/pack/useAchievementUnlock.ts`) and
+  `recordLevelCrossings` (`src/pack/useLevelUp.ts`) are the only
+  recorders; EVERY attempt-producing path must reach `recordLevelCrossings`
+  (runners via the hooks, Drive silently, imported/synced history via
+  the ProgressCard effect), and every runner must call the sticker
+  recorder too. Never bypass or remove that persistence.
 - **Storage is per pack** (`quizmill.<packId>.*`); device-level switches
   are app-level keys (`quizmill.<name>.v1`) and go through
   `src/lib/devicePref.ts` + `useDevicePref` — a new switch declares
