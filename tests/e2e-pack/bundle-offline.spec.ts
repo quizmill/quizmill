@@ -118,7 +118,7 @@ describe('bundled pack images offline', () => {
       // Nothing to prefetch — the images are inside the pack, so the
       // "saved for offline use" suffix must NOT appear.
       const message = await page.$eval(
-        '[data-testid="packs-message"]',
+        '[data-testid="insert-result"]',
         (el) => el.textContent ?? '',
       );
       expect(message).not.toMatch(/saved for offline use/);
