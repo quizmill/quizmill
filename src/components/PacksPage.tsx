@@ -8,9 +8,11 @@ import {
   Download,
   FileJson,
   Link as LinkIcon,
+  LoaderCircle,
   PackagePlus,
   PackageX,
   Play,
+  RotateCw,
   Store,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -44,6 +46,23 @@ import {
 const MAX_ERRORS_SHOWN = 6;
 
 const NO_PACKS: PackLibraryEntry[] = [];
+
+/** Which insert control is working — each wears its own "busy" label. */
+type InsertBusy = 'files' | 'url' | null;
+
+/**
+ * The outcome of the last insert, shown INSIDE the Insert card. The card
+ * is the last thing on the page, so on a laptop the file picker is used
+ * scrolled to the bottom: a confirmation at the top of the page went
+ * unseen, and "nothing happened" earned a second insert. Keeping it in
+ * the card (until the next insert, or "Not now") also makes a second
+ * Choose files… a conscious choice rather than a retry.
+ */
+interface InsertedNotice {
+  entry: PackLibraryEntry;
+  /** Set once the background image prefetch has something to report. */
+  imagesNote?: string;
+}
 
 function ProgressLine({ packId }: { packId: string }) {
   // Read after mount: SSG renders with no localStorage.
@@ -159,11 +178,15 @@ function PackCard({
 export function PacksPage() {
   const [entries, setEntries] = useClientState(listInsertedPacks, NO_PACKS);
   const mounted = useMounted();
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<InsertBusy>(null);
+  // Shelf notices (switching, ejected) — the insert's own feedback lives in
+  // the Insert card, see InsertedNotice.
   const [message, setMessage] = useState<string | null>(null);
+  const [inserted, setInserted] = useState<InsertedNotice | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [url, setUrl] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
+  const feedback = useRef<HTMLDivElement>(null);
 
   // The published-pack registry — loaded once on mount, best source wins
   // (website API → raw GitHub → the copy baked into this build).
@@ -190,7 +213,31 @@ export function PacksPage() {
   const externalActive =
     activeId !== buildId && !entries.some((e) => e.id === activeId);
 
+  // Bring whichever feedback just rendered (result or errors) into view: the
+  // card sits at the foot of the page, so a panel appended below the
+  // buttons would otherwise open just under the fold.
+  const [feedbackSeq, setFeedbackSeq] = useState(0);
+  useEffect(() => {
+    if (feedbackSeq === 0) return;
+    feedback.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }, [feedbackSeq]);
+
+  // A new insert owns the feedback area: the previous result OR failure
+  // goes before the busy label shows, so a stale verdict never sits under
+  // "Reading…" as if it belonged to the file being read.
+  function clearFeedback() {
+    setMessage(null);
+    setInserted(null);
+    setErrors([]);
+  }
+
+  function beginInsert(kind: InsertBusy) {
+    setBusy(kind);
+    clearFeedback();
+  }
+
   function finishInsert(outcome: ParseOutcome, origin: string) {
+    setFeedbackSeq((n) => n + 1);
     if (!outcome.ok) {
       setErrors(outcome.errors);
       return;
@@ -204,8 +251,8 @@ export function PacksPage() {
     // Funnel event (src/lib/analytics.ts) — recorded under the ACTIVE pack,
     // naming the one that arrived.
     recordEvent('bundle_inserted', { pack: result.entry.id });
-    const base = `Inserted “${result.entry.title}” (${result.entry.questionCount} questions). Make it active to start practising.`;
-    setMessage(base);
+    const notice: InsertedNotice = { entry: result.entry };
+    setInserted(notice);
     refresh();
     // Prefetch the pack's images for offline practice — in the background,
     // the insert itself is already done.
@@ -213,7 +260,14 @@ export function PacksPage() {
     if (stored) {
       void cachePackAssets(stored).then(({ total, cached }) => {
         if (total > 0 && cached > 0) {
-          setMessage(`${base} ${cached} of ${total} images saved for offline use.`);
+          // Only THIS insert's prefetch may annotate the panel: a re-insert
+          // of the same pack id shows a new notice, and a slow prefetch from
+          // the earlier one must not describe it.
+          setInserted((cur) =>
+            cur && cur.entry === notice.entry
+              ? { ...cur, imagesNote: `${cached} of ${total} images saved for offline use.` }
+              : cur,
+          );
         }
       });
     }
@@ -221,35 +275,35 @@ export function PacksPage() {
 
   async function handleFiles(list: FileList | null) {
     if (!list || list.length === 0) return;
-    setBusy(true);
-    setMessage(null);
+    beginInsert('files');
     try {
       const files = await Promise.all(
         Array.from(list).map(async (f) => ({ name: f.name, text: await f.text() })),
       );
       finishInsert(parsePackFiles(files), files.map((f) => f.name).join(', '));
     } finally {
-      setBusy(false);
+      setBusy(null);
       if (fileInput.current) fileInput.current.value = '';
     }
   }
 
   async function handleUrl() {
-    if (!url.trim()) return;
-    setBusy(true);
-    setMessage(null);
+    // Same guard as the Fetch button: Enter in the field must not start a
+    // second insert while one is reading or fetching.
+    if (busy !== null || !url.trim()) return;
+    beginInsert('url');
     try {
       finishInsert(await fetchPackFromUrl(url), url.trim());
       setUrl('');
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
   async function handleRegistryInsert(listing: PackListing) {
     if (busyRepo) return;
     setBusyRepo(listing.repo);
-    setMessage(null);
+    clearFeedback();
     try {
       finishInsert(await fetchPackFromUrl(registryRepoUrl(listing)), registryRepoUrl(listing));
     } finally {
@@ -259,7 +313,7 @@ export function PacksPage() {
 
   function switchTo(id: string | null, title: string) {
     if (!activatePack(id)) return;
-    setMessage(`Switching to “${title}”…`);
+    setMessage(id === activeId ? `Reloading “${title}”…` : `Switching to “${title}”…`);
     // Any #pack= hash would outrank the pointer on reload — drop it first.
     window.history.replaceState(null, '', window.location.pathname + window.location.search);
     window.location.reload();
@@ -444,11 +498,20 @@ export function PacksPage() {
             size="sm"
             variant="secondary"
             onClick={() => void handleUrl()}
-            disabled={busy || !url.trim()}
+            disabled={busy !== null || !url.trim()}
             data-testid="insert-url-go"
           >
-            <LinkIcon className="h-4 w-4" />
-            Fetch
+            {busy === 'url' ? (
+              <>
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+                Fetching…
+              </>
+            ) : (
+              <>
+                <LinkIcon className="h-4 w-4" />
+                Fetch
+              </>
+            )}
           </Button>
         </div>
 
@@ -466,15 +529,75 @@ export function PacksPage() {
             size="sm"
             variant="secondary"
             onClick={() => fileInput.current?.click()}
-            disabled={busy}
+            disabled={busy !== null}
+            data-testid="insert-files-button"
           >
-            <FileJson className="h-4 w-4" />
-            Choose files…
+            {busy === 'files' ? (
+              <>
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+                Reading…
+              </>
+            ) : (
+              <>
+                <FileJson className="h-4 w-4" />
+                Choose files…
+              </>
+            )}
           </Button>
         </div>
 
+        {inserted ? (
+          <div
+            ref={feedback}
+            data-testid="insert-result"
+            role="status"
+            className="mt-4 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800"
+          >
+            <p>
+              <strong>
+                Inserted “{inserted.entry.title}” ({inserted.entry.questionCount} question
+                {inserted.entry.questionCount === 1 ? '' : 's'}).
+              </strong>{' '}
+              {inserted.entry.id === activeId
+                ? 'It is the active pack — reload to practise the updated questions.'
+                : 'It is on the shelf above. Make it active to start practising.'}
+              {inserted.imagesNote ? <> {inserted.imagesNote}</> : null}
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {/* Both go through switchTo: the active pack may have arrived
+                  from an external handoff (blob or #pack= hash), and either
+                  outranks the library pointer at startup — a raw reload would
+                  bring the OLD questions back. Pointing the library at the
+                  inserted pack and dropping both makes the update stick. */}
+              <Button
+                size="sm"
+                data-testid={
+                  inserted.entry.id === activeId ? 'insert-result-reload' : 'insert-result-activate'
+                }
+                onClick={() => switchTo(inserted.entry.id, inserted.entry.title)}
+              >
+                {inserted.entry.id === activeId ? (
+                  <>
+                    <RotateCw className="h-4 w-4" />
+                    Reload
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4" />
+                    Make active
+                  </>
+                )}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setInserted(null)}>
+                Not now
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
         {errors.length > 0 ? (
           <div
+            ref={feedback}
             data-testid="insert-errors"
             className="mt-4 rounded-xl border border-warn-500/40 bg-warn-500/10 px-4 py-3 text-sm text-ink-800"
           >

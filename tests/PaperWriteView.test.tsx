@@ -5,7 +5,7 @@
 // come back to it later. happy-dom has no layout (every rect is zero),
 // so client coordinates are taken as page coordinates — which is all
 // these tests need; real geometry is covered end to end in
-// tests/e2e-pack/paper.spec.ts.
+// tests/e2e/paper.spec.ts.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
