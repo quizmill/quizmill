@@ -36,7 +36,7 @@ const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 // engine chunks' module evaluation. When a chunk wins, source.ts reads
 // `__QUIZMILL_PACK__` before it's set and the injected pack is silently
 // ignored. A parser-executed inline script always runs before any
-// deferred/module bundle (guarded by tests/e2e-pack/runtime-pack-bootstrap).
+// deferred/module bundle (guarded by tests/e2e/runtime-pack-bootstrap).
 // insertedPackKey(id) = PACK_KEY_BEFORE_ID + id + PACK_KEY_AFTER_ID — split
 // around a placeholder so the inline script rebuilds the exact same key.
 const [PACK_KEY_BEFORE_ID, PACK_KEY_AFTER_ID] = insertedPackKey('').split('');
