@@ -286,7 +286,7 @@ npm run pack:list                    # published packs from the registry
 npm run build                        # static export in out/
 
 npm test                             # unit tests (vitest)
-npm run test:e2e                     # build + drive the demo pack with Puppeteer
+npm run test:e2e                     # build + drive the demo pack with Playwright
 ```
 
 To point the `npx quizmill` CLI at your checkout (so `run`/`build` use

@@ -43,3 +43,7 @@ npm-debug.log*
 
 # review screenshots are attached to the PR, never committed (see CLAUDE.md)
 /docs/screenshots/
+
+# Playwright reports and traces
+/playwright-report/
+/test-results/
