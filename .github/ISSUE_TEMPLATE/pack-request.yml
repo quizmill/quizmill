@@ -1,0 +1,43 @@
+name: Pack request
+description: Suggest a new quizmill learning pack.
+title: "Pack request: <topic>"
+labels: [pack-request]
+body:
+  - type: input
+    id: topic
+    attributes:
+      label: Topic
+      description: What should this pack help people practise?
+      placeholder: AWS Advanced Networking Specialty
+    validations:
+      required: true
+  - type: dropdown
+    id: audience
+    attributes:
+      label: Audience / level
+      options:
+        - Beginner
+        - Practitioner
+        - Exam prep
+        - Expert / extreme
+        - Mixed
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What should be included/excluded? Add exam blueprint links, docs, notes, or source material if you have them.
+    validations:
+      required: true
+  - type: input
+    id: question-count
+    attributes:
+      label: Target size
+      placeholder: 30-50 questions for a first public pack
+  - type: textarea
+    id: quality
+    attributes:
+      label: Quality bar
+      description: What would make this pack trustworthy/useful?
+      placeholder: Source-backed explanations, human reviewed, includes extreme scenarios...
