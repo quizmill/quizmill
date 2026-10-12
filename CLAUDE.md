@@ -173,13 +173,13 @@ dispatch. The in-app version comes from `git describe` at build time
   Puppeteer at a phone viewport (414×896, `deviceScaleFactor: 2`) seeding
   `localStorage` for the state you want — same harness as `tests/e2e/`.
   Show each meaningful state (e.g. empty / in-progress / complete), not
-  just one. Screenshots are **never committed**: `docs/screenshots/` is
-  gitignored (write the PNGs there locally if convenient) and the images
-  go on the PR itself — drag them into the PR description so GitHub hosts
-  them. GitHub has no API for that upload, so an unattended session that
-  cannot attach an image instead links the PR's Cloudflare preview (the
-  `pr-preview` bot comment), names the routes and the localStorage state
-  to seed, and says so in the PR body.
+  just one, of the change this PR makes. Screenshots are **never
+  committed**: write the PNGs to the gitignored `docs/screenshots/` and
+  upload them with `gh pr create`/`gh pr edit --attach <png>` (gh ≥ 2.99),
+  which hosts them on GitHub. `gh` swaps a Markdown `![alt](./file.png)`
+  reference in the body for the uploaded URL (not an HTML `<img>`). No
+  images means the PR isn't done: if the upload fails, say so in the PR
+  body rather than substituting preview steps.
 - **Keep this file short.** Add a line only for a boundary, an invariant
   or a workflow rule an agent can't infer from the code; append to the
   relevant section rather than reflowing neighbours (several PRs edit
