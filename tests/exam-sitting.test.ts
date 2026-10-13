@@ -109,7 +109,17 @@ describe('the demo pack sitting', () => {
 
 describe('passed', () => {
   it('passes at or above the pass mark', () => {
-    expect(passed({ passPct: 70 }, 70)).toBe(true);
-    expect(passed({ passPct: 70 }, 69)).toBe(false);
+    expect(passed({ passPct: 70 }, { correct: 7, total: 10 })).toBe(true);
+    expect(passed({ passPct: 70 }, { correct: 69, total: 100 })).toBe(false);
+  });
+
+  it('compares the exact fraction, not the rounded percentage', () => {
+    // 4/6 = 66.67% rounds to 67 on screen but is below a 67% mark.
+    expect(passed({ passPct: 67 }, { correct: 4, total: 6 })).toBe(false);
+    expect(passed({ passPct: 66 }, { correct: 4, total: 6 })).toBe(true);
+  });
+
+  it('never passes an empty sitting', () => {
+    expect(passed({ passPct: 0 }, { correct: 0, total: 0 })).toBe(false);
   });
 });

@@ -71,7 +71,14 @@ export const EXAM_SITTING: ExamSitting | null = buildSitting(
   packQuestions,
 );
 
-/** Whether a score meets the pack's declared pass mark. */
-export function passed(exam: Pick<PackExam, 'passPct'>, pct: number): boolean {
-  return pct >= exam.passPct;
+/**
+ * Whether a score meets the pack's declared pass mark. Compares the exact
+ * fraction, not the whole-number percentage shown on screen — 4/6 reads
+ * as 67% but is below a 67% mark.
+ */
+export function passed(
+  exam: Pick<PackExam, 'passPct'>,
+  score: { correct: number; total: number },
+): boolean {
+  return score.total > 0 && score.correct * 100 >= exam.passPct * score.total;
 }
