@@ -78,7 +78,7 @@ function fullDay(offset: number, n = 10): Attempt[] {
 }
 
 describe('PackHome is the practice loop only (#188)', () => {
-  it('carries no status card, stat tiles or nav buttons — those live on the tabs', async () => {
+  it('carries no status card, stat tiles or install nudge — status lives on Progress', async () => {
     localStorage.setItem(ATTEMPTS_KEY, JSON.stringify(fullDay(0)));
     await render();
     // The level/streak card and the Answered/Readiness tiles moved to Progress.
@@ -86,12 +86,27 @@ describe('PackHome is the practice loop only (#188)', () => {
     expect(container.querySelector('[data-testid="streak-card"]')).toBeNull();
     expect(container.querySelector('[data-testid="exam-readiness-tile"]')).toBeNull();
     expect(container.textContent).not.toContain('Answered');
-    // The four round header buttons are the layout's tab bar now.
-    for (const label of ['Progress', 'Sticker cabinet', 'My notes', 'Settings']) {
-      expect(container.querySelector(`a[aria-label="${label}"]`), label).toBeNull();
-    }
     // The install nudge is gone too (Settings keeps its install card).
     expect(container.querySelector('[data-testid="install-banner"]')).toBeNull();
+  });
+
+  it('keeps the four round header buttons for desktop, where there is no tab bar', async () => {
+    await render();
+    const nav = container.querySelector('header nav[aria-label="Pages"]');
+    expect(nav).toBeTruthy();
+    // Phones get the bottom tab bar instead, so the row is hidden below sm:.
+    expect(nav!.className).toContain('hidden');
+    expect(nav!.className).toContain('sm:flex');
+    for (const [label, href] of [
+      ['Progress', '/progress'],
+      ['Sticker cabinet', '/stickers'],
+      ['My notes', '/notes'],
+      ['Settings', '/settings'],
+    ]) {
+      const link = nav!.querySelector(`a[aria-label="${label}"]`);
+      expect(link, label).toBeTruthy();
+      expect(link!.getAttribute('href'), label).toBe(href);
+    }
   });
 
   it('puts Review mistakes and the categories before the mode rail', async () => {

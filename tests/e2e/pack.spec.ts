@@ -255,6 +255,41 @@ test.describe('tab bar navigation', () => {
     await waitForText(page, /Q\s*1\s*\/\s*\d+/, 20_000);
     await expect(page.locator('nav[aria-label="Main"]')).toHaveCount(0);
   });
+
+  test('every tab page keeps its "← Home" link', async ({ page }) => {
+    for (const path of ['/progress/', '/stickers/', '/notes/', '/settings/']) {
+      await page.goto(path);
+      const back = page.locator('header a[href="/"]', { hasText: 'Home' });
+      await expect(back, path).toBeVisible();
+    }
+    await page.locator('header a[href="/"]', { hasText: 'Home' }).click();
+    await waitForText(page, 'Solar System Practice');
+  });
+});
+
+test.describe('desktop navigation', () => {
+  // The tab bar is a phone affordance. From sm: up the app keeps the nav it
+  // always had: four round buttons in Home's header and "← Home" on the
+  // sub-pages.
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test('hides the tab bar and shows Home’s header buttons', async ({ page }) => {
+    await waitForText(page, 'Solar System Practice');
+    await expect(page.locator('nav[aria-label="Main"]')).toBeHidden();
+    const header = page.locator('header nav[aria-label="Pages"]');
+    await expect(header).toBeVisible();
+    for (const label of ['Progress', 'Sticker cabinet', 'My notes', 'Settings']) {
+      await expect(header.getByRole('link', { name: label }), label).toBeVisible();
+    }
+
+    // Home → Settings → back, the way it was before the tab bar.
+    await header.getByRole('link', { name: 'Settings' }).click();
+    await waitForText(page, 'Packs, progress & sync');
+    await expect(page.locator('nav[aria-label="Main"]')).toBeHidden();
+    await page.locator('header a[href="/"]', { hasText: 'Home' }).click();
+    await waitForText(page, 'Solar System Practice');
+    await expect(header).toBeVisible();
+  });
 });
 
 test.describe('sticker cabinet page', () => {

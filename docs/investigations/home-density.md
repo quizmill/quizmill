@@ -135,9 +135,11 @@ every route, not just Home.
 route, hidden during a runner (a session should not have a tab bar
 under it) and in the full-screen paper/scratchpad views; it must share
 the bottom edge with the update notifier and the layout's bottom
-padding; on desktop a bottom bar looks wrong, so `sm:` and up render it
-as a top nav. The level bar leaves Home; a learner sees it on the
-Progress tab and in the level-up celebration instead.
+padding; on desktop a bottom bar looks wrong, so it is a phone-only
+affordance and `sm:` and up keep the nav the app always had (Home's
+header buttons, "← Home" on each page). The level bar leaves Home; a
+learner sees it on the Progress tab and in the level-up celebration
+instead.
 
 ## Recommendation
 
@@ -162,14 +164,20 @@ rather than the two above:
 - **Tab bar** (`src/components/TabBar.tsx`, mounted once in the root
   layout): Home · Progress · Stickers · Notes · Settings. Fixed to the
   bottom on phones (safe-area padded; the update notifier lifts above
-  it via a `data-tab-bar` flag on `<html>`), an ordinary top row from
-  `sm:` up. It shows only on the tab routes and Settings' `/packs`
-  sub-page — never under a runner, Drive, Coach, Paper or Games — so a
-  session has nothing to tap away to. The four tab pages lost their
-  "← Home" back links; the tab bar is the way back.
+  it via a `data-tab-bar` flag on `<html>`), and **phones only** — from
+  `sm:` up it is hidden and the app keeps the navigation it had before:
+  the four round page buttons in Home's header and a "← Home" link at
+  the top of Progress, Stickers, Notes and Settings. (A first cut
+  rendered the bar as a top row on desktop and dropped the back links;
+  review found that inconsistent with the rest of the app and the
+  Home → Settings → Home round trip felt wrong, so desktop is unchanged
+  from before this PR.) It shows only on the tab routes and Settings'
+  `/packs` sub-page — never under a runner, Drive, Coach, Paper or
+  Games — so a session has nothing to tap away to.
 - **Home** is the practice loop only: compact header (title, subtitle
   clamped to two lines, a streak chip that reads "N-day streak" or
-  "N more today" and opens Progress), Review mistakes, the level filter
+  "N more today" and opens Progress, plus the page buttons from `sm:`
+  up), Review mistakes, the level filter
   and nudge, the categories, then "More ways to practise" — Drive,
   Coach, Paper and the timed exam as a rail of equal-width tiles (icon,
   label, a few-word caption). The upgrade card stays last.

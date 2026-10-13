@@ -155,6 +155,15 @@ describe('ProgressPage level card (progression)', () => {
   });
 });
 
+describe('ProgressPage navigation', () => {
+  it('keeps its "← Home" link — the way back on desktop, where there is no tab bar', async () => {
+    await render(<ProgressPage />);
+    const back = container.querySelector('header a[href="/"]');
+    expect(back).toBeTruthy();
+    expect(back!.textContent).toContain('Home');
+  });
+});
+
 describe('ProgressPage streak and totals', () => {
   it('shows the live streak and the day’s goal', async () => {
     localStorage.setItem(ATTEMPTS_KEY, JSON.stringify([...fullDay(0), ...fullDay(1)]));

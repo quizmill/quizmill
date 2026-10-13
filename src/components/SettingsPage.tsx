@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import {
   Activity,
+  ArrowLeft,
   Boxes,
   Car,
   Gamepad2,
@@ -337,6 +338,16 @@ export function SettingsPage({ extras }: SettingsPageProps) {
 
   return (
     <main className="flex flex-col gap-5">
+      <header className="flex items-center justify-between">
+        <Link
+          href="/"
+          className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm font-medium text-ink-600 hover:bg-ink-100"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Home
+        </Link>
+      </header>
+
       <div>
         <h1 className="text-3xl font-bold text-ink-900">Settings</h1>
         <p className="mt-1 text-ink-500">

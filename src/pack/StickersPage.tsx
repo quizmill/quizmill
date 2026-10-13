@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { PackChip } from '@/components/PackChip';
-import { X } from 'lucide-react';
+import { ArrowLeft, X } from 'lucide-react';
 import {
   ACHIEVEMENTS,
   CATEGORY_LABEL,
@@ -40,7 +41,14 @@ export default function StickersPage() {
 
   return (
     <main className="flex flex-col gap-6">
-      <header className="flex items-center justify-end">
+      <header className="flex items-center justify-between">
+        <Link
+          href="/"
+          className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm font-medium text-ink-600 hover:bg-ink-100"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Home
+        </Link>
         <div className="text-sm font-medium text-ink-500" data-testid="sticker-count">
           <span className="font-semibold text-ink-900">{earnedCount}</span>
           <span> / {ACHIEVEMENTS.length} stickers</span>

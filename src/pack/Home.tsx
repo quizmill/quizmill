@@ -4,11 +4,15 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
+  BarChart3,
   Car,
   GraduationCap,
+  NotebookPen,
   Printer,
   RefreshCw,
+  Settings,
   Timer,
+  Trophy,
   TrendingDown,
   TrendingUp,
   X,
@@ -57,6 +61,14 @@ import { recordLevelCrossings } from '@/pack/useLevelUp';
  *  only exists so a dedicated runtime-pack build never paints the demo
  *  pack first.) */
 const RUNTIME_PACK_MODE = process.env.NEXT_PUBLIC_RUNTIME_PACK === '1';
+
+/** The header's round page buttons (desktop; phones use the tab bar). */
+const PAGE_LINKS = [
+  { href: '/progress', label: 'Progress', icon: BarChart3 },
+  { href: '/stickers', label: 'Sticker cabinet', icon: Trophy },
+  { href: '/notes', label: 'My notes', icon: NotebookPen },
+  { href: '/settings', label: 'Settings', icon: Settings },
+] as const;
 
 function HomeSkeleton() {
   return (
@@ -166,8 +178,9 @@ export default function PackHome() {
 
   return (
     <main className="flex flex-col gap-6">
-      {/* Compact header: the title, a subtitle clamped to two lines, and
-          the streak chip. Navigation is the tab bar in the layout. */}
+      {/* Compact header: the title, a subtitle clamped to two lines, the
+          streak chip, and — from sm: up — the four round page buttons the
+          header always had. On phones those are the layout's tab bar. */}
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold text-ink-900 sm:text-3xl">
@@ -177,8 +190,20 @@ export default function PackHome() {
             {APP_CONFIG.homeSubtitle}
           </p>
         </div>
-        <div className="pt-1">
+        <div className="flex shrink-0 items-center gap-2 pt-1">
           <StreakChip attempts={attempts} />
+          <nav aria-label="Pages" className="hidden items-center gap-2 sm:flex">
+            {PAGE_LINKS.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                aria-label={label}
+                className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-surface text-ink-700 shadow-xs"
+              >
+                <Icon className="h-4 w-4" />
+              </Link>
+            ))}
+          </nav>
         </div>
       </header>
 

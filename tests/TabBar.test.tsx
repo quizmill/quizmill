@@ -61,6 +61,14 @@ describe('TabBar', () => {
     ]);
   });
 
+  it('is a phone-only bottom bar — desktop keeps Home’s header buttons and the back links', async () => {
+    await render('/');
+    const nav = container.querySelector('nav[aria-label="Main"]')!;
+    expect(nav.className).toContain('fixed');
+    expect(nav.className).toContain('bottom-0');
+    expect(nav.className).toContain('sm:hidden');
+  });
+
   it('marks the current tab, tolerating the export’s trailing slash', async () => {
     await render('/progress/');
     const current = tabs().filter((a) => a.getAttribute('aria-current') === 'page');

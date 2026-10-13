@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { PackChip } from '@/components/PackChip';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { APP_CONFIG } from '@/config';
 import { recordEvent } from '@/lib/storage';
@@ -59,6 +60,16 @@ export default function ProgressPage() {
 
   return (
     <main className="flex flex-col gap-6">
+      <header className="flex items-center justify-between">
+        <Link
+          href="/"
+          className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm font-medium text-ink-600 hover:bg-ink-100"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Home
+        </Link>
+      </header>
+
       <div>
         <PackChip className="mb-2" />
         <h1 className="text-3xl font-bold text-ink-900">Progress</h1>

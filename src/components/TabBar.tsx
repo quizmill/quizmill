@@ -14,16 +14,19 @@ import {
 import { cn } from '@/lib/cn';
 
 /**
- * The app's primary navigation: a bottom tab bar on phones, a top nav row
- * from `sm:` up. Mounted once in the root layout, so every tab route gets
- * it for free; it shows ONLY on the tab routes themselves (and Settings'
- * sub-pages), never under a runner or a full-screen mode — a session
- * should have nothing to tap away to.
+ * The app's phone navigation: a bottom tab bar, below `sm:` only. Mounted
+ * once in the root layout, so every tab route gets it for free; it shows
+ * ONLY on the tab routes themselves (and Settings' sub-pages), never under
+ * a runner or a full-screen mode — a session should have nothing to tap
+ * away to.
  *
- * It exists so Home can be nothing but ways to practise (issue #188): the
- * four round nav buttons that used to share Home's header live here as
- * labelled tabs, and the status pieces Home used to carry (level, streak,
- * answered, readiness) moved to the Progress tab.
+ * It exists so Home can be nothing but ways to practise on a phone (issue
+ * #188): the four round nav buttons in Home's header hide below `sm:` and
+ * live here as labelled tabs instead, and the status pieces Home used to
+ * carry (level, streak, answered, readiness) moved to the Progress tab.
+ * From `sm:` up the app keeps the nav it always had — Home's header
+ * buttons and a "← Home" link on each page — so desktop is unchanged and
+ * the bar is `sm:hidden`.
  *
  * The bar sets `data-tab-bar` on <html> while it is showing so other fixed
  * bottom UI (the update notifier) can lift itself above it on phones.
@@ -77,31 +80,28 @@ export function TabBar() {
       aria-label="Main"
       data-testid="tab-bar"
       className={cn(
-        // Phone: fixed to the bottom edge, full width, above the page's
-        // bottom padding; respects the home-indicator safe area.
+        // Fixed to the bottom edge, full width, above the page's bottom
+        // padding; respects the home-indicator safe area.
         'fixed inset-x-0 bottom-0 z-40 border-t border-ink-200 bg-surface/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_0_0_rgb(0_0_0/0.02)] backdrop-blur-sm',
-        // Desktop: an ordinary row at the top of the column.
-        'sm:static sm:mb-6 sm:border-0 sm:bg-transparent sm:pb-0 sm:shadow-none sm:backdrop-blur-none',
+        // Phones only — see the component note.
+        'sm:hidden',
       )}
     >
-      <ul className="mx-auto flex w-full max-w-(--breakpoint-sm) items-stretch justify-around sm:max-w-none sm:justify-start sm:gap-1">
+      <ul className="mx-auto flex w-full max-w-(--breakpoint-sm) items-stretch justify-around">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = tab === active;
           return (
-            <li key={tab.href} className="flex-1 sm:flex-none">
+            <li key={tab.href} className="flex-1">
               <Link
                 href={tab.href === '/' ? '/' : `${tab.href}/`}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
                   'tap-feedback flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition-colors',
-                  'sm:h-9 sm:flex-row sm:gap-1.5 sm:rounded-full sm:px-3 sm:text-sm',
-                  isActive
-                    ? 'text-brand-600 sm:bg-brand-50 sm:text-brand-700'
-                    : 'text-ink-500 hover:text-ink-900 sm:hover:bg-ink-100',
+                  isActive ? 'text-brand-600' : 'text-ink-500 hover:text-ink-900',
                 )}
               >
-                <Icon className="h-5 w-5 sm:h-4 sm:w-4" aria-hidden />
+                <Icon className="h-5 w-5" aria-hidden />
                 <span>{tab.label}</span>
               </Link>
             </li>

@@ -137,8 +137,9 @@ export default function RootLayout({
         {/* Bottom padding clears the phone tab bar (h-14) plus the update
             notifier; the safe-area term keeps it clear of a home indicator. */}
         <div className="mx-auto w-full max-w-(--breakpoint-sm) px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-4 sm:max-w-(--breakpoint-md) sm:pb-24 sm:pt-8">
-          {/* Primary navigation: bottom tabs on phones, a top row from sm:.
-              Pack-independent, so it sits outside the hydration boundary. */}
+          {/* Phone navigation: bottom tabs below sm: (desktop keeps the
+              header buttons and back links). Pack-independent, so it sits
+              outside the hydration boundary. */}
           <TabBar />
           {/* When the bootstrap above swapped a runtime pack in, the page was
               prerendered from a different pack — adopt that markup for the
