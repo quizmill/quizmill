@@ -5,6 +5,9 @@ practising first on a phone when a pack declares an exam and progression,
 the device has Drive, Coach and Paper practice switched on, the browser
 offers installation, and there are mistakes to review.*
 
+**Decision (2026-10-13): P3, built in full — see "As built" at the end.**
+The proposals below are kept as the record of what was weighed.
+
 ## The problem, measured
 
 Home is a single column that stacks, in order: header (title, subtitle,
@@ -17,21 +20,25 @@ practise.
 Each of those blocks is optional and was added one at a time, each
 "above the categories" because it was the new thing. With all of them
 on, the first category card sits at **1403 CSS px** on a 414×896 phone —
-more than one and a half screens down. Even the Review card, the loop's
-best prompt, is at 1156 px. The desktop screenshot in the issue is the
+more than half a screen of scrolling before its top edge appears. Even
+the Review card, the loop's best prompt, is at 1156 px, below the fold. The desktop screenshot in the issue is the
 same list at a wider column, so it reads as "busy" rather than "buried".
 
 Measured from the real static build (demo pack, `npm run build`, phone
-viewport 414×896) with every option on; `firstCategoryTop` is the y of
-the first category card, `reviewTop` the Review-mistakes card:
+viewport 414×896) with every option on. "first category" and "Review
+card" are the y of the top edge of that card in CSS px from the top of
+the page; "scroll to reach" is how far the learner has to scroll before
+that top edge enters the viewport, `max(0, y − 896) / 896`, in viewports
+— the same formula for every row (a card whose top edge is at 795 px is
+visible without scrolling, though only its top edge):
 
-| Layout                   | first category | Review card | page height | screens to scroll |
-| ------------------------ | -------------: | ----------: | ----------: | ----------------: |
-| today                    |           1403 |        1156 |        1767 |               1.6 |
-| P0 quick wins only       |           1109 |         862 |        1563 |               1.2 |
-| P1 practice first        |            350 |         127 |        1678 |               0.0 |
-| P2 compress              |            795 |         549 |        1249 |               0.9 |
-| P3 tab bar               |            342 |          95 |         899 |               0.0 |
+| Layout                   | first category | Review card | page height | scroll to reach first category |
+| ------------------------ | -------------: | ----------: | ----------: | -----------------------------: |
+| today                    |           1403 |        1156 |        1767 |                            0.6 |
+| P0 quick wins only       |           1109 |         862 |        1563 |                            0.2 |
+| P1 practice first        |            350 |         127 |        1678 |                            0.0 |
+| P2 compress              |            795 |         549 |        1249 |                            0.0 |
+| P3 tab bar (mockup)      |            342 |          95 |         899 |                            0.0 |
 
 The mockups are DOM rearrangements applied to the real page (same markup
 and styles), captured by `docs/screenshots/home-density/capture.ts`
@@ -95,10 +102,11 @@ Keep the order but change the shape of the two biggest blocks:
 - Compact header (as P0), banner last.
 
 **Pros:** the page shrinks from 1767 to 1249 px; the progress bars stay
-on top; the categories are at 795 px, just under one screen; on desktop
-the rail reads as a toolbar rather than a stack of banners.
-**Cons:** the categories are still not visible without a scroll on a
-896-px phone (they would be on a taller one); the tiles lose their
+on top; the first category's top edge is at 795 px, so it just makes the
+fold on an 896-px phone; on desktop the rail reads as a toolbar rather
+than a stack of banners.
+**Cons:** only the top edge of the first category shows without a
+scroll on an 896-px phone (a taller one shows more); the tiles lose their
 one-line blurbs, so a first-time visitor learns less about what Coach or
 Paper practice is; a rail with five or more tiles scrolls sideways,
 which is easy to miss.
@@ -145,3 +153,44 @@ Things to settle before step two: whether the streak chip in the header
 is enough visible progress on Home (the daily-goal line would only be on
 the Progress tab), and whether Games (currently reached from Settings)
 earns a tab or a tile in the mode rail.
+
+## As built (P3, this PR)
+
+Peter picked P3 and asked for it in full, so it shipped in one step
+rather than the two above:
+
+- **Tab bar** (`src/components/TabBar.tsx`, mounted once in the root
+  layout): Home · Progress · Stickers · Notes · Settings. Fixed to the
+  bottom on phones (safe-area padded; the update notifier lifts above
+  it via a `data-tab-bar` flag on `<html>`), an ordinary top row from
+  `sm:` up. It shows only on the tab routes and Settings' `/packs`
+  sub-page — never under a runner, Drive, Coach, Paper or Games — so a
+  session has nothing to tap away to. The four tab pages lost their
+  "← Home" back links; the tab bar is the way back.
+- **Home** is the practice loop only: compact header (title, subtitle
+  clamped to two lines, a streak chip that reads "N-day streak" or
+  "N more today" and opens Progress), Review mistakes, the level filter
+  and nudge, the categories, then "More ways to practise" — Drive,
+  Coach, Paper and the timed exam as a rail of equal-width tiles (icon,
+  label, a few-word caption). The upgrade card stays last.
+- **Progress** opens with the level/streak card, now carrying one line
+  of totals ("10 of 18 questions answered · 50% accuracy") in place of
+  Home's two stat tiles; the exam-readiness tile is gone (the full
+  readiness panel sits directly under the card).
+- **Install banner** removed; Settings' install card is the one place
+  that explains installation and offers the browser's install prompt.
+- **Invariant kept:** Home still runs the `recordLevelCrossings`
+  backfill on every attempts change (and ProgressCard does too), so
+  imported or synced history is credited without visiting a runner.
+
+Measured as above (414×896, everything on, 10 answers today, 5 wrong):
+
+| Layout         | first category | Review card | mode rail | page height |
+| -------------- | -------------: | ----------: | --------: | ----------: |
+| P3 as built    |            363 |         116 |       570 |         896 |
+| P3, no history |            256 |           — |       464 |         896 |
+
+The whole page fits the viewport in both states: nothing to scroll. The
+two open questions from the recommendation were settled as: the streak
+chip is Home's only status (the daily-goal line lives on Progress), and
+Games stays an easter egg reached from Settings — no tab, no tile.

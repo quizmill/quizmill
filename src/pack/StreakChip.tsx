@@ -25,7 +25,7 @@ export function StreakChip({ attempts }: { attempts: readonly Attempt[] }) {
       data-testid="streak-chip"
       aria-label={`${label} — open Progress`}
       className={cn(
-        'tap-feedback inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold',
+        'tap-feedback inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold',
         goalMet ? 'bg-brand-50 text-brand-700' : 'bg-warn-100 text-warn-700',
       )}
     >

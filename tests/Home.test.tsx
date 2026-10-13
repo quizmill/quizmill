@@ -215,7 +215,7 @@ describe('PackHome timed exam tile', () => {
     expect(card!.getAttribute('href')).toBe('/practice/exam');
     expect(card!.textContent).toContain('Mock exam');
     // 9 Advanced questions at 20-in-30-min pace = 13:30.
-    expect(card!.textContent).toContain('9 questions · 13:30');
+    expect(card!.textContent).toContain('9 Qs · 13:30');
   });
 
   it('is the only tile in the rail when no device mode is on', async () => {

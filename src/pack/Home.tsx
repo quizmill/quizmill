@@ -358,7 +358,7 @@ export default function PackHome() {
                 tone="night"
                 icon={Car}
                 label="Drive"
-                caption="Hands-free, by voice"
+                caption="By voice"
               />
             ) : null}
             {coachMode ? (
@@ -368,7 +368,7 @@ export default function PackHome() {
                 tone="brand"
                 icon={GraduationCap}
                 label="Coach"
-                caption="Go back through a session"
+                caption="Replay"
               />
             ) : null}
             {paperMode ? (
@@ -378,7 +378,7 @@ export default function PackHome() {
                 tone="ink"
                 icon={Printer}
                 label="Paper"
-                caption="Print, write, mark"
+                caption="Print & mark"
               />
             ) : null}
             {EXAM_SITTING ? (
@@ -388,7 +388,7 @@ export default function PackHome() {
                 tone="ink"
                 icon={Timer}
                 label={APP_CONFIG.exam?.label ?? 'Timed exam'}
-                caption={`${EXAM_SITTING.count} questions · ${formatClock(EXAM_SITTING.durationSeconds)}`}
+                caption={`${EXAM_SITTING.count} Qs · ${formatClock(EXAM_SITTING.durationSeconds)}`}
               />
             ) : null}
           </div>

@@ -67,8 +67,8 @@ test('confirms a file insert in view, and its Make active opens the new pack', a
     timeout: 20_000,
   });
 
-  // Home now counts the new pack's questions.
+  // Home now counts the new pack's questions (on its one category card).
   await page.goto('/', { waitUntil: 'networkidle' });
   await waitForText(page, 'Insert Feedback Fixture', 20_000);
-  await waitForText(page, '0 of 3 available', 20_000);
+  await waitForText(page, '3 questions available', 20_000);
 });

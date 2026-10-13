@@ -122,7 +122,7 @@ export function ModeTile({
       >
         <Icon className="h-4.5 w-4.5" />
       </span>
-      <span className={`w-full truncate text-sm font-semibold leading-tight ${t.title}`}>
+      <span className={`line-clamp-2 w-full text-[13px] font-semibold leading-tight ${t.title}`}>
         {label}
       </span>
       <span className={`w-full truncate text-[11px] leading-tight ${t.blurb}`}>
