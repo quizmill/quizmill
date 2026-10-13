@@ -68,7 +68,7 @@ export function UpdateNotifier() {
   return (
     // On phones the tab bar (when showing — see TabBar's data-tab-bar flag)
     // owns the bottom edge, so the banner lifts above it; from sm: up the
-    // bar is a top row and the banner keeps the bottom.
+    // bar is hidden and the banner keeps the bottom.
     <div className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-(--breakpoint-sm) px-4 pb-4 [html[data-tab-bar]_&]:bottom-14 sm:[html[data-tab-bar]_&]:bottom-0">
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-brand-400 bg-brand-500 px-4 py-3 text-white shadow-lg">
         <div className="flex items-center gap-2 text-sm font-medium">
