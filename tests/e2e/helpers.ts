@@ -120,16 +120,32 @@ export async function severNetwork(...servers: Server[]): Promise<void> {
 /**
  * Wait until the service worker controls the page AND has precached the
  * practice route — it must be reachable offline without visiting it online.
+ *
+ * Polled from Node through `page.evaluate` (which awaits the promise), NOT
+ * `page.waitForFunction`: that one doesn't await an async predicate, and a
+ * pending Promise is truthy, so its first poll "passed" before the worker
+ * had even installed. The offline specs then severed the network while the
+ * precache was still in flight and flaked under load (#185).
+ *
+ * The route is matched exactly: the client router's prefetch of
+ * `/practice/?subject=…` lands in the runtime cache too, and an
+ * ignore-search match on it would pass before the shell itself is cached.
  */
-export async function waitForPrecache(page: Page): Promise<void> {
-  await page.waitForFunction(
-    async () => {
+export async function waitForPrecache(page: Page, timeoutMs = 30_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const ready = await page.evaluate(async () => {
       if (!navigator.serviceWorker?.controller) return false;
-      return Boolean(await caches.match('/practice/', { ignoreSearch: true }));
-    },
-    undefined,
-    { timeout: 30_000, polling: 500 },
-  );
+      return Boolean(await caches.match('/practice/'));
+    });
+    if (ready) return;
+    if (Date.now() > deadline) {
+      throw new Error(
+        `precache not ready within ${timeoutMs}ms — no controlling service worker, or /practice/ not cached`,
+      );
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
 }
 
 export interface SeedAttempt {
