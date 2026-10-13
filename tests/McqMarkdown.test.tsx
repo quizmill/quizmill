@@ -90,4 +90,36 @@ describe('McqMarkdown emphasis', () => {
     expect(container.querySelector('strong')).toBeNull();
     expect(container.textContent).toBe('**open\nclosed**');
   });
+
+  it('caps emphasis nesting depth; deeper delimiters stay literal', async () => {
+    // 12 openers (`*a` after a space) then 12 closers (`a*` before a space):
+    // without a cap this nests <em> 12 deep and the render recursion follows.
+    const depth = 12;
+    await render('*a '.repeat(depth) + 'core' + ' a*'.repeat(depth));
+    const nesting = Math.max(
+      ...Array.from(container.querySelectorAll('em')).map((el) => {
+        let d = 0;
+        for (let n: Element | null = el; n; n = n.parentElement) if (n.tagName === 'EM') d++;
+        return d;
+      }),
+    );
+    expect(nesting).toBeLessThanOrEqual(8);
+    // No text is lost or invented: the asterisks that didn't pair stay visible.
+    expect(container.textContent?.replace(/\*/g, '')).toBe(
+      ('a '.repeat(depth) + 'core' + ' a'.repeat(depth)),
+    );
+    expect(container.textContent?.split('*').length - 1).toBe((depth - 8) * 2);
+  });
+
+  it('parses a large malformed string in linear time (runtime packs are unbounded)', async () => {
+    // ~220 KB of unmatched openers followed by as many closers: the shape
+    // that made the opener lookup quadratic.
+    const n = 24_000;
+    const text = '*a '.repeat(n) + ' a*'.repeat(n);
+    const started = performance.now();
+    await render(text);
+    const elapsed = performance.now() - started;
+    expect(container.textContent?.match(/a/g)?.length).toBe(2 * n);
+    expect(elapsed, `took ${elapsed.toFixed(0)}ms`).toBeLessThan(1000);
+  });
 });

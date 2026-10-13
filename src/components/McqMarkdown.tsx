@@ -67,16 +67,43 @@ type InlineToken =
   | { kind: 'strong' | 'em'; children: InlineToken[] };
 
 /**
+ * Deepest emphasis nesting the tokenizer will open. Real content nests two
+ * or three levels (`**bold *and italic* bold**`); the cap keeps parsing,
+ * flattening and the recursive render bounded on malformed runtime-pack
+ * text (`*a *a *a …` would otherwise open one frame per delimiter).
+ * Delimiters past the cap stay literal.
+ */
+const MAX_EMPHASIS_DEPTH = 8;
+
+/**
  * Inline tokenizer: code spans are atomic (asterisks inside them stay
  * literal), `**` / `*` open emphasis only when followed by a non-space
  * and close only when preceded by one — so `3 * 4 * 5`, `2 ** 3` and a
  * leading `* ` stay literal. Emphasis never spans a line break; anything
  * still open at a newline or the end is flattened back to literal text.
+ *
+ * Linear in the input: each frame remembers the index of the previous
+ * open frame with the same delimiter, so finding the matching opener is
+ * O(1) rather than a scan of the stack, and the stack itself is capped at
+ * `MAX_EMPHASIS_DEPTH`.
  */
 function parseInline(text: string): InlineToken[] {
-  type Frame = { delim: '**' | '*' | null; children: InlineToken[] };
-  const stack: Frame[] = [{ delim: null, children: [] }];
+  type Delim = '**' | '*';
+  type Frame = {
+    delim: Delim | null;
+    children: InlineToken[];
+    /** Stack index of the nearest enclosing frame with the same delimiter, or -1. */
+    prevSame: number;
+  };
+  const stack: Frame[] = [{ delim: null, children: [], prevSame: -1 }];
+  /** Stack index of the innermost open frame per delimiter (-1 = none). */
+  const lastOpen: Record<Delim, number> = { '**': -1, '*': -1 };
   const top = () => stack[stack.length - 1];
+  const popFrame = (): Frame | undefined => {
+    const frame = stack.pop();
+    if (frame?.delim) lastOpen[frame.delim] = frame.prevSame;
+    return frame;
+  };
   const pushText = (s: string) => {
     if (!s) return;
     const children = top().children;
@@ -88,7 +115,7 @@ function parseInline(text: string): InlineToken[] {
    *  delimiters back into text. */
   const flatten = (to: number) => {
     while (stack.length > to) {
-      const frame = stack.pop();
+      const frame = popFrame();
       if (!frame) break;
       pushText(frame.delim ?? '');
       for (const child of frame.children) {
@@ -111,18 +138,19 @@ function parseInline(text: string): InlineToken[] {
     } else if (tok.startsWith('`')) {
       top().children.push({ kind: 'code', text: match[1] });
     } else {
-      const delim = tok as '**' | '*';
+      const delim = tok as Delim;
       const before = text[match.index - 1];
       const after = text[lastIndex];
       const canClose = before !== undefined && !/\s/.test(before) && before !== '*';
       const canOpen = after !== undefined && !/\s/.test(after) && after !== '*';
-      const openIdx = canClose ? stack.map((f) => f.delim).lastIndexOf(delim) : -1;
+      const openIdx = canClose ? lastOpen[delim] : -1;
       if (openIdx > 0) {
         flatten(openIdx + 1);
-        const { children } = stack.pop() ?? { children: [] };
+        const { children } = popFrame() ?? { children: [] };
         top().children.push({ kind: delim === '**' ? 'strong' : 'em', children });
-      } else if (canOpen) {
-        stack.push({ delim, children: [] });
+      } else if (canOpen && stack.length <= MAX_EMPHASIS_DEPTH) {
+        stack.push({ delim, children: [], prevSame: lastOpen[delim] });
+        lastOpen[delim] = stack.length - 1;
       } else {
         pushText(delim);
       }
