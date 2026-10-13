@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { PlusCircle, Share, X } from 'lucide-react';
+import { PlusCircle, Share } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import {
   describeInstallSurface,
@@ -9,8 +9,6 @@ import {
   type InstallSurface,
 } from '@/lib/install';
 import { useClientState } from '@/lib/useMounted';
-
-const DISMISS_KEY = 'quizmill.install-banner-dismissed';
 
 /** Which install surface this browser is — read on the client only. */
 function detectInstallSurface(): InstallSurface {
@@ -25,11 +23,8 @@ function detectInstallSurface(): InstallSurface {
   );
 }
 
-function loadBannerDismissed(): boolean {
-  return window.localStorage.getItem(DISMISS_KEY) === '1';
-}
 
-/** Shared state for both install UIs: which surface we're on, and the
+/** Install state for the Settings card: which surface we're on, and the
  *  stashed Chromium prompt event when the app is installable. */
 function useInstallPrompt(): {
   surface: InstallSurface | null; // null until mounted (SSR-safe)
@@ -109,41 +104,3 @@ export function InstallCard() {
   );
 }
 
-/**
- * Compact home-screen banner, shown only when the browser is actually
- * offering installation (Chromium's beforeinstallprompt) and the user
- * hasn't dismissed it this browser.
- */
-export function InstallBanner() {
-  const { surface, promptEvent, promptInstall } = useInstallPrompt();
-  const [dismissed, setDismissed] = useClientState(loadBannerDismissed, true);
-
-  if (surface !== 'browser' || !promptEvent || dismissed) return null;
-
-  return (
-    <div
-      data-testid="install-banner"
-      className="flex items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-3 pl-4 shadow-xs"
-    >
-      <div className="text-sm font-medium text-brand-800">
-        ⊕ Add to Home Screen — works offline
-      </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <Button size="sm" onClick={promptInstall}>
-          Install
-        </Button>
-        <button
-          type="button"
-          aria-label="Dismiss"
-          className="tap-feedback rounded-full p-1.5 text-ink-500 hover:bg-ink-100"
-          onClick={() => {
-            window.localStorage.setItem(DISMISS_KEY, '1');
-            setDismissed(true);
-          }}
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-    </div>
-  );
-}

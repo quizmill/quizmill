@@ -1,8 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
-import { Card } from '@/components/ui/Card';
 import { APP_CONFIG } from '@/config';
 import type { Attempt } from '@/data/types';
 import {
@@ -15,7 +13,7 @@ import { EXAM_AVAILABLE_BY_CATEGORY, examInScope } from '@/pack/data';
 import { cn } from '@/lib/cn';
 
 /** Build the readiness report for the active pack's exam goal, or null when
- *  the pack declares none. Shared by the Progress panel and the Home chip. */
+ *  the pack declares none. Used by the Progress panel. */
 export function readinessFor(attempts: readonly Attempt[]): ReadinessReport | null {
   const exam = APP_CONFIG.exam;
   if (!exam) return null;
@@ -186,46 +184,6 @@ function ScoreGauge({ report, tone }: { report: ReadinessReport; tone: Tone }) {
         <span className="absolute right-0">100%</span>
       </div>
     </div>
-  );
-}
-
-/**
- * Home-screen stat tile (exam packs): the readiness estimate with the verdict
- * as a coloured pill, linking to the full Progress breakdown. Replaces the
- * plain accuracy tile for exam packs — same cold-look basis, so there aren't
- * two near-identical percentages side by side. Renders nothing when the pack
- * declares no exam goal.
- */
-export function ExamReadinessTile({ attempts }: { attempts: readonly Attempt[] }) {
-  const report = readinessFor(attempts);
-  if (!report) return null;
-  const meta = VERDICT_META[report.verdict];
-  const hasReadings = report.judgedWeightPct > 0;
-  return (
-    <Link href="/progress" data-testid="exam-readiness-tile" className="tap-feedback group">
-      <Card className="h-full p-4 transition hover:border-brand-300 hover:shadow-md">
-        <div className="flex items-center justify-between text-sm font-medium uppercase tracking-wide text-ink-500">
-          Readiness
-          <ArrowRight className="h-3.5 w-3.5 text-ink-400 transition group-hover:text-brand-600" />
-        </div>
-        <div
-          className={cn('mt-1 text-3xl font-bold', hasReadings ? meta.text : 'text-ink-400')}
-        >
-          {hasReadings ? `${report.estimatePct}%` : '—'}
-        </div>
-        <div className="mt-1.5">
-          <span
-            data-verdict={report.verdict}
-            className={cn(
-              'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold',
-              hasReadings ? meta.pill : 'bg-ink-100 text-ink-500',
-            )}
-          >
-            {hasReadings ? meta.label : 'keep going'}
-          </span>
-        </div>
-      </Card>
-    </Link>
   );
 }
 

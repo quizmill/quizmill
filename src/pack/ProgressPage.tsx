@@ -3,20 +3,18 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { PackChip } from '@/components/PackChip';
-import { ArrowLeft, Flame } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { APP_CONFIG } from '@/config';
 import { recordEvent } from '@/lib/storage';
 import { useStorageData } from '@/lib/useStorage';
 import {
   accuracyByDay,
-  practiceDates,
   sessionsByWeekday,
   sessionSummary,
   weakestQuestions,
 } from '@/lib/stats';
 import { coldLookByCategory } from '@/lib/readiness';
-import { currentStreak } from '@/lib/streak';
+import { ProgressCard } from '@/pack/ProgressCard';
 import { formatSpan } from '@/lib/duration';
 import {
   packQuestions,
@@ -41,7 +39,6 @@ export default function ProgressPage() {
   }, []);
   const { sessions, attempts } = useStorageData();
 
-  const streak = currentStreak(practiceDates(attempts));
   const summary = sessionSummary(sessions);
   const byWeekday = sessionsByWeekday(sessions);
   const maxWeekday = Math.max(...byWeekday.map((d) => d.sessions), 1);
@@ -62,33 +59,17 @@ export default function ProgressPage() {
 
   return (
     <main className="flex flex-col gap-6">
-      <header className="flex items-center justify-between">
-        <Link
-          href="/"
-          className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm font-medium text-ink-600 hover:bg-ink-100"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Home
-        </Link>
-        {streak > 0 ? (
-          <div
-            data-testid="daily-streak"
-            className="inline-flex items-center gap-1 rounded-full bg-warn-100 px-3 py-1 text-sm font-semibold text-warn-700"
-          >
-            <Flame className="h-4 w-4" />
-            {streak}-day streak
-          </div>
-        ) : null}
-      </header>
-
       <div>
         <PackChip className="mb-2" />
         <h1 className="text-3xl font-bold text-ink-900">Progress</h1>
         <p className="mt-1 text-ink-500">
-          Your sessions, accuracy by category and over time, and where to
-          focus next.
+          Your level and streak, accuracy by category and over time, and
+          where to focus next.
         </p>
       </div>
+
+      {/* Level, streak and totals — the card Home used to open with. */}
+      <ProgressCard attempts={attempts} />
 
       {attempts.length === 0 ? (
         <div className="rounded-2xl border border-ink-200 bg-surface p-6 text-center shadow-xs">

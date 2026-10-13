@@ -226,19 +226,34 @@ test('scratchpad opens a pad saved by an older build (text only, no strokes/mode
   await expect(page.locator(tid('scratchpad-undo'))).toBeDisabled();
 });
 
-test.describe('home navigation', () => {
-  test('links to progress, sticker cabinet, and settings', async ({ page }) => {
+test.describe('tab bar navigation', () => {
+  test('offers Home, Progress, Stickers, Notes and Settings on every tab route', async ({ page }) => {
     await waitForText(page, 'Solar System Practice');
+    const bar = page.locator('nav[aria-label="Main"]');
     for (const [label, href] of [
+      ['Home', '/'],
       ['Progress', '/progress'],
-      ['Sticker cabinet', '/stickers'],
+      ['Stickers', '/stickers'],
+      ['Notes', '/notes'],
       ['Settings', '/settings'],
     ]) {
-      await expect(page.locator(`a[aria-label="${label}"]`), `${label} link`).toHaveAttribute(
+      await expect(bar.getByRole('link', { name: label }), `${label} tab`).toHaveAttribute(
         'href',
-        new RegExp(href),
+        new RegExp(`^${href}/?$`),
       );
     }
+    await expect(bar.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
+
+    // Tabs are real navigation; the destination highlights its own tab.
+    await bar.getByRole('link', { name: 'Progress' }).click();
+    await waitForText(page, 'No practice yet');
+    await expect(bar.getByRole('link', { name: 'Progress' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  test('stays out of a practice session', async ({ page }) => {
+    await page.goto('/practice/?subject=planets');
+    await waitForText(page, /Q\s*1\s*\/\s*\d+/, 20_000);
+    await expect(page.locator('nav[aria-label="Main"]')).toHaveCount(0);
   });
 });
 
@@ -317,7 +332,8 @@ test.describe('progress page', () => {
     const counts = await bars.evaluateAll((els) => els.map((el) => Number(el.getAttribute('data-count'))));
     expect(counts.reduce((a, b) => a + b, 0)).toBe(1);
 
-    await expect(page.locator(tid('daily-streak'))).toContainText('1-day streak');
+    // The level/streak card (moved here from Home) shows the live streak.
+    await expect(page.locator(tid('streak-card'))).toContainText('1-day streak');
 
     // The demo declares an exam goal, so the standalone "By category" view
     // is hidden — per-category accuracy lives in the Exam-readiness section
@@ -357,11 +373,12 @@ test.describe('progress page', () => {
     await expect(section).toContainText('75%'); // blueprint-weighted estimate
     await expect(section).toContainText('pass 70%'); // gauge pass-line label
 
-    // The Home screen surfaces readiness as a third stat tile.
+    // Home carries no readiness tile any more (#188): status is the
+    // Progress tab's; Home keeps only the streak chip.
     await page.goto('/');
-    const tile = page.locator(tid('exam-readiness-tile'));
-    await expect(tile).toContainText('Readiness');
-    await expect(tile).toContainText('75%');
+    await waitForText(page, 'Solar System Practice');
+    await expect(page.locator(tid('exam-readiness-tile'))).toHaveCount(0);
+    await expect(page.locator(tid('streak-chip'))).toContainText('1-day streak');
   });
 });
 

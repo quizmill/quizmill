@@ -11,16 +11,22 @@ import {
   PROGRESSION_EVENT,
   loadProgressionShown,
 } from '@/lib/progressionPref';
-import { progressionEnabled, PACK_XP_LEVELS } from '@/pack/data';
+import { latestColdLook } from '@/lib/readiness';
+import { progressionEnabled, PACK_XP_LEVELS, packQuestions } from '@/pack/data';
 import { recordLevelCrossings, recordedLevel } from '@/pack/useLevelUp';
 
 /**
- * The single "how am I doing" card on Home: the level row (for packs
- * that opt into progression) and the daily-streak row, folded into one
- * compact card so the top of the app stays calm — one border, slim
- * bars, no oversized icons. Either row hides independently: the level
- * row without the manifest `progression` block or when the device pref
- * hides it; the streak row until there's any streak signal at all.
+ * The single "how am I doing" card at the top of the Progress tab: the
+ * level row (for packs that opt into progression), the daily-streak row,
+ * and one small line of totals (questions answered, accuracy), folded
+ * into one compact card — one border, slim bars, no oversized icons.
+ * Each row hides independently: the level row without the manifest
+ * `progression` block or when the device pref hides it; the streak row
+ * until there's any streak signal at all; the totals until something
+ * has been answered.
+ *
+ * It used to sit on Home; it moved so Home could be nothing but ways to
+ * practise (issue #188). Home keeps a streak chip in its header.
  *
  * Progress-bar-first by design: the meta-analyses put visible progress
  * toward an attainable criterion at the healthy end of gamification,
@@ -50,7 +56,14 @@ export function ProgressCard({ attempts }: { attempts: readonly Attempt[] }) {
   const { streak, bestStreak, goal, answeredToday, remaining, goalMet } =
     streakProgress(attempts);
   const showStreak = !(streak === 0 && answeredToday === 0 && bestStreak === 0);
-  if (!showLevel && !showStreak) return null;
+  // Totals count DISTINCT questions (latest cold look), not raw attempts —
+  // a re-answered question is one answered question, so the numerator
+  // never exceeds the bank and accuracy never tops 100%.
+  const looks = latestColdLook(attempts);
+  const totalAnswered = looks.length;
+  const totalCorrect = looks.filter((a) => a.isCorrect).length;
+  const showTotals = totalAnswered > 0;
+  if (!showLevel && !showStreak && !showTotals) return null;
 
   // The persisted high-water mark floors the displayed level, so a bank
   // that grew (stretching the ladder) never demotes anyone on screen.
@@ -138,6 +151,19 @@ export function ProgressCard({ attempts }: { attempts: readonly Attempt[] }) {
                   streak > 0 ? 'keep it alive' : 'lock in day one'
                 }.`}
           </div>
+        </div>
+      ) : null}
+
+      {(p || showStreak) && showTotals ? <div className="border-t border-ink-100" /> : null}
+
+      {showTotals ? (
+        <div data-testid="totals-line" className="text-xs text-ink-600">
+          <span className="font-semibold text-ink-900">{totalAnswered}</span> of{' '}
+          {packQuestions.length} questions answered ·{' '}
+          <span className="font-semibold text-ink-900">
+            {Math.round((totalCorrect / totalAnswered) * 100)}%
+          </span>{' '}
+          accuracy
         </div>
       ) : null}
     </div>

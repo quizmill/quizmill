@@ -5,10 +5,13 @@ import Link from 'next/link';
 import { ArrowRight, type LucideIcon } from 'lucide-react';
 
 /**
- * The Home screen's mode cards — Drive, Coach, Paper practice, Review
- * mistakes. One row: an icon bubble, a title with a one-line blurb, and an
- * arrow, the whole card a link. The modes differ only in colour, so each
- * picks a `tone` and the markup lives here once.
+ * The Home screen's mode surfaces. `HomeCard` is the full-width row — an
+ * icon bubble, a title with a one-line blurb, an arrow, the whole card a
+ * link — kept for Review mistakes, the one mode that is a prompt rather
+ * than a tool. `ModeTile` is the compact square for the occasional modes
+ * (Drive, Coach, Paper, the timed exam), laid side by side in a rail so
+ * four of them cost one row instead of four. Both pick a `tone`; the
+ * colours live here once.
  */
 
 export type HomeCardTone = 'night' | 'brand' | 'ink' | 'warn';
@@ -83,6 +86,48 @@ export function HomeCard({
         </div>
       </div>
       <ArrowRight className={`h-5 w-5 shrink-0 ${t.arrow}`} />
+    </Link>
+  );
+}
+
+/**
+ * A square tile for the mode rail: icon bubble, label, and one short
+ * caption (a few words — "Hands-free", "9 questions · 13:30"). Equal
+ * widths in a flex row, so two tiles are wide and four are square.
+ */
+export function ModeTile({
+  href,
+  icon: Icon,
+  label,
+  caption,
+  tone,
+  testid,
+}: {
+  href: string;
+  icon: LucideIcon;
+  label: ReactNode;
+  caption: ReactNode;
+  tone: HomeCardTone;
+  testid?: string;
+}) {
+  const t = TONE[tone];
+  return (
+    <Link
+      href={href}
+      data-testid={testid}
+      className={`tap-feedback flex min-w-0 flex-1 flex-col items-center gap-1.5 rounded-2xl border ${t.card} px-2 py-3 text-center shadow-xs`}
+    >
+      <span
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${t.bubble}`}
+      >
+        <Icon className="h-4.5 w-4.5" />
+      </span>
+      <span className={`w-full truncate text-sm font-semibold leading-tight ${t.title}`}>
+        {label}
+      </span>
+      <span className={`w-full truncate text-[11px] leading-tight ${t.blurb}`}>
+        {caption}
+      </span>
     </Link>
   );
 }

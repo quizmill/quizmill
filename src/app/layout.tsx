@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { APP_CONFIG } from '@/config';
 import { UpdateNotifier } from '@/components/UpdateNotifier';
+import { TabBar } from '@/components/TabBar';
 import { SyncBootstrap } from '@/components/SyncBootstrap';
 import { SyncIndicator } from '@/components/SyncIndicator';
 import { ThemeWatcher } from '@/components/ThemeWatcher';
@@ -92,6 +93,9 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
+  // Lets the bottom tab bar pad itself by env(safe-area-inset-bottom) on
+  // phones with a home indicator.
+  viewportFit: 'cover',
   themeColor: APP_CONFIG.themeColor,
 };
 
@@ -130,7 +134,12 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
         <script dangerouslySetInnerHTML={{ __html: LOOK_BOOTSTRAP }} />
         <script dangerouslySetInnerHTML={{ __html: PACK_BOOTSTRAP }} />
-        <div className="mx-auto w-full max-w-(--breakpoint-sm) px-4 pb-24 pt-4 sm:max-w-(--breakpoint-md) sm:pt-8">
+        {/* Bottom padding clears the phone tab bar (h-14) plus the update
+            notifier; the safe-area term keeps it clear of a home indicator. */}
+        <div className="mx-auto w-full max-w-(--breakpoint-sm) px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-4 sm:max-w-(--breakpoint-md) sm:pb-24 sm:pt-8">
+          {/* Primary navigation: bottom tabs on phones, a top row from sm:.
+              Pack-independent, so it sits outside the hydration boundary. */}
+          <TabBar />
           {/* When the bootstrap above swapped a runtime pack in, the page was
               prerendered from a different pack — adopt that markup for the
               hydration pass instead of reporting the mismatch. */}

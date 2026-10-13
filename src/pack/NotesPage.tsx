@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
 import { PackChip } from '@/components/PackChip';
-import { ArrowLeft, NotebookPen, Play, Sparkles, Trash2 } from 'lucide-react';
+import { NotebookPen, Play, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { APP_CONFIG } from '@/config';
 import { useQuestionNotes } from '@/lib/useStorage';
@@ -150,21 +150,14 @@ export default function NotesPage() {
 
   return (
     <main className="flex flex-col gap-6">
-      <header className="flex items-center justify-between">
-        <Link
-          href="/"
-          className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm font-medium text-ink-600 hover:bg-ink-100"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Home
-        </Link>
-        {sorted.length > 0 ? (
+      {sorted.length > 0 ? (
+        <header className="flex items-center justify-end">
           <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-sm font-semibold text-brand-700">
             <NotebookPen className="h-4 w-4" />
             {sorted.length} {sorted.length === 1 ? 'note' : 'notes'}
           </span>
-        ) : null}
-      </header>
+        </header>
+      ) : null}
 
       <div>
         <PackChip className="mb-2" />
