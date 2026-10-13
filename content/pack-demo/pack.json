@@ -29,7 +29,8 @@
   "exam": {
     "label": "Mock exam",
     "passPct": 70,
-    "questionCount": 20
+    "questionCount": 20,
+    "durationMinutes": 30
   },
   "games": {},
   "progression": {},

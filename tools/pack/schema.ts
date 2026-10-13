@@ -98,8 +98,19 @@ export const packExamSchema = z.object({
    *  isn't public). The estimate is then shown with an explicit caveat —
    *  we estimate raw accuracy, not the scaled result. */
   scaled: z.boolean().optional(),
-  /** Number of questions on the real exam, if known. Informational. */
+  /** Number of questions on the real exam, if known. Shown on the
+   *  readiness panel, and — with `durationMinutes` — sizes the timed
+   *  sitting (capped at the questions available). */
   questionCount: z.number().int().positive().max(1000).optional(),
+  /** Length of the real exam in minutes. Setting it switches on the
+   *  TIMED EXAM: a sitting at the real exam's pace, dealt from the
+   *  pack's hardest level (`scope.level` when declared, otherwise the
+   *  last declared level, otherwise the whole bank), with a countdown
+   *  the learner can pause and no feedback until the end. When the
+   *  sitting is smaller than `questionCount` the time is pro-rated so
+   *  the seconds-per-question match the real thing. Absent → no timed
+   *  exam anywhere, exactly as today. */
+  durationMinutes: z.number().int().positive().max(600).optional(),
   /** Restrict readiness to questions in this level band (must reference a
    *  manifest level key). Use when a pack mixes exam and non-exam material
    *  — e.g. only `level: "exam"` questions count toward readiness. */
@@ -576,6 +587,26 @@ export function validatePack(input: PackFiles): PackValidationResult {
         if (inScope === 0) {
           warnings.push(
             `pack.json: exam.scope.level "${scope.level}" matches no questions — readiness will have nothing to measure`,
+          );
+        }
+      }
+      if (exam.durationMinutes !== undefined) {
+        // The timed sitting deals from the hardest level — mirror
+        // src/pack/exam.ts so the author hears about an empty band here,
+        // not from a learner tapping a card that leads nowhere.
+        const levels = manifest.data.levels ?? [];
+        const sittingLevel = scope?.level ?? levels[levels.length - 1]?.key;
+        if (
+          sittingLevel !== undefined &&
+          !questions.some((q) => q.level === sittingLevel)
+        ) {
+          warnings.push(
+            `pack.json: exam.durationMinutes set but level "${sittingLevel}" (the timed sitting's source) has no questions — the timed exam will be unavailable`,
+          );
+        }
+        if (exam.questionCount === undefined) {
+          warnings.push(
+            'pack.json: exam.durationMinutes set without questionCount — the timed sitting will deal every question in its level; add questionCount to size it like the real exam',
           );
         }
       }

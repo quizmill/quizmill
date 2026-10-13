@@ -11,6 +11,7 @@ import {
   Printer,
   RefreshCw,
   Settings,
+  Timer,
   TrendingDown,
   TrendingUp,
   Trophy,
@@ -45,6 +46,8 @@ import {
   PACK_LEVEL_BY_QUESTION_ID,
 } from '@/pack/data';
 import { ExamReadinessTile } from '@/pack/ExamReadiness';
+import { EXAM_SITTING } from '@/pack/exam';
+import { formatClock } from '@/lib/examClock';
 import { HomeCard } from '@/pack/HomeCard';
 import { ProgressCard } from '@/pack/ProgressCard';
 import { UpgradeCard } from '@/pack/UpgradeCard';
@@ -263,6 +266,18 @@ export default function PackHome() {
           icon={Printer}
           title="Paper practice"
           blurb="Print a sheet or write on it on screen, then mark it back in."
+        />
+      ) : null}
+
+      {/* The timed sitting — only for packs that declare an exam length. */}
+      {EXAM_SITTING ? (
+        <HomeCard
+          href="/practice/exam/"
+          testid="exam-card"
+          tone="ink"
+          icon={Timer}
+          title={APP_CONFIG.exam?.label ?? 'Timed exam'}
+          blurb={`${EXAM_SITTING.count} questions in ${formatClock(EXAM_SITTING.durationSeconds)} — no answers until the end.`}
         />
       ) : null}
 
