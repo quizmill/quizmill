@@ -547,6 +547,76 @@ describe('validatePack', () => {
     expect(validatePack(noUrl).ok).toBe(false);
   });
 
+  // ——— timed exam (exam.durationMinutes, opt-in) ———
+
+  it('accepts exam.durationMinutes alongside questionCount', () => {
+    const input = loadDemo();
+    (input.manifest as { exam: Record<string, unknown> }).exam = {
+      passPct: 70,
+      questionCount: 20,
+      durationMinutes: 30,
+    };
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('rejects a zero, negative or fractional durationMinutes', () => {
+    for (const bad of [0, -5, 12.5, '30']) {
+      const input = loadDemo();
+      (input.manifest as { exam: Record<string, unknown> }).exam = {
+        passPct: 70,
+        questionCount: 20,
+        durationMinutes: bad,
+      };
+      const result = validatePack(input);
+      expect(result.ok, `durationMinutes ${String(bad)}`).toBe(false);
+      expect(result.errors.some((e) => e.includes('durationMinutes'))).toBe(true);
+    }
+  });
+
+  it('warns when durationMinutes is set without questionCount', () => {
+    const input = loadDemo();
+    (input.manifest as { exam: Record<string, unknown> }).exam = {
+      passPct: 70,
+      durationMinutes: 30,
+    };
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    expect(result.warnings.some((w) => w.includes('questionCount'))).toBe(true);
+  });
+
+  it('warns when the hardest level (the timed sitting source) has no questions', () => {
+    const input = loadDemo();
+    (input.manifest as { levels: { key: string; label: string }[] }).levels.push({
+      key: 'expert',
+      label: 'Expert',
+    });
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    expect(result.warnings.some((w) => w.includes('"expert"') && w.includes('timed'))).toBe(
+      true,
+    );
+  });
+
+  it('uses exam.scope.level, not the last level, as the sitting source', () => {
+    const input = loadDemo();
+    (input.manifest as { levels: { key: string; label: string }[] }).levels.push({
+      key: 'expert',
+      label: 'Expert',
+    });
+    (input.manifest as { exam: Record<string, unknown> }).exam = {
+      passPct: 70,
+      questionCount: 20,
+      durationMinutes: 30,
+      scope: { level: 'advanced' },
+    };
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    expect(result.warnings.some((w) => w.includes('timed'))).toBe(false);
+  });
+
   it('keeps the demo pack free of an upgrade block', () => {
     const input = loadDemo();
     expect((input.manifest as { upgrade?: unknown }).upgrade).toBeUndefined();

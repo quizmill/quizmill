@@ -40,6 +40,8 @@ export type PackExam = {
   passPct: number;
   scaled?: boolean;
   questionCount?: number;
+  /** Real exam length in minutes — presence switches on the timed sitting. */
+  durationMinutes?: number;
   scope?: { level: string };
 };
 

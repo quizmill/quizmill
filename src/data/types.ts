@@ -11,8 +11,11 @@
 
 /** How a session was run. Older records omit it (= 'practice').
  *  'paper' = answered on a printed sheet, entered afterwards — its
- *  attempts carry the marking time, and timeTakenSeconds 1 (unmeasured). */
-export type SessionMode = 'practice' | 'review' | 'drive' | 'notes' | 'paper';
+ *  attempts carry the marking time, and timeTakenSeconds 1 (unmeasured).
+ *  'exam' = a timed sitting at the pack's declared exam pace: no
+ *  feedback between questions, so its attempts never carry
+ *  feedbackSeconds. */
+export type SessionMode = 'practice' | 'review' | 'drive' | 'notes' | 'paper' | 'exam';
 
 export interface Attempt {
   id: string; // crypto.randomUUID() at write time
@@ -50,8 +53,9 @@ export interface Attempt {
 
 export interface Session {
   id: string; // crypto.randomUUID()
-  /** Pack category key (see Attempt.subject), or 'drive' for Drive Mode
-   *  sessions (which mix categories; their attempts keep real keys). */
+  /** Pack category key (see Attempt.subject), or 'drive' / 'exam' for
+   *  Drive Mode and timed-exam sessions (which mix categories; their
+   *  attempts keep real keys). */
   subject: string;
   startedAt: number;
   endedAt: number | null;
