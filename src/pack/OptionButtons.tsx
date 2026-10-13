@@ -83,6 +83,8 @@ export function OptionButtons({
         // buried in the explanation block below. Hidden while choosing
         // (it would give the answer away). Tinted to the option's state:
         // the answer reads green, a wrong pick amber, the rest muted.
+        // Not linkified: the note lives inside the (disabled) <button>,
+        // where a nested <a> is invalid and unreachable.
         const note =
           stage === 'feedback' && opt.explanation ? (
             <span
@@ -92,7 +94,7 @@ export function OptionButtons({
                 isAnswer ? 'text-success-700' : isThis ? 'text-warn-700' : 'text-ink-600',
               )}
             >
-              <McqMarkdown text={opt.explanation} />
+              <McqMarkdown text={opt.explanation} linkify={false} />
             </span>
           ) : null;
 

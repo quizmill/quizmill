@@ -133,6 +133,24 @@ describe('OptionButtons inline explanations', () => {
     expect(d.textContent).toContain('Delta is a common mix-up.');
   });
 
+  it('never nests a link inside the (disabled) option button', async () => {
+    // McqMarkdown auto-linkifies bare URLs; an <a> inside a <button> is
+    // invalid HTML and unreachable while the button is disabled, which is
+    // exactly when the note is shown. The URL must come out as plain text.
+    await renderButtons({
+      options: [
+        { key: 'A', text: 'Alpha', explanation: 'See https://example.org/why for why.' },
+        { key: 'B', text: 'Bravo' },
+      ],
+      selected: ['A'],
+      stage: 'feedback',
+      correctKeys: ['B'],
+      multi: false,
+    });
+    expect(container.querySelector('button a')).toBeNull();
+    expect(inlineExplanations()).toEqual(['See https://example.org/why for why.']);
+  });
+
   it('renders no explanation row when no option carries one', async () => {
     await renderButtons({
       selected: ['A'],
