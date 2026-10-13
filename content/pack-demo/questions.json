@@ -12,19 +12,23 @@
     "options": [
       {
         "key": "A",
-        "text": "Venus"
+        "text": "Venus",
+        "explanation": "Second from the Sun — hottest, but not closest."
       },
       {
         "key": "B",
-        "text": "Mercury"
+        "text": "Mercury",
+        "explanation": "Innermost planet, about 58 million km out."
       },
       {
         "key": "C",
-        "text": "Mars"
+        "text": "Mars",
+        "explanation": "Fourth from the Sun, beyond Earth."
       },
       {
         "key": "D",
-        "text": "Earth"
+        "text": "Earth",
+        "explanation": "Third from the Sun."
       }
     ],
     "correctKey": "B",
@@ -41,19 +45,23 @@
     "options": [
       {
         "key": "A",
-        "text": "Jupiter"
+        "text": "Jupiter",
+        "explanation": "Held the record for decades — the tempting pick."
       },
       {
         "key": "B",
-        "text": "Uranus"
+        "text": "Uranus",
+        "explanation": "Fewer than 30 known moons."
       },
       {
         "key": "C",
-        "text": "Saturn"
+        "text": "Saturn",
+        "explanation": "Passed 140 confirmed moons after a wave of small-moon finds."
       },
       {
         "key": "D",
-        "text": "Neptune"
+        "text": "Neptune",
+        "explanation": "Only 16 known moons."
       }
     ],
     "correctKey": "C",
@@ -100,19 +108,23 @@
     "options": [
       {
         "key": "A",
-        "text": "Phobos, a moon of Mars"
+        "text": "Phobos, a moon of Mars",
+        "explanation": "A dry rubble pile — no ocean, no plumes."
       },
       {
         "key": "B",
-        "text": "Enceladus, a moon of Saturn"
+        "text": "Enceladus, a moon of Saturn",
+        "explanation": "Cassini flew through its south-polar water plumes."
       },
       {
         "key": "C",
-        "text": "Callisto, a moon of Jupiter"
+        "text": "Callisto, a moon of Jupiter",
+        "explanation": "May hide an ocean, but shows no plumes."
       },
       {
         "key": "D",
-        "text": "Triton, a moon of Neptune"
+        "text": "Triton, a moon of Neptune",
+        "explanation": "Its geysers are nitrogen, not water."
       }
     ],
     "correctKey": "B",
@@ -129,19 +141,23 @@
     "options": [
       {
         "key": "A",
-        "text": "A dwarf planet is smaller than any moon in the solar system"
+        "text": "A dwarf planet is smaller than any moon in the solar system",
+        "explanation": "Pluto is larger than several moons; size is not the test."
       },
       {
         "key": "B",
-        "text": "A dwarf planet has not cleared other objects from its orbital neighbourhood"
+        "text": "A dwarf planet has not cleared other objects from its orbital neighbourhood",
+        "explanation": "The third IAU test — the one Pluto fails."
       },
       {
         "key": "C",
-        "text": "A dwarf planet does not orbit the Sun directly"
+        "text": "A dwarf planet does not orbit the Sun directly",
+        "explanation": "Pluto orbits the Sun directly, like any planet."
       },
       {
         "key": "D",
-        "text": "A dwarf planet lacks enough gravity to be round"
+        "text": "A dwarf planet lacks enough gravity to be round",
+        "explanation": "Pluto is round; it passes this test."
       }
     ],
     "correctKey": "B",
@@ -208,23 +224,28 @@
     "options": [
       {
         "key": "A",
-        "text": "Earth"
+        "text": "Earth",
+        "explanation": "About a tenth of Jupiter’s diameter."
       },
       {
         "key": "B",
-        "text": "Jupiter"
+        "text": "Jupiter",
+        "explanation": "About 318 Earth masses and 11 Earth diameters."
       },
       {
         "key": "C",
-        "text": "Saturn"
+        "text": "Saturn",
+        "explanation": "Second largest."
       },
       {
         "key": "D",
-        "text": "Neptune"
+        "text": "Neptune",
+        "explanation": "Far smaller than either gas giant."
       },
       {
         "key": "E",
-        "text": "Mars"
+        "text": "Mars",
+        "explanation": "Smaller than Earth."
       }
     ],
     "correctKey": "B",
@@ -242,22 +263,26 @@
       {
         "key": "A",
         "text": "Saturn",
-        "image": "saturn.svg"
+        "image": "saturn.svg",
+        "explanation": "Broad, bright rings of ice and rock."
       },
       {
         "key": "B",
         "text": "Mars",
-        "image": "mars.svg"
+        "image": "mars.svg",
+        "explanation": "No rings at all."
       },
       {
         "key": "C",
         "text": "Neptune",
-        "image": "neptune.svg"
+        "image": "neptune.svg",
+        "explanation": "Faint, dark ring arcs."
       },
       {
         "key": "D",
         "text": "Jupiter",
-        "image": "jupiter.svg"
+        "image": "jupiter.svg",
+        "explanation": "A thin, dusty ring you can barely see."
       }
     ],
     "correctKey": "A",
@@ -308,19 +333,23 @@
     "options": [
       {
         "key": "A",
-        "text": "Jupiter"
+        "text": "Jupiter",
+        "explanation": "Mostly hydrogen and helium — a gas giant."
       },
       {
         "key": "B",
-        "text": "Saturn"
+        "text": "Saturn",
+        "explanation": "Mostly hydrogen and helium — a gas giant."
       },
       {
         "key": "C",
-        "text": "Neptune"
+        "text": "Neptune",
+        "explanation": "A giant, but an ice giant — the deliberate near miss."
       },
       {
         "key": "D",
-        "text": "Mars"
+        "text": "Mars",
+        "explanation": "A small rocky planet."
       }
     ],
     "correctKeys": [
@@ -369,19 +398,23 @@
     "options": [
       {
         "key": "A",
-        "text": "Pioneer 10 and Pioneer 11"
+        "text": "Pioneer 10 and Pioneer 11",
+        "explanation": "Headed out, but fell silent before crossing."
       },
       {
         "key": "B",
-        "text": "Voyager 1 and Voyager 2"
+        "text": "Voyager 1 and Voyager 2",
+        "explanation": "Crossed the heliopause in 2012 and 2018, still transmitting."
       },
       {
         "key": "C",
-        "text": "New Horizons and Cassini"
+        "text": "New Horizons and Cassini",
+        "explanation": "Cassini ended at Saturn; New Horizons is still inside the heliosphere."
       },
       {
         "key": "D",
-        "text": "Galileo and Juno"
+        "text": "Galileo and Juno",
+        "explanation": "Both orbiters, deliberately ended at Jupiter."
       }
     ],
     "correctKey": "B",
@@ -460,19 +493,23 @@
     "options": [
       {
         "key": "A",
-        "text": "NASA (United States)"
+        "text": "NASA (United States)",
+        "explanation": "A United States government agency."
       },
       {
         "key": "B",
-        "text": "ESA (Europe)"
+        "text": "ESA (Europe)",
+        "explanation": "Funded by a consortium of European states."
       },
       {
         "key": "C",
-        "text": "SpaceX"
+        "text": "SpaceX",
+        "explanation": "The trap: launches under contract, but a private company."
       },
       {
         "key": "D",
-        "text": "JAXA (Japan)"
+        "text": "JAXA (Japan)",
+        "explanation": "Japan’s government agency."
       }
     ],
     "correctKeys": [
