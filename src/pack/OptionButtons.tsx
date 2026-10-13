@@ -78,6 +78,23 @@ export function OptionButtons({
           ) : stage === 'feedback' && isThis && !isAnswer ? (
             <X className="h-5 w-5 shrink-0 text-warn-500" />
           ) : null;
+        // The option's own verdict, inline under its text once checked —
+        // so "why this one is wrong" sits next to the wrong one instead of
+        // buried in the explanation block below. Hidden while choosing
+        // (it would give the answer away). Tinted to the option's state:
+        // the answer reads green, a wrong pick amber, the rest muted.
+        const note =
+          stage === 'feedback' && opt.explanation ? (
+            <span
+              data-testid="option-explanation"
+              className={cn(
+                'mt-1 block w-full text-left text-[13px] font-normal leading-snug',
+                isAnswer ? 'text-success-700' : isThis ? 'text-warn-700' : 'text-ink-600',
+              )}
+            >
+              <McqMarkdown text={opt.explanation} />
+            </span>
+          ) : null;
 
         if (opt.image) {
           return (
@@ -100,6 +117,7 @@ export function OptionButtons({
                 alt={opt.text}
                 className="max-h-32 w-auto object-contain"
               />
+              {note}
             </button>
           );
         }
@@ -118,6 +136,7 @@ export function OptionButtons({
             {keyBubble('mt-0.5')}
             <span className="flex-1 leading-relaxed">
               <McqMarkdown text={opt.text} />
+              {note}
             </span>
             {mark}
           </button>

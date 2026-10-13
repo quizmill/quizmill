@@ -108,7 +108,13 @@ export type PackConcept = {
   tags?: string[];
 };
 
-export type PackOption = { key: OptionKey; text: string; image?: string };
+export type PackOption = {
+  key: OptionKey;
+  text: string;
+  image?: string;
+  /** Short per-option verdict, rendered inline under the option in feedback. */
+  explanation?: string;
+};
 
 export type PackQuestion = {
   id: string;
