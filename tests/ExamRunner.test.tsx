@@ -180,5 +180,25 @@ describe('PackExamRunner', () => {
     expect(text()).toContain('Not passed');
     expect(loadAttempts()).toHaveLength(1);
     expect(loadSessions()[0].endedAt).not.toBeNull();
+    // Unreached questions were never shown, so they are not mistakes to
+    // review — the results say so instead of offering an empty review.
+    expect(text()).toContain(`${sitting.count - 1} unanswered`);
+    expect(text()).toContain("weren't reached");
+    expect(control('Review')).toBeUndefined();
+  });
+
+  it('refuses an answer submitted after the deadline, even before the next tick', async () => {
+    await render();
+    await click(control('Start exam')!);
+    const q = currentQuestion();
+    await pickOption(correctKeysOf(q)[0]);
+    // Jump the wall clock past the deadline WITHOUT firing the interval —
+    // the window between the bell and the next one-second tick.
+    vi.setSystemTime(Date.now() + sitting.durationSeconds * 1000 + 100);
+    await click(control('Next question')!);
+    expect(text()).toContain("Time's up");
+    expect(loadAttempts()).toHaveLength(0);
+    expect(text()).toContain(`0/${sitting.count}`);
+    expect(loadSessions()[0].endedAt).not.toBeNull();
   });
 });

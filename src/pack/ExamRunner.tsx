@@ -202,7 +202,7 @@ export function PackExamRunner() {
             {sitting.count} questions{from ? ` from the ${from} set` : ''}, at the real
             exam&apos;s pace. No answers or explanations until the end — then
             your score against the {exam.passPct}% pass mark, and a review of
-            anything you missed.
+            the questions you got wrong.
           </p>
           <p className="mt-2 text-sm leading-relaxed text-ink-600">
             You can pause the clock; the question is hidden while paused.
@@ -220,7 +220,7 @@ export function PackExamRunner() {
 
   if (phase === 'done') {
     const score = scoreSummary(state);
-    const ok = passed(exam, score.pct);
+    const ok = passed(exam, score);
     const mistakes = sessionMistakeIds(attempts, state.sessionId).length;
     const unanswered =
       state.questions.length - attempts.filter((a) => a.sessionId === state.sessionId).length;
@@ -245,6 +245,15 @@ export function PackExamRunner() {
               {examName} · {used} of {duration} used
               {unanswered > 0 ? ` · ${unanswered} unanswered` : ''}
             </span>
+            {unanswered > 0 ? (
+              // Unreached questions count as wrong in the score but were
+              // never shown, so they are not attempts and not mistakes:
+              // the review below covers only what was answered.
+              <span className="text-xs text-ink-400">
+                Questions that weren&apos;t reached count as wrong but aren&apos;t in
+                your mistakes — sit again to get to them.
+              </span>
+            ) : null}
             {exam.scaled ? (
               <span className="text-xs text-ink-400">
                 The real exam is scored on a scaled curve — treat the pass mark as approximate.
@@ -324,7 +333,15 @@ export function PackExamRunner() {
   }
 
   function handleNext() {
-    if (!state || selected.length === 0 || paused) return;
+    if (!state || !clock || !sitting || selected.length === 0 || paused) return;
+    const t = Date.now();
+    // The interval only polls once a second (and the browser may throttle
+    // it further), so an answer sent between the bell and the next tick
+    // must still be refused: nothing after the deadline counts.
+    if (isTimeUp(clock, sitting.durationSeconds, t)) {
+      finish(state, 'timeUp');
+      return;
+    }
     const attempt = buildAttempt({
       state,
       question: current,
@@ -332,7 +349,7 @@ export function PackExamRunner() {
       // Persist the question's actual category so per-category stats and
       // readiness stay accurate across the mixed sitting.
       categoryKey: current.categoryKey,
-      now: Date.now(),
+      now: t,
       attemptId: crypto.randomUUID(),
       mode: 'exam',
       firstSelected: firstSelectedRef.current ?? undefined,
