@@ -136,6 +136,10 @@ Beyond the required fields, all optional:
 - **2–6 options** keyed `A`–`F` (a fixed 4 is just the common case)
 - **images** — `image` on a question prompt and/or on individual
   options, resolved from the pack's `assets/` directory
+- **per-option explanations** — a short `explanation` on an option
+  shows inline under it once the answer is checked, so "why this one is
+  wrong" sits next to the wrong one; the question's `explanation` keeps
+  the full reasoning
 - **concept cards** — a `concepts.json` of short explainers; a question
   points at one with `conceptId` and it shows in the answer panel
 - **levels** — a second axis beside category: manifest `levels`

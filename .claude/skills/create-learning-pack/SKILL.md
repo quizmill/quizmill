@@ -74,6 +74,13 @@ example.
    - The explanation teaches: why the answer is right AND why the
      tempting distractor is wrong. Markdown backticks/code blocks and
      bare URLs render properly.
+   - Prefer putting each option's verdict on the option itself: an
+     optional `explanation` (1–300 chars, one short sentence) on an
+     option shows inline under it once the answer is checked — "Second
+     from the Sun, not first" sits next to the wrong pick instead of
+     buried in the paragraph below. Keep the question's `explanation`
+     for the full reasoning; leave an option bare when there is nothing
+     worth saying about it.
    - Spread difficulty: ~20% level 1–2, ~60% level 3, ~20% level 4–5.
    - Shuffle which letter is correct — do not let "C" dominate.
 
