@@ -171,6 +171,18 @@ describe('PackHome category stats', () => {
   });
 });
 
+describe('PackHome timed exam card', () => {
+  it('links to the sitting with its size and clock (the demo declares 30 min)', async () => {
+    await render();
+    const card = container.querySelector('[data-testid="exam-card"]');
+    expect(card).toBeTruthy();
+    expect(card!.getAttribute('href')).toBe('/practice/exam');
+    expect(card!.textContent).toContain('Mock exam');
+    // 9 Advanced questions at 20-in-30-min pace = 13:30.
+    expect(card!.textContent).toContain('9 questions in 13:30');
+  });
+});
+
 describe('PackHome mode cards', () => {
   it('renders the Drive, Coach, Paper and Review cards exactly as before (markup pin)', async () => {
     // All four opt-in / conditional cards at once: each mode switched on,
