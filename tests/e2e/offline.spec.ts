@@ -32,8 +32,9 @@ test('category click and hard reload work with the network gone', async ({ page 
 
   await severNetwork(server);
 
-  // Client-side navigation: tap the first category card.
-  await page.locator('a[href*="/practice/"]').first().click();
+  // Client-side navigation: tap the first category card (the mode cards
+  // above it — the timed exam's — link under /practice/ too).
+  await page.locator('a[href*="/practice/?subject="]').first().click();
   await waitForText(page, /Q\s*1\s*\/\s*\d+/, 20_000);
 
   // Hard navigation with a query string (?subject=...) must also hit
