@@ -231,6 +231,12 @@ export const packOptionSchema = z.object({
   /** Optional answer image. When any option has one, all must (an
    *  image-answer question, e.g. Non-Verbal Reasoning) — see superRefine. */
   image: packImagePathSchema.optional(),
+  /** Optional one- or two-sentence verdict on THIS option ("Second from
+   *  the Sun, not first"), shown inline under it once the answer is
+   *  checked. Keep the full reasoning in the question's `explanation`;
+   *  this is the per-option footnote, so it is capped short. Explain
+   *  only the options worth a word — a bare distractor can stay bare. */
+  explanation: z.string().min(1).max(300).optional(),
 });
 
 export const packScenarioSchema = z.object({

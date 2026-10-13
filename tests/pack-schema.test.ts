@@ -29,7 +29,7 @@ function makeOptions(n: number): { key: string; text: string }[] {
 /** Overwrite the first question's options + correctKey in place. */
 function setFirstOptions(
   input: ReturnType<typeof loadDemo>,
-  options: { key: string; text: string; image?: string }[],
+  options: { key: string; text: string; image?: string; explanation?: string }[],
   correctKey: string,
 ): void {
   const q = (input.questions as { options: unknown; correctKey: string }[])[0];
@@ -314,6 +314,41 @@ describe('validatePack', () => {
     const result = validatePack(input);
     expect(result.ok).toBe(false);
     expect(result.errors.some((e) => e.includes('all-or-nothing'))).toBe(true);
+  });
+
+  // ——— per-option explanations (optional, additive) ———
+
+  it('accepts an optional explanation on individual options', () => {
+    const input = loadDemo();
+    setFirstOptions(input, [
+      { key: 'A', text: 'Venus', explanation: 'Second from the Sun, not first.' },
+      { key: 'B', text: 'Mercury', explanation: 'The innermost planet.' },
+      { key: 'C', text: 'Mars' },
+      { key: 'D', text: 'Earth' },
+    ], 'B');
+    const result = validatePack(input);
+    expect(result.errors).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects an empty or over-long option explanation', () => {
+    const empty = loadDemo();
+    setFirstOptions(empty, [
+      { key: 'A', text: 'Venus', explanation: '' },
+      { key: 'B', text: 'Mercury' },
+      { key: 'C', text: 'Mars' },
+      { key: 'D', text: 'Earth' },
+    ], 'B');
+    expect(validatePack(empty).ok).toBe(false);
+
+    const long = loadDemo();
+    setFirstOptions(long, [
+      { key: 'A', text: 'Venus', explanation: 'x'.repeat(301) },
+      { key: 'B', text: 'Mercury' },
+      { key: 'C', text: 'Mars' },
+      { key: 'D', text: 'Earth' },
+    ], 'B');
+    expect(validatePack(long).ok).toBe(false);
   });
 
   it('rejects an absolute or traversing image path', () => {

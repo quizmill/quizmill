@@ -5,8 +5,12 @@ import { Fragment, useMemo, type ReactNode } from 'react';
 /**
  * Minimal markdown for MCQ prompts / options / explanations: fenced
  * code blocks, inline backticks, and auto-linkified bare URLs.
+ *
+ * `linkify={false}` leaves URLs as plain text — for content rendered
+ * inside an interactive element (a `<button>`), where a nested `<a>` is
+ * invalid HTML and unreachable while the button is disabled.
  */
-export function McqMarkdown({ text }: { text: string }) {
+export function McqMarkdown({ text, linkify = true }: { text: string; linkify?: boolean }) {
   const segments = useMemo(() => splitMarkdown(text), [text]);
   return (
     <>
@@ -17,7 +21,7 @@ export function McqMarkdown({ text }: { text: string }) {
               <code>{seg.text}</code>
             </pre>
           ) : (
-            <InlineMarkdown text={seg.text} />
+            <InlineMarkdown text={seg.text} linkify={linkify} />
           )}
         </Fragment>
       ))}
@@ -25,7 +29,7 @@ export function McqMarkdown({ text }: { text: string }) {
   );
 }
 
-function InlineMarkdown({ text }: { text: string }): ReactNode {
+function InlineMarkdown({ text, linkify }: { text: string; linkify: boolean }): ReactNode {
   const parts = text.split(/`([^`\n]+)`/);
   return (
     <span className="whitespace-pre-line">
@@ -38,7 +42,7 @@ function InlineMarkdown({ text }: { text: string }): ReactNode {
             {p}
           </code>
         ) : (
-          <Fragment key={i}>{linkifyUrls(p)}</Fragment>
+          <Fragment key={i}>{linkify ? linkifyUrls(p) : p}</Fragment>
         ),
       )}
     </span>
