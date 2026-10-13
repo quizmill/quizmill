@@ -136,6 +136,10 @@ Beyond the required fields, all optional:
 - **2–6 options** keyed `A`–`F` (a fixed 4 is just the common case)
 - **images** — `image` on a question prompt and/or on individual
   options, resolved from the pack's `assets/` directory
+- **per-option explanations** — a short `explanation` on an option
+  shows inline under it once the answer is checked, so "why this one is
+  wrong" sits next to the wrong one; the question's `explanation` keeps
+  the full reasoning
 - **concept cards** — a `concepts.json` of short explainers; a question
   points at one with `conceptId` and it shows in the answer panel
 - **levels** — a second axis beside category: manifest `levels`
@@ -145,6 +149,14 @@ Beyond the required fields, all optional:
   renders a "Question sources" card in Settings; questions reference an
   entry by `sourceRef`
 
+- **timed exam** — manifest `exam` (`{passPct, questionCount?,
+  durationMinutes?, scope?}`): `passPct` alone gives the exam-readiness
+  estimate on Progress; add `durationMinutes` (the real exam's length)
+  and the app offers a timed sitting from Home — `questionCount`
+  questions drawn from the hardest level (`scope.level` or the last
+  declared level), time pro-rated when fewer are available, pausable,
+  no feedback until the end, then a pass verdict and a review of the
+  sitting's mistakes
 - **upgrade card** — manifest `upgrade` (`{title, url, price?, blurb?}`)
   for a free sampler pointing at its paid course or fuller bank: one
   card on Home (below the practice loop) and one in Settings, linking

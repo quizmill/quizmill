@@ -29,7 +29,7 @@ function makeOptions(n: number): { key: string; text: string }[] {
 /** Overwrite the first question's options + correctKey in place. */
 function setFirstOptions(
   input: ReturnType<typeof loadDemo>,
-  options: { key: string; text: string; image?: string }[],
+  options: { key: string; text: string; image?: string; explanation?: string }[],
   correctKey: string,
 ): void {
   const q = (input.questions as { options: unknown; correctKey: string }[])[0];
@@ -314,6 +314,41 @@ describe('validatePack', () => {
     const result = validatePack(input);
     expect(result.ok).toBe(false);
     expect(result.errors.some((e) => e.includes('all-or-nothing'))).toBe(true);
+  });
+
+  // ——— per-option explanations (optional, additive) ———
+
+  it('accepts an optional explanation on individual options', () => {
+    const input = loadDemo();
+    setFirstOptions(input, [
+      { key: 'A', text: 'Venus', explanation: 'Second from the Sun, not first.' },
+      { key: 'B', text: 'Mercury', explanation: 'The innermost planet.' },
+      { key: 'C', text: 'Mars' },
+      { key: 'D', text: 'Earth' },
+    ], 'B');
+    const result = validatePack(input);
+    expect(result.errors).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects an empty or over-long option explanation', () => {
+    const empty = loadDemo();
+    setFirstOptions(empty, [
+      { key: 'A', text: 'Venus', explanation: '' },
+      { key: 'B', text: 'Mercury' },
+      { key: 'C', text: 'Mars' },
+      { key: 'D', text: 'Earth' },
+    ], 'B');
+    expect(validatePack(empty).ok).toBe(false);
+
+    const long = loadDemo();
+    setFirstOptions(long, [
+      { key: 'A', text: 'Venus', explanation: 'x'.repeat(301) },
+      { key: 'B', text: 'Mercury' },
+      { key: 'C', text: 'Mars' },
+      { key: 'D', text: 'Earth' },
+    ], 'B');
+    expect(validatePack(long).ok).toBe(false);
   });
 
   it('rejects an absolute or traversing image path', () => {
@@ -607,6 +642,76 @@ describe('validatePack', () => {
     const result = validatePack(self);
     expect(result.ok).toBe(false);
     expect(result.errors.some((e) => e.includes('upgrade.packId'))).toBe(true);
+  });
+
+  // ——— timed exam (exam.durationMinutes, opt-in) ———
+
+  it('accepts exam.durationMinutes alongside questionCount', () => {
+    const input = loadDemo();
+    (input.manifest as { exam: Record<string, unknown> }).exam = {
+      passPct: 70,
+      questionCount: 20,
+      durationMinutes: 30,
+    };
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('rejects a zero, negative or fractional durationMinutes', () => {
+    for (const bad of [0, -5, 12.5, '30']) {
+      const input = loadDemo();
+      (input.manifest as { exam: Record<string, unknown> }).exam = {
+        passPct: 70,
+        questionCount: 20,
+        durationMinutes: bad,
+      };
+      const result = validatePack(input);
+      expect(result.ok, `durationMinutes ${String(bad)}`).toBe(false);
+      expect(result.errors.some((e) => e.includes('durationMinutes'))).toBe(true);
+    }
+  });
+
+  it('warns when durationMinutes is set without questionCount', () => {
+    const input = loadDemo();
+    (input.manifest as { exam: Record<string, unknown> }).exam = {
+      passPct: 70,
+      durationMinutes: 30,
+    };
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    expect(result.warnings.some((w) => w.includes('questionCount'))).toBe(true);
+  });
+
+  it('warns when the hardest level (the timed sitting source) has no questions', () => {
+    const input = loadDemo();
+    (input.manifest as { levels: { key: string; label: string }[] }).levels.push({
+      key: 'expert',
+      label: 'Expert',
+    });
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    expect(result.warnings.some((w) => w.includes('"expert"') && w.includes('timed'))).toBe(
+      true,
+    );
+  });
+
+  it('uses exam.scope.level, not the last level, as the sitting source', () => {
+    const input = loadDemo();
+    (input.manifest as { levels: { key: string; label: string }[] }).levels.push({
+      key: 'expert',
+      label: 'Expert',
+    });
+    (input.manifest as { exam: Record<string, unknown> }).exam = {
+      passPct: 70,
+      questionCount: 20,
+      durationMinutes: 30,
+      scope: { level: 'advanced' },
+    };
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    expect(result.warnings.some((w) => w.includes('timed'))).toBe(false);
   });
 
   it('keeps the demo pack free of an upgrade block', () => {
