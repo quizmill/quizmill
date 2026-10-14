@@ -14,7 +14,7 @@ device's.*
 | Drive | Settings → This device | per pack, inside `quizmill.<packId>.prefs.v1` (`driveMode`) | no | no |
 | Coach | Settings → This device | app-level `quizmill.coach.v1` | yes | yes |
 | Paper | Settings → This device | app-level `quizmill.paper.v1` | yes | yes |
-| Timed exam | the pack: `exam.durationMinutes` in pack.json | not stored; derived from the manifest at build time (`EXAM_SITTING`) | n/a | n/a |
+| Timed exam | the pack: `exam.durationMinutes` in pack.json | not stored; derived once at module load from the ACTIVE manifest (`EXAM_SITTING` over `activeManifest`, so a runtime pack from the library or `quizmill.activePack` is honoured, and a pack swap reloads) | follows the new pack | n/a |
 
 Measured on the real static build of the demo pack (414×896 phone,
 nothing answered yet):
