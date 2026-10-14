@@ -12,14 +12,12 @@ import {
   RefreshCw,
   Settings,
   Timer,
+  Trophy,
   TrendingDown,
   TrendingUp,
-  Trophy,
   X,
 } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
-import { StatTile } from '@/components/StatTile';
-import { InstallBanner } from '@/components/InstallPrompt';
 import { useStorageData } from '@/lib/useStorage';
 import { useClientState, useMounted } from '@/lib/useMounted';
 import { unresolvedMistakeCount } from '@/lib/mistakes';
@@ -45,12 +43,12 @@ import {
   PACK_LEVEL_LABEL,
   PACK_LEVEL_BY_QUESTION_ID,
 } from '@/pack/data';
-import { ExamReadinessTile } from '@/pack/ExamReadiness';
 import { EXAM_SITTING } from '@/pack/exam';
 import { formatClock } from '@/lib/examClock';
-import { HomeCard } from '@/pack/HomeCard';
-import { ProgressCard } from '@/pack/ProgressCard';
+import { HomeCard, ModeTile } from '@/pack/HomeCard';
+import { StreakChip } from '@/pack/StreakChip';
 import { UpgradeCard } from '@/pack/UpgradeCard';
+import { recordLevelCrossings } from '@/pack/useLevelUp';
 
 /** Runtime-pack mode (quizmill-cloud's served engine): the pack is injected at
  *  boot from the browser, so it differs from the build-time pack baked into the
@@ -64,14 +62,19 @@ import { UpgradeCard } from '@/pack/UpgradeCard';
  *  pack first.) */
 const RUNTIME_PACK_MODE = process.env.NEXT_PUBLIC_RUNTIME_PACK === '1';
 
+/** The header's round page buttons (desktop; phones use the tab bar). */
+const PAGE_LINKS = [
+  { href: '/progress', label: 'Progress', icon: BarChart3 },
+  { href: '/stickers', label: 'Sticker cabinet', icon: Trophy },
+  { href: '/notes', label: 'My notes', icon: NotebookPen },
+  { href: '/settings', label: 'Settings', icon: Settings },
+] as const;
+
 function HomeSkeleton() {
   return (
     <main className="flex animate-pulse flex-col gap-6" aria-hidden>
-      <div className="h-9 w-2/3 rounded-lg bg-ink-100" />
-      <div className="grid grid-cols-2 gap-3">
-        <div className="h-20 rounded-2xl bg-ink-100" />
-        <div className="h-20 rounded-2xl bg-ink-100" />
-      </div>
+      <div className="h-8 w-2/3 rounded-lg bg-ink-100" />
+      <div className="h-10 rounded-full bg-ink-100" />
       <div className="flex flex-col gap-3">
         <div className="h-16 rounded-2xl bg-ink-100" />
         <div className="h-16 rounded-2xl bg-ink-100" />
@@ -81,8 +84,16 @@ function HomeSkeleton() {
   );
 }
 
-/** Home screen for the generic pack variant — category cards + stats,
- *  all driven by the active pack's manifest. */
+/**
+ * Home screen for the generic pack variant: nothing but ways to practise,
+ * all driven by the active pack's manifest. Review mistakes, the level
+ * filter and the category cards come first; the occasional modes (Drive,
+ * Coach, Paper, the timed exam) follow as a rail of tiles. Status (level,
+ * streak, answered, readiness) lives on the Progress tab — Home keeps a
+ * streak chip in the header — and the app's navigation is the tab bar in
+ * the layout, so with every option on the practice loop still fits one
+ * phone screen (issue #188).
+ */
 export default function PackHome() {
   const { attempts } = useStorageData();
   // Active level-band filter (a manifest level key) or null = All. Read
@@ -101,6 +112,14 @@ export default function PackHome() {
   useEffect(() => {
     if (RUNTIME_PACK_MODE) document.title = APP_CONFIG.title;
   }, []);
+  // Catch-all for history that arrives OUTSIDE a runner (file import,
+  // sync merge, another device): whenever Home — the landing route — sees
+  // new attempts, any level they earned is persisted, so the high-water
+  // record can never lag the ledger for long. No-ops without the pack's
+  // opt-in. (ProgressCard runs the same backfill on the Progress tab.)
+  useEffect(() => {
+    recordLevelCrossings(attempts);
+  }, [attempts]);
   const setLevel = (next: string | null) => {
     setLevelState(next);
     saveLevelFilter(next);
@@ -127,14 +146,6 @@ export default function PackHome() {
     setLevel(nudge.to);
   };
 
-  // Count DISTINCT questions (via the latest cold look), not raw attempts —
-  // a re-answered question is one answered question, so the numerator can
-  // never exceed the available denominator, and accuracy never tops 100%.
-  const answeredLooks = latestColdLook(attempts);
-  const totalAnswered = answeredLooks.length;
-  const totalCorrect = answeredLooks.filter((a) => a.isCorrect).length;
-  const overallAccuracy =
-    totalAnswered === 0 ? 0 : Math.round((totalCorrect / totalAnswered) * 100);
   const mistakeCount = unresolvedMistakeCount(attempts);
 
   const statsByCategory = new Map<
@@ -167,119 +178,34 @@ export default function PackHome() {
 
   return (
     <main className="flex flex-col gap-6">
-      <header className="flex items-end justify-between gap-2">
-        <div>
-          <h1 className="text-3xl font-bold text-ink-900">{APP_CONFIG.title}</h1>
-          <p className="mt-1 text-ink-500">{APP_CONFIG.homeSubtitle}</p>
+      {/* Compact header: the title, a subtitle clamped to two lines, the
+          streak chip, and — from sm: up — the four round page buttons the
+          header always had. On phones those are the layout's tab bar. */}
+      <header className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-ink-900 sm:text-3xl">
+            {APP_CONFIG.title}
+          </h1>
+          <p className="mt-1 line-clamp-2 text-sm text-ink-500 sm:text-base">
+            {APP_CONFIG.homeSubtitle}
+          </p>
         </div>
-        <nav className="flex items-center gap-2">
-          <Link
-            href="/progress"
-            aria-label="Progress"
-            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-surface text-ink-700 shadow-xs"
-          >
-            <BarChart3 className="h-4 w-4" />
-          </Link>
-          <Link
-            href="/stickers"
-            aria-label="Sticker cabinet"
-            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-surface text-ink-700 shadow-xs"
-          >
-            <Trophy className="h-4 w-4" />
-          </Link>
-          <Link
-            href="/notes"
-            aria-label="My notes"
-            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-surface text-ink-700 shadow-xs"
-          >
-            <NotebookPen className="h-4 w-4" />
-          </Link>
-          <Link
-            href="/settings"
-            aria-label="Settings"
-            className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-surface text-ink-700 shadow-xs"
-          >
-            <Settings className="h-4 w-4" />
-          </Link>
-        </nav>
+        <div className="flex shrink-0 items-center gap-2 pt-1">
+          <StreakChip attempts={attempts} />
+          <nav aria-label="Pages" className="hidden items-center gap-2 sm:flex">
+            {PAGE_LINKS.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                aria-label={label}
+                className="tap-feedback inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink-200 bg-surface text-ink-700 shadow-xs"
+              >
+                <Icon className="h-4 w-4" />
+              </Link>
+            ))}
+          </nav>
+        </div>
       </header>
-
-      <InstallBanner />
-
-      <ProgressCard attempts={attempts} />
-
-      <section className="grid grid-cols-2 gap-3">
-        <StatTile
-          label="Answered"
-          value={totalAnswered}
-          hint={
-            totalAnswered === 0
-              ? `0 of ${packQuestions.length} available`
-              : `of ${packQuestions.length} available`
-          }
-        />
-        {/* For exam packs the readiness estimate replaces the plain accuracy
-            tile (same cold-look basis as Progress; verdict shown as a pill) —
-            no more two near-identical % side by side. */}
-        {APP_CONFIG.exam ? (
-          <ExamReadinessTile attempts={attempts} />
-        ) : (
-          <StatTile
-            label="Accuracy"
-            value={`${overallAccuracy}%`}
-            hint={
-              totalAnswered === 0
-                ? 'no data yet'
-                : `${totalCorrect}/${totalAnswered} correct`
-            }
-          />
-        )}
-      </section>
-
-      {driveMode ? (
-        <HomeCard
-          href="/drive/"
-          testid="drive-card"
-          tone="night"
-          icon={Car}
-          title="Drive mode"
-          blurb="Hands-free voice quiz for the car — eyes on the road."
-        />
-      ) : null}
-
-      {coachMode ? (
-        <HomeCard
-          href="/coach/"
-          testid="coach-card"
-          tone="brand"
-          icon={GraduationCap}
-          title="Coach"
-          blurb="Go back through a session together — answers hidden until you say."
-        />
-      ) : null}
-
-      {paperMode ? (
-        <HomeCard
-          href="/paper/"
-          testid="paper-card"
-          tone="ink"
-          icon={Printer}
-          title="Paper practice"
-          blurb="Print a sheet or write on it on screen, then mark it back in."
-        />
-      ) : null}
-
-      {/* The timed sitting — only for packs that declare an exam length. */}
-      {EXAM_SITTING ? (
-        <HomeCard
-          href="/practice/exam/"
-          testid="exam-card"
-          tone="ink"
-          icon={Timer}
-          title={APP_CONFIG.exam?.label ?? 'Timed exam'}
-          blurb={`${EXAM_SITTING.count} questions in ${formatClock(EXAM_SITTING.durationSeconds)} — no answers until the end.`}
-        />
-      ) : null}
 
       {mistakeCount > 0 ? (
         <HomeCard
@@ -442,6 +368,57 @@ export default function PackHome() {
           })}
         </div>
       </section>
+
+      {/* The occasional modes as a rail of tiles — one row however many are
+          on. Drive, Coach and Paper are device opt-ins (Settings); the
+          timed sitting shows for packs that declare an exam length. */}
+      {driveMode || coachMode || paperMode || EXAM_SITTING ? (
+        <section className="flex flex-col gap-3" data-testid="mode-rail">
+          <h2 className="text-lg font-semibold text-ink-700">More ways to practise</h2>
+          <div className="flex gap-2">
+            {driveMode ? (
+              <ModeTile
+                href="/drive/"
+                testid="drive-card"
+                tone="night"
+                icon={Car}
+                label="Drive"
+                caption="By voice"
+              />
+            ) : null}
+            {coachMode ? (
+              <ModeTile
+                href="/coach/"
+                testid="coach-card"
+                tone="brand"
+                icon={GraduationCap}
+                label="Coach"
+                caption="Replay"
+              />
+            ) : null}
+            {paperMode ? (
+              <ModeTile
+                href="/paper/"
+                testid="paper-card"
+                tone="ink"
+                icon={Printer}
+                label="Paper"
+                caption="Print & mark"
+              />
+            ) : null}
+            {EXAM_SITTING ? (
+              <ModeTile
+                href="/practice/exam/"
+                testid="exam-card"
+                tone="ink"
+                icon={Timer}
+                label={APP_CONFIG.exam?.label ?? 'Timed exam'}
+                caption={`${EXAM_SITTING.count} Qs · ${formatClock(EXAM_SITTING.durationSeconds)}`}
+              />
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       {/* The pack's upgrade pitch, if it has one — last, below the practice
           loop: a sampler sells itself by being practised, not by a banner. */}

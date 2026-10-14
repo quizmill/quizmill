@@ -3,10 +3,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import PackHome from '@/pack/Home';
-import { ATTEMPTS_KEY, saveDriveModeEnabled, saveLevelFilter } from '@/lib/storage';
+import {
+  ATTEMPTS_KEY,
+  loadAchievements,
+  saveDriveModeEnabled,
+  saveLevelFilter,
+} from '@/lib/storage';
 import { saveCoachModeEnabled } from '@/lib/coach';
 import { savePaperModeEnabled } from '@/lib/paper';
-import { saveProgressionShown } from '@/lib/progressionPref';
 import type { Attempt } from '@/data/types';
 
 // React needs this flag to allow act() outside @testing-library.
@@ -73,45 +77,92 @@ function fullDay(offset: number, n = 10): Attempt[] {
   }));
 }
 
-describe('PackHome level card (progression)', () => {
-  it('shows Level 1 · Grain before any practice', async () => {
-    await render();
-    const card = container.querySelector('[data-testid="level-card"]');
-    expect(card).toBeTruthy();
-    expect(card!.textContent).toContain('Level 1 · Grain');
-  });
-
-  it('derives the level and XP retroactively from history', async () => {
-    // 10 first-time-correct answers today: 10×(1+10) + 25 daily = 135 XP.
-    // Demo ladder (18-question bank → the 1000 XP floor): level 3 at 80,
-    // level 4 at 150.
+describe('PackHome is the practice loop only (#188)', () => {
+  it('carries no status card, stat tiles or install nudge — status lives on Progress', async () => {
     localStorage.setItem(ATTEMPTS_KEY, JSON.stringify(fullDay(0)));
     await render();
-    const card = container.querySelector('[data-testid="level-card"]');
-    expect(card!.textContent).toContain('Level 3 · Mill Hand');
-    expect(card!.textContent).toContain('135 XP');
-    expect(card!.textContent).toContain('15 XP to Apprentice Miller');
+    // The level/streak card and the Answered/Readiness tiles moved to Progress.
+    expect(container.querySelector('[data-testid="level-card"]')).toBeNull();
+    expect(container.querySelector('[data-testid="streak-card"]')).toBeNull();
+    expect(container.querySelector('[data-testid="exam-readiness-tile"]')).toBeNull();
+    expect(container.textContent).not.toContain('Answered');
+    // The install nudge is gone too (Settings keeps its install card).
+    expect(container.querySelector('[data-testid="install-banner"]')).toBeNull();
   });
 
-  it('is hidden when the device pref turns Levels & XP off', async () => {
-    saveProgressionShown(false);
+  it('keeps the four round header buttons for desktop, where there is no tab bar', async () => {
     await render();
-    expect(container.querySelector('[data-testid="level-card"]')).toBeNull();
+    const nav = container.querySelector('header nav[aria-label="Pages"]');
+    expect(nav).toBeTruthy();
+    // Phones get the bottom tab bar instead, so the row is hidden below sm:.
+    expect(nav!.className).toContain('hidden');
+    expect(nav!.className).toContain('sm:flex');
+    for (const [label, href] of [
+      ['Progress', '/progress'],
+      ['Sticker cabinet', '/stickers'],
+      ['My notes', '/notes'],
+      ['Settings', '/settings'],
+    ]) {
+      const link = nav!.querySelector(`a[aria-label="${label}"]`);
+      expect(link, label).toBeTruthy();
+      expect(link!.getAttribute('href'), label).toBe(href);
+    }
+  });
+
+  it('puts Review mistakes and the categories before the mode rail', async () => {
+    localStorage.setItem(
+      ATTEMPTS_KEY,
+      JSON.stringify([attempt('demo-planets-001', 'planets', false)]),
+    );
+    await render();
+    const text = container.textContent ?? '';
+    const review = text.indexOf('Review 1 mistake');
+    const categories = text.indexOf('Pick a category');
+    const modes = text.indexOf('More ways to practise');
+    expect(review).toBeGreaterThan(-1);
+    expect(categories).toBeGreaterThan(review);
+    expect(modes).toBeGreaterThan(categories);
   });
 });
 
-describe('PackHome best-ever streak', () => {
-  it('shows the record when the live streak has lapsed', async () => {
-    // A 3-day run three weeks ago, nothing since: current streak 0, but
-    // the record survives — that is the anti-loss-aversion point.
+describe('PackHome streak chip', () => {
+  it('is hidden until there is any streak signal', async () => {
+    await render();
+    expect(container.querySelector('[data-testid="streak-chip"]')).toBeNull();
+  });
+
+  it('counts down to today’s goal while it is unmet, and links to Progress', async () => {
     localStorage.setItem(
       ATTEMPTS_KEY,
-      JSON.stringify([...fullDay(20), ...fullDay(21), ...fullDay(22)]),
+      JSON.stringify([attempt('demo-planets-001', 'planets', true)]),
     );
     await render();
-    const best = container.querySelector('[data-testid="best-streak"]');
-    expect(best).toBeTruthy();
-    expect(best!.textContent).toContain('Best: 3 days');
+    const chip = container.querySelector('[data-testid="streak-chip"]');
+    expect(chip).toBeTruthy();
+    expect(chip!.textContent).toContain('9 more today');
+    expect(chip!.getAttribute('href')).toBe('/progress');
+  });
+
+  it('shows the streak once the goal is met', async () => {
+    localStorage.setItem(ATTEMPTS_KEY, JSON.stringify([...fullDay(0), ...fullDay(1)]));
+    await render();
+    const chip = container.querySelector('[data-testid="streak-chip"]');
+    expect(chip!.textContent).toContain('2-day streak');
+  });
+});
+
+describe('PackHome level-crossing backfill', () => {
+  it('records levels earned by history that arrived outside a runner', async () => {
+    // Imported / synced attempts never pass through a runner's hook; Home
+    // is the landing route, so it persists the crossing — the invariant
+    // that every attempt-producing path reaches recordLevelCrossings.
+    // 10 first-time-correct answers today = 135 XP = level 3 on the demo ladder.
+    localStorage.setItem(ATTEMPTS_KEY, JSON.stringify(fullDay(0)));
+    await render();
+    const ids = loadAchievements().map((e) => e.id);
+    expect(ids).toContain('level-2');
+    expect(ids).toContain('level-3');
+    expect(ids).not.toContain('level-4');
   });
 });
 
@@ -171,7 +222,7 @@ describe('PackHome category stats', () => {
   });
 });
 
-describe('PackHome timed exam card', () => {
+describe('PackHome timed exam tile', () => {
   it('links to the sitting with its size and clock (the demo declares 30 min)', async () => {
     await render();
     const card = container.querySelector('[data-testid="exam-card"]');
@@ -179,16 +230,22 @@ describe('PackHome timed exam card', () => {
     expect(card!.getAttribute('href')).toBe('/practice/exam');
     expect(card!.textContent).toContain('Mock exam');
     // 9 Advanced questions at 20-in-30-min pace = 13:30.
-    expect(card!.textContent).toContain('9 questions in 13:30');
+    expect(card!.textContent).toContain('9 Qs · 13:30');
+  });
+
+  it('is the only tile in the rail when no device mode is on', async () => {
+    await render();
+    const rail = container.querySelector('[data-testid="mode-rail"]');
+    expect(rail).toBeTruthy();
+    expect(rail!.querySelectorAll('a')).toHaveLength(1);
   });
 });
 
 describe('PackHome mode cards', () => {
-  it('renders the Drive, Coach, Paper and Review cards exactly as before (markup pin)', async () => {
-    // All four opt-in / conditional cards at once: each mode switched on,
-    // plus one unresolved mistake so the Review card shows. The cards share
-    // one component — this snapshot is the proof that extracting it moved
-    // the markup without changing it.
+  it('renders the Drive, Coach and Paper tiles and the Review card (markup pin)', async () => {
+    // All four opt-in / conditional surfaces at once: each mode switched on,
+    // plus one unresolved mistake so the Review card shows. The tiles share
+    // one component and the Review card another — this snapshot pins both.
     saveDriveModeEnabled(true);
     saveCoachModeEnabled(true);
     savePaperModeEnabled(true);
