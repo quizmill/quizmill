@@ -582,6 +582,68 @@ describe('validatePack', () => {
     expect(validatePack(noUrl).ok).toBe(false);
   });
 
+  // ——— licence unlock (upgrade.packId + upgrade.unlockUrl) ———
+
+  it('accepts an upgrade block naming the pack a licence key unlocks and its endpoint', () => {
+    const input = loadDemo();
+    (input.manifest as { upgrade?: unknown }).upgrade = {
+      title: 'Get the full course',
+      url: 'https://example.com/course',
+      packId: 'solar-system-full',
+      unlockUrl: 'https://unlock.example.com',
+    };
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('rejects an unlockUrl that is not https', () => {
+    const input = loadDemo();
+    (input.manifest as { upgrade?: unknown }).upgrade = {
+      title: 'Get the full course',
+      url: 'https://example.com/course',
+      packId: 'solar-system-full',
+      unlockUrl: 'http://unlock.example.com',
+    };
+    const result = validatePack(input);
+    expect(result.ok).toBe(false);
+    expect(
+      result.errors.some((e) => e.includes('upgrade.unlockUrl') && e.includes('https')),
+    ).toBe(true);
+  });
+
+  it('rejects an unlockUrl without the packId it would fetch', () => {
+    const input = loadDemo();
+    (input.manifest as { upgrade?: unknown }).upgrade = {
+      title: 'Get the full course',
+      url: 'https://example.com/course',
+      unlockUrl: 'https://unlock.example.com',
+    };
+    const result = validatePack(input);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.includes('upgrade.packId'))).toBe(true);
+  });
+
+  it('rejects an upgrade packId that is not a slug or is the pack itself', () => {
+    const notSlug = loadDemo();
+    (notSlug.manifest as { upgrade?: unknown }).upgrade = {
+      title: 'Get the full course',
+      url: 'https://example.com/course',
+      packId: 'Not A Slug',
+    };
+    expect(validatePack(notSlug).ok).toBe(false);
+
+    const self = loadDemo();
+    (self.manifest as { upgrade?: unknown }).upgrade = {
+      title: 'Get the full course',
+      url: 'https://example.com/course',
+      packId: (self.manifest as { id: string }).id,
+    };
+    const result = validatePack(self);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.includes('upgrade.packId'))).toBe(true);
+  });
+
   // ——— timed exam (exam.durationMinutes, opt-in) ———
 
   it('accepts exam.durationMinutes alongside questionCount', () => {

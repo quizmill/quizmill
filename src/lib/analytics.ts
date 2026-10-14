@@ -6,9 +6,13 @@
  * name, key or email), first-party (the beacon goes to the URL the host
  * app was BUILT with — nobody else's), no cookies, no cross-site, and a
  * one-tap off switch in Settings. The payload is exactly
- * `{ event, packId, deviceId, appBuild, ts }` — no progress, no answers,
- * no user agent. Dormant unless NEXT_PUBLIC_ANALYTICS_URL is set at build
- * time, the same pattern as cloud sync.
+ * `{ event, packId, deviceId, appBuild, ts }` — plus, for the events
+ * that are ABOUT another pack arriving (`bundle_inserted`,
+ * `pack_unlocked`, `unlock_failed`), that pack's id as `pack`, so an
+ * insert is not filed under whatever pack happened to be active. No
+ * progress, no answers, no user agent, never a licence key. Dormant
+ * unless NEXT_PUBLIC_ANALYTICS_URL is set at build time, the same
+ * pattern as cloud sync.
  *
  * Two halves:
  *  - the BEACON: a `navigator.sendBeacon` fire-and-forget POST for every
@@ -68,6 +72,16 @@ export const FUNNEL_EVENTS: readonly AppEventType[] = [
   'upsell_seen',
   'upsell_clicked',
   'bundle_inserted',
+  'pack_unlocked',
+  'unlock_failed',
+];
+
+/** The funnel events that are about ANOTHER pack arriving — the only ones
+ *  whose beacon carries a second pack id (`pack`, from the event data). */
+const PACK_TARGETED_EVENTS: readonly AppEventType[] = [
+  'bundle_inserted',
+  'pack_unlocked',
+  'unlock_failed',
 ];
 
 export interface AnalyticsBeacon {
@@ -76,6 +90,8 @@ export interface AnalyticsBeacon {
   deviceId: string;
   appBuild: string;
   ts: number;
+  /** The arriving pack's id, for PACK_TARGETED_EVENTS only. */
+  pack?: string;
 }
 
 function browser(): boolean {
@@ -161,14 +177,18 @@ export const saveAnalyticsEnabled = analyticsEnabledPref.save;
 
 // ── Beacon ──────────────────────────────────────────────────────────────
 
-/** The wire payload for one event — nothing beyond these five fields. */
+/** The wire payload for one event — nothing beyond these five fields,
+ *  plus the arriving pack's id for the pack-targeted events. */
 export function beaconFor(event: AppEvent, deviceId: string, appBuild: string): AnalyticsBeacon {
+  const pack = event.data?.pack;
+  const targeted = PACK_TARGETED_EVENTS.includes(event.type) && typeof pack === 'string';
   return {
     event: event.type,
     packId: APP_CONFIG.packId,
     deviceId,
     appBuild,
     ts: event.at,
+    ...(targeted ? { pack } : {}),
   };
 }
 

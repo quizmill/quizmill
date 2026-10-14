@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
+import { UnlockedToast } from '@/components/UnlockedToast';
 import { useStorageData } from '@/lib/useStorage';
 import { useClientState, useMounted } from '@/lib/useMounted';
 import { unresolvedMistakeCount } from '@/lib/mistakes';
@@ -206,6 +207,10 @@ export default function PackHome() {
           </nav>
         </div>
       </header>
+
+      {/* One-time "Unlocked: N questions" after a licence-key unlock landed
+          here (sessionStorage; see UnlockedToast). */}
+      <UnlockedToast />
 
       {mistakeCount > 0 ? (
         <HomeCard

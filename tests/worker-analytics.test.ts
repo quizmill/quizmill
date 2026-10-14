@@ -51,6 +51,17 @@ describe('parseBeacon', () => {
     expect([...WORKER_FUNNEL_EVENTS]).toEqual([...FUNNEL_EVENTS]);
   });
 
+  it('accepts an optional arriving-pack id and rejects a malformed one', () => {
+    expect(parseBeacon({ ...beacon, event: 'bundle_inserted', pack: 'full-pack' })).toEqual({
+      ...beacon,
+      event: 'bundle_inserted',
+      pack: 'full-pack',
+    });
+    expect(parseBeacon({ ...beacon, pack: '' })).toBeNull();
+    expect(parseBeacon({ ...beacon, pack: 42 })).toBeNull();
+    expect(parseBeacon({ ...beacon, pack: 'x'.repeat(300) })).toBeNull();
+  });
+
   it('rejects unknown events, bad ids, bad timestamps and junk', () => {
     expect(parseBeacon({ ...beacon, event: 'game_open' })).toBeNull();
     expect(parseBeacon({ ...beacon, event: 'x'.repeat(50) })).toBeNull();
@@ -76,7 +87,17 @@ describe('statementsForBeacon', () => {
       'abc1234',
       beacon.ts,
       1_700_000_005_000,
+      null,
     ]);
+  });
+
+  it('stores the arriving pack id when the beacon names one', () => {
+    const [stmt] = statementsForBeacon(
+      parseBeacon({ ...beacon, event: 'pack_unlocked', pack: 'full-pack' })!,
+      1_700_000_005_000,
+    );
+    expect(stmt.sql).toContain('target_pack_id');
+    expect(stmt.params.at(-1)).toBe('full-pack');
   });
 });
 
@@ -96,13 +117,13 @@ describe('parseSummaryQuery', () => {
     expect(parseSummaryQuery(new URLSearchParams(''))).toBeNull();
   });
 
-  it('scopes every summary statement to the pack and the window', () => {
+  it('scopes every summary statement to the pack — active OR arriving — and the window', () => {
     const stmts = summaryStatements('demo', 1_000);
     expect(stmts.length).toBeGreaterThan(0);
     for (const s of stmts) {
-      expect(s.sql).toContain('pack_id = ?');
+      expect(s.sql).toContain('(pack_id = ? OR target_pack_id = ?)');
       expect(s.sql).toContain('received_at >= ?');
-      expect(s.params).toEqual(['demo', 1_000]);
+      expect(s.params).toEqual(['demo', 'demo', 1_000]);
     }
   });
 });
@@ -221,6 +242,32 @@ describe('analytics end-to-end (client beacon ↔ real worker ↔ real SQLite)',
     // Another pack sees none of it.
     const other = await summary('pack=other-pack');
     expect(other.body.events.app_open).toEqual({ count: 0, devices: 0 });
+  });
+
+  it('an unlock shows in the arriving pack’s summary as well as the active pack’s', async () => {
+    await device('11111111-1111-4111-8111-111111111111');
+    expect(
+      sendFunnelEvent({
+        id: 'e1',
+        type: 'pack_unlocked',
+        at: Date.now(),
+        data: { pack: 'solar-system-full' },
+      }),
+    ).toBe(true);
+    expect(sendFunnelEvent({ id: 'e2', type: 'app_open', at: Date.now() })).toBe(true);
+    await Promise.all(inflight);
+
+    // The sampler keeps its whole funnel (upsell_seen → … → pack_unlocked).
+    const sampler = await summary('pack=solar-system-demo');
+    expect(sampler.body.events.pack_unlocked).toEqual({ count: 1, devices: 1 });
+    expect(sampler.body.events.app_open).toEqual({ count: 1, devices: 1 });
+    // The arriving pack sees the unlock, and nothing of the sampler's own events.
+    const full = await summary('pack=solar-system-full');
+    expect(full.body.events.pack_unlocked).toEqual({ count: 1, devices: 1 });
+    expect(full.body.events.app_open).toEqual({ count: 0, devices: 0 });
+    expect(full.body.daily).toEqual([
+      { day: expect.any(String), event: 'pack_unlocked', devices: 1 },
+    ]);
   });
 
   it('the ingest route needs no sync key and answers 204 with CORS headers', async () => {

@@ -132,6 +132,32 @@ describe('beacon payload', () => {
     });
     expect(Object.keys(payload).sort()).toEqual(['appBuild', 'deviceId', 'event', 'packId', 'ts']);
   });
+
+  it('names the ARRIVING pack for insert and unlock events, and nothing else from data', () => {
+    for (const type of ['bundle_inserted', 'pack_unlocked', 'unlock_failed'] as const) {
+      const payload = beaconFor(
+        { id: 'e1', type, at: 1, data: { pack: 'full-pack', reason: 'denied' } },
+        'dev-1',
+        'b1',
+      );
+      expect(payload.pack).toBe('full-pack');
+      expect(Object.keys(payload).sort()).toEqual([
+        'appBuild',
+        'deviceId',
+        'event',
+        'pack',
+        'packId',
+        'ts',
+      ]);
+    }
+    // Other events never gain the field, whatever their data carries.
+    const other = beaconFor(
+      { id: 'e2', type: 'upsell_seen', at: 1, data: { placement: 'home', pack: 'x' } },
+      'dev-1',
+      'b1',
+    );
+    expect('pack' in other).toBe(false);
+  });
 });
 
 describe('sendFunnelEvent', () => {

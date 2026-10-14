@@ -163,6 +163,15 @@ Beyond the required fields, all optional:
   to the https `url` with `?ref=<packId>-home` / `-settings` appended
   so the destination can tell where the tap came from. The engine
   carries no shop or price of its own — the pack supplies the words.
+- **licence unlock** — `upgrade.packId` + `upgrade.unlockUrl` let a
+  learner who holds a licence key fetch the fuller pack in one tap:
+  a link to `/unlock#key=<key>` (the key rides in the fragment, which
+  never reaches a server) or the "Have a licence key?" entry on
+  `/packs`. The app calls `GET <unlockUrl>/v1/unlock?pack=<packId>&key=…`
+  and expects a pack bundle (200), a refusal `{ "error": "…" }` it may
+  show (403) or 404; it inserts the bundle, makes it active and keeps
+  the key under `quizmill.<packId>.licence`. CORS `*`, no cookies; how
+  keys are issued is the author's business.
 
 The validator (`npx quizmill validate <dir>`) cross-checks ids,
 category / scenario / concept / level references, image paths, and
@@ -251,9 +260,11 @@ NEXT_PUBLIC_PRIVACY_URL=https://example.com/privacy   # optional, linked from Se
 
 and the app beacons a handful of funnel events — `app_open`,
 `first_answer`, `session_10` (tenth completed session), `upsell_seen`,
-`upsell_clicked`, `bundle_inserted` — as
-`{ event, packId, deviceId, appBuild, ts }`. That is the whole payload:
-no answers, no progress, no sync key, no user agent. `deviceId` is a
+`upsell_clicked`, `bundle_inserted`, `pack_unlocked`, `unlock_failed` — as
+`{ event, packId, deviceId, appBuild, ts }`; the last three add `pack`,
+the id of the pack that arrived (or was refused), since `packId` is the
+one that was active at the time. That is the whole payload: no answers,
+no progress, no sync key, no licence key, no user agent. `deviceId` is a
 random UUID the learner can regenerate (or switch the beacon off) in
 Settings → Usage analytics; the card only exists in builds that set the
 URL, and without it nothing leaves the device. The sync worker in
