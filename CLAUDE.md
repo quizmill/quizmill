@@ -61,8 +61,8 @@ code or in `docs/investigations/`.
   `recordLevelCrossings` (`src/pack/useLevelUp.ts`) are the only
   recorders; EVERY attempt-producing path must reach `recordLevelCrossings`
   (runners via the hooks, Drive silently, imported/synced history via
-  the ProgressCard effect), and every runner must call the sticker
-  recorder too. Never bypass or remove that persistence.
+  the backfill effects on Home and ProgressCard), and every runner must
+  call the sticker recorder too. Never bypass or remove that persistence.
 - **Storage is per pack** (`quizmill.<packId>.*`); device-level switches
   are app-level keys (`quizmill.<name>.v1`) and go through
   `src/lib/devicePref.ts` + `useDevicePref` — a new switch declares

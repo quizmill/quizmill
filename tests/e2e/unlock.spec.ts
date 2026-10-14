@@ -142,7 +142,8 @@ test('/unlock#key=GOOD lands on Home with the unlocked pack active — no Packs 
   // The unlock navigates to Home on its own.
   await expect(page.locator('h1')).toHaveText('Solar System Full Course', { timeout: 20_000 });
   await waitForText(page, 'Unlocked: 7 questions');
-  expect(await bodyText(page)).toContain('0 of 7 available');
+  // Home (#191) shows the counts per category card; the full pack has one.
+  expect(await bodyText(page)).toContain('7 questions available');
 
   // One request, to the contract's URL — and no key anywhere after load.
   expect(endpointHits).toEqual([`${UNLOCK_BASE}/v1/unlock?pack=solar-system-full&key=${GOOD}`]);

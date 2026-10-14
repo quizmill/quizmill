@@ -147,7 +147,7 @@
       {
         "key": "B",
         "text": "A dwarf planet has not cleared other objects from its orbital neighbourhood",
-        "explanation": "The third IAU test — the one Pluto fails."
+        "explanation": "The third IAU test — the one Pluto *fails*."
       },
       {
         "key": "C",
@@ -161,7 +161,7 @@
       }
     ],
     "correctKey": "B",
-    "explanation": "Under the 2006 IAU definition, a planet must orbit the Sun, be massive enough to be round, AND have cleared its orbital neighbourhood. Pluto fails only the third test — it shares the Kuiper belt with many similar bodies. It is round, and it is larger than several moons.",
+    "explanation": "Under the 2006 IAU definition, a planet must orbit the Sun, be massive enough to be round, **and** have cleared its orbital neighbourhood. Pluto fails only the third test — it shares the Kuiper belt with many similar bodies. It is round, and it is larger than several moons.",
     "source": "original",
     "reviewStatus": "approved"
   },
