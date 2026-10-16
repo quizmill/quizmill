@@ -26,9 +26,9 @@ import {
   saveLevelFilter,
   loadDismissedNudge,
   saveDismissedNudge,
-  loadDriveModeEnabled,
 } from '@/lib/storage';
 import { levelNudge } from '@/lib/stats';
+import { loadDriveModeEnabled } from '@/lib/drive';
 import { loadCoachModeEnabled } from '@/lib/coach';
 import { loadPaperModeEnabled } from '@/lib/paper';
 import { latestColdLook } from '@/lib/readiness';

@@ -28,10 +28,7 @@ import {
 } from '@/lib/useStorage';
 import { useClientState } from '@/lib/useMounted';
 import { cn } from '@/lib/cn';
-import {
-  loadDriveModeEnabled,
-  saveDriveModeEnabled,
-} from '@/lib/storage';
+import { loadDriveModeEnabled, saveDriveModeEnabled } from '@/lib/drive';
 import { useTheme } from '@/lib/useTheme';
 import type { ThemePref } from '@/lib/theme';
 import { useLook } from '@/lib/useLook';
@@ -500,7 +497,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
         <OptInCard
           icon={Car}
           title="Drive mode"
-          blurb="Hands-free voice quiz for the car — questions read aloud, answers by voice. Adds a card to the home screen."
+          blurb="Hands-free voice quiz for the car — questions read aloud, answers by voice. Adds a tile under “More ways to practise” on Home."
           checked={driveMode}
           onToggle={toggleDriveMode}
           testId="drive-mode-toggle"
@@ -510,7 +507,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
         <OptInCard
           icon={GraduationCap}
           title="Coach mode"
-          blurb="For parents and tutors: go back through any past session together, question by question, with answers hidden until you reveal them. Nothing is recorded. Adds a card to the home screen."
+          blurb="For parents and tutors: go back through any past session together, question by question, with answers hidden until you reveal them. Nothing is recorded. Adds a tile under “More ways to practise” on Home."
           checked={coachMode}
           onToggle={toggleCoachMode}
           testId="coach-mode-toggle"
@@ -520,7 +517,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
         <OptInCard
           icon={Printer}
           title="Paper practice"
-          blurb="Print a worksheet — or write on it with a pencil on a tablet — then mark the answers back in. They count like any practice session. Adds a card to the home screen."
+          blurb="Print a worksheet — or write on it with a pencil on a tablet — then mark the answers back in. They count like any practice session. Adds a tile under “More ways to practise” on Home."
           checked={paperMode}
           onToggle={togglePaperMode}
           testId="paper-mode-toggle"

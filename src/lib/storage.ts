@@ -125,8 +125,8 @@ export interface PackPrefs {
   /** The last adaptive level nudge the user dismissed, as "from>to", so the
    *  same suggestion doesn't keep re-appearing. */
   dismissedNudge?: string;
-  /** Drive Mode opt-in — shows the hands-free voice quiz entry on Home.
-   *  Absent = off: it's a niche mode, so Home stays uncluttered by default. */
+  /** LEGACY: where the Drive switch lived before it became an app-level
+   *  device pref (src/lib/drive.ts). Read once there, promoted, removed. */
   driveMode?: boolean;
 }
 
@@ -160,13 +160,13 @@ export function saveDismissedNudge(key: string | null): void {
   patchPrefs('dismissedNudge', key);
 }
 
-/** Whether Drive Mode is switched on (Settings toggle). Default off. */
-export function loadDriveModeEnabled(): boolean {
-  return loadPrefs().driveMode === true;
+/** The old per-pack Drive switch, if this pack's prefs still carry it. */
+export function loadLegacyDriveMode(): boolean | undefined {
+  return loadPrefs().driveMode === true ? true : undefined;
 }
 
-export function saveDriveModeEnabled(on: boolean): void {
-  patchPrefs('driveMode', on);
+export function forgetLegacyDriveMode(): void {
+  patchPrefs('driveMode', null);
 }
 
 // ---- scratchpad (local-only working notes; deliberately not synced) ----

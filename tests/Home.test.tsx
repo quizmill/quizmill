@@ -6,9 +6,9 @@ import PackHome from '@/pack/Home';
 import {
   ATTEMPTS_KEY,
   loadAchievements,
-  saveDriveModeEnabled,
   saveLevelFilter,
 } from '@/lib/storage';
+import { saveDriveModeEnabled } from '@/lib/drive';
 import { saveCoachModeEnabled } from '@/lib/coach';
 import { savePaperModeEnabled } from '@/lib/paper';
 import type { Attempt } from '@/data/types';
