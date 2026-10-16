@@ -10,23 +10,18 @@
  * and mistake queue only move when they practise on their own.
  *
  * Stored app-level (bare `quizmill.` prefix) so it survives pack swaps and
- * never mixes into a pack's synced data.
+ * never mixes into a pack's synced data. An untouched device follows the
+ * pack's `modes.coach` default (src/lib/practiceModes.ts).
  */
-import { devicePref } from './devicePref';
+import { modeEnabled, modePref } from './practiceModes';
 
 export const COACH_KEY = 'quizmill.coach.v1';
 
 /** Local event fired after saveCoachModeEnabled so mounted hooks re-read. */
 export const COACH_EVENT = 'quizmill:coach';
 
-/** '1' = on; absent = off. */
-export const coachModePref = devicePref<boolean>({
-  key: COACH_KEY,
-  event: COACH_EVENT,
-  fallback: false,
-  parse: (raw) => raw === '1',
-  serialise: (on) => (on ? '1' : null),
-});
+/** '1' = on, '0' = off; absent = the pack's `modes.coach` default. */
+export const coachModePref = modePref({ key: COACH_KEY, event: COACH_EVENT });
 
-export const loadCoachModeEnabled = coachModePref.load;
-export const saveCoachModeEnabled = coachModePref.save;
+export const loadCoachModeEnabled = (): boolean => modeEnabled(coachModePref, 'coach');
+export const saveCoachModeEnabled = (on: boolean): void => coachModePref.save(on);

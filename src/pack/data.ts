@@ -50,6 +50,14 @@ export type PackGames = {
   include?: string[];
 };
 
+/** Optional pack defaults for the device opt-in modes; true = on until
+ *  the device switches it off. */
+export type PackModes = {
+  drive?: boolean;
+  coach?: boolean;
+  paper?: boolean;
+};
+
 /** Optional XP/levels progression declared by the pack. Presence enables;
  *  deliberately no options yet. */
 export type PackProgression = Record<string, never>;
@@ -84,6 +92,7 @@ export type PackManifest = {
   upgrade?: PackUpgrade;
   /** Default visual look; 'poster' = the loud campaign style. */
   look?: 'classic' | 'poster';
+  modes?: PackModes;
 };
 
 export type PackScenario = {

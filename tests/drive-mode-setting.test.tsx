@@ -7,6 +7,7 @@ import PackHome from '@/pack/Home';
 import { SettingsPage } from '@/components/SettingsPage';
 import { saveLevelFilter, loadLevelFilter, clearAll, KEY_PREFIX } from '@/lib/storage';
 import { DRIVE_KEY, loadDriveModeEnabled, saveDriveModeEnabled } from '@/lib/drive';
+import { APP_CONFIG } from '@/config';
 
 // React needs this flag to allow act() outside @testing-library.
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -18,14 +19,18 @@ if (!globalThis.crypto?.randomUUID) {
 
 let container: HTMLDivElement;
 let root: Root | undefined;
+// The demo ships Drive on; these tests are about a pack that does not.
+const demoModes = APP_CONFIG.modes;
 
 beforeEach(() => {
   localStorage.clear();
+  APP_CONFIG.modes = undefined;
   container = document.createElement('div');
   document.body.appendChild(container);
 });
 
 afterEach(async () => {
+  APP_CONFIG.modes = demoModes;
   await act(async () => {
     root?.unmount();
   });

@@ -178,6 +178,23 @@ export const packUpgradeSchema = z.object({
   blurb: z.string().min(1).max(240).optional(),
 });
 
+/**
+ * Optional pack defaults for the occasional practice modes (additive).
+ * Drive, Coach and Paper are device opt-ins (Settings → This device); a
+ * mode set true here starts ON on a device that has not touched its
+ * switch, and the device's own choice wins either way — the same shape
+ * as `look`. Absent or false → off until switched on, exactly as today.
+ * The timed exam is not here: `exam.durationMinutes` switches that on.
+ */
+export const packModesSchema = z.object({
+  /** Drive mode: the hands-free voice quiz. */
+  drive: z.boolean().optional(),
+  /** Coach mode: replay past sessions together, nothing recorded. */
+  coach: z.boolean().optional(),
+  /** Paper practice: print a worksheet, mark it back in. */
+  paper: z.boolean().optional(),
+});
+
 export const packManifestSchema = z
   .object({
     /** The one accepted format version — see the file header. A pack
@@ -213,6 +230,8 @@ export const packManifestSchema = z
      *  quizmill.dev campaign style (kids' packs). Device Settings can
      *  override either way; omit for the calm classic UI. */
     look: z.enum(['classic', 'poster']).optional(),
+    /** Optional default-on practice modes — see packModesSchema. */
+    modes: packModesSchema.optional(),
     /** Optional reward mini-games — see packGamesSchema. */
     games: packGamesSchema.optional(),
     /** Optional XP/levels progression — see packProgressionSchema. */

@@ -234,6 +234,10 @@ describe('PackHome timed exam tile', () => {
   });
 
   it('is the only tile in the rail when no device mode is on', async () => {
+    // The demo ships Drive, Coach and Paper on; this device switched them off.
+    saveDriveModeEnabled(false);
+    saveCoachModeEnabled(false);
+    savePaperModeEnabled(false);
     await render();
     const rail = container.querySelector('[data-testid="mode-rail"]');
     expect(rail).toBeTruthy();

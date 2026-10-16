@@ -32,6 +32,7 @@
     "questionCount": 20,
     "durationMinutes": 30
   },
+  "modes": { "drive": true, "coach": true, "paper": true },
   "games": {},
   "progression": {},
   "sources": [

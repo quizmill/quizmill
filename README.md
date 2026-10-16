@@ -157,6 +157,10 @@ Beyond the required fields, all optional:
   declared level), time pro-rated when fewer are available, pausable,
   no feedback until the end, then a pass verdict and a review of the
   sitting's mistakes
+- **default-on modes** — manifest `modes` (`{drive?, coach?, paper?}`):
+  Drive, Coach and Paper are device opt-ins in Settings, off by default;
+  a mode set `true` here starts on for a device that hasn't touched its
+  switch, and the device's own choice wins either way (like `look`)
 - **upgrade card** — manifest `upgrade` (`{title, url, price?, blurb?}`)
   for a free sampler pointing at its paid course or fuller bank: one
   card on Home (below the practice loop) and one in Settings, linking

@@ -284,6 +284,25 @@ describe('validatePack', () => {
     }
   });
 
+  // ——— optional modes block (pack defaults for Drive/Coach/Paper) ———
+
+  it('the demo pack switches every opt-in mode on by default', () => {
+    const { manifest } = loadDemo();
+    expect((manifest as { modes?: unknown }).modes).toEqual({
+      drive: true,
+      coach: true,
+      paper: true,
+    });
+  });
+
+  it('rejects a non-boolean mode default', () => {
+    const input = loadDemo();
+    (input.manifest as { modes: unknown }).modes = { coach: 'yes' };
+    const result = validatePack(input);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.startsWith('pack.json: modes.coach'))).toBe(true);
+  });
+
   // ——— schema v2: image questions ———
 
   it('accepts a prompt image on a question', () => {
