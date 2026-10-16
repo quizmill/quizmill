@@ -13,6 +13,7 @@ import {
   Moon,
   Printer,
   Sun,
+  Timer,
   Trash2,
   Wheat,
 } from 'lucide-react';
@@ -57,6 +58,8 @@ import {
   gamesEnabled,
   progressionEnabled,
 } from '@/pack/data';
+import { EXAM_SITTING } from '@/pack/exam';
+import { loadExamShown, saveExamShown } from '@/lib/examPref';
 import { enabledGames } from '@/lib/games/registry';
 import { UpgradeCard } from '@/pack/UpgradeCard';
 
@@ -265,6 +268,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
     saveProgressionShown,
     true,
   );
+  const [examShown, toggleExamShown] = useDeviceToggle(loadExamShown, saveExamShown, true);
 
   // Usage analytics (device-level) — the anonymous funnel beacon a hosted
   // app sends its author. The card exists only in builds that configure
@@ -523,6 +527,21 @@ export function SettingsPage({ extras }: SettingsPageProps) {
           testId="paper-mode-toggle"
           link={{ href: '/paper/', label: 'Open paper practice', testId: 'open-paper' }}
         />
+
+        {/* Only for packs that declare a timed exam: the pack switches it
+            on, this device may only hide the tile (the route stays). */}
+        {EXAM_SITTING ? (
+          <OptInCard
+            icon={Timer}
+            title="Timed exam"
+            blurb={`${APP_CONFIG.exam?.label ?? 'Timed exam'}: ${EXAM_SITTING.count} questions in ${Math.round(EXAM_SITTING.durationSeconds / 60)} minutes, set by this pack. Turn it off to hide the tile on this device; readiness on Progress is unaffected.`}
+            checked={examShown}
+            onToggle={toggleExamShown}
+            testId="exam-toggle"
+            cardTestId="exam-setting"
+            link={{ href: '/practice/exam/', label: 'Open the timed exam', testId: 'open-exam' }}
+          />
+        ) : null}
 
         {/* Only for packs that opt into progression — the parent lever.
             Hiding is display-only: XP stays derived from history. */}
