@@ -8,23 +8,18 @@
  * readiness, stickers) as a `mode: 'paper'` session.
  *
  * Stored app-level (bare `quizmill.` prefix) so it survives pack swaps
- * and never mixes into a pack's synced data.
+ * and never mixes into a pack's synced data. An untouched device follows
+ * the pack's `modes.paper` default (src/lib/practiceModes.ts).
  */
-import { devicePref } from './devicePref';
+import { modeEnabled, modePref } from './practiceModes';
 
 export const PAPER_KEY = 'quizmill.paper.v1';
 
 /** Local event fired after savePaperModeEnabled so mounted hooks re-read. */
 export const PAPER_EVENT = 'quizmill:paper';
 
-/** '1' = on; absent = off. */
-export const paperModePref = devicePref<boolean>({
-  key: PAPER_KEY,
-  event: PAPER_EVENT,
-  fallback: false,
-  parse: (raw) => raw === '1',
-  serialise: (on) => (on ? '1' : null),
-});
+/** '1' = on, '0' = off; absent = the pack's `modes.paper` default. */
+export const paperModePref = modePref({ key: PAPER_KEY, event: PAPER_EVENT });
 
-export const loadPaperModeEnabled = paperModePref.load;
-export const savePaperModeEnabled = paperModePref.save;
+export const loadPaperModeEnabled = (): boolean => modeEnabled(paperModePref, 'paper');
+export const savePaperModeEnabled = (on: boolean): void => paperModePref.save(on);

@@ -13,6 +13,7 @@ import {
   Moon,
   Printer,
   Sun,
+  Timer,
   Trash2,
   Wheat,
 } from 'lucide-react';
@@ -28,10 +29,7 @@ import {
 } from '@/lib/useStorage';
 import { useClientState } from '@/lib/useMounted';
 import { cn } from '@/lib/cn';
-import {
-  loadDriveModeEnabled,
-  saveDriveModeEnabled,
-} from '@/lib/storage';
+import { loadDriveModeEnabled, saveDriveModeEnabled } from '@/lib/drive';
 import { useTheme } from '@/lib/useTheme';
 import type { ThemePref } from '@/lib/theme';
 import { useLook } from '@/lib/useLook';
@@ -60,6 +58,8 @@ import {
   gamesEnabled,
   progressionEnabled,
 } from '@/pack/data';
+import { EXAM_SITTING } from '@/pack/exam';
+import { loadExamShown, saveExamShown } from '@/lib/examPref';
 import { enabledGames } from '@/lib/games/registry';
 import { UpgradeCard } from '@/pack/UpgradeCard';
 
@@ -268,6 +268,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
     saveProgressionShown,
     true,
   );
+  const [examShown, toggleExamShown] = useDeviceToggle(loadExamShown, saveExamShown, true);
 
   // Usage analytics (device-level) — the anonymous funnel beacon a hosted
   // app sends its author. The card exists only in builds that configure
@@ -500,7 +501,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
         <OptInCard
           icon={Car}
           title="Drive mode"
-          blurb="Hands-free voice quiz for the car — questions read aloud, answers by voice. Adds a card to the home screen."
+          blurb="Hands-free voice quiz for the car — questions read aloud, answers by voice. Adds a tile under “More ways to practise” on Home."
           checked={driveMode}
           onToggle={toggleDriveMode}
           testId="drive-mode-toggle"
@@ -510,7 +511,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
         <OptInCard
           icon={GraduationCap}
           title="Coach mode"
-          blurb="For parents and tutors: go back through any past session together, question by question, with answers hidden until you reveal them. Nothing is recorded. Adds a card to the home screen."
+          blurb="For parents and tutors: go back through any past session together, question by question, with answers hidden until you reveal them. Nothing is recorded. Adds a tile under “More ways to practise” on Home."
           checked={coachMode}
           onToggle={toggleCoachMode}
           testId="coach-mode-toggle"
@@ -520,12 +521,27 @@ export function SettingsPage({ extras }: SettingsPageProps) {
         <OptInCard
           icon={Printer}
           title="Paper practice"
-          blurb="Print a worksheet — or write on it with a pencil on a tablet — then mark the answers back in. They count like any practice session. Adds a card to the home screen."
+          blurb="Print a worksheet — or write on it with a pencil on a tablet — then mark the answers back in. They count like any practice session. Adds a tile under “More ways to practise” on Home."
           checked={paperMode}
           onToggle={togglePaperMode}
           testId="paper-mode-toggle"
           link={{ href: '/paper/', label: 'Open paper practice', testId: 'open-paper' }}
         />
+
+        {/* Only for packs that declare a timed exam: the pack switches it
+            on, this device may only hide the tile (the route stays). */}
+        {EXAM_SITTING ? (
+          <OptInCard
+            icon={Timer}
+            title="Timed exam"
+            blurb={`${APP_CONFIG.exam?.label ?? 'Timed exam'}: ${EXAM_SITTING.count} questions in ${Math.round(EXAM_SITTING.durationSeconds / 60)} minutes, set by this pack. Turn it off to hide the tile on this device; readiness on Progress is unaffected.`}
+            checked={examShown}
+            onToggle={toggleExamShown}
+            testId="exam-toggle"
+            cardTestId="exam-setting"
+            link={{ href: '/practice/exam/', label: 'Open the timed exam', testId: 'open-exam' }}
+          />
+        ) : null}
 
         {/* Only for packs that opt into progression — the parent lever.
             Hiding is display-only: XP stays derived from history. */}

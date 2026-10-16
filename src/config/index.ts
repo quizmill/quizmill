@@ -3,6 +3,7 @@ import type {
   PackCategory,
   PackExam,
   PackGames,
+  PackModes,
   PackProgression,
   PackUpgrade,
 } from '@/pack/data';
@@ -38,6 +39,8 @@ export interface AppConfig {
   themeColor: string;
   /** Pack-declared default look ('poster' = the campaign style). */
   look: 'classic' | 'poster';
+  /** Pack defaults for Drive/Coach/Paper; the device switch overrides. */
+  modes?: PackModes;
   categories: CategoryDef[];
   /** Exam-readiness goal, when the pack declares one. Absent → no readiness UI. */
   exam?: PackExam;
@@ -57,6 +60,7 @@ export const APP_CONFIG: AppConfig = {
   homeSubtitle: manifest.homeSubtitle,
   themeColor: manifest.themeColor,
   look: manifest.look === 'poster' ? 'poster' : 'classic',
+  modes: manifest.modes,
   categories: manifest.categories,
   exam: manifest.exam,
   games: manifest.games,

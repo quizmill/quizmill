@@ -29,9 +29,10 @@
   "exam": {
     "label": "Mock exam",
     "passPct": 70,
-    "questionCount": 20,
-    "durationMinutes": 30
+    "questionCount": 9,
+    "durationMinutes": 15
   },
+  "modes": { "drive": true, "coach": true, "paper": true },
   "games": {},
   "progression": {},
   "sources": [

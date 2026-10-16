@@ -1,7 +1,7 @@
 /**
  * The one engine behind every device-level preference: colour scheme,
- * visual look, the Levels & XP off-switch, Coach mode, Paper practice,
- * the analytics switch. Each is a single app-level localStorage key
+ * visual look, the Levels & XP and timed-exam off-switches, Drive mode,
+ * Coach mode, Paper practice, the analytics switch. Each is a single app-level localStorage key
  * (bare `quizmill.` prefix — about the device, not any one pack, never
  * synced, untouched by "Reset all local progress") read as a bare
  * string, plus a window event so every mounted hook re-reads after a
@@ -19,7 +19,9 @@
  *    `load()` says the old value. Storage takes over again the moment a
  *    write succeeds, so an edit from another tab is never shadowed;
  *  - the legacy-key promotion the theme needs (`legacyKey`): an older
- *    per-pack key read once, copied to the current key and removed.
+ *    per-pack key read once, copied to the current key and removed;
+ *  - the same promotion out of a value that lived somewhere other than
+ *    its own key (`legacy`) — Drive's switch inside a pack's prefs blob.
  *
  * Storage keys and event names are the concrete modules' business and
  * stay exactly as they were, so nothing a device has saved changes.
@@ -38,6 +40,9 @@ export interface DevicePrefSpec<T> {
   serialise: (value: T) => string | null;
   /** An older key to promote on first read, then forget. */
   legacyKey?: string;
+  /** An older home that is not a key of its own: `read` returns the old
+   *  value (undefined = none), `forget` drops it once it is promoted. */
+  legacy?: { read: () => T | undefined; forget: () => void };
 }
 
 export interface DevicePref<T> {
@@ -51,7 +56,7 @@ export interface DevicePref<T> {
 }
 
 export function devicePref<T>(spec: DevicePrefSpec<T>): DevicePref<T> {
-  const { key, event, fallback, parse, serialise, legacyKey } = spec;
+  const { key, event, fallback, parse, serialise, legacyKey, legacy } = spec;
 
   /**
    * The value as last saved on THIS page when localStorage refused to
@@ -73,12 +78,21 @@ export function devicePref<T>(spec: DevicePrefSpec<T>): DevicePref<T> {
       const current = read(storage, key);
       if (current !== undefined) return current;
       if (legacyKey) {
-        const legacy = read(storage, legacyKey);
-        if (legacy !== undefined) {
-          const raw = serialise(legacy);
+        const promoted = read(storage, legacyKey);
+        if (promoted !== undefined) {
+          const raw = serialise(promoted);
           if (raw !== null) storage.setItem(key, raw);
           storage.removeItem(legacyKey);
-          return legacy;
+          return promoted;
+        }
+      }
+      if (legacy) {
+        const promoted = legacy.read();
+        if (promoted !== undefined) {
+          const raw = serialise(promoted);
+          if (raw !== null) storage.setItem(key, raw);
+          legacy.forget();
+          return promoted;
         }
       }
       return fallback;
