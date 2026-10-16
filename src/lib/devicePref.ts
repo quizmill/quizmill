@@ -1,7 +1,7 @@
 /**
  * The one engine behind every device-level preference: colour scheme,
- * visual look, the Levels & XP off-switch, Drive mode, Coach mode, Paper practice,
- * the analytics switch. Each is a single app-level localStorage key
+ * visual look, the Levels & XP and timed-exam off-switches, Drive mode,
+ * Coach mode, Paper practice, the analytics switch. Each is a single app-level localStorage key
  * (bare `quizmill.` prefix — about the device, not any one pack, never
  * synced, untouched by "Reset all local progress") read as a bare
  * string, plus a window event so every mounted hook re-reads after a

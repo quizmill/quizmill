@@ -141,3 +141,22 @@ honour.
 
 1, 2 and 5 are housekeeping; 3 and 4 are the two product choices in the
 issue and are worth a word from the maintainer before they are built.
+
+## Outcome
+
+All five accepted (2026-10-16) and built on the same branch:
+
+1. Drive is `quizmill.drive.v1` (`src/lib/drive.ts`); `devicePref` gained
+   a `legacy` hook that promotes the old `driveMode` out of the pack's
+   prefs blob on first read.
+2. The blurbs say "Adds a tile under “More ways to practise” on Home."
+3. `modes: { drive?, coach?, paper? }` in pack.json
+   (`src/lib/practiceModes.ts`). The three switches store '1' / '0';
+   an absent key follows the pack. A Coach or Paper switch saved as
+   '1' before this change keeps working. A switch someone turned off
+   earlier left no key, so it now follows the pack, and that is still
+   off unless the pack says otherwise.
+4. Settings → This device → **Timed exam** (`src/lib/examPref.ts`,
+   `quizmill.examHidden.v1`), only for packs with a sitting.
+5. The demo's exam declares 9 questions in 15 minutes: exactly its
+   Advanced band, so nothing is pro-rated.
