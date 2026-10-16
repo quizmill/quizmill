@@ -223,14 +223,14 @@ describe('PackHome category stats', () => {
 });
 
 describe('PackHome timed exam tile', () => {
-  it('links to the sitting with its size and clock (the demo declares 30 min)', async () => {
+  it('links to the sitting with its size and clock (the demo declares 15 min)', async () => {
     await render();
     const card = container.querySelector('[data-testid="exam-card"]');
     expect(card).toBeTruthy();
     expect(card!.getAttribute('href')).toBe('/practice/exam');
     expect(card!.textContent).toContain('Mock exam');
-    // 9 Advanced questions at 20-in-30-min pace = 13:30.
-    expect(card!.textContent).toContain('9 Qs · 13:30');
+    // The demo declares exactly its 9 Advanced questions in 15 minutes.
+    expect(card!.textContent).toContain('9 Qs · 15:00');
   });
 
   it('is the only tile in the rail when no device mode is on', async () => {

@@ -110,7 +110,7 @@ describe('PackExamRunner', () => {
     await render();
     expect(text()).toContain('Mock exam');
     expect(text()).toContain(`${sitting.count} questions`);
-    expect(text()).toContain('13:30');
+    expect(text()).toContain('15:00');
     expect(text()).toContain('70%');
     expect(control('Start exam')).toBeTruthy();
     // Nothing recorded until Start.
@@ -122,7 +122,7 @@ describe('PackExamRunner', () => {
     await click(control('Start exam')!);
     expect(loadSessions()).toHaveLength(1);
     expect(loadSessions()[0]).toMatchObject({ mode: 'exam', subject: 'exam', endedAt: null });
-    expect(clock()).toBe('13:30');
+    expect(clock()).toBe('15:00');
 
     // First question: wrong, on purpose — and no verdict or explanation.
     const first = currentQuestion();
@@ -154,7 +154,7 @@ describe('PackExamRunner', () => {
     await render();
     await click(control('Start exam')!);
     await tick(30_000);
-    expect(clock()).toBe('13:00');
+    expect(clock()).toBe('14:30');
     expect(text()).toContain('0:30');
 
     const q = currentQuestion();
@@ -162,12 +162,12 @@ describe('PackExamRunner', () => {
     expect(text()).toContain('Paused');
     expect(text()).not.toContain(q.prompt);
     await tick(60_000);
-    expect(clock()).toBe('13:00');
+    expect(clock()).toBe('14:30');
 
     await click(control('Resume')!);
     expect(text()).toContain(q.prompt);
     await tick(10_000);
-    expect(clock()).toBe('12:50');
+    expect(clock()).toBe('14:20');
   });
 
   it('ends the sitting when time runs out, scoring unanswered questions as wrong', async () => {

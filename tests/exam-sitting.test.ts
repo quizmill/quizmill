@@ -96,14 +96,16 @@ describe('buildSitting', () => {
 });
 
 describe('the demo pack sitting', () => {
-  it('is the Advanced band at the manifest pace', () => {
-    // content/pack-demo: exam { questionCount: 20, durationMinutes: 30 },
-    // levels basics → advanced, 9 advanced questions.
+  it('is the whole Advanced band, exactly the exam the manifest declares', () => {
+    // content/pack-demo: exam { questionCount: 9, durationMinutes: 15 },
+    // levels basics → advanced, 9 advanced questions. The showcase must
+    // not pro-rate (#192: a "9 Qs · 13:30" tile reads like a bug).
     expect(EXAM_SITTING).not.toBeNull();
     expect(EXAM_SITTING!.level).toBe('advanced');
     const advanced = packQuestions.filter((x) => x.level === 'advanced').length;
     expect(EXAM_SITTING!.count).toBe(advanced);
-    expect(EXAM_SITTING!.durationSeconds).toBe(Math.round((30 * 60 * advanced) / 20));
+    expect(EXAM_SITTING!.count).toBe(9);
+    expect(EXAM_SITTING!.durationSeconds).toBe(15 * 60);
   });
 });
 
