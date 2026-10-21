@@ -26,6 +26,11 @@
  * nothing about whether a pack exists. Keys are stored in clear (the
  * author lists them back), unlike sync keys, which are hashed: holding a
  * licence key opens a pack's content, not anyone's practice history.
+ *
+ * Stored keys are OPAQUE strings: whatever the table holds unlocks, as
+ * given. `QL-XXXX-XXXX-XXXX` is only what `share` mints; a writer with
+ * table access may insert keys in another provider's format and they
+ * unlock the same way. The routes reject only empty and over-long input.
  */
 import type { SqlStatement } from './ops';
 
@@ -36,6 +41,10 @@ import type { SqlStatement } from './ops';
 // input the Crockford confusables fold (i/l → 1, o → 0). Visibly a
 // different thing from a `QM-` sync key, which opens a learner's
 // history rather than a pack.
+
+/** The longest key the routes will look up; anything longer is refused
+ *  with the unknown-key words, like an empty one. */
+export const MAX_LICENCE_KEY_LENGTH = 128;
 
 /** Crockford base32 — digits then letters without I, L, O, U. */
 export const LICENCE_KEY_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
@@ -83,6 +92,19 @@ export function normalizeLicenceKey(raw: string): string | null {
     if (!LICENCE_KEY_ALPHABET.includes(ch)) return null;
   }
   return formatLicenceKey(body);
+}
+
+/**
+ * The stored keys a raw input may name, in lookup order: the input
+ * exactly as given (stored keys are opaque, so a key in another
+ * provider's format matches only this way), then — when it reads as a
+ * typed QL key and differs — its canonical form. Empty for input that
+ * is empty or over-long, which is refused without a lookup.
+ */
+export function licenceKeyCandidates(raw: string): string[] {
+  if (raw.length === 0 || raw.length > MAX_LICENCE_KEY_LENGTH) return [];
+  const canonical = normalizeLicenceKey(raw);
+  return canonical && canonical !== raw ? [raw, canonical] : [raw];
 }
 
 // ── Ids and labels ──────────────────────────────────────────────────────
@@ -145,10 +167,22 @@ export function keyLookupStatement(key: string): SqlStatement {
   return { sql: `SELECT ${ROW_COLUMNS} FROM licence_keys WHERE key = ?`, params: [key] };
 }
 
-/** Every key of a pack, oldest first — what `share --list` prints. */
+/**
+ * The rows any of `candidates` (licenceKeyCandidates) names; the caller
+ * takes the first in candidate order. Null when there is nothing to
+ * look up.
+ */
+export function keyCandidatesLookupStatement(candidates: string[]): SqlStatement | null {
+  if (candidates.length === 0) return null;
+  const marks = candidates.map(() => '?').join(', ');
+  return { sql: `SELECT ${ROW_COLUMNS} FROM licence_keys WHERE key IN (${marks})`, params: candidates };
+}
+
+/** Every key of a pack, oldest first (insertion order breaks a tie within
+ *  one millisecond) — what `share --list` prints. */
 export function keysForPackStatement(packId: string): SqlStatement {
   return {
-    sql: `SELECT ${ROW_COLUMNS} FROM licence_keys WHERE pack_id = ? ORDER BY created_at, key`,
+    sql: `SELECT ${ROW_COLUMNS} FROM licence_keys WHERE pack_id = ? ORDER BY created_at, rowid`,
     params: [packId],
   };
 }
@@ -192,9 +226,21 @@ VALUES (?, ?, ?, 0, ?, ?, NULL)`,
   ];
 }
 
-/** One successful download = one use. 304s and refusals don't count. */
-export function statementsForUse(key: string): SqlStatement[] {
-  return [{ sql: 'UPDATE licence_keys SET uses = uses + 1 WHERE key = ?', params: [key] }];
+/**
+ * Claim one use of a key — one successful download; 304s and refusals
+ * don't count. The claim is a single conditional UPDATE so two devices
+ * racing for the last use of a key, or a download overlapping a
+ * revocation, cannot both be served: it returns the row it changed, and
+ * no row means the key was revoked or spent in the meantime (the caller
+ * re-reads it for the reason).
+ */
+export function claimUseStatement(key: string): SqlStatement {
+  return {
+    sql: `UPDATE licence_keys SET uses = uses + 1
+WHERE key = ? AND revoked_at IS NULL AND (max_uses IS NULL OR uses < max_uses)
+RETURNING ${ROW_COLUMNS}`,
+    params: [key],
+  };
 }
 
 /** Revoking twice keeps the first timestamp. */

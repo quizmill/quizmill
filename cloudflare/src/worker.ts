@@ -44,19 +44,21 @@ import {
   adminTokenMatches,
   bundleEtag,
   bundleObjectKey,
+  claimUseStatement,
   decideUnlock,
   etagMatches,
   generateLicenceKey,
   isPackId,
+  keyCandidatesLookupStatement,
   keyLookupStatement,
   keysForPackStatement,
-  normalizeLicenceKey,
+  licenceKeyCandidates,
   parseBundleUpload,
   parseMintRequest,
   statementsForMint,
   statementsForRevoke,
-  statementsForUse,
   toLicenceKey,
+  KEY_EXHAUSTED,
   KEY_NOT_RECOGNISED,
   MAX_BUNDLE_BYTES,
 } from './unlock';
@@ -267,8 +269,34 @@ function bundles(env: Env): R2Bucket | null {
   return env.BUNDLES ?? null;
 }
 
+/** The row of a key the worker itself holds in canonical form. */
 async function lookupKey(env: Env, key: string): Promise<LicenceKeyRow | null> {
   const stmt = keyLookupStatement(key);
+  const { results } = await env.DB.prepare(stmt.sql).bind(...stmt.params).all<LicenceKeyRow>();
+  return results[0] ?? null;
+}
+
+/**
+ * The row a key from the outside (a link, a typed key, a `--revoke`
+ * argument) names. Stored keys are opaque, so the input is matched as
+ * given first; a typed QL key that differs from its canonical form is
+ * matched by that form second. Null = no such key, or nothing to look up.
+ */
+async function findKey(env: Env, raw: string): Promise<LicenceKeyRow | null> {
+  const candidates = licenceKeyCandidates(raw);
+  const stmt = keyCandidatesLookupStatement(candidates);
+  if (!stmt) return null;
+  const { results } = await env.DB.prepare(stmt.sql).bind(...stmt.params).all<LicenceKeyRow>();
+  for (const candidate of candidates) {
+    const row = results.find((r) => r.key === candidate);
+    if (row) return row;
+  }
+  return null;
+}
+
+/** Atomically count one use; null when the key was revoked or spent first. */
+async function claimUse(env: Env, key: string): Promise<LicenceKeyRow | null> {
+  const stmt = claimUseStatement(key);
   const { results } = await env.DB.prepare(stmt.sql).bind(...stmt.params).all<LicenceKeyRow>();
   return results[0] ?? null;
 }
@@ -281,18 +309,22 @@ async function keysForPack(env: Env, packId: string) {
 
 /**
  * `GET /v1/unlock?key=…[&pack=…]` — the bundle a key opens. The key is
- * judged before anything is read from the bucket, and a malformed key is
- * refused with the same words as an unknown one, so nothing in the reply
- * says whether a pack exists until the caller has proven they may have
- * it. The ETag is the stored version; a matching If-None-Match gets a 304
- * and does not count as a use.
+ * judged before anything is read from the bucket, and a malformed or
+ * over-long key is refused with the same words as an unknown one, so
+ * nothing in the reply says whether a pack exists until the caller has
+ * proven they may have it. The ETag is the stored version; a matching
+ * If-None-Match gets a 304 and does not count as a use. A 200 does, and
+ * the use is claimed atomically AFTER the bundle is in hand: two devices
+ * racing for the last use, or a download overlapping a revocation, see
+ * exactly one 200 — the loser is refused with the reason the row now
+ * carries.
  */
 async function handleUnlock(request: Request, env: Env, bucket: R2Bucket): Promise<Response> {
   const params = new URL(request.url).searchParams;
-  const key = normalizeLicenceKey(params.get('key') ?? '');
   const packParam = params.get('pack');
-  if (!key) return json({ error: KEY_NOT_RECOGNISED }, 403);
-  const decision = decideUnlock(await lookupKey(env, key), packParam);
+  const row = await findKey(env, params.get('key') ?? '');
+  if (!row) return json({ error: KEY_NOT_RECOGNISED }, 403);
+  const decision = decideUnlock(row, packParam);
   if (!decision.ok) return json({ error: decision.error }, decision.status);
 
   const object = await bucket.get(bundleObjectKey(decision.packId));
@@ -301,7 +333,11 @@ async function handleUnlock(request: Request, env: Env, bucket: R2Bucket): Promi
   if (etagMatches(request.headers.get('if-none-match'), etag)) {
     return new Response(null, { status: 304, headers: { etag, ...CORS_HEADERS } });
   }
-  await env.DB.batch(bindAll(env, statementsForUse(key)));
+  if (!(await claimUse(env, row.key))) {
+    // Revoked or spent since the check above — say which.
+    const now = decideUnlock(await lookupKey(env, row.key));
+    return json({ error: now.ok ? KEY_EXHAUSTED : now.error }, now.ok ? 403 : now.status);
+  }
   return new Response(await object.text(), {
     status: 200,
     headers: { 'content-type': 'application/json', etag, ...CORS_HEADERS },
@@ -376,13 +412,14 @@ async function handleMintKey(
   return json({ ok: true, key: row ? toLicenceKey(row) : null });
 }
 
-/** `DELETE /v1/keys/:key` — revoke; the row stays so `--list` shows it. */
+/** `DELETE /v1/keys/:key` — revoke; the row stays so `--list` shows it.
+ *  The key is matched like an unlock: as given first, so a key in another
+ *  format revokes as it lists. */
 async function handleRevokeKey(env: Env, rawKey: string): Promise<Response> {
-  const key = normalizeLicenceKey(rawKey);
-  const row = key ? await lookupKey(env, key) : null;
-  if (!key || !row) return json({ error: 'no such licence key' }, 404);
-  await env.DB.batch(bindAll(env, statementsForRevoke(key, Date.now())));
-  const after = await lookupKey(env, key);
+  const row = await findKey(env, rawKey);
+  if (!row) return json({ error: 'no such licence key' }, 404);
+  await env.DB.batch(bindAll(env, statementsForRevoke(row.key, Date.now())));
+  const after = await lookupKey(env, row.key);
   return json({ ok: true, key: after ? toLicenceKey(after) : null });
 }
 

@@ -217,10 +217,15 @@ than showing zeros.
 The same worker is the **unlock service** behind `quizmill share` and
 the app's `/unlock` route: one R2 bucket of pack bundles (`BUNDLES`,
 one object per pack id) and a `licence_keys` table saying which key
-opens which pack. A key is `QL-XXXX-XXXX-XXXX` (Crockford base32, 60
-bits; typed input folds case, separators and the i/l/o confusables) —
-visibly not a `QM-` sync key, and a different trust model: it is the
-capability to *download one pack*, never anyone's practice history.
+opens which pack. `share` mints `QL-XXXX-XXXX-XXXX` (Crockford base32,
+60 bits; typed input folds case, separators and the i/l/o confusables)
+— visibly not a `QM-` sync key, and a different trust model: it is the
+capability to *download one pack*, never anyone's practice history. The
+stored key is **opaque**, though: the routes match it exactly as given
+first (so a key in another provider's format, written straight to the
+table, unlocks and revokes as-is) and fall back to the folded QL form
+for typed keys; only empty and over-long (> 128 chars) input is refused
+outright.
 
 | Route | Auth | Purpose |
 | --- | --- | --- |
@@ -235,7 +240,9 @@ A missing, malformed or unknown key gets the **same** 403 text, with or
 without a `pack=`, so nothing in a reply says whether a pack exists;
 the pack-mismatch 404 only follows a key that itself passed. A 200
 counts as a use (`maxUses` is per key; `null` = unlimited); a 304 does
-not. The ETag is the pack's git revision when the bundle was built from
+not. The use is claimed with one conditional `UPDATE` once the bundle
+is in hand, so two devices racing for a key's last use, or a download
+overlapping a revocation, get exactly one 200. The ETag is the pack's git revision when the bundle was built from
 a clean checkout, otherwise a hash of the bundle — so a re-share always
 reads as new to a device holding the previous one. Keys are stored in
 clear (the author lists and revokes them). CORS `*`, no cookies, and

@@ -18,10 +18,12 @@ import {
   KEY_REVOKED,
   LICENCE_KEY_ALPHABET,
   LICENCE_KEY_LENGTH,
+  MAX_LICENCE_KEY_LENGTH,
   adminTokenMatches,
   decideUnlock,
   etagMatches,
   generateLicenceKey,
+  licenceKeyCandidates,
   normalizeLicenceKey,
   parseBundleUpload,
   parseMintRequest,
@@ -60,6 +62,20 @@ describe('licence key format', () => {
     expect(normalizeLicenceKey('QL-7F3K-9Q2M-X4PD-EXTRA')).toBeNull();
     expect(normalizeLicenceKey('QL-7F3K-9Q2M-X4PU')).toBeNull(); // U is not Crockford
     expect(normalizeLicenceKey('QM-H3KDA-P9RWX-T2MNQ-C7FGB')).toBeNull(); // a sync key
+  });
+
+  it('looks a key up as given first — stored keys are opaque — then as a typed QL key', () => {
+    // A minted key: exact and canonical are the same string.
+    expect(licenceKeyCandidates('QL-7F3K-9Q2M-X4PD')).toEqual(['QL-7F3K-9Q2M-X4PD']);
+    // Typed: the exact input is tried before the canonical form.
+    expect(licenceKeyCandidates('ql 7f3k 9q2m x4pd')).toEqual(['ql 7f3k 9q2m x4pd', 'QL-7F3K-9Q2M-X4PD']);
+    // Another provider's format is looked up exactly, never reshaped.
+    const uuid = '3f2504e0-4f89-11d3-9a0c-0305e82c3301';
+    expect(licenceKeyCandidates(uuid)).toEqual([uuid]);
+    expect(licenceKeyCandidates('x'.repeat(MAX_LICENCE_KEY_LENGTH))).toHaveLength(1);
+    // Only empty and over-long input is refused outright.
+    expect(licenceKeyCandidates('')).toEqual([]);
+    expect(licenceKeyCandidates('x'.repeat(MAX_LICENCE_KEY_LENGTH + 1))).toEqual([]);
   });
 });
 
@@ -317,6 +333,73 @@ describe('unlock service end-to-end (worker ↔ real SQLite + in-memory R2)', ()
       ['', 0],
       ['Leo', 2],
     ]);
+  });
+
+  it('a key in another format, written straight to the table, unlocks, counts, lists and revokes as-is', async () => {
+    await share('aws-genai-udemy');
+    // What a private writer (another provider's licence) might insert:
+    // 36 hyphenated characters, nothing like QL-XXXX-XXXX-XXXX.
+    const opaque = '3f2504e0-4f89-11d3-9a0c-0305e82c3301';
+    db.prepare(
+      "INSERT INTO licence_keys (key, pack_id, label, uses, max_uses, created_at, revoked_at) VALUES (?, 'aws-genai-udemy', 'provider', 0, 2, '2026-10-21T00:00:00.000Z', NULL)",
+    ).run(opaque);
+
+    const got = await call(`/v1/unlock?key=${opaque}`);
+    expect(got.status).toBe(200);
+    expect(got.body.id).toBe('aws-genai-udemy');
+    expect((await call(`/v1/unlock?key=${opaque}&pack=aws-genai-udemy`)).status).toBe(200);
+    expect((await call(`/v1/unlock?key=${opaque}`)).body).toEqual({ error: KEY_EXHAUSTED });
+    // Case matters: the key is what the table holds, not a reshaped form.
+    expect((await call(`/v1/unlock?key=${opaque.toUpperCase()}`)).body).toEqual({ error: KEY_NOT_RECOGNISED });
+
+    const list = await call('/v1/packs/aws-genai-udemy/keys', admin());
+    expect(list.body.keys.map((k: { key: string; uses: number }) => [k.key, k.uses])).toContainEqual([opaque, 2]);
+
+    const gone = await call(`/v1/keys/${opaque}`, admin({ method: 'DELETE' }));
+    expect(gone.status).toBe(200);
+    expect(gone.body.key).toMatchObject({ key: opaque, uses: 2 });
+    expect(gone.body.key.revokedAt).toMatch(/^\d{4}-/);
+    expect((await call(`/v1/unlock?key=${opaque}`)).body).toEqual({ error: KEY_REVOKED });
+
+    // Only empty and over-long keys are refused without a lookup — with the usual words.
+    const long = 'x'.repeat(MAX_LICENCE_KEY_LENGTH + 1);
+    expect((await call(`/v1/unlock?key=${long}`)).body).toEqual({ error: KEY_NOT_RECOGNISED });
+    expect((await call(`/v1/keys/${long}`, admin({ method: 'DELETE' }))).status).toBe(404);
+  });
+
+  it('two unlocks racing for the last use of a key: exactly one is served', async () => {
+    await share('aws-genai-udemy');
+    const minted = await call(
+      '/v1/packs/aws-genai-udemy/keys',
+      admin({ method: 'POST', body: JSON.stringify({ maxUses: 1 }) }),
+    );
+    const key: string = minted.body.key.key;
+    // Both read `uses = 0` before either records a use: the claim must be
+    // atomic, not read-then-write.
+    const [a, b] = await Promise.all([call(`/v1/unlock?key=${key}`), call(`/v1/unlock?key=${key}`)]);
+    expect([a.status, b.status].sort()).toEqual([200, 403]);
+    const refused = a.status === 403 ? a : b;
+    expect(refused.body).toEqual({ error: KEY_EXHAUSTED });
+    const list = await call('/v1/packs/aws-genai-udemy/keys', admin());
+    expect(list.body.keys.find((k: { key: string }) => k.key === key).uses).toBe(1);
+  });
+
+  it('a key revoked while its bundle is being read is not served', async () => {
+    const { body } = await share('aws-genai-udemy');
+    const key: string = body.keys[0].key;
+    const bucket = env.BUNDLES!;
+    const realGet = bucket.get;
+    bucket.get = async (k: string) => {
+      // The author revokes between the key check and the download.
+      await call(`/v1/keys/${key}`, admin({ method: 'DELETE' }));
+      return realGet(k);
+    };
+    const res = await call(`/v1/unlock?key=${key}`);
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ error: KEY_REVOKED });
+    bucket.get = realGet;
+    const list = await call('/v1/packs/aws-genai-udemy/keys', admin());
+    expect(list.body.keys[0].uses).toBe(0);
   });
 
   it('re-sharing replaces the bundle and leaves the keys alone', async () => {
