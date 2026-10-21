@@ -21,10 +21,12 @@ name: Deploy apps
 #
 # Scope: ONLY the engine's own apps — the public showcase pack
 # world-capitals and the home app (app.quizmill.dev, built from the in-repo
-# content/pack-demo). The home app IS the demo: the former demo at
-# try.quizmill.dev now redirects there at the zone level (it was the same
-# build on a second name; no Pages project is behind it, so nothing
-# deploys to it). These carry no secrets, so they can be
+# starter pack content/pack-start: titled after the app, a few questions
+# about using it, the ways a pack gets in on Home). The former demo at
+# try.quizmill.dev now redirects to the home app at the zone level (no
+# Pages project is behind it, so nothing deploys to it); the solar-system
+# demo pack stays in the repo for tests, E2E and the website, and is no
+# longer deployed anywhere. These carry no secrets, so they can be
 # built here from an anonymous clone. They DO carry the anonymous funnel
 # beacon (src/lib/analytics.ts): the NEXT_PUBLIC_* values on the build step
 # are public by design and mirror the `analytics_url` / `privacy_url` /
@@ -78,20 +80,21 @@ jobs:
             project: world-capitals
           # The home app (app.quizmill.dev, #195): the one app a learner
           # installs; private packs arrive through /unlock#key=… links and
-          # sit on its shelf. Built from the demo pack until a neutral
-          # starter pack exists, so it doubles as the live demo. It carries
-          # the public sync URL so progress follows the learner across
-          # devices like the pack apps. Installed PWAs live here: never
-          # move this app to another project or origin.
+          # sit on its shelf. Built from the starter pack (#198): a fresh
+          # install opens as "quizmill" with insert / licence key / registry
+          # one tap away, and a few questions about the app to practise.
+          # It carries the public sync URL so progress follows the learner
+          # across devices like the pack apps. Installed PWAs live here:
+          # never move this app to another project or origin.
           - name: app
-            pack: content/pack-demo
-            app: solar-system-demo-app
+            pack: content/pack-start
+            app: quizmill-start-app
             project: quizmill-app
             sync_url: https://sync.quizmill.dev
     steps:
       # fetch-depth: 0 brings the tags so we can pin the build to the
-      # released engine version. The checkout also puts the bundled demo
-      # pack (content/pack-demo) on disk for the home-app build; the remote
+      # released engine version. The checkout also puts the bundled starter
+      # pack (content/pack-start) on disk for the home-app build; the remote
       # packs are fetched by the CLI from their own repos.
       - uses: actions/checkout@v4
         with:
