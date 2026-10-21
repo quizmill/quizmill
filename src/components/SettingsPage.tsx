@@ -62,6 +62,8 @@ import {
 } from '@/pack/data';
 import { enabledGames } from '@/lib/games/registry';
 import { UpgradeCard } from '@/pack/UpgradeCard';
+import { AppUpdateCheck } from '@/components/AppUpdateCheck';
+import { formatBuildDate } from '@/lib/appUpdate';
 
 /** Taps on the version pill that reveal the hidden games panel — the
  *  Android-style "tap the build number" easter egg. Games are a treat, so
@@ -289,6 +291,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
   // remembered on this device once found. Only for packs with games; the
   // taps still count on any pack, they just reveal nothing.
   const [versionTaps, setVersionTaps] = useState(0);
+  const buildDateLabel = formatBuildDate(process.env.NEXT_PUBLIC_APP_BUILD_DATE);
   const [gamesFound, setGamesFound] = useDevicePref(gamesRevealedPref);
   const tapVersion = () => {
     const taps = versionTaps + 1;
@@ -656,17 +659,30 @@ export function SettingsPage({ extras }: SettingsPageProps) {
           </div>
           <div className="mt-1 flex items-center justify-between text-xs text-ink-500">
             <span>Build</span>
-            <code
-              data-testid="app-build"
-              className="font-mono text-ink-500"
-            >
-              {process.env.NEXT_PUBLIC_APP_BUILD ?? 'dev'}
-            </code>
+            <span className="flex items-center gap-2">
+              <code
+                data-testid="app-build"
+                className="font-mono text-ink-500"
+              >
+                {process.env.NEXT_PUBLIC_APP_BUILD ?? 'dev'}
+              </code>
+              {buildDateLabel ? (
+                // When this build was made — how old the copy on this
+                // device is, which the tag alone doesn't say.
+                <time
+                  data-testid="app-build-date"
+                  dateTime={process.env.NEXT_PUBLIC_APP_BUILD_DATE}
+                >
+                  {buildDateLabel}
+                </time>
+              ) : null}
+            </span>
           </div>
           <p className="mt-2 text-xs text-ink-500">
             Updates fetch automatically when you&apos;re back online;
-            you&apos;ll see a banner offering to refresh.
+            you&apos;ll see a banner offering to refresh. Or ask now:
           </p>
+          <AppUpdateCheck />
         </div>
 
         {gamesRevealed ? (

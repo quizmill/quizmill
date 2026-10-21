@@ -1,5 +1,5 @@
 import type { NextConfig } from 'next';
-import { appVersion, gitShortSha } from './scripts/app-version';
+import { appVersion, buildDate, gitShortSha } from './scripts/app-version';
 
 // Cloudflare Pages serves at the domain root, so the default base path is
 // empty. (Set NEXT_PUBLIC_BASE_PATH to a sub-path only if hosting under one.)
@@ -29,6 +29,9 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_BASE_PATH: effectiveBasePath,
     NEXT_PUBLIC_APP_VERSION: semver,
     NEXT_PUBLIC_APP_BUILD: buildTag(),
+    // When the build was made — shown next to the build tag so a learner
+    // can tell how old their copy is. See scripts/app-version.ts.
+    NEXT_PUBLIC_APP_BUILD_DATE: buildDate(),
     // '1' when this build serves runtime-injected packs (quizmill-cloud's
     // engine) rather than one baked-in pack — defers Home's first paint to
     // the client so the injected pack doesn't clash with the prerender.
