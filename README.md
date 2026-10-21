@@ -224,6 +224,9 @@ The validator (`npx quizmill validate <dir>`) cross-checks ids,
 category / scenario / concept / level references, image paths, and
 weights, and exits non-zero with per-question errors — agents loop on
 it until the pack is clean, so malformed content can't reach the app.
+It also warns about every referenced image that isn't a file under
+`assets/`, so a misnamed figure is caught here rather than as a broken
+image in the app or a refused bundle.
 
 ## What the engine gives every pack
 
