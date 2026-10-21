@@ -121,8 +121,8 @@ const linkKey = (text: string) => {
 
 describe('quizmill share', () => {
   it('refuses to start without a token, naming the config file', async () => {
-    expect((await cli('new', 'udemy-set')).status).toBe(0);
-    const r = await cli('share', 'udemy-set');
+    expect((await cli('new', 'study-set')).status).toBe(0);
+    const r = await cli('share', 'study-set');
     expect(r.status).toBe(1);
     expect(r.stderr).toContain(path.join(home, 'config.json'));
     expect(r.stderr).toContain('UNLOCK_ADMIN_TOKEN');
@@ -135,20 +135,20 @@ describe('quizmill share', () => {
     expect(bare.status).toBe(1);
     expect(bare.stderr).toContain('usage: quizmill share <dir>');
     expect((await cli('share', 'missing')).stderr).toContain('not a directory');
-    expect((await cli('share', 'udemy-set', '--bogus')).stderr).toContain('unknown option "--bogus"');
+    expect((await cli('share', 'study-set', '--bogus')).stderr).toContain('unknown option "--bogus"');
   });
 
   it(
     'validates, bundles, uploads and prints one link per live key — and that link opens the pack',
     async () => {
-      expect((await cli('new', 'udemy-set')).status).toBe(0);
+      expect((await cli('new', 'study-set')).status).toBe(0);
       writeConfig({ endpoint, app: 'app.test', token: ADMIN });
 
-      const first = await cli('share', 'udemy-set');
+      const first = await cli('share', 'study-set');
       expect(first.stderr).toBe('');
       expect(first.status).toBe(0);
       const lines = first.stdout.trim().split('\n');
-      expect(lines[0]).toBe('Uploaded udemy-set (1 question, 1 KiB)');
+      expect(lines[0]).toBe('Uploaded study-set (1 question, 1 KiB)');
       expect(lines[1]).toMatch(/^https:\/\/app\.test\/unlock#key=QL-/);
       expect(lines[1]).toMatch(KEY_SHAPE);
       expect(lines).toHaveLength(2);
@@ -156,29 +156,29 @@ describe('quizmill share', () => {
       expect(first.stdout).not.toContain('bundled');
 
       // What the worker stored is a real bundle of that pack, versioned.
-      const stored = env.BUNDLES.objects.get('udemy-set.json')!;
+      const stored = env.BUNDLES.objects.get('study-set.json')!;
       expect(stored).toBeDefined();
       const bundle = JSON.parse(stored.text);
-      expect(bundle).toMatchObject({ format: 'quizmill-pack-bundle', id: 'udemy-set' });
-      expect(bundle.manifest.id).toBe('udemy-set');
+      expect(bundle).toMatchObject({ format: 'quizmill-pack-bundle', id: 'study-set' });
+      expect(bundle.manifest.id).toBe('study-set');
       expect(stored.customMetadata.version).toMatch(/^[0-9a-f]{7,}/);
 
       // Tapping the link: the key alone names the pack.
       const key = linkKey(lines[1])!;
       const got = await unlock(key);
       expect(got.status).toBe(200);
-      expect(got.body.manifest.id).toBe('udemy-set');
+      expect(got.body.manifest.id).toBe('study-set');
       expect(got.body.questions).toHaveLength(1);
       expect(got.etag).toBe(`"${stored.customMetadata.version}"`);
 
       // Edit the pack and share again: same link, new bundle, keys untouched.
-      const qFile = path.join(tmp, 'udemy-set', 'questions.json');
+      const qFile = path.join(tmp, 'study-set', 'questions.json');
       const questions = JSON.parse(fs.readFileSync(qFile, 'utf8'));
-      questions.push({ ...questions[0], id: 'udemy-set-basics-002', prompt: 'A second question?' });
+      questions.push({ ...questions[0], id: 'study-set-basics-002', prompt: 'A second question?' });
       fs.writeFileSync(qFile, JSON.stringify(questions, null, 2));
-      const second = await cli('share', 'udemy-set');
+      const second = await cli('share', 'study-set');
       expect(second.status).toBe(0);
-      expect(second.stdout).toContain('Uploaded udemy-set (2 questions, ');
+      expect(second.stdout).toContain('Uploaded study-set (2 questions, ');
       expect(second.stdout).toContain(lines[1]);
       const again = await unlock(key, { headers: { 'if-none-match': got.etag! } });
       expect(again.status).toBe(200);
@@ -192,13 +192,13 @@ describe('quizmill share', () => {
   it(
     'an invalid pack is refused by the validator before anything is uploaded',
     async () => {
-      expect((await cli('new', 'udemy-set')).status).toBe(0);
+      expect((await cli('new', 'study-set')).status).toBe(0);
       writeConfig({ endpoint, token: ADMIN });
-      const qFile = path.join(tmp, 'udemy-set', 'questions.json');
+      const qFile = path.join(tmp, 'study-set', 'questions.json');
       const questions = JSON.parse(fs.readFileSync(qFile, 'utf8'));
       questions[0].correctKey = 'Z';
       fs.writeFileSync(qFile, JSON.stringify(questions));
-      const r = await cli('share', 'udemy-set');
+      const r = await cli('share', 'study-set');
       expect(r.status).not.toBe(0);
       expect(r.stderr).toContain('correctKey');
       expect(r.stdout).not.toContain('Uploaded');
@@ -210,38 +210,38 @@ describe('quizmill share', () => {
   it(
     '--new-key, --list and --revoke manage the keys without re-uploading',
     async () => {
-      expect((await cli('new', 'udemy-set')).status).toBe(0);
+      expect((await cli('new', 'study-set')).status).toBe(0);
       writeConfig({ endpoint, app: 'https://app.test/', token: ADMIN });
-      const before = await cli('share', 'udemy-set', '--list');
+      const before = await cli('share', 'study-set', '--list');
       expect(before.status).toBe(0);
-      expect(before.stdout).toContain('udemy-set: no licence keys yet');
+      expect(before.stdout).toContain('study-set: no licence keys yet');
 
-      expect((await cli('share', 'udemy-set')).status).toBe(0);
-      const firstKey = linkKey((await cli('share', 'udemy-set', '--list')).stdout)!;
+      expect((await cli('share', 'study-set')).status).toBe(0);
+      const firstKey = linkKey((await cli('share', 'study-set', '--list')).stdout)!;
 
-      const minted = await cli('share', 'udemy-set', '--new-key', 'Leo');
+      const minted = await cli('share', 'study-set', '--new-key', 'Leo');
       expect(minted.status).toBe(0);
-      expect(minted.stdout).toContain('✓ new licence key for udemy-set (Leo)');
+      expect(minted.stdout).toContain('✓ new licence key for study-set (Leo)');
       const leoKey = linkKey(minted.stdout)!;
       expect(leoKey).not.toBe(firstKey);
       expect((await unlock(leoKey)).status).toBe(200);
 
-      const list = await cli('share', 'udemy-set', '--list');
-      expect(list.stdout).toContain('udemy-set — 2 licence keys');
+      const list = await cli('share', 'study-set', '--list');
+      expect(list.stdout).toContain('study-set — 2 licence keys');
       expect(list.stdout).toContain(`${firstKey}  0 uses  https://app.test/unlock#key=${firstKey}`);
       expect(list.stdout).toContain(`${leoKey}  Leo  1 use  https://app.test/unlock#key=${leoKey}`);
 
       const revoked = await cli('share', '--revoke', leoKey);
       expect(revoked.status).toBe(0);
-      expect(revoked.stdout).toContain(`✓ revoked ${leoKey} (udemy-set)`);
+      expect(revoked.stdout).toContain(`✓ revoked ${leoKey} (study-set)`);
       expect((await unlock(leoKey)).status).toBe(403);
       expect((await unlock(firstKey)).status).toBe(200);
-      expect((await cli('share', 'udemy-set', '--list')).stdout).toMatch(
+      expect((await cli('share', 'study-set', '--list')).stdout).toMatch(
         new RegExp(`${leoKey}  Leo  1 use  revoked \\d{4}-`),
       );
 
       // The share summary lists only keys that still open the pack.
-      const reshare = await cli('share', 'udemy-set');
+      const reshare = await cli('share', 'study-set');
       expect(reshare.stdout).toContain(firstKey);
       expect(reshare.stdout).not.toContain(leoKey);
 
@@ -251,15 +251,15 @@ describe('quizmill share', () => {
   );
 
   it('--endpoint and --app override the config; a refused token is explained', async () => {
-    expect((await cli('new', 'udemy-set')).status).toBe(0);
+    expect((await cli('new', 'study-set')).status).toBe(0);
     writeConfig({ endpoint: unreachable, app: 'https://wrong.test', token: 'QT-wrong' });
-    const refused = await cli('share', 'udemy-set', '--list', '--endpoint', endpoint);
+    const refused = await cli('share', 'study-set', '--list', '--endpoint', endpoint);
     expect(refused.status).toBe(1);
     expect(refused.stderr).toContain('refused the token');
 
     writeConfig({ endpoint: unreachable, app: 'https://wrong.test', token: ADMIN });
-    expect((await cli('share', 'udemy-set', '--list', '--endpoint', endpoint)).status).toBe(0);
-    const down = await cli('share', 'udemy-set', '--list');
+    expect((await cli('share', 'study-set', '--list', '--endpoint', endpoint)).status).toBe(0);
+    const down = await cli('share', 'study-set', '--list');
     expect(down.status).toBe(1);
     expect(down.stderr).toContain(`could not reach ${unreachable}`);
   });
