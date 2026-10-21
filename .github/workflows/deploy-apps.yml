@@ -29,7 +29,7 @@ name: Deploy apps
 # app sets the sync URL.
 #
 # Deliberately NOT here: any app that needs its own secrets (Cloudflare,
-# Supabase keys) or is a private pack. Those are "personal apps"
+# private clone credentials) or is a private pack. Those are "personal apps"
 # (claude-cert, eleven-plus, …) and each deploys from ITS OWN repo via the
 # reusable workflow (.github/workflows/deploy-pack.yml), so per-app secrets
 # stay in the pack repo and private packs build with their own clone
