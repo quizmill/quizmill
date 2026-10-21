@@ -205,6 +205,20 @@ Beyond the required fields, all optional:
   to the https `url` with `?ref=<packId>-home` / `-settings` appended
   so the destination can tell where the tap came from. The engine
   carries no shop or price of its own — the pack supplies the words.
+- **licence unlock** — every build lets a learner who holds a licence
+  key fetch the pack it opens in one tap: a link to `/unlock#key=<key>`
+  (the key rides in the fragment, which never reaches a server) or the
+  "Have a licence key?" entry on `/packs`. The key alone says which
+  pack: the app calls `GET <unlockUrl>/v1/unlock?key=…`, expects a pack
+  bundle (200), a refusal `{ "error": "…" }` it may show (403) or 404,
+  and inserts the bundle under its own manifest id, makes it active and
+  keeps the key under `quizmill.<packId>.licence`. Two optional manifest
+  hints: `upgrade.packId` names the pack a key entered in THIS app is
+  expected to open (a sampler and its full bank — sent as `&pack=`, and
+  any other bundle is refused), and `upgrade.unlockUrl` points at the
+  author's own endpoint instead of the build's (see `NEXT_PUBLIC_UNLOCK_URL`
+  below). CORS `*`, no cookies; how keys are issued is the author's
+  business.
 
 The validator (`npx quizmill validate <dir>`) cross-checks ids,
 category / scenario / concept / level references, image paths, and
@@ -281,6 +295,19 @@ configured). Without any backend, Settings → "Move progress"
 exports/imports progress as a JSON file for device moves and offline
 backups.
 
+### Licence unlock endpoint (optional)
+
+The `/unlock` route and "Have a licence key?" fetch a pack bundle from
+the hosted service at `https://sync.quizmill.dev` unless the build says
+otherwise:
+
+```
+NEXT_PUBLIC_UNLOCK_URL=https://<your unlock service>
+```
+
+A pack's `upgrade.unlockUrl` overrides either for that pack. The
+contract is the one under **licence unlock** above.
+
 ### Usage analytics (optional, anonymous)
 
 A hosted app has no way of telling its author whether anyone opens it.
@@ -293,9 +320,11 @@ NEXT_PUBLIC_PRIVACY_URL=https://example.com/privacy   # optional, linked from Se
 
 and the app beacons a handful of funnel events — `app_open`,
 `first_answer`, `session_10` (tenth completed session), `upsell_seen`,
-`upsell_clicked`, `bundle_inserted` — as
-`{ event, packId, deviceId, appBuild, ts }`. That is the whole payload:
-no answers, no progress, no sync key, no user agent. `deviceId` is a
+`upsell_clicked`, `bundle_inserted`, `pack_unlocked`, `unlock_failed` — as
+`{ event, packId, deviceId, appBuild, ts }`; the last three add `pack`,
+the id of the pack that arrived (or was refused), since `packId` is the
+one that was active at the time. That is the whole payload: no answers,
+no progress, no sync key, no licence key, no user agent. `deviceId` is a
 random UUID the learner can regenerate (or switch the beacon off) in
 Settings → Usage analytics; the card only exists in builds that set the
 URL, and without it nothing leaves the device. The sync worker in

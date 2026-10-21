@@ -94,6 +94,11 @@ npx wrangler d1 execute quizmill-sync --remote --file=schema.sql
 npx wrangler deploy
 ```
 
+The `analytics_events.target_pack_id` column was likewise added later;
+a database created before it needs `migrations/0001-target-pack-id.sql`
+applied **once** (an `ALTER TABLE`, so it is not idempotent) before the
+worker that writes it is deployed — see the comment in that file.
+
 Until that runs, the app keeps names on the device and says they haven't
 reached the other devices yet; it pushes them up by itself on the first
 visit after the upgrade.
@@ -125,7 +130,7 @@ any language) lives in `docs/sync-protocol.md`.
 | `POST /v1/ops` | Bearer sync key | apply `{ pack, ops: [...] }` idempotent mutations |
 | `GET /v1/profile` | Bearer sync key | this key's name, `{ name }` (`null` when unnamed) |
 | `POST /v1/profile` | Bearer sync key | name this key, `{ name }` (empty string clears it) |
-| `POST /v1/analytics` | none | one anonymous funnel beacon, `{ event, packId, deviceId, appBuild, ts }` → 204 |
+| `POST /v1/analytics` | none | one anonymous funnel beacon, `{ event, packId, deviceId, appBuild, ts, pack? }` → 204 |
 | `GET /v1/analytics/summary?pack=<id>&days=<n>` | Bearer `ANALYTICS_READ_TOKEN` if set | per-event totals + distinct devices, per-day series |
 
 Rows are opaque JSON keyed by `(user_id, pack_id, tbl, id)` — the worker
@@ -144,10 +149,13 @@ NEXT_PUBLIC_ANALYTICS_URL=https://sync.quizmill.dev/v1/analytics   # or your own
 NEXT_PUBLIC_PRIVACY_URL=https://example.com/privacy                 # optional
 ```
 
-sends `navigator.sendBeacon` posts for six funnel events (`app_open`,
+sends `navigator.sendBeacon` posts for eight funnel events (`app_open`,
 `first_answer`, `session_10`, `upsell_seen`, `upsell_clicked`,
-`bundle_inserted`) carrying exactly `{ event, packId, deviceId, appBuild,
-ts }`. There is deliberately no auth on the ingest route — devices hold
+`bundle_inserted`, `pack_unlocked`, `unlock_failed`) carrying exactly
+`{ event, packId, deviceId, appBuild, ts }` — plus `pack`, the ARRIVING
+pack's id, on the last three (`packId` is the pack that was active when
+it arrived; stored as `target_pack_id`, never a licence key). There is
+deliberately no auth on the ingest route — devices hold
 no credential, and a sync key must never travel with a beacon — so the
 worker refuses any body over 1 KiB before parsing it (413; a real beacon
 is ~170 bytes), validates the rest against a closed event list and
@@ -171,6 +179,11 @@ curl 'https://sync.quizmill.dev/v1/analytics/summary?pack=solar-system-demo&days
 #  "events":{"app_open":{"count":42,"devices":17},"first_answer":{…},…},
 #  "daily":[{"day":"2026-10-09","event":"app_open","devices":5},…]}
 ```
+
+A pack's summary covers the events that happened in it (`packId`) and
+the ones about it (`pack`, the arriving pack of an insert / unlock): a
+sampler keeps its whole funnel through `pack_unlocked`, and the pack a
+key unlocked sees its own arrivals.
 
 The summary is aggregate counts only, so it is open by default; to gate
 it, `npx wrangler secret put ANALYTICS_READ_TOKEN` and send the value as

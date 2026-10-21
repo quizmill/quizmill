@@ -46,19 +46,29 @@ CREATE TABLE IF NOT EXISTS profiles (
 -- client's timestamp and the server's receipt time (both unix ms; the
 -- summary windows on received_at). Deliberately NOT joined to `rows` or
 -- `profiles`: a device id never meets a sync key.
+--
+-- target_pack_id names the pack an event is ABOUT when that is not the
+-- active one (bundle_inserted / pack_unlocked / unlock_failed carry the
+-- arriving pack's id); NULL for every other event. Added after the first
+-- release — an existing database needs migrations/0001-target-pack-id.sql
+-- once (CREATE TABLE IF NOT EXISTS cannot add a column).
 CREATE TABLE IF NOT EXISTS analytics_events (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  event       TEXT NOT NULL,
-  pack_id     TEXT NOT NULL,
-  device_id   TEXT NOT NULL,
-  app_build   TEXT NOT NULL DEFAULT '',
-  ts          INTEGER NOT NULL,
-  received_at INTEGER NOT NULL
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  event          TEXT NOT NULL,
+  pack_id        TEXT NOT NULL,
+  device_id      TEXT NOT NULL,
+  app_build      TEXT NOT NULL DEFAULT '',
+  ts             INTEGER NOT NULL,
+  received_at    INTEGER NOT NULL,
+  target_pack_id TEXT
 );
 
--- The summary reads one pack over a time window.
+-- The summary reads one pack over a time window — the events in it, plus
+-- the inserts / unlocks about it (the second index serves the OR).
 CREATE INDEX IF NOT EXISTS analytics_by_pack
   ON analytics_events (pack_id, received_at);
+CREATE INDEX IF NOT EXISTS analytics_by_target
+  ON analytics_events (target_pack_id, received_at);
 
 -- Licence keys (GET /v1/unlock, src/unlock.ts): one row per key an author
 -- minted for a pack. A key opens exactly ONE pack; a pack may have one

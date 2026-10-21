@@ -47,6 +47,11 @@ const nextConfig: NextConfig = {
     // device. See src/lib/analytics.ts.
     NEXT_PUBLIC_ANALYTICS_URL: process.env.NEXT_PUBLIC_ANALYTICS_URL ?? '',
     NEXT_PUBLIC_PRIVACY_URL: process.env.NEXT_PUBLIC_PRIVACY_URL ?? '',
+    // The licence-unlock service (optional): the base URL the /unlock
+    // route and "Have a licence key?" fetch a pack bundle from. Unset →
+    // the hosted service; a pack's `upgrade.unlockUrl` overrides either.
+    // See src/lib/unlock.ts.
+    NEXT_PUBLIC_UNLOCK_URL: process.env.NEXT_PUBLIC_UNLOCK_URL ?? '',
   },
 };
 
