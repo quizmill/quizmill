@@ -25,7 +25,7 @@ import {
   type PackManifest,
   type PackQuestion,
 } from './schema';
-import { readPackDir } from './validate';
+import { readPackDir, referencedImages } from './validate';
 
 export const BUNDLE_FORMAT = 'quizmill-pack-bundle';
 
@@ -76,20 +76,6 @@ const MEDIA_TYPES: Record<string, string> = {
 /** Browsers cap localStorage around 5 MiB per origin and the importer
  *  stores the bundle wholesale — warn well before a pack can't fit. */
 const SIZE_WARN_BYTES = 4 * 1024 * 1024;
-
-/** Every relative image path the bank references, deduped in first-seen
- *  order (absolute URLs — not valid in a pack anyway — are left alone). */
-export function referencedImages(questions: PackQuestion[]): string[] {
-  const seen = new Set<string>();
-  const add = (src: string | undefined) => {
-    if (src && !/^https?:\/\//i.test(src)) seen.add(src);
-  };
-  for (const q of questions) {
-    add(q.image);
-    for (const o of q.options) add(o.image);
-  }
-  return [...seen];
-}
 
 function dataUrl(file: string): string {
   const ext = path.extname(file).slice(1).toLowerCase();
