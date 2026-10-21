@@ -69,3 +69,25 @@ CREATE INDEX IF NOT EXISTS analytics_by_pack
   ON analytics_events (pack_id, received_at);
 CREATE INDEX IF NOT EXISTS analytics_by_target
   ON analytics_events (target_pack_id, received_at);
+
+-- Licence keys (GET /v1/unlock, src/unlock.ts): one row per key an author
+-- minted for a pack. A key opens exactly ONE pack; a pack may have one
+-- shared key (a private study set) or one per buyer (a paid bank). The
+-- bundle itself lives in the BUNDLES R2 bucket under `<pack_id>.json`;
+-- this table only says which keys open it. `uses` counts successful
+-- unlocks (a device re-fetching counts again); `max_uses` NULL = no limit;
+-- `revoked_at` set = 403 from then on. Keys are stored in clear — they are
+-- the author's to list and revoke, unlike sync keys, which are hashed.
+CREATE TABLE IF NOT EXISTS licence_keys (
+  key        TEXT PRIMARY KEY,
+  pack_id    TEXT NOT NULL,
+  label      TEXT NOT NULL DEFAULT '',
+  uses       INTEGER NOT NULL DEFAULT 0,
+  max_uses   INTEGER,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  revoked_at TEXT
+);
+
+-- `share --list` reads one pack's keys.
+CREATE INDEX IF NOT EXISTS licence_keys_by_pack
+  ON licence_keys (pack_id);

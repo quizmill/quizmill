@@ -24,3 +24,13 @@ binding = "DB"
 database_name = "quizmill-sync"
 # Replace with the id printed by `npx wrangler d1 create quizmill-sync`:
 database_id = "REPLACE_WITH_YOUR_DATABASE_ID"
+
+# Pack bundles for licence-key unlock (GET /v1/unlock, PUT /v1/packs/:id —
+# src/unlock.ts). One object per pack id, `<pack_id>.json`, the file
+# `quizmill bundle` produces. Uploads are authorised by the
+# UNLOCK_ADMIN_TOKEN secret (`npx wrangler secret put UNLOCK_ADMIN_TOKEN`);
+# downloads by a row in the licence_keys table (schema.sql). Create with
+# `npx wrangler r2 bucket create quizmill-bundles`.
+[[r2_buckets]]
+binding = "BUNDLES"
+bucket_name = "quizmill-bundles"
