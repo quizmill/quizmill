@@ -409,9 +409,10 @@ async function routeUnlock(request: Request, env: Env, pathname: string): Promis
     if (request.method !== 'DELETE') return json({ error: 'method not allowed' }, 405);
     return handleRevokeKey(env, decodeURIComponent(keyMatch[1]));
   }
-  const packId = decodeURIComponent(packMatch![1]);
+  if (!packMatch) return null;
+  const packId = decodeURIComponent(packMatch[1]);
   if (!isPackId(packId)) return json({ error: 'invalid pack id' }, 400);
-  if (packMatch![2]) {
+  if (packMatch[2]) {
     if (request.method === 'GET') return json({ keys: await keysForPack(env, packId) });
     if (request.method === 'POST') return handleMintKey(request, env, bucket, packId);
     return json({ error: 'method not allowed' }, 405);

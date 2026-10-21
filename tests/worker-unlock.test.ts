@@ -6,11 +6,11 @@
  * /unlock route drive it.
  */
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
-import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { webcrypto } from 'node:crypto';
 import worker from '../cloudflare/src/worker';
+import { makeD1, makeR2, openSqlite, type SqliteDatabase } from './helpers/worker-fakes';
 import {
   KEY_EXHAUSTED,
   KEY_NOT_RECOGNISED,
@@ -27,11 +27,6 @@ import {
   parseMintRequest,
   type LicenceKeyRow,
 } from '../cloudflare/src/unlock';
-
-const { DatabaseSync } = createRequire(import.meta.url)(
-  'node:sqlite',
-) as typeof import('node:sqlite');
-type DatabaseSync = InstanceType<typeof DatabaseSync>;
 
 if (!globalThis.crypto?.subtle) {
   Object.defineProperty(globalThis, 'crypto', { value: webcrypto });
@@ -102,8 +97,8 @@ describe('decideUnlock', () => {
   it('404s a pack hint the key does not open — only after the key itself passed', () => {
     expect(decideUnlock(row, 'other-pack')).toEqual({ ok: false, status: 404, error: KEY_OTHER_PACK });
     // An unknown key asking for a pack learns nothing about that pack.
-    expect(decideUnlock(null, 'other-pack').status).toBe(403);
-    expect(decideUnlock({ ...row, revoked_at: 'x' }, 'other-pack').status).toBe(403);
+    expect(decideUnlock(null, 'other-pack')).toMatchObject({ ok: false, status: 403 });
+    expect(decideUnlock({ ...row, revoked_at: 'x' }, 'other-pack')).toMatchObject({ ok: false, status: 403 });
   });
 });
 
@@ -194,64 +189,13 @@ describe('etagMatches / adminTokenMatches', () => {
 
 // ── Full pipeline: share-style uploads ↔ worker.fetch ↔ SQLite + R2 ────
 
-interface BoundStmt {
-  bind(...values: unknown[]): BoundStmt;
-  all<T>(): Promise<{ results: T[] }>;
-  runNow(): void;
-}
-
-function makeD1(db: DatabaseSync) {
-  const prepare = (sql: string): BoundStmt => {
-    let params: unknown[] = [];
-    const stmt: BoundStmt = {
-      bind(...values: unknown[]) {
-        params = values;
-        return stmt;
-      },
-      async all<T>() {
-        const results = db.prepare(sql).all(...(params as never[])) as T[];
-        return { results };
-      },
-      runNow() {
-        db.prepare(sql).run(...(params as never[]));
-      },
-    };
-    return stmt;
-  };
-  return {
-    prepare,
-    async batch(statements: BoundStmt[]) {
-      for (const s of statements) s.runNow();
-      return [];
-    },
-  };
-}
-
-/** The slice of R2 the worker uses, over a Map. */
-export function makeR2() {
-  const objects = new Map<string, { text: string; customMetadata: Record<string, string> }>();
-  return {
-    objects,
-    async head(key: string) {
-      const o = objects.get(key);
-      return o ? { customMetadata: o.customMetadata } : null;
-    },
-    async get(key: string) {
-      const o = objects.get(key);
-      return o ? { customMetadata: o.customMetadata, text: async () => o.text } : null;
-    },
-    async put(key: string, value: string, options?: { customMetadata?: Record<string, string> }) {
-      const o = { text: value, customMetadata: options?.customMetadata ?? {} };
-      objects.set(key, o);
-      return { customMetadata: o.customMetadata };
-    },
-  };
-}
-
 const ADMIN = 'QT-test-admin-token';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- the worker's JSON replies are asserted field by field below
+type Reply = any;
+
 describe('unlock service end-to-end (worker ↔ real SQLite + in-memory R2)', () => {
-  let db: DatabaseSync;
+  let db: SqliteDatabase;
   let env: {
     DB: ReturnType<typeof makeD1>;
     BUNDLES?: ReturnType<typeof makeR2>;
@@ -259,7 +203,7 @@ describe('unlock service end-to-end (worker ↔ real SQLite + in-memory R2)', ()
   };
 
   beforeEach(() => {
-    db = new DatabaseSync(':memory:');
+    db = openSqlite();
     db.exec(fs.readFileSync(path.join(__dirname, '..', 'cloudflare', 'schema.sql'), 'utf8'));
     env = { DB: makeD1(db), BUNDLES: makeR2(), UNLOCK_ADMIN_TOKEN: ADMIN };
   });
@@ -274,7 +218,7 @@ describe('unlock service end-to-end (worker ↔ real SQLite + in-memory R2)', ()
     } catch {
       body = text;
     }
-    return { status: res.status, headers: res.headers, body: body as never };
+    return { status: res.status, headers: res.headers, body: body as Reply };
   };
   const admin = (init: RequestInit = {}) => ({
     ...init,
