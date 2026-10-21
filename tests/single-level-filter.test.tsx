@@ -141,4 +141,23 @@ describe('Paper level filter with a single-level pack (#201)', () => {
     // The other compose controls are untouched.
     expect(container.querySelector('[role="radiogroup"][aria-label="Question count"]')).toBeTruthy();
   });
+
+  it('offers the whole bank ("All") without a saved level filter when the pack has one level', async () => {
+    // "All" prints a whole level in pack order and used to need a level
+    // picked in the row above. With the row gone, a one-level pack's only
+    // level IS the whole bank — otherwise a fresh learner could never print
+    // the complete paper (Copilot review on #205).
+    state.levels = ONE_LEVEL;
+    await render(<PaperPage />);
+    const counts = container.querySelector('[role="radiogroup"][aria-label="Question count"]');
+    expect(radioLabels(counts!)).toEqual(['5', '10', '15', '20', 'All']);
+  });
+
+  it('still needs a level picked before offering "All" when the pack has two', async () => {
+    // Two levels, filter on All: the bank spans both levels, which is not
+    // "a paper as written" — the count stays numeric until a level is chosen.
+    await render(<PaperPage />);
+    const counts = container.querySelector('[role="radiogroup"][aria-label="Question count"]');
+    expect(radioLabels(counts!)).toEqual(['5', '10', '15', '20']);
+  });
 });
