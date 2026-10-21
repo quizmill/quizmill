@@ -19,16 +19,17 @@ name: Deploy apps
 #   - daily (picks up content changes in the separate pack repos)
 #   - manual dispatch
 #
-# Scope: ONLY the engine's own showcase apps — the demo ("try", built
-# from the in-repo content/pack-demo) and the public showcase pack
-# world-capitals. These carry no secrets and have no cloud sync, so they
-# can be built here from an anonymous clone. They DO carry the anonymous
-# funnel beacon (src/lib/analytics.ts): the two NEXT_PUBLIC_* values on the
-# build step are public by design and mirror the `analytics_url` /
-# `privacy_url` inputs the pack repos pass to deploy-pack.yml.
+# Scope: ONLY the engine's own apps — the demo ("try", built from the
+# in-repo content/pack-demo), the public showcase pack world-capitals, and
+# the home app (app.quizmill.dev). These carry no secrets, so they can be
+# built here from an anonymous clone. They DO carry the anonymous funnel
+# beacon (src/lib/analytics.ts): the NEXT_PUBLIC_* values on the build step
+# are public by design and mirror the `analytics_url` / `privacy_url` /
+# `sync_url` inputs the pack repos pass to deploy-pack.yml; only the home
+# app sets the sync URL.
 #
 # Deliberately NOT here: any app that needs its own secrets (Cloudflare,
-# a sync URL) or is a private pack. Those are "personal apps"
+# Supabase keys) or is a private pack. Those are "personal apps"
 # (claude-cert, eleven-plus, …) and each deploys from ITS OWN repo via the
 # reusable workflow (.github/workflows/deploy-pack.yml), so per-app secrets
 # stay in the pack repo and private packs build with their own clone
@@ -76,6 +77,16 @@ jobs:
             pack: quizmill/pack-world-capitals
             app: world-capitals-app
             project: world-capitals
+          # The home app (app.quizmill.dev, #195): the one app a learner
+          # installs; private packs arrive through /unlock#key=… links and
+          # sit on its shelf. Built from the demo pack until a neutral
+          # starter pack exists. It carries the public sync URL so progress
+          # follows the learner across devices like the pack apps.
+          - name: app
+            pack: content/pack-demo
+            app: solar-system-demo-app
+            project: quizmill-app
+            sync_url: https://sync.quizmill.dev
     steps:
       # fetch-depth: 0 brings the tags so we can pin the build to the
       # released engine version. The checkout also puts the bundled demo
@@ -132,6 +143,10 @@ jobs:
           NEXT_PUBLIC_ANALYTICS_URL: https://sync.quizmill.dev/v1/analytics
           # Privacy page the Settings analytics card links to.
           NEXT_PUBLIC_PRIVACY_URL: https://quizmill.dev/privacy
+          # Cloud sync, only for apps whose matrix entry sets it (the home
+          # app). The URL is public — it is baked into the served bundle —
+          # and an empty value leaves the sync layer dormant.
+          NEXT_PUBLIC_SYNC_URL: ${{ matrix.sync_url }}
         run: npx --yes quizmill@${{ steps.engine.outputs.spec }} build ${{ matrix.pack }}
 
       - name: Deploy to Cloudflare Pages
