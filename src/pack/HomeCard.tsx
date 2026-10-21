@@ -10,14 +10,14 @@ import { ArrowRight, type LucideIcon } from 'lucide-react';
  * link — kept for Review mistakes, the one mode that is a prompt rather
  * than a tool. `ModeTile` is the compact square for the occasional modes
  * (Drive, Coach, Paper, the timed exam), laid side by side in a rail so
- * four of them cost one row instead of four. Both pick a `tone`; the
- * colours live here once.
+ * four of them cost one row instead of four. The card picks a `tone`,
+ * the tiles share one; the colours live here once.
  */
 
 export type HomeCardTone = 'night' | 'brand' | 'ink' | 'warn';
 
 /** Per-tone classes for the card, the icon bubble, the two text lines and
- *  the arrow. `night` is the dark Drive card; the rest are light. */
+ *  the arrow. `night` is dark in both themes; the rest follow the theme. */
 const TONE: Record<
   HomeCardTone,
   { card: string; bubble: string; title: string; blurb: string; arrow: string }
@@ -94,23 +94,23 @@ export function HomeCard({
  * A square tile for the mode rail: icon bubble, label, and one short
  * caption (a few words — "Hands-free", "9 questions · 13:30"). Equal
  * widths in a flex row, so two tiles are wide and four are square.
+ * Every tile wears the same neutral `ink` tone: side by side they are a
+ * set of equals, and a tinted one among plain ones reads as selected.
  */
 export function ModeTile({
   href,
   icon: Icon,
   label,
   caption,
-  tone,
   testid,
 }: {
   href: string;
   icon: LucideIcon;
   label: ReactNode;
   caption: ReactNode;
-  tone: HomeCardTone;
   testid?: string;
 }) {
-  const t = TONE[tone];
+  const t = TONE.ink;
   return (
     <Link
       href={href}

@@ -401,7 +401,6 @@ export default function PackHome() {
               <ModeTile
                 href="/drive/"
                 testid="drive-card"
-                tone="night"
                 icon={Car}
                 label="Drive"
                 caption="By voice"
@@ -411,7 +410,6 @@ export default function PackHome() {
               <ModeTile
                 href="/coach/"
                 testid="coach-card"
-                tone="brand"
                 icon={GraduationCap}
                 label="Coach"
                 caption="Replay"
@@ -421,7 +419,6 @@ export default function PackHome() {
               <ModeTile
                 href="/paper/"
                 testid="paper-card"
-                tone="ink"
                 icon={Printer}
                 label="Paper"
                 caption="Print & mark"
@@ -431,7 +428,6 @@ export default function PackHome() {
               <ModeTile
                 href="/practice/exam/"
                 testid="exam-card"
-                tone="ink"
                 icon={Timer}
                 label={APP_CONFIG.exam?.label ?? 'Timed exam'}
                 caption={`${examSitting.count} Qs · ${formatClock(examSitting.durationSeconds)}`}

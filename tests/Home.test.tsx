@@ -281,4 +281,26 @@ describe('PackHome mode cards', () => {
       './__snapshots__/home-mode-cards.html',
     );
   });
+
+  it('gives every tile in the rail the same look — none is highlighted', async () => {
+    // Four tiles side by side read as one set of equals; a tinted Coach
+    // tile among three plain ones looked like a selection (#193 review).
+    saveDriveModeEnabled(true);
+    saveCoachModeEnabled(true);
+    savePaperModeEnabled(true);
+    await render();
+    const tiles = Array.from(
+      container.querySelectorAll('[data-testid="mode-rail"] a'),
+    );
+    expect(tiles.map((a) => a.getAttribute('data-testid'))).toEqual([
+      'drive-card',
+      'coach-card',
+      'paper-card',
+      'exam-card',
+    ]);
+    const looks = new Set(tiles.map((a) => a.className));
+    expect(looks.size, [...looks].join('\n')).toBe(1);
+    const bubbles = new Set(tiles.map((a) => a.querySelector('span')!.className));
+    expect(bubbles.size).toBe(1);
+  });
 });
