@@ -12,7 +12,7 @@
  *        progress kept — every store is `quizmill.<packId>.*`), then one
  *        line on Home: "Updated: now N questions"; beacon `pack_updated`
  *   403  the key no longer opens it: nothing visible, and the pack is not
- *        asked about again until a key is entered (a fresh unlock clears
+ *        asked about again until a key is entered (a fresh unlock resets
  *        the record); 404 — the key opens another pack now — the same
  *   offline / network error: silent, and the pack stays due
  *

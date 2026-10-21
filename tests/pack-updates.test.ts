@@ -15,6 +15,7 @@ import {
   loadUpdateCheck,
   stashPackUpdatedNotice,
   takePackUpdatedNotices,
+  updateDue,
 } from '@/lib/packUpdates';
 import {
   activatePack,
@@ -281,15 +282,18 @@ describe('checkPackUpdates — what the endpoint says', () => {
     });
     expect(calls).toHaveLength(1);
 
-    // A key entered again (the unlock flow) lifts the stop.
+    // A key entered again (the unlock flow) lifts the stop — and counts as
+    // today's look, so the fresh bundle is not asked about again at once.
     const unlocked = await unlockPack(KEY, {
       config: { unlockUrl: DEFAULT_UNLOCK_URL },
       buildPackId: BUILD,
       fetchImpl: respond(200, bundle('paid-pack', 3), { etag: '"v3"' }),
     });
     expect(unlocked.ok).toBe(true);
-    expect(loadUpdateCheck('paid-pack')).toBeNull();
+    expect(loadUpdateCheck('paid-pack')).toEqual({ checkedAt: expect.any(Number) });
     expect(listInsertedPacks()[0]).toMatchObject({ packVersion: 'v3', unlockUrl: DEFAULT_UNLOCK_URL });
+    expect(updateDue('paid-pack', Date.now())).toBe(false);
+    expect(updateDue('paid-pack', Date.now() + PACK_UPDATE_INTERVAL_MS)).toBe(true);
   });
 
   it('404 (the key opens another pack now) is treated like a refusal', async () => {

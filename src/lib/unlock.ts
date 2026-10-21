@@ -62,7 +62,8 @@ export function licenceKeyStorageKey(packId: string): string {
 
 /** Where the daily update check keeps its record for a pack (when it last
  *  asked, and whether the key was refused) — see src/lib/packUpdates.ts.
- *  A fresh unlock clears it, so a key entered again resumes the checks. */
+ *  A fresh unlock resets it to "checked now", so a key entered again
+ *  resumes the checks from tomorrow. */
 export function updateCheckStorageKey(packId: string): string {
   return `quizmill.${packId}.packUpdate.v1`;
 }
@@ -345,8 +346,13 @@ export async function unlockPack(
   activatePack(entry.id);
   try {
     window.localStorage.setItem(licenceKeyStorageKey(entry.id), key);
-    // A key entered again lifts a refusal the update check may have hit.
-    window.localStorage.removeItem(updateCheckStorageKey(entry.id));
+    // The bundle was fetched just now, so the daily update check counts
+    // this as today's look — and a key entered again lifts a refusal the
+    // check may have hit (src/lib/packUpdates.ts).
+    window.localStorage.setItem(
+      updateCheckStorageKey(entry.id),
+      JSON.stringify({ checkedAt: Date.now() }),
+    );
   } catch {
     // the pack is in; a key that can't be kept just means typing it again
   }
