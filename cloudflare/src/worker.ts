@@ -40,6 +40,27 @@ import {
   statementsForBeacon,
   summaryStatements,
 } from './analytics';
+import {
+  adminTokenMatches,
+  bundleEtag,
+  bundleObjectKey,
+  decideUnlock,
+  etagMatches,
+  generateLicenceKey,
+  isPackId,
+  keyLookupStatement,
+  keysForPackStatement,
+  normalizeLicenceKey,
+  parseBundleUpload,
+  parseMintRequest,
+  statementsForMint,
+  statementsForRevoke,
+  statementsForUse,
+  toLicenceKey,
+  KEY_NOT_RECOGNISED,
+  MAX_BUNDLE_BYTES,
+} from './unlock';
+import type { LicenceKeyRow } from './unlock';
 
 // Minimal D1 surface, declared locally so the engine repo's `tsc` run
 // doesn't need @cloudflare/workers-types. Matches the real runtime API.
@@ -51,20 +72,45 @@ interface D1Database {
   prepare(sql: string): D1PreparedStatement;
   batch(statements: D1PreparedStatement[]): Promise<unknown[]>;
 }
+// Likewise the slice of R2 the unlock routes use: one object per pack.
+interface R2Object {
+  customMetadata?: Record<string, string>;
+}
+interface R2ObjectBody extends R2Object {
+  text(): Promise<string>;
+}
+interface R2Bucket {
+  head(key: string): Promise<R2Object | null>;
+  get(key: string): Promise<R2ObjectBody | null>;
+  put(
+    key: string,
+    value: string,
+    options?: { httpMetadata?: { contentType?: string }; customMetadata?: Record<string, string> },
+  ): Promise<R2Object>;
+}
 interface Env {
   DB: D1Database;
   /** Optional (`wrangler secret put ANALYTICS_READ_TOKEN`): when set, the
    *  analytics summary needs it as a bearer token. Unset = the aggregate
    *  counts are readable by anyone who knows a pack id. */
   ANALYTICS_READ_TOKEN?: string;
+  /** Pack bundles for licence-key unlock (wrangler.toml `[[r2_buckets]]`);
+   *  without the binding the unlock routes answer 404 like any other
+   *  unknown path. */
+  BUNDLES?: R2Bucket;
+  /** `wrangler secret put UNLOCK_ADMIN_TOKEN`: the bearer token `quizmill
+   *  share` uploads bundles and mints keys with. Unset = no admin routes. */
+  UNLOCK_ADMIN_TOKEN?: string;
 }
 
 const CORS_HEADERS: Record<string, string> = {
   // Bearer-key auth with no cookies, so a wildcard origin is safe — the
   // key itself is the capability, not the caller's origin.
   'access-control-allow-origin': '*',
-  'access-control-allow-methods': 'GET, POST, OPTIONS',
-  'access-control-allow-headers': 'authorization, content-type',
+  'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'access-control-allow-headers': 'authorization, content-type, if-none-match',
+  // The unlock ETag is the pack version the app re-checks later (#172).
+  'access-control-expose-headers': 'etag',
   'access-control-max-age': '86400',
 };
 
@@ -214,6 +260,166 @@ async function handleSummary(request: Request, env: Env): Promise<Response> {
   return json(buildSummary(query, sinceMs, totals.results, daily.results));
 }
 
+// ── Licence-key unlock (no sync key involved; see unlock.ts) ───────────
+
+/** The bucket, or null when this deployment has no unlock service. */
+function bundles(env: Env): R2Bucket | null {
+  return env.BUNDLES ?? null;
+}
+
+async function lookupKey(env: Env, key: string): Promise<LicenceKeyRow | null> {
+  const stmt = keyLookupStatement(key);
+  const { results } = await env.DB.prepare(stmt.sql).bind(...stmt.params).all<LicenceKeyRow>();
+  return results[0] ?? null;
+}
+
+async function keysForPack(env: Env, packId: string) {
+  const stmt = keysForPackStatement(packId);
+  const { results } = await env.DB.prepare(stmt.sql).bind(...stmt.params).all<LicenceKeyRow>();
+  return results.map(toLicenceKey);
+}
+
+/**
+ * `GET /v1/unlock?key=…[&pack=…]` — the bundle a key opens. The key is
+ * judged before anything is read from the bucket, and a malformed key is
+ * refused with the same words as an unknown one, so nothing in the reply
+ * says whether a pack exists until the caller has proven they may have
+ * it. The ETag is the stored version; a matching If-None-Match gets a 304
+ * and does not count as a use.
+ */
+async function handleUnlock(request: Request, env: Env, bucket: R2Bucket): Promise<Response> {
+  const params = new URL(request.url).searchParams;
+  const key = normalizeLicenceKey(params.get('key') ?? '');
+  const packParam = params.get('pack');
+  if (!key) return json({ error: KEY_NOT_RECOGNISED }, 403);
+  const decision = decideUnlock(await lookupKey(env, key), packParam);
+  if (!decision.ok) return json({ error: decision.error }, decision.status);
+
+  const object = await bucket.get(bundleObjectKey(decision.packId));
+  if (!object) return json({ error: 'The pack behind this key is not available.' }, 404);
+  const etag = bundleEtag(object.customMetadata?.version ?? '');
+  if (etagMatches(request.headers.get('if-none-match'), etag)) {
+    return new Response(null, { status: 304, headers: { etag, ...CORS_HEADERS } });
+  }
+  await env.DB.batch(bindAll(env, statementsForUse(key)));
+  return new Response(await object.text(), {
+    status: 200,
+    headers: { 'content-type': 'application/json', etag, ...CORS_HEADERS },
+  });
+}
+
+/** `PUT /v1/packs/:id` — store (or replace) a pack's bundle. Keys are
+ *  left alone, so a re-share keeps every link working and every learner's
+ *  progress (same pack id); a pack with no key yet gets its first one. */
+async function handlePutPack(
+  request: Request,
+  env: Env,
+  bucket: R2Bucket,
+  packId: string,
+): Promise<Response> {
+  const declared = Number(request.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > MAX_BUNDLE_BYTES) {
+    return json({ error: 'bundle too large' }, 413);
+  }
+  const body = await jsonBody(request);
+  if (body === undefined) return json({ error: 'invalid JSON' }, 400);
+  const parsed = await parseBundleUpload(body, packId);
+  if (!parsed.ok) return json({ error: parsed.error }, 400);
+  const { bundle } = parsed;
+  await bucket.put(bundleObjectKey(packId), bundle.text, {
+    httpMetadata: { contentType: 'application/json' },
+    customMetadata: { version: bundle.version, questions: String(bundle.questions) },
+  });
+  let keys = await keysForPack(env, packId);
+  if (keys.length === 0) {
+    const key = generateLicenceKey();
+    await env.DB.batch(
+      bindAll(env, statementsForMint(key, packId, { label: '', maxUses: null }, Date.now())),
+    );
+    keys = await keysForPack(env, packId);
+  }
+  return json({
+    ok: true,
+    id: packId,
+    version: bundle.version,
+    questions: bundle.questions,
+    bytes: bundle.bytes,
+    keys,
+  });
+}
+
+/** `POST /v1/packs/:id/keys` — mint a key for a pack that has a bundle. */
+async function handleMintKey(
+  request: Request,
+  env: Env,
+  bucket: R2Bucket,
+  packId: string,
+): Promise<Response> {
+  // An empty body is a plain unlabelled key; anything else must be JSON.
+  const text = await request.text();
+  let body: unknown = null;
+  if (text.trim() !== '') {
+    try {
+      body = JSON.parse(text);
+    } catch {
+      return json({ error: 'invalid JSON' }, 400);
+    }
+  }
+  const mint = parseMintRequest(body);
+  if (!mint) return json({ error: 'invalid key request' }, 400);
+  if (!(await bucket.head(bundleObjectKey(packId)))) {
+    return json({ error: `no bundle stored for "${packId}" — share the pack first` }, 404);
+  }
+  const key = generateLicenceKey();
+  await env.DB.batch(bindAll(env, statementsForMint(key, packId, mint, Date.now())));
+  const row = await lookupKey(env, key);
+  return json({ ok: true, key: row ? toLicenceKey(row) : null });
+}
+
+/** `DELETE /v1/keys/:key` — revoke; the row stays so `--list` shows it. */
+async function handleRevokeKey(env: Env, rawKey: string): Promise<Response> {
+  const key = normalizeLicenceKey(rawKey);
+  const row = key ? await lookupKey(env, key) : null;
+  if (!key || !row) return json({ error: 'no such licence key' }, 404);
+  await env.DB.batch(bindAll(env, statementsForRevoke(key, Date.now())));
+  const after = await lookupKey(env, key);
+  return json({ ok: true, key: after ? toLicenceKey(after) : null });
+}
+
+/**
+ * Route the unlock service's paths; null when the path is not one of
+ * them. Admin routes need the UNLOCK_ADMIN_TOKEN bearer; without the
+ * secret or the bucket binding the whole service is absent (404), so a
+ * fork that only wants sync changes nothing.
+ */
+async function routeUnlock(request: Request, env: Env, pathname: string): Promise<Response | null> {
+  const bucket = bundles(env);
+  if (!bucket) return null;
+  if (pathname === '/v1/unlock') {
+    if (request.method !== 'GET') return json({ error: 'method not allowed' }, 405);
+    return handleUnlock(request, env, bucket);
+  }
+  const packMatch = /^\/v1\/packs\/([^/]+)(\/keys)?$/.exec(pathname);
+  const keyMatch = /^\/v1\/keys\/([^/]+)$/.exec(pathname);
+  if (!packMatch && !keyMatch) return null;
+  if (!env.UNLOCK_ADMIN_TOKEN || !adminTokenMatches(bearerToken(request), env.UNLOCK_ADMIN_TOKEN)) {
+    return json({ error: 'missing or invalid admin token' }, 401);
+  }
+  if (keyMatch) {
+    if (request.method !== 'DELETE') return json({ error: 'method not allowed' }, 405);
+    return handleRevokeKey(env, decodeURIComponent(keyMatch[1]));
+  }
+  const packId = decodeURIComponent(packMatch![1]);
+  if (!isPackId(packId)) return json({ error: 'invalid pack id' }, 400);
+  if (packMatch![2]) {
+    if (request.method === 'GET') return json({ keys: await keysForPack(env, packId) });
+    if (request.method === 'POST') return handleMintKey(request, env, bucket, packId);
+    return json({ error: 'method not allowed' }, 405);
+  }
+  if (request.method !== 'PUT') return json({ error: 'method not allowed' }, 405);
+  return handlePutPack(request, env, bucket, packId);
+}
+
 const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method === 'OPTIONS') {
@@ -235,6 +441,10 @@ const worker = {
       if (pathname === '/v1/analytics/summary' && request.method === 'GET') {
         return await handleSummary(request, env);
       }
+      // Licence-key unlock carries its own credentials (a licence key, or
+      // the admin token), never a sync key.
+      const unlocked = await routeUnlock(request, env, pathname);
+      if (unlocked) return unlocked;
     } catch (err) {
       console.error('[quizmill-sync]', err);
       return json({ error: 'internal error' }, 500);
