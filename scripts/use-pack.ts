@@ -74,7 +74,7 @@ function main(): void {
   if (fs.existsSync(srcAssets)) fs.cpSync(srcAssets, destAssets, { recursive: true });
 
   const manifest = input.manifest as PackManifest;
-  writePackAssets(manifest);
+  writePackAssets(manifest, { packDir: TARGET });
   syncPackAssets(TARGET);
   const questions = input.questions as unknown[];
   console.log(

@@ -21,7 +21,7 @@ function ensurePwaAssets(): void {
   const manifest = JSON.parse(
     fs.readFileSync(path.join(TARGET, 'pack.json'), 'utf8'),
   );
-  writePackAssets(manifest);
+  writePackAssets(manifest, { packDir: TARGET });
   // Re-mirror the active pack's images on every dev/build run, so a
   // cleaned public/ or a freshly-seeded pack still serves /pack-assets/.
   syncPackAssets(TARGET);
