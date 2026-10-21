@@ -42,6 +42,14 @@ export interface PackLibraryEntry {
   insertedAt: number;
   /** Where the pack came from — a URL or file name, purely informational. */
   origin?: string;
+  /** The pack revision this content is: a bundle's `packVersion`, or —
+   *  for a pack fetched with a licence key — the ETag the unlock endpoint
+   *  served it under, which is what a later `If-None-Match` compares
+   *  (src/lib/packUpdates.ts). Absent for packs inserted as plain files. */
+  packVersion?: string;
+  /** The unlock endpoint base a licence-key pack was fetched from, so the
+   *  daily update check asks the same place. Absent for other inserts. */
+  unlockUrl?: string;
 }
 
 export type InsertResult =
@@ -138,10 +146,13 @@ function embeddedAssets(raw: unknown): Record<string, string> | undefined {
  * stored. Re-inserting an existing id replaces its content (pack update);
  * progress is unaffected either way. `buildPackId` (the pack compiled into
  * this deployment) is refused — that one is built in, not inserted.
+ * `packVersion` overrides the version the bundle envelope carries (the
+ * unlock path passes the endpoint's ETag); `unlockUrl` is kept only when
+ * given, so a later file insert of the same pack simply forgets it.
  */
 export function insertPack(
   raw: unknown,
-  opts: { origin?: string; buildPackId: string },
+  opts: { origin?: string; buildPackId: string; packVersion?: string; unlockUrl?: string },
 ): InsertResult {
   if (!browser()) return { ok: false, errors: ['not in a browser'] };
   if (typeof raw !== 'object' || raw === null) {
@@ -182,6 +193,11 @@ export function insertPack(
     ...(assetsBase ? { assetsBase } : {}),
     ...(assets ? { assets } : {}),
   };
+  // The bundle envelope's own revision (tools/pack/bundle.ts) unless the
+  // caller knows better; never an empty string.
+  const envelopeVersion = (candidate as { packVersion?: unknown }).packVersion;
+  const packVersion =
+    opts.packVersion || (typeof envelopeVersion === 'string' && envelopeVersion ? envelopeVersion : undefined);
   const entry: PackLibraryEntry = {
     id: manifest.id,
     title: manifest.title,
@@ -191,6 +207,8 @@ export function insertPack(
     categoryCount: manifest.categories.length,
     insertedAt: Date.now(),
     origin: opts.origin,
+    ...(packVersion ? { packVersion } : {}),
+    ...(opts.unlockUrl ? { unlockUrl: opts.unlockUrl } : {}),
   };
   try {
     window.localStorage.setItem(insertedPackKey(entry.id), JSON.stringify(pack));

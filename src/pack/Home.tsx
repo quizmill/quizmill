@@ -18,6 +18,8 @@ import {
   X,
 } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
+import { UnlockedToast } from '@/components/UnlockedToast';
+import { PackUpdatedNotice } from '@/components/PackUpdatedNotice';
 import { useStorageData } from '@/lib/useStorage';
 import { useClientState, useMounted } from '@/lib/useMounted';
 import { unresolvedMistakeCount } from '@/lib/mistakes';
@@ -129,15 +131,17 @@ export default function PackHome() {
     saveLevelFilter(next);
   };
   const levelsLabel = packManifest.levelsLabel ?? 'Level';
+  // A single level is nothing to filter by: "All" and the level select the
+  // same questions, so the row (and the nudge, which needs an adjacent
+  // level) only appear from two levels up. The `level` pref and `#level=`
+  // hash keep working if set — they just have no UI here (#201).
+  const hasLevelAxis = packLevels.length > 1;
 
   // Adaptive nudge: once the learner is consistently strong (or struggling)
   // at the level they've picked, suggest the adjacent one.
-  const nudge = levelNudge(
-    attempts,
-    (id) => PACK_LEVEL_BY_QUESTION_ID[id],
-    packLevelKeys,
-    level,
-  );
+  const nudge = hasLevelAxis
+    ? levelNudge(attempts, (id) => PACK_LEVEL_BY_QUESTION_ID[id], packLevelKeys, level)
+    : null;
   const nudgeKey = nudge ? `${nudge.from}>${nudge.to}` : null;
   const showNudge = nudge !== null && nudgeKey !== dismissedNudge;
   const dismissNudge = () => {
@@ -211,6 +215,13 @@ export default function PackHome() {
         </div>
       </header>
 
+      {/* One-time "Unlocked: N questions" after a licence-key unlock landed
+          here (sessionStorage; see UnlockedToast). */}
+      <UnlockedToast />
+      {/* One-time "Updated: now N questions" after an unlocked pack's daily
+          check fetched a newer bundle (sessionStorage; see PackUpdatedNotice). */}
+      <PackUpdatedNotice />
+
       {mistakeCount > 0 ? (
         <HomeCard
           href="/practice/review/"
@@ -225,7 +236,7 @@ export default function PackHome() {
         />
       ) : null}
 
-      {packLevels.length > 0 ? (
+      {hasLevelAxis ? (
         <section className="flex flex-col gap-2">
           <h2 className="text-lg font-semibold text-ink-700">{levelsLabel}</h2>
           <div

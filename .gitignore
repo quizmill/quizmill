@@ -47,3 +47,4 @@ npm-debug.log*
 # Playwright reports and traces
 /playwright-report/
 /test-results/
+cloudflare/.dev.vars

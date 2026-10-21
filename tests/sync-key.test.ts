@@ -174,16 +174,16 @@ describe('syncKeyLabel', () => {
 
 describe('syncKeyMailto with a named key', () => {
   it('names the key in the subject and body, so two keys look different', () => {
-    const url = syncKeyMailto('QM-ABCDE-FGHJK-MNPQR-STVWX', 'Eleven Plus', 'Leo');
+    const url = syncKeyMailto('QM-ABCDE-FGHJK-MNPQR-STVWX', 'Solar System', 'Leo');
     const params = new URLSearchParams(url.slice('mailto:?'.length));
-    expect(params.get('subject')).toBe('Eleven Plus \u2014 sync key for Leo');
+    expect(params.get('subject')).toBe('Solar System \u2014 sync key for Leo');
     expect(params.get('body')).toContain('Sync key for Leo');
   });
 
   it('falls back to the unnamed wording for a nameless key', () => {
-    const url = syncKeyMailto('QM-ABCDE-FGHJK-MNPQR-STVWX', 'Eleven Plus', '  ');
+    const url = syncKeyMailto('QM-ABCDE-FGHJK-MNPQR-STVWX', 'Solar System', '  ');
     const params = new URLSearchParams(url.slice('mailto:?'.length));
-    expect(params.get('subject')).toBe('Eleven Plus \u2014 sync key');
-    expect(params.get('body')).toContain('Your sync key for Eleven Plus');
+    expect(params.get('subject')).toBe('Solar System \u2014 sync key');
+    expect(params.get('body')).toContain('Your sync key for Solar System');
   });
 });

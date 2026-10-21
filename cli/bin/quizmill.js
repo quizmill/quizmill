@@ -13,6 +13,7 @@
  *   npx quizmill run owner/repo      ...straight from a GitHub pack repo
  *   npx quizmill build my-topic      static site in <pack-id>-app/
  *   npx quizmill bundle my-topic     one <pack-id>.bundle.json to hand over
+ *   npx quizmill share my-topic      upload the bundle to the unlock service, print the link
  *   npx quizmill list                published packs
  *   npx quizmill upgrade             update the cached engine
  */
@@ -91,7 +92,10 @@ function engineSha() {
   }
 }
 
-function engineNpm(args) {
+/** Run one of the engine's npm scripts. `quiet` swallows its stdout (the
+ *  caller prints its own summary); stderr — the validator's errors — is
+ *  always passed through. */
+function engineNpm(args, { quiet = false } = {}) {
   ensureEngine();
   const env = { ...process.env };
   // Stamp the build with the CLI version, which always matches the pinned
@@ -102,7 +106,7 @@ function engineNpm(args) {
   if (!process.env.QUIZMILL_ENGINE && !env.NEXT_PUBLIC_APP_VERSION) {
     env.NEXT_PUBLIC_APP_VERSION = CLI_VERSION;
   }
-  run('npm', args, { cwd: ENGINE, env });
+  run('npm', args, { cwd: ENGINE, env, ...(quiet ? { stdio: ['inherit', 'pipe', 'inherit'] } : {}) });
 }
 
 /** Resolve a pack argument: absolute path for dirs, verbatim otherwise
@@ -238,6 +242,186 @@ function cmdBundle(arg, rest) {
   engineNpm(['run', 'pack:bundle', '--', src, '--out', target]);
 }
 
+// ── share: a private pack behind a licence key ──────────────────────────
+//
+// `share` is `bundle` with the file going to the unlock service instead
+// of the desk: the engine validates and bundles the pack, the CLI PUTs
+// the bundle to `<endpoint>/v1/packs/<id>` with the admin token, and the
+// service answers with the pack's licence keys — minting the first one
+// on the first upload. Each key becomes a link to the home app
+// (`<app>/unlock#key=…`): tapping it on a phone fetches the bundle with
+// the key, inserts the pack and makes it active, no file picker. The
+// key rides in the fragment, which no server or log ever sees.
+// Re-running `share` replaces the bundle and leaves the keys alone, so
+// links keep working and (same pack id) learners keep their progress.
+//
+// Settings live in ~/.quizmill/config.json:
+//   { "unlock": { "endpoint": "https://sync.quizmill.dev",
+//                 "app": "https://app.quizmill.dev", "token": "QT-…" } }
+// `endpoint` and `app` have defaults; `token` is the service's
+// UNLOCK_ADMIN_TOKEN and has none.
+
+const CONFIG_FILE = path.join(HOME, 'config.json');
+const DEFAULT_UNLOCK_ENDPOINT = 'https://sync.quizmill.dev';
+const DEFAULT_UNLOCK_APP = 'https://app.quizmill.dev';
+
+/** The `unlock` block of the config file, `{}` when there is none. */
+function readUnlockConfig() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+    return parsed && typeof parsed.unlock === 'object' && parsed.unlock ? parsed.unlock : {};
+  } catch {
+    return {};
+  }
+}
+
+/** An origin typed without a scheme (`app.quizmill.dev`) means https. */
+function withScheme(origin) {
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(origin) ? origin : `https://${origin}`;
+}
+
+function parseShareArgs(arg, rest) {
+  const opts = { dir: null, list: false, newKey: null, revoke: null, app: null, endpoint: null };
+  const argv = arg === undefined ? rest : [arg, ...rest];
+  const usage =
+    'usage: quizmill share <dir> [--new-key [label]] [--list] [--app <origin>] [--endpoint <url>]\n' +
+    '       quizmill share --revoke <key>';
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    const value = (flag) => {
+      const v = argv[++i];
+      if (v === undefined || v.startsWith('--')) die(`${flag} needs a value — ${usage}`);
+      return v;
+    };
+    if (a === '--list') opts.list = true;
+    else if (a === '--new-key') {
+      // The label is optional: the next word is one unless it is a flag.
+      opts.newKey = argv[i + 1] !== undefined && !argv[i + 1].startsWith('--') ? argv[++i] : '';
+    } else if (a.startsWith('--new-key=')) opts.newKey = a.slice('--new-key='.length);
+    else if (a === '--revoke') opts.revoke = value('--revoke');
+    else if (a.startsWith('--revoke=')) opts.revoke = a.slice('--revoke='.length);
+    else if (a === '--app') opts.app = value('--app');
+    else if (a.startsWith('--app=')) opts.app = a.slice('--app='.length);
+    else if (a === '--endpoint') opts.endpoint = value('--endpoint');
+    else if (a.startsWith('--endpoint=')) opts.endpoint = a.slice('--endpoint='.length);
+    else if (a.startsWith('-')) die(`unknown option "${a}" — ${usage}`);
+    else if (opts.dir === null) opts.dir = a;
+    else die(`unexpected argument "${a}" — ${usage}`);
+  }
+  if (opts.dir === null && opts.revoke === null) die(usage);
+  return opts;
+}
+
+/** One request to the unlock service's admin routes; dies with the
+ *  service's own words on anything but a 2xx. */
+async function unlockApi(cfg, method, route, body) {
+  const url = `${cfg.endpoint.replace(/\/+$/, '')}${route}`;
+  let res;
+  try {
+    res = await fetch(url, {
+      method,
+      headers: {
+        authorization: `Bearer ${cfg.token}`,
+        ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
+      },
+      ...(body !== undefined ? { body } : {}),
+    });
+  } catch (err) {
+    die(`could not reach ${cfg.endpoint}: ${err.cause ? err.cause.message : err.message}`);
+  }
+  let data = null;
+  try {
+    data = await res.json();
+  } catch {
+    // a non-JSON answer: reported by status below
+  }
+  if (res.status === 401) {
+    die(`${cfg.endpoint} refused the token in ${CONFIG_FILE} (unlock.token)`);
+  }
+  if (!res.ok) {
+    die(`${method} ${route} → HTTP ${res.status}${data && data.error ? `: ${data.error}` : ''}`);
+  }
+  return data;
+}
+
+const unlockLink = (cfg, key) => `${cfg.app.replace(/\/+$/, '')}/unlock#key=${key}`;
+
+/** `--list`: every key of the pack, spent and revoked ones included. */
+function printKeys(cfg, id, keys) {
+  if (keys.length === 0) {
+    log(`${id}: no licence keys yet — run \`quizmill share <dir>\` to upload and mint one`);
+    return;
+  }
+  log(`${id} — ${keys.length} licence key${keys.length === 1 ? '' : 's'}`);
+  for (const k of keys) {
+    const uses = k.maxUses === null ? `${k.uses} use${k.uses === 1 ? '' : 's'}` : `${k.uses}/${k.maxUses} uses`;
+    const state = k.revokedAt
+      ? `revoked ${k.revokedAt.slice(0, 10)}`
+      : k.maxUses !== null && k.uses >= k.maxUses
+        ? 'spent'
+        : unlockLink(cfg, k.key);
+    log(`  ${k.key}  ${k.label ? `${k.label}  ` : ''}${uses}  ${state}`);
+  }
+}
+
+async function cmdShare(arg, rest) {
+  const opts = parseShareArgs(arg, rest);
+  const file = readUnlockConfig();
+  const cfg = {
+    endpoint: opts.endpoint || file.endpoint || DEFAULT_UNLOCK_ENDPOINT,
+    app: withScheme(opts.app || file.app || DEFAULT_UNLOCK_APP),
+    token: typeof file.token === 'string' ? file.token.trim() : '',
+  };
+  if (!cfg.token) {
+    die(
+      `no unlock token — put the service's UNLOCK_ADMIN_TOKEN in ${CONFIG_FILE}:\n` +
+        `  { "unlock": { "endpoint": "${cfg.endpoint}", "app": "${cfg.app}", "token": "…" } }`,
+    );
+  }
+
+  if (opts.revoke !== null) {
+    const data = await unlockApi(cfg, 'DELETE', `/v1/keys/${encodeURIComponent(opts.revoke)}`);
+    const k = data.key || {};
+    log(`✓ revoked ${k.key || opts.revoke}${k.packId ? ` (${k.packId})` : ''} — its link no longer unlocks anything`);
+    return;
+  }
+
+  const src = packSource(opts.dir);
+  if (!fs.existsSync(src)) die(`not a directory: ${opts.dir}`);
+  const id = packIdOf(src);
+  if (!id) die(`${opts.dir}/pack.json has no readable "id" — run \`quizmill validate ${opts.dir}\``);
+
+  if (opts.list) {
+    const data = await unlockApi(cfg, 'GET', `/v1/packs/${id}/keys`);
+    printKeys(cfg, id, data.keys || []);
+    return;
+  }
+  if (opts.newKey !== null) {
+    const data = await unlockApi(cfg, 'POST', `/v1/packs/${id}/keys`, JSON.stringify({ label: opts.newKey }));
+    log(`✓ new licence key for ${id}${opts.newKey ? ` (${opts.newKey})` : ''}`);
+    log(unlockLink(cfg, data.key.key));
+    return;
+  }
+
+  // Validate + bundle via the engine (it refuses an invalid pack, with the
+  // validator's errors on stderr), through a scratch file the engine
+  // writes and the CLI reads straight back — nothing is left on disk.
+  const scratch = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'quizmill-share-')), `${id}.json`);
+  let text;
+  try {
+    engineNpm(['run', 'pack:bundle', '--', src, '--out', scratch], { quiet: true });
+    text = fs.readFileSync(scratch, 'utf8');
+  } finally {
+    fs.rmSync(path.dirname(scratch), { recursive: true, force: true });
+  }
+  const data = await unlockApi(cfg, 'PUT', `/v1/packs/${id}`, text);
+  const kib = Math.round(Buffer.byteLength(text) / 1024);
+  log(`Uploaded ${id} (${data.questions} question${data.questions === 1 ? '' : 's'}, ${kib} KiB)`);
+  const live = (data.keys || []).filter((k) => !k.revokedAt && (k.maxUses === null || k.uses < k.maxUses));
+  for (const k of live) log(`${unlockLink(cfg, k.key)}${k.label ? `  (${k.label})` : ''}`);
+  if (live.length === 0) log(`(no live licence key — mint one with \`quizmill share ${opts.dir} --new-key\`)`);
+}
+
 function cmdUpgrade() {
   if (process.env.QUIZMILL_ENGINE) {
     ensureEngine();
@@ -263,6 +447,8 @@ usage:
   quizmill run [dir|owner/repo] activate a pack (default: current/demo) and start the app
   quizmill build [dir|owner/repo]  build a static app into <pack-id>-app/
   quizmill bundle <dir> [--out file]  one <pack-id>.bundle.json, images inside — insert it at /packs
+  quizmill share <dir>          upload the bundle to the unlock service; prints the licence-key link
+    --new-key [label] | --list | --revoke <key> | --app <origin> | --endpoint <url>
   quizmill list                 published packs you can install
   quizmill upgrade              update the cached engine (~/.quizmill)
   quizmill --version            print the CLI version (stamped into builds)
@@ -279,6 +465,13 @@ try {
     case 'run':       cmdRun(arg); break;
     case 'build':     cmdBuild(arg); break;
     case 'bundle':    cmdBundle(arg, rest); break;
+    case 'share':
+      // The only async command (it talks HTTP); failures end the process
+      // the same way the synchronous ones do.
+      cmdShare(arg, rest).catch((err) => {
+        process.exit(typeof err.status === 'number' ? err.status : 1);
+      });
+      break;
     case 'list':      engineNpm(['run', 'pack:list']); break;
     case 'upgrade':   cmdUpgrade(); break;
     case 'version':

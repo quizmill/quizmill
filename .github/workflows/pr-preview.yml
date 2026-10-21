@@ -3,9 +3,19 @@ name: PR preview
 # Deploy a Cloudflare Pages PREVIEW of the demo-pack app for every PR, so
 # UI/feature changes can be clicked through before merge. Unlike
 # deploy-apps.yml (which rebuilds on the PUBLISHED engine), this builds the
-# PR's OWN code (npm run build → out/) and deploys it to the quizmill-try
-# project on a per-PR branch — a Cloudflare Pages *preview*, never
-# production (production is the `main` branch deploy in deploy-apps.yml).
+# PR's OWN code (npm run build → out/) and deploys it to the quizmill-app
+# project on a per-PR branch (`pr-<n>`, served at
+# pr-<n>.quizmill-app.pages.dev) — a Cloudflare Pages *preview*, never
+# production (production is the `main` branch deploy in deploy-apps.yml;
+# Pages only serves app.quizmill.dev from that branch, so a preview can
+# never reach an installed learner).
+#
+# Why the home app's project and not one of its own: previews used to go
+# to the Pages project behind the old demo at try.quizmill.dev (a redirect
+# to app.quizmill.dev since that demo retired — it was the home app's
+# build on a second name). That project went with the demo, so previews
+# moved here: one Pages project per app, previews included, rather than a
+# preview-only project to keep alive and explain.
 #
 # Reuses the existing repo secrets (no new setup):
 #   CLOUDFLARE_API_TOKEN   token with "Cloudflare Pages — Edit"
@@ -54,7 +64,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy out --project-name quizmill-try --branch=pr-${{ github.event.pull_request.number }}
+          command: pages deploy out --project-name quizmill-app --branch=pr-${{ github.event.pull_request.number }}
 
       - name: Comment the preview URL
         uses: actions/github-script@v7

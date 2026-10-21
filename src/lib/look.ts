@@ -2,7 +2,7 @@
  * Visual "look" preference: the calm classic UI, or the Poster look — the
  * loud quizmill.dev campaign style (warm paper, hard ink borders, offset
  * shadows, the vivid sail palette) brought into the app. Kids' packs love
- * it; the eleven-plus pack is the reason it exists.
+ * it; a kids' private pack is the reason it exists.
  *
  * Mirrors src/lib/theme.ts exactly, because it is the same kind of thing:
  * the resolved look is applied as a `data-look="poster"` attribute on

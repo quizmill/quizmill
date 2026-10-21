@@ -94,6 +94,11 @@ npx wrangler d1 execute quizmill-sync --remote --file=schema.sql
 npx wrangler deploy
 ```
 
+The `analytics_events.target_pack_id` column was likewise added later;
+a database created before it needs `migrations/0001-target-pack-id.sql`
+applied **once** (an `ALTER TABLE`, so it is not idempotent) before the
+worker that writes it is deployed — see the comment in that file.
+
 Until that runs, the app keeps names on the device and says they haven't
 reached the other devices yet; it pushes them up by itself on the first
 visit after the upgrade.
@@ -125,7 +130,7 @@ any language) lives in `docs/sync-protocol.md`.
 | `POST /v1/ops` | Bearer sync key | apply `{ pack, ops: [...] }` idempotent mutations |
 | `GET /v1/profile` | Bearer sync key | this key's name, `{ name }` (`null` when unnamed) |
 | `POST /v1/profile` | Bearer sync key | name this key, `{ name }` (empty string clears it) |
-| `POST /v1/analytics` | none | one anonymous funnel beacon, `{ event, packId, deviceId, appBuild, ts }` → 204 |
+| `POST /v1/analytics` | none | one anonymous funnel beacon, `{ event, packId, deviceId, appBuild, ts, pack? }` → 204 |
 | `GET /v1/analytics/summary?pack=<id>&days=<n>` | Bearer `ANALYTICS_READ_TOKEN` if set | per-event totals + distinct devices, per-day series |
 
 Rows are opaque JSON keyed by `(user_id, pack_id, tbl, id)` — the worker
@@ -144,10 +149,13 @@ NEXT_PUBLIC_ANALYTICS_URL=https://sync.quizmill.dev/v1/analytics   # or your own
 NEXT_PUBLIC_PRIVACY_URL=https://example.com/privacy                 # optional
 ```
 
-sends `navigator.sendBeacon` posts for six funnel events (`app_open`,
+sends `navigator.sendBeacon` posts for eight funnel events (`app_open`,
 `first_answer`, `session_10`, `upsell_seen`, `upsell_clicked`,
-`bundle_inserted`) carrying exactly `{ event, packId, deviceId, appBuild,
-ts }`. There is deliberately no auth on the ingest route — devices hold
+`bundle_inserted`, `pack_unlocked`, `unlock_failed`) carrying exactly
+`{ event, packId, deviceId, appBuild, ts }` — plus `pack`, the ARRIVING
+pack's id, on the last three (`packId` is the pack that was active when
+it arrived; stored as `target_pack_id`, never a licence key). There is
+deliberately no auth on the ingest route — devices hold
 no credential, and a sync key must never travel with a beacon — so the
 worker refuses any body over 1 KiB before parsing it (413; a real beacon
 is ~170 bytes), validates the rest against a closed event list and
@@ -171,6 +179,11 @@ curl 'https://sync.quizmill.dev/v1/analytics/summary?pack=solar-system-demo&days
 #  "events":{"app_open":{"count":42,"devices":17},"first_answer":{…},…},
 #  "daily":[{"day":"2026-10-09","event":"app_open","devices":5},…]}
 ```
+
+A pack's summary covers the events that happened in it (`packId`) and
+the ones about it (`pack`, the arriving pack of an insert / unlock): a
+sampler keeps its whole funnel through `pack_unlocked`, and the pack a
+key unlocked sees its own arrivals.
 
 The summary is aggregate counts only, so it is open by default; to gate
 it, `npx wrangler secret put ANALYTICS_READ_TOKEN` and send the value as
@@ -211,3 +224,65 @@ ANALYTICS_READ_TOKEN=… npm run sync:report -- --remote --analytics https://syn
 
 On a worker without that route the section says "not available" rather
 than showing zeros.
+
+## Licence-key unlock (private packs behind a link)
+
+The same worker is the **unlock service** behind `quizmill share` and
+the app's `/unlock` route: one R2 bucket of pack bundles (`BUNDLES`,
+one object per pack id) and a `licence_keys` table saying which key
+opens which pack. `share` mints `QL-XXXX-XXXX-XXXX` (Crockford base32,
+60 bits; typed input folds case, separators and the i/l/o confusables)
+— visibly not a `QM-` sync key, and a different trust model: it is the
+capability to *download one pack*, never anyone's practice history. The
+stored key is **opaque**, though: the routes match it exactly as given
+first (so a key in another provider's format, written straight to the
+table, unlocks and revokes as-is) and fall back to the folded QL form
+for typed keys; whitespace around the key is trimmed first, and only
+empty and over-long (> 128 chars) input is refused outright.
+
+| Route | Auth | Purpose |
+| --- | --- | --- |
+| `GET /v1/unlock?key=<key>[&pack=<id>]` | the key | 200 the bundle, `ETag: "<version>"`; 304 on a matching `If-None-Match`; 403 `{ error }` unknown / revoked / spent; 404 `pack` passed and the key opens another |
+| `PUT /v1/packs/:id` | Bearer `UNLOCK_ADMIN_TOKEN` | store or replace the bundle; mints the first key when the pack has none → `{ keys }` |
+| `POST /v1/packs/:id/keys` | Bearer `UNLOCK_ADMIN_TOKEN` | mint `{ label?, maxUses? }` → `{ key }` |
+| `GET /v1/packs/:id/keys` | Bearer `UNLOCK_ADMIN_TOKEN` | `{ keys: [{ key, packId, label, uses, maxUses, createdAt, revokedAt }] }` |
+| `DELETE /v1/keys/:key` | Bearer `UNLOCK_ADMIN_TOKEN` | revoke (the row stays, so it still lists) |
+
+The service never lists packs and never serves one without a live key.
+A missing, malformed or unknown key gets the **same** 403 text, with or
+without a `pack=`, so nothing in a reply says whether a pack exists;
+the pack-mismatch 404 only follows a key that itself passed. A 200
+counts as a use (`maxUses` is per key; `null` = unlimited); a 304 does
+not. The use is claimed with one conditional `UPDATE` once the bundle
+is in hand, so two devices racing for a key's last use, or a download
+overlapping a revocation, get exactly one 200. The ETag is the pack's git revision when the bundle was built from
+a clean checkout, otherwise a hash of the bundle — so a re-share always
+reads as new to a device holding the previous one. Keys are stored in
+clear (the author lists and revokes them). CORS `*`, no cookies, and
+`ETag` is exposed to the app.
+
+Setup, on top of the sync worker:
+
+```sh
+npx wrangler r2 bucket create quizmill-bundles       # the BUNDLES binding in wrangler.toml
+npx wrangler d1 execute quizmill-sync --remote --file=schema.sql   # adds licence_keys (idempotent)
+npx wrangler secret put UNLOCK_ADMIN_TOKEN           # what `quizmill share` sends
+npx wrangler deploy
+```
+
+Without the bucket binding the routes are simply absent, so a fork that
+only wants sync changes nothing. Locally, `wrangler dev` serves the
+bucket from disk too:
+
+```sh
+npx wrangler d1 execute quizmill-sync --local --file=schema.sql
+echo 'UNLOCK_ADMIN_TOKEN=dev' > .dev.vars      # wrangler dev reads secrets from here (untracked)
+npx wrangler dev --port 8787
+npx quizmill share my-topic --endpoint http://127.0.0.1:8787 --app http://localhost:3000
+```
+
+(with `"token": "dev"` in `~/.quizmill/config.json`, and the app served
+from a build with `NEXT_PUBLIC_UNLOCK_URL=http://127.0.0.1:8787`). The
+rules are pure and unit-tested in `tests/worker-unlock.test.ts`; the
+CLI round trip in `tests/cli-share.test.ts` runs the real CLI against
+the real worker over HTTP.

@@ -4,6 +4,7 @@ import { APP_CONFIG } from '@/config';
 import { UpdateNotifier } from '@/components/UpdateNotifier';
 import { TabBar } from '@/components/TabBar';
 import { SyncBootstrap } from '@/components/SyncBootstrap';
+import { PackUpdateCheck } from '@/components/PackUpdateCheck';
 import { SyncIndicator } from '@/components/SyncIndicator';
 import { ThemeWatcher } from '@/components/ThemeWatcher';
 import { RuntimePackBoundary } from '@/components/RuntimePackBoundary';
@@ -165,6 +166,8 @@ export default function RootLayout({
         <ThemeWatcher />
         <UpdateNotifier />
         <SyncBootstrap />
+        {/* Unlocked packs ask their endpoint for a newer bundle once a day. */}
+        <PackUpdateCheck />
         <SyncIndicator />
       </body>
     </html>

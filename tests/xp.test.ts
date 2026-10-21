@@ -106,7 +106,7 @@ describe('buildLevels (ladder scaled to the bank)', () => {
   });
 
   it('tops out at "first-correct the whole bank" for a real-sized pack', () => {
-    // 1120 questions (the eleven-plus bank): Master Miller costs the XP
+    // 1120 questions (a large private bank): Master Miller costs the XP
     // of answering every question correctly once.
     const levels = buildLevels(1120);
     expect(levels[levels.length - 1].xp).toBe(

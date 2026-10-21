@@ -32,6 +32,7 @@ npx quizmill build my-topic      # static app in my-topic-app/ — deploy anywhe
 | `run [dir\|owner/repo]` | activate a pack and start the app |
 | `build [dir\|owner/repo]` | emit a deployable static app in `<pack-id>-app/` |
 | `bundle <dir> [--out file]` | validate + write one `<pack-id>.bundle.json` to hand over (see [Share a pack as one file](#share-a-pack-as-one-file)) |
+| `share <dir>` | validate + bundle + upload behind a licence key; prints a one-tap install link (see [Share a private pack with a link](#share-a-private-pack-with-a-link)) |
 | `list` | published packs you can install |
 | `upgrade` | re-align the cached engine (see [Upgrading](#upgrading)) |
 
@@ -116,6 +117,47 @@ works offline there because its images travel inside the file. Browsers
 keep an inserted pack in about 5 MiB of storage, so the bundler warns
 when the images push a bundle past 4 MiB.
 
+## Share a private pack with a link
+
+Handing a file to a phone is the weak step. `share` does what `bundle`
+does and then uploads the bundle to the **unlock service** (the sync
+worker in `cloudflare/`, see its README) behind a **licence key**, and
+prints a link to the home app that installs the pack in one tap:
+
+```
+npx quizmill share my-topic
+Uploaded my-topic (150 questions, 612 KiB)
+https://app.quizmill.dev/unlock#key=QL-7F3K-9Q2M-X4PD
+```
+
+Opening the link on a phone that has never seen the pack fetches the
+bundle with the key, inserts it and makes it active — no Packs visit,
+no file picker. The key rides in the URL fragment, which no server ever
+sees, and the same key typed under Packs → "Have a licence key?" in an
+installed app does the same. Run `share` again after editing the pack
+and the link serves the new bundle; the keys stay as they were, and
+(same pack id) learners keep their progress.
+
+```
+npx quizmill share my-topic --new-key "Leo"   # one more key (and link) for the pack
+npx quizmill share my-topic --list            # every key, its uses, revoked or live
+npx quizmill share --revoke QL-7F3K-9Q2M-X4PD # that link now opens nothing
+```
+
+`share` reads `~/.quizmill/config.json`:
+
+```json
+{ "unlock": { "endpoint": "https://sync.quizmill.dev",
+              "app": "https://app.quizmill.dev", "token": "…" } }
+```
+
+`token` is the service's `UNLOCK_ADMIN_TOKEN`; `endpoint` and `app`
+have those defaults and `--endpoint` / `--app` override them per run
+(an author hosting their own worker, or a pack app with its own
+origin). A key protects the download, not the content: anyone holding
+it gets the whole bundle, and on a device the pack is readable — the
+same caveat as a bundle file.
+
 ## Pack format
 
 A pack is a directory of JSON, specified by the Zod schemas in
@@ -168,11 +210,28 @@ Beyond the required fields, all optional:
   to the https `url` with `?ref=<packId>-home` / `-settings` appended
   so the destination can tell where the tap came from. The engine
   carries no shop or price of its own — the pack supplies the words.
+- **licence unlock** — every build lets a learner who holds a licence
+  key fetch the pack it opens in one tap: a link to `/unlock#key=<key>`
+  (the key rides in the fragment, which never reaches a server) or the
+  "Have a licence key?" entry on `/packs`. The key alone says which
+  pack: the app calls `GET <unlockUrl>/v1/unlock?key=…`, expects a pack
+  bundle (200), a refusal `{ "error": "…" }` it may show (403) or 404,
+  and inserts the bundle under its own manifest id, makes it active and
+  keeps the key under `quizmill.<packId>.licence`. Two optional manifest
+  hints: `upgrade.packId` names the pack a key entered in THIS app is
+  expected to open (a sampler and its full bank — sent as `&pack=`, and
+  any other bundle is refused), and `upgrade.unlockUrl` points at the
+  author's own endpoint instead of the build's (see `NEXT_PUBLIC_UNLOCK_URL`
+  below). CORS `*`, no cookies; how keys are issued is the author's
+  business.
 
 The validator (`npx quizmill validate <dir>`) cross-checks ids,
 category / scenario / concept / level references, image paths, and
 weights, and exits non-zero with per-question errors — agents loop on
 it until the pack is clean, so malformed content can't reach the app.
+It also warns about every referenced image that isn't a file under
+`assets/`, so a misnamed figure is caught here rather than as a broken
+image in the app or a refused bundle.
 
 ## What the engine gives every pack
 
@@ -244,6 +303,19 @@ configured). Without any backend, Settings → "Move progress"
 exports/imports progress as a JSON file for device moves and offline
 backups.
 
+### Licence unlock endpoint (optional)
+
+The `/unlock` route and "Have a licence key?" fetch a pack bundle from
+the hosted service at `https://sync.quizmill.dev` unless the build says
+otherwise:
+
+```
+NEXT_PUBLIC_UNLOCK_URL=https://<your unlock service>
+```
+
+A pack's `upgrade.unlockUrl` overrides either for that pack. The
+contract is the one under **licence unlock** above.
+
 ### Usage analytics (optional, anonymous)
 
 A hosted app has no way of telling its author whether anyone opens it.
@@ -256,9 +328,12 @@ NEXT_PUBLIC_PRIVACY_URL=https://example.com/privacy   # optional, linked from Se
 
 and the app beacons a handful of funnel events — `app_open`,
 `first_answer`, `session_10` (tenth completed session), `upsell_seen`,
-`upsell_clicked`, `bundle_inserted` — as
-`{ event, packId, deviceId, appBuild, ts }`. That is the whole payload:
-no answers, no progress, no sync key, no user agent. `deviceId` is a
+`upsell_clicked`, `bundle_inserted`, `pack_unlocked`, `unlock_failed`,
+`pack_updated` (an unlocked pack's daily check fetched a newer bundle) — as
+`{ event, packId, deviceId, appBuild, ts }`; the last four add `pack`,
+the id of the pack that arrived (or was refused), since `packId` is the
+one that was active at the time. That is the whole payload: no answers,
+no progress, no sync key, no licence key, no user agent. `deviceId` is a
 random UUID the learner can regenerate (or switch the beacon off) in
 Settings → Usage analytics; the card only exists in builds that set the
 URL, and without it nothing leaves the device. The sync worker in

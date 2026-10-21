@@ -106,16 +106,20 @@ Pack repos carry their own licensing rules; two to keep in view:
   community banks with per-question `sourceRef` + NOTICE.md. Questions
   from `paullarionov/claude-certified-architect` are EXCLUDED (no
   upstream license) — don't re-add unless a license appears upstream.
-- `quizmill/pack-eleven-plus` (PRIVATE — must stay private). GL material
-  (© GL Assessment) is deliberately out.
+- Private pack repos (names deliberately not listed here) stay private
+  and are never named in this repo — not in issues, PR bodies, comments,
+  commit messages, docs or test fixtures. Say "a private pack". Material
+  © a third-party publisher is deliberately out of them.
 
 ## Surfaces
 
 Engine at `quizmill/quizmill`; CLI on npm as `quizmill`; domain
 `quizmill.dev` on Cloudflare. Website = repo `quizmill/website`
 (quizmill.dev, incl. the `/packs` directory and `/api/registry`);
-demo app at try.quizmill.dev; sync server at sync.quizmill.dev; each
-published pack at `<pack-id>.quizmill.dev`. Adjacent, private:
+home app — the one learners install, and the live demo — at
+app.quizmill.dev (try.quizmill.dev redirects there; never move the home
+app's origin again, installed PWAs live on it); sync server at
+sync.quizmill.dev; each published pack at `<pack-id>.quizmill.dev`. Adjacent, private:
 `quizmill/quizmill-cloud` generates a pack and hands it to the engine via
 the `quizmill.activePack` localStorage blob.
 
