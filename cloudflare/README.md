@@ -211,3 +211,58 @@ ANALYTICS_READ_TOKEN=… npm run sync:report -- --remote --analytics https://syn
 
 On a worker without that route the section says "not available" rather
 than showing zeros.
+
+## Licence-key unlock (private packs behind a link)
+
+The same worker is the **unlock service** behind `quizmill share` and
+the app's `/unlock` route: one R2 bucket of pack bundles (`BUNDLES`,
+one object per pack id) and a `licence_keys` table saying which key
+opens which pack. A key is `QL-XXXX-XXXX-XXXX` (Crockford base32, 60
+bits; typed input folds case, separators and the i/l/o confusables) —
+visibly not a `QM-` sync key, and a different trust model: it is the
+capability to *download one pack*, never anyone's practice history.
+
+| Route | Auth | Purpose |
+| --- | --- | --- |
+| `GET /v1/unlock?key=<key>[&pack=<id>]` | the key | 200 the bundle, `ETag: "<version>"`; 304 on a matching `If-None-Match`; 403 `{ error }` unknown / revoked / spent; 404 `pack` passed and the key opens another |
+| `PUT /v1/packs/:id` | Bearer `UNLOCK_ADMIN_TOKEN` | store or replace the bundle; mints the first key when the pack has none → `{ keys }` |
+| `POST /v1/packs/:id/keys` | Bearer `UNLOCK_ADMIN_TOKEN` | mint `{ label?, maxUses? }` → `{ key }` |
+| `GET /v1/packs/:id/keys` | Bearer `UNLOCK_ADMIN_TOKEN` | `{ keys: [{ key, packId, label, uses, maxUses, createdAt, revokedAt }] }` |
+| `DELETE /v1/keys/:key` | Bearer `UNLOCK_ADMIN_TOKEN` | revoke (the row stays, so it still lists) |
+
+The service never lists packs and never serves one without a live key.
+A missing, malformed or unknown key gets the **same** 403 text, with or
+without a `pack=`, so nothing in a reply says whether a pack exists;
+the pack-mismatch 404 only follows a key that itself passed. A 200
+counts as a use (`maxUses` is per key; `null` = unlimited); a 304 does
+not. The ETag is the pack's git revision when the bundle was built from
+a clean checkout, otherwise a hash of the bundle — so a re-share always
+reads as new to a device holding the previous one. Keys are stored in
+clear (the author lists and revokes them). CORS `*`, no cookies, and
+`ETag` is exposed to the app.
+
+Setup, on top of the sync worker:
+
+```sh
+npx wrangler r2 bucket create quizmill-bundles       # the BUNDLES binding in wrangler.toml
+npx wrangler d1 execute quizmill-sync --remote --file=schema.sql   # adds licence_keys (idempotent)
+npx wrangler secret put UNLOCK_ADMIN_TOKEN           # what `quizmill share` sends
+npx wrangler deploy
+```
+
+Without the bucket binding the routes are simply absent, so a fork that
+only wants sync changes nothing. Locally, `wrangler dev` serves the
+bucket from disk too:
+
+```sh
+npx wrangler d1 execute quizmill-sync --local --file=schema.sql
+echo 'UNLOCK_ADMIN_TOKEN=dev' > .dev.vars      # wrangler dev reads secrets from here (untracked)
+npx wrangler dev --port 8787
+npx quizmill share my-topic --endpoint http://127.0.0.1:8787 --app http://localhost:3000
+```
+
+(with `"token": "dev"` in `~/.quizmill/config.json`, and the app served
+from a build with `NEXT_PUBLIC_UNLOCK_URL=http://127.0.0.1:8787`). The
+rules are pure and unit-tested in `tests/worker-unlock.test.ts`; the
+CLI round trip in `tests/cli-share.test.ts` runs the real CLI against
+the real worker over HTTP.
