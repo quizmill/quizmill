@@ -114,8 +114,10 @@ Pack repos carry their own licensing rules; two to keep in view:
 Engine at `quizmill/quizmill`; CLI on npm as `quizmill`; domain
 `quizmill.dev` on Cloudflare. Website = repo `quizmill/website`
 (quizmill.dev, incl. the `/packs` directory and `/api/registry`);
-demo app at try.quizmill.dev; sync server at sync.quizmill.dev; each
-published pack at `<pack-id>.quizmill.dev`. Adjacent, private:
+home app — the one learners install, and the live demo — at
+app.quizmill.dev (try.quizmill.dev redirects there; never move the home
+app's origin again, installed PWAs live on it); sync server at
+sync.quizmill.dev; each published pack at `<pack-id>.quizmill.dev`. Adjacent, private:
 `quizmill/quizmill-cloud` generates a pack and hands it to the engine via
 the `quizmill.activePack` localStorage blob.
 
