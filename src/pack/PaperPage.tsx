@@ -367,7 +367,8 @@ function ComposeCard({
         </div>
       </div>
 
-      {packLevels.length > 0 ? (
+      {/* Same rule as Home: one level is nothing to filter by (#201). */}
+      {packLevels.length > 1 ? (
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium text-ink-600">
             {packManifest.levelsLabel ?? 'Level'}
