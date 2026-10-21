@@ -309,8 +309,11 @@ function ComposeCard({
 
   const bank = filterByLevel(bankForCategory(packQuestions, categoryKey), level);
   // "All" prints a whole level in pack order (a past paper as written) —
-  // only for a single level small enough for the QR to stay scannable.
-  const allAvailable = level !== null && bank.length > 0 && bank.length <= PAPER_ALL_MAX;
+  // only for a single level small enough for the QR to stay scannable. A
+  // one-level pack has no level row to pick from (#201), but its whole bank
+  // IS that one level, so "All" stays reachable without a saved filter.
+  const singleLevel = level !== null || packLevels.length === 1;
+  const allAvailable = singleLevel && bank.length > 0 && bank.length <= PAPER_ALL_MAX;
   const count: PaperCount =
     chosenCount === 'all' && !allAvailable ? DEFAULT_PAPER_COUNT : chosenCount;
   const sheetSize = count === 'all' ? bank.length : Math.min(count, bank.length);
@@ -367,7 +370,8 @@ function ComposeCard({
         </div>
       </div>
 
-      {packLevels.length > 0 ? (
+      {/* Same rule as Home: one level is nothing to filter by (#201). */}
+      {packLevels.length > 1 ? (
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium text-ink-600">
             {packManifest.levelsLabel ?? 'Level'}
