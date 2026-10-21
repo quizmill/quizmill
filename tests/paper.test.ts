@@ -192,16 +192,16 @@ describe('paper payload encode/decode', () => {
   });
 
   it('keeps a realistic worst-case sheet scannable when printed', async () => {
-    // 20 long real-world ids (shared prefix, like eleven-plus banks).
+    // 20 long real-world ids (shared prefix, like large real banks).
     const ids = Array.from(
       { length: 20 },
-      (_, i) => `eleven-plus-nonverbal-y6-question-${i + 100}`,
+      (_, i) => `school-prep-nonverbal-y6-question-${i + 100}`,
     );
     const payload = payloadFromSheet(
       sheet({ id: crypto.randomUUID(), questionIds: ids, categoryKey: 'nonverbal' }),
-      'eleven-plus',
+      'school-prep',
     );
-    const url = `https://leven.quizmill.dev/paper/mark/#s=${await encodePaperPayload(payload)}`;
+    const url = `https://lemon.quizmill.dev/paper/mark/#s=${await encodePaperPayload(payload)}`;
     const qrcodegen = (await import('qrcode-generator')).default;
     const qr = qrcodegen(0, 'M');
     qr.addData(url, 'Byte');

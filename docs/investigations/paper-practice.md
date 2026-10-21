@@ -1,6 +1,6 @@
 # Investigation: practice on paper (print sheets, mark them back in)
 
-*Researched 2026-09-22. Goal: let a child (the eleven-plus learner) do
+*Researched 2026-09-22. Goal: let a child (a primary-school learner) do
 sessions of ~10 questions **on paper**, then get the results back into
 the app's progress — ideally by snapping a photo of the finished sheet —
 so streaks, mistakes review, readiness and stickers keep tracking even

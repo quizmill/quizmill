@@ -217,20 +217,31 @@ jobs:
       # only fires when this job SUCCEEDS — so letting one unreachable repo
       # fail the job used to cancel the demo/showcase rollout for a release
       # that had already shipped (v0.3.13/v0.3.14: the PAT hadn't been
-      # granted the newer pack-claude-cert-pro repo, 403 → whole job red).
+      # granted a newly added pack repo, 403 → whole job red).
       # A repo that misses its dispatch still rebuilds on its daily cron.
+      #
+      # WHICH repos get the dispatch is the repository variable
+      # PACK_DISPATCH_REPOS (space-separated `owner/repo` list, set under
+      # Settings → Variables), not a list in this file: some of those packs
+      # are private and are not named in this public repo. A fork sets its
+      # own list; unset → skip with a notice.
       - name: Fan out engine-update to pack repos
         if: steps.version.outputs.version != ''
         env:
           GH_TOKEN: ${{ secrets.PACK_DISPATCH_TOKEN }}
+          REPOS: ${{ vars.PACK_DISPATCH_REPOS }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           if [ -z "$GH_TOKEN" ]; then
             echo "::notice::PACK_DISPATCH_TOKEN not set — skipping fan-out (packs will rebuild on their daily cron)."
             exit 0
           fi
+          if [ -z "$REPOS" ]; then
+            echo "::notice::PACK_DISPATCH_REPOS variable not set — skipping fan-out (packs will rebuild on their daily cron)."
+            exit 0
+          fi
           failed=0
-          for repo in quizmill/pack-claude-cert quizmill/pack-claude-cert-pro quizmill/pack-eleven-plus; do
+          for repo in $REPOS; do
             echo "Dispatching engine-update (${VERSION#v}) to $repo"
             if ! jq -nc --arg v "${VERSION#v}" \
               '{event_type:"engine-update",client_payload:{version:$v}}' \
