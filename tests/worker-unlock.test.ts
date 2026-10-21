@@ -82,7 +82,7 @@ describe('licence key format', () => {
 describe('decideUnlock', () => {
   const row: LicenceKeyRow = {
     key: 'QL-7F3K-9Q2M-X4PD',
-    pack_id: 'aws-genai-udemy',
+    pack_id: 'exam-set',
     label: '',
     uses: 0,
     max_uses: null,
@@ -91,8 +91,8 @@ describe('decideUnlock', () => {
   };
 
   it('opens the pack a live key names, whatever pack hint it carries', () => {
-    expect(decideUnlock(row)).toEqual({ ok: true, packId: 'aws-genai-udemy' });
-    expect(decideUnlock(row, 'aws-genai-udemy')).toEqual({ ok: true, packId: 'aws-genai-udemy' });
+    expect(decideUnlock(row)).toEqual({ ok: true, packId: 'exam-set' });
+    expect(decideUnlock(row, 'exam-set')).toEqual({ ok: true, packId: 'exam-set' });
     expect(decideUnlock({ ...row, uses: 4, max_uses: 5 }).ok).toBe(true);
   });
 
@@ -140,20 +140,20 @@ const bundle = (id: string, extra: Record<string, unknown> = {}) => ({
   schemaVersion: 2,
   id,
   bundledAt: '2026-10-21T00:00:00.000Z',
-  manifest: { schemaVersion: 2, id, title: 'Udemy study set' },
+  manifest: { schemaVersion: 2, id, title: 'Study set' },
   questions: [{ id: `${id}-basics-001` }, { id: `${id}-basics-002` }],
   ...extra,
 });
 
 describe('parseBundleUpload', () => {
   it('accepts a bundle whose envelope and manifest agree with the path id', async () => {
-    const out = await parseBundleUpload(bundle('aws-genai-udemy', { packVersion: 'abc1234' }), 'aws-genai-udemy');
+    const out = await parseBundleUpload(bundle('exam-set', { packVersion: 'abc1234' }), 'exam-set');
     expect(out.ok).toBe(true);
     if (!out.ok) return;
     expect(out.bundle.questions).toBe(2);
     expect(out.bundle.version).toBe('abc1234');
     expect(out.bundle.bytes).toBe(Buffer.byteLength(out.bundle.text));
-    expect(JSON.parse(out.bundle.text).manifest.title).toBe('Udemy study set');
+    expect(JSON.parse(out.bundle.text).manifest.title).toBe('Study set');
   });
 
   it('versions a dirty or unversioned bundle by its content', async () => {
@@ -244,13 +244,13 @@ describe('unlock service end-to-end (worker ↔ real SQLite + in-memory R2)', ()
     call(`/v1/packs/${id}`, admin({ method: 'PUT', body: JSON.stringify(bundle(id, extra)) }));
 
   it('share → link → unlock: the first upload mints a key that serves the bundle with its version as ETag', async () => {
-    const up = await share('aws-genai-udemy', { packVersion: 'abc1234' });
+    const up = await share('exam-set', { packVersion: 'abc1234' });
     expect(up.status).toBe(200);
-    expect(up.body).toMatchObject({ ok: true, id: 'aws-genai-udemy', version: 'abc1234', questions: 2 });
+    expect(up.body).toMatchObject({ ok: true, id: 'exam-set', version: 'abc1234', questions: 2 });
     expect(up.body.keys).toHaveLength(1);
     const key: string = up.body.keys[0].key;
     expect(key).toMatch(KEY_SHAPE);
-    expect(up.body.keys[0]).toMatchObject({ packId: 'aws-genai-udemy', label: '', uses: 0, maxUses: null, revokedAt: null });
+    expect(up.body.keys[0]).toMatchObject({ packId: 'exam-set', label: '', uses: 0, maxUses: null, revokedAt: null });
 
     const got = await call(`/v1/unlock?key=${key}`);
     expect(got.status).toBe(200);
@@ -258,32 +258,32 @@ describe('unlock service end-to-end (worker ↔ real SQLite + in-memory R2)', ()
     expect(got.headers.get('etag')).toBe('"abc1234"');
     expect(got.headers.get('access-control-allow-origin')).toBe('*');
     expect(got.headers.get('access-control-expose-headers')).toContain('etag');
-    expect(got.body).toMatchObject({ format: 'quizmill-pack-bundle', id: 'aws-genai-udemy' });
-    expect(got.body.manifest.id).toBe('aws-genai-udemy');
+    expect(got.body).toMatchObject({ format: 'quizmill-pack-bundle', id: 'exam-set' });
+    expect(got.body.manifest.id).toBe('exam-set');
     expect(got.body.questions).toHaveLength(2);
 
     // A device that already holds this version gets 304, and it is not a use.
     const same = await call(`/v1/unlock?key=${key}`, { headers: { 'if-none-match': '"abc1234"' } });
     expect(same.status).toBe(304);
     expect(same.headers.get('etag')).toBe('"abc1234"');
-    const list = await call('/v1/packs/aws-genai-udemy/keys', admin());
+    const list = await call('/v1/packs/exam-set/keys', admin());
     expect(list.body.keys[0].uses).toBe(1);
   });
 
   it('typed keys are canonicalised, and a pack hint only matters for the right key', async () => {
-    const { body } = await share('aws-genai-udemy');
+    const { body } = await share('exam-set');
     const key: string = body.keys[0].key;
     const typed = key.toLowerCase().replace(/-/g, ' ').replace(/^ql/, '');
     expect((await call(`/v1/unlock?key=${encodeURIComponent(typed)}`)).status).toBe(200);
-    expect((await call(`/v1/unlock?key=${key}&pack=aws-genai-udemy`)).status).toBe(200);
-    const other = await call(`/v1/unlock?key=${key}&pack=eleven-plus`);
+    expect((await call(`/v1/unlock?key=${key}&pack=exam-set`)).status).toBe(200);
+    const other = await call(`/v1/unlock?key=${key}&pack=other-set`);
     expect(other.status).toBe(404);
     expect(other.body).toEqual({ error: KEY_OTHER_PACK });
   });
 
   it('a missing, malformed or unknown key is refused alike — nothing says whether a pack exists', async () => {
-    await share('aws-genai-udemy');
-    for (const q of ['', '?key=', '?key=nope', '?key=QL-0000-0000-0000', '?key=QL-0000-0000-0000&pack=aws-genai-udemy', '?pack=aws-genai-udemy']) {
+    await share('exam-set');
+    for (const q of ['', '?key=', '?key=nope', '?key=QL-0000-0000-0000', '?key=QL-0000-0000-0000&pack=exam-set', '?pack=exam-set']) {
       const res = await call(`/v1/unlock${q}`);
       expect(res.status, q).toBe(403);
       expect(res.body, q).toEqual({ error: KEY_NOT_RECOGNISED });
@@ -294,7 +294,7 @@ describe('unlock service end-to-end (worker ↔ real SQLite + in-memory R2)', ()
   });
 
   it('a revoked key is refused with the server text and stays listed; revoking twice is harmless', async () => {
-    const { body } = await share('aws-genai-udemy');
+    const { body } = await share('exam-set');
     const key: string = body.keys[0].key;
     const gone = await call(`/v1/keys/${key}`, admin({ method: 'DELETE' }));
     expect(gone.status).toBe(200);
@@ -308,15 +308,15 @@ describe('unlock service end-to-end (worker ↔ real SQLite + in-memory R2)', ()
     expect((await call('/v1/keys/QL-0000-0000-0000', admin({ method: 'DELETE' }))).status).toBe(404);
     expect((await call('/v1/keys/not-a-key', admin({ method: 'DELETE' }))).status).toBe(404);
 
-    const list = await call('/v1/packs/aws-genai-udemy/keys', admin());
+    const list = await call('/v1/packs/exam-set/keys', admin());
     expect(list.body.keys).toHaveLength(1);
     expect(list.body.keys[0].revokedAt).toBe(gone.body.key.revokedAt);
   });
 
   it('a key with a use limit stops serving once it is spent', async () => {
-    await share('aws-genai-udemy');
+    await share('exam-set');
     const minted = await call(
-      '/v1/packs/aws-genai-udemy/keys',
+      '/v1/packs/exam-set/keys',
       admin({ method: 'POST', body: JSON.stringify({ label: 'Leo', maxUses: 2 }) }),
     );
     expect(minted.status).toBe(200);
@@ -328,7 +328,7 @@ describe('unlock service end-to-end (worker ↔ real SQLite + in-memory R2)', ()
     expect(spent.status).toBe(403);
     expect(spent.body).toEqual({ error: KEY_EXHAUSTED });
     // The pack's first key is untouched by the second one's limit.
-    const list = await call('/v1/packs/aws-genai-udemy/keys', admin());
+    const list = await call('/v1/packs/exam-set/keys', admin());
     expect(list.body.keys.map((k: { label: string; uses: number }) => [k.label, k.uses])).toEqual([
       ['', 0],
       ['Leo', 2],
@@ -336,23 +336,23 @@ describe('unlock service end-to-end (worker ↔ real SQLite + in-memory R2)', ()
   });
 
   it('a key in another format, written straight to the table, unlocks, counts, lists and revokes as-is', async () => {
-    await share('aws-genai-udemy');
+    await share('exam-set');
     // What a private writer (another provider's licence) might insert:
     // 36 hyphenated characters, nothing like QL-XXXX-XXXX-XXXX.
     const opaque = '3f2504e0-4f89-11d3-9a0c-0305e82c3301';
     db.prepare(
-      "INSERT INTO licence_keys (key, pack_id, label, uses, max_uses, created_at, revoked_at) VALUES (?, 'aws-genai-udemy', 'provider', 0, 2, '2026-10-21T00:00:00.000Z', NULL)",
+      "INSERT INTO licence_keys (key, pack_id, label, uses, max_uses, created_at, revoked_at) VALUES (?, 'exam-set', 'provider', 0, 2, '2026-10-21T00:00:00.000Z', NULL)",
     ).run(opaque);
 
     const got = await call(`/v1/unlock?key=${opaque}`);
     expect(got.status).toBe(200);
-    expect(got.body.id).toBe('aws-genai-udemy');
-    expect((await call(`/v1/unlock?key=${opaque}&pack=aws-genai-udemy`)).status).toBe(200);
+    expect(got.body.id).toBe('exam-set');
+    expect((await call(`/v1/unlock?key=${opaque}&pack=exam-set`)).status).toBe(200);
     expect((await call(`/v1/unlock?key=${opaque}`)).body).toEqual({ error: KEY_EXHAUSTED });
     // Case matters: the key is what the table holds, not a reshaped form.
     expect((await call(`/v1/unlock?key=${opaque.toUpperCase()}`)).body).toEqual({ error: KEY_NOT_RECOGNISED });
 
-    const list = await call('/v1/packs/aws-genai-udemy/keys', admin());
+    const list = await call('/v1/packs/exam-set/keys', admin());
     expect(list.body.keys.map((k: { key: string; uses: number }) => [k.key, k.uses])).toContainEqual([opaque, 2]);
 
     const gone = await call(`/v1/keys/${opaque}`, admin({ method: 'DELETE' }));
@@ -368,9 +368,9 @@ describe('unlock service end-to-end (worker ↔ real SQLite + in-memory R2)', ()
   });
 
   it('two unlocks racing for the last use of a key: exactly one is served', async () => {
-    await share('aws-genai-udemy');
+    await share('exam-set');
     const minted = await call(
-      '/v1/packs/aws-genai-udemy/keys',
+      '/v1/packs/exam-set/keys',
       admin({ method: 'POST', body: JSON.stringify({ maxUses: 1 }) }),
     );
     const key: string = minted.body.key.key;
@@ -380,12 +380,12 @@ describe('unlock service end-to-end (worker ↔ real SQLite + in-memory R2)', ()
     expect([a.status, b.status].sort()).toEqual([200, 403]);
     const refused = a.status === 403 ? a : b;
     expect(refused.body).toEqual({ error: KEY_EXHAUSTED });
-    const list = await call('/v1/packs/aws-genai-udemy/keys', admin());
+    const list = await call('/v1/packs/exam-set/keys', admin());
     expect(list.body.keys.find((k: { key: string }) => k.key === key).uses).toBe(1);
   });
 
   it('a key revoked while its bundle is being read is not served', async () => {
-    const { body } = await share('aws-genai-udemy');
+    const { body } = await share('exam-set');
     const key: string = body.keys[0].key;
     const bucket = env.BUNDLES!;
     const realGet = bucket.get;
@@ -398,14 +398,14 @@ describe('unlock service end-to-end (worker ↔ real SQLite + in-memory R2)', ()
     expect(res.status).toBe(403);
     expect(res.body).toEqual({ error: KEY_REVOKED });
     bucket.get = realGet;
-    const list = await call('/v1/packs/aws-genai-udemy/keys', admin());
+    const list = await call('/v1/packs/exam-set/keys', admin());
     expect(list.body.keys[0].uses).toBe(0);
   });
 
   it('re-sharing replaces the bundle and leaves the keys alone', async () => {
-    const first = await share('aws-genai-udemy', { packVersion: 'abc1234' });
+    const first = await share('exam-set', { packVersion: 'abc1234' });
     const key: string = first.body.keys[0].key;
-    const second = await share('aws-genai-udemy', {
+    const second = await share('exam-set', {
       packVersion: 'def5678',
       questions: [{ id: 'q1' }, { id: 'q2' }, { id: 'q3' }],
     });
@@ -421,36 +421,36 @@ describe('unlock service end-to-end (worker ↔ real SQLite + in-memory R2)', ()
   });
 
   it('refuses an upload that is not this pack, and keeps what was there', async () => {
-    await share('aws-genai-udemy', { packVersion: 'abc1234' });
+    await share('exam-set', { packVersion: 'abc1234' });
     const wrong = await call(
-      '/v1/packs/aws-genai-udemy',
-      admin({ method: 'PUT', body: JSON.stringify(bundle('eleven-plus')) }),
+      '/v1/packs/exam-set',
+      admin({ method: 'PUT', body: JSON.stringify(bundle('other-set')) }),
     );
     expect(wrong.status).toBe(400);
-    expect(wrong.body.error).toMatch(/for pack "eleven-plus"/);
-    expect((await call('/v1/packs/aws-genai-udemy', admin({ method: 'PUT', body: 'nope' }))).status).toBe(400);
+    expect(wrong.body.error).toMatch(/for pack "other-set"/);
+    expect((await call('/v1/packs/exam-set', admin({ method: 'PUT', body: 'nope' }))).status).toBe(400);
     expect((await call('/v1/packs/Bad_Id', admin({ method: 'PUT', body: '{}' }))).status).toBe(400);
     const big = await call(
-      '/v1/packs/aws-genai-udemy',
+      '/v1/packs/exam-set',
       admin({ method: 'PUT', body: '{}', headers: { 'content-length': String(30 * 1024 * 1024) } }),
     );
     expect(big.status).toBe(413);
-    expect(env.BUNDLES!.objects.get('aws-genai-udemy.json')!.customMetadata.version).toBe('abc1234');
-    expect(env.BUNDLES!.objects.has('eleven-plus.json')).toBe(false);
+    expect(env.BUNDLES!.objects.get('exam-set.json')!.customMetadata.version).toBe('abc1234');
+    expect(env.BUNDLES!.objects.has('other-set.json')).toBe(false);
   });
 
   it('a key cannot be minted for a pack that has no bundle', async () => {
-    const res = await call('/v1/packs/eleven-plus/keys', admin({ method: 'POST' }));
+    const res = await call('/v1/packs/other-set/keys', admin({ method: 'POST' }));
     expect(res.status).toBe(404);
     expect(res.body.error).toMatch(/share the pack first/);
-    expect((await call('/v1/packs/eleven-plus/keys', admin())).body).toEqual({ keys: [] });
+    expect((await call('/v1/packs/other-set/keys', admin())).body).toEqual({ keys: [] });
   });
 
   it('admin routes need the admin token; the service is absent without the bucket', async () => {
     for (const [method, p] of [
-      ['PUT', '/v1/packs/aws-genai-udemy'],
-      ['GET', '/v1/packs/aws-genai-udemy/keys'],
-      ['POST', '/v1/packs/aws-genai-udemy/keys'],
+      ['PUT', '/v1/packs/exam-set'],
+      ['GET', '/v1/packs/exam-set/keys'],
+      ['POST', '/v1/packs/exam-set/keys'],
       ['DELETE', '/v1/keys/QL-0000-0000-0000'],
     ] as const) {
       expect((await call(p, { method })).status, `${method} ${p}`).toBe(401);
@@ -461,12 +461,12 @@ describe('unlock service end-to-end (worker ↔ real SQLite + in-memory R2)', ()
       ).toBe(401);
     }
     delete env.UNLOCK_ADMIN_TOKEN;
-    expect((await call('/v1/packs/aws-genai-udemy/keys', admin())).status).toBe(401);
+    expect((await call('/v1/packs/exam-set/keys', admin())).status).toBe(401);
 
     delete env.BUNDLES;
     env.UNLOCK_ADMIN_TOKEN = ADMIN;
     expect((await call('/v1/unlock?key=QL-0000-0000-0000')).status).toBe(401);
-    expect((await call('/v1/packs/aws-genai-udemy/keys', admin())).status).toBe(401);
+    expect((await call('/v1/packs/exam-set/keys', admin())).status).toBe(401);
   });
 
   it('answers the CORS preflight the app sends for a cross-origin unlock', async () => {
