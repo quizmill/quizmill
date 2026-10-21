@@ -73,8 +73,12 @@ describe('licence key format', () => {
     const uuid = '3f2504e0-4f89-11d3-9a0c-0305e82c3301';
     expect(licenceKeyCandidates(uuid)).toEqual([uuid]);
     expect(licenceKeyCandidates('x'.repeat(MAX_LICENCE_KEY_LENGTH))).toHaveLength(1);
+    // Whitespace around a pasted key is not part of it, whatever its format.
+    expect(licenceKeyCandidates(`  ${uuid}\n`)).toEqual([uuid]);
+    expect(licenceKeyCandidates(' QL-7F3K-9Q2M-X4PD ')).toEqual(['QL-7F3K-9Q2M-X4PD']);
     // Only empty and over-long input is refused outright.
     expect(licenceKeyCandidates('')).toEqual([]);
+    expect(licenceKeyCandidates('   ')).toEqual([]);
     expect(licenceKeyCandidates('x'.repeat(MAX_LICENCE_KEY_LENGTH + 1))).toEqual([]);
   });
 });
@@ -474,5 +478,56 @@ describe('unlock service end-to-end (worker ↔ real SQLite + in-memory R2)', ()
     expect(res.status).toBe(204);
     expect(res.headers.get('access-control-allow-headers')).toContain('if-none-match');
     expect(res.headers.get('access-control-allow-methods')).toContain('PUT');
+  });
+
+  // Keys are opaque strings: `QL-…` is what `share` mints, not what the
+  // service requires (#200). A writer with table access may store keys in
+  // any format and they must unlock, list and revoke exactly like a
+  // minted one.
+  it('a key in any format is served as stored; a typed QL key still folds; the refusals stay uniform', async () => {
+    await share('exam-set');
+    const insert = (key: string) =>
+      db
+        .prepare(
+          "INSERT INTO licence_keys (key, pack_id, label, uses, max_uses, created_at, revoked_at) VALUES (?, 'exam-set', '', 0, NULL, '2026-10-21T00:00:00.000Z', NULL)",
+        )
+        .run(key);
+
+    // 1. Another provider's format, inserted directly: unlocks, lists, revokes.
+    const foreign = 'ABCD1234-EFGH5678-IJKL9012-MNOP3456';
+    insert(foreign);
+    const got = await call(`/v1/unlock?key=${foreign}`);
+    expect(got.status).toBe(200);
+    expect(got.body.id).toBe('exam-set');
+    // A pasted key keeps its surrounding whitespace out of the lookup.
+    expect((await call(`/v1/unlock?key=${encodeURIComponent(`  ${foreign}\n`)}`)).status).toBe(200);
+    const listed = await call('/v1/packs/exam-set/keys', admin());
+    expect(listed.body.keys.map((k: { key: string }) => k.key)).toContain(foreign);
+    const revoked = await call(`/v1/keys/${foreign}`, admin({ method: 'DELETE' }));
+    expect(revoked.status).toBe(200);
+    expect(revoked.body.key).toMatchObject({ key: foreign, packId: 'exam-set', uses: 2 });
+    expect((await call(`/v1/unlock?key=${foreign}`)).body).toEqual({ error: KEY_REVOKED });
+
+    // 2. A minted-style key typed with the Crockford confusables and no prefix.
+    insert('QL-1F3K-1Q2M-04PD');
+    const typed = encodeURIComponent(' if3k lq2m o4pd ');
+    expect((await call(`/v1/unlock?key=${typed}`)).status).toBe(200);
+    expect((await call(`/v1/keys/${typed}`, admin({ method: 'DELETE' }))).body.key.key).toBe('QL-1F3K-1Q2M-04PD');
+
+    // 3. Empty and over-long keys get the unknown-key words.
+    for (const key of ['', encodeURIComponent('   '), 'k'.repeat(200)]) {
+      const res = await call(`/v1/unlock?key=${key}`);
+      expect(res.status, key).toBe(403);
+      expect(res.body, key).toEqual({ error: KEY_NOT_RECOGNISED });
+    }
+
+    // 4. An unknown key in a non-QL format learns nothing about packs:
+    //    the same words with a pack that exists, one that does not, and none.
+    const unknown = '3f2504e0-4f89-11d3-9a0c-0305e82c3301';
+    for (const q of ['', '&pack=exam-set', '&pack=never-shared']) {
+      const res = await call(`/v1/unlock?key=${unknown}${q}`);
+      expect(res.status, q).toBe(403);
+      expect(res.body, q).toEqual({ error: KEY_NOT_RECOGNISED });
+    }
   });
 });
