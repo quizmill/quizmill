@@ -160,3 +160,8 @@ All five accepted (2026-10-16) and built on the same branch:
    `quizmill.examHidden.v1`), only for packs with a sitting.
 5. The demo's exam declares 9 questions in 15 minutes: exactly its
    Advanced band, so nothing is pro-rated.
+
+How the four ways now fit together — who switches each on, and what a
+fresh phone sees on the home app at app.quizmill.dev — is written up
+for authors and learners in the README's "Ways to practise" section
+(2026-10-21).

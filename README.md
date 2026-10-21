@@ -199,11 +199,13 @@ Beyond the required fields, all optional:
   declared level), time pro-rated when fewer are available, pausable,
   no feedback until the end, then a pass verdict and a review of the
   sitting's mistakes. The pack decides whether the sitting exists; a
-  device can only hide its Home tile (Settings → Timed exam)
+  device can only hide its Home tile (Settings → Timed exam). See
+  [Ways to practise](#ways-to-practise)
 - **default-on modes** — manifest `modes` (`{drive?, coach?, paper?}`):
   Drive, Coach and Paper are device opt-ins in Settings, off by default;
   a mode set `true` here starts on for a device that hasn't touched its
-  switch, and the device's own choice wins either way (like `look`)
+  switch, and the device's own choice wins either way (like `look`). See
+  [Ways to practise](#ways-to-practise)
 - **upgrade card** — manifest `upgrade` (`{title, url, price?, blurb?}`)
   for a free sampler pointing at its paid course or fuller bank: one
   card on Home (below the practice loop) and one in Settings, linking
@@ -249,6 +251,49 @@ image in the app or a refused bundle.
 - **Static export** — `npx quizmill build` produces a plain static site,
   deployable to any static host (Cloudflare Pages, GitHub Pages,
   Netlify…)
+
+## Ways to practise
+
+The practice loop above is in every pack. Four more ways sit in a rail
+under **More ways to practise** on Home, and one rule covers all of
+them: **the pack says what it ships with; the device has the last word,
+in Settings → This device.**
+
+| Way | What it is | Who switches it on | Card in Settings → This device |
+|---|---|---|---|
+| **Timed exam** | one sitting at the real exam's pace — no feedback until the end, then a pass verdict and a review of the mistakes | **the pack**, by declaring `exam.durationMinutes` | **Timed exam** — shown by default; off only hides the tile |
+| **Drive mode** | hands-free voice quiz for the car: questions read aloud, answers by voice | **the device**; a pack may start it on with `modes.drive` | **Drive mode** |
+| **Coach mode** | a parent or tutor replays a past session with the learner, answers hidden until revealed; nothing is recorded | **the device**; `modes.coach` | **Coach mode** |
+| **Paper practice** | print a worksheet (or write on it on a tablet), then mark the answers back in as a normal session | **the device**; `modes.paper` | **Paper practice** |
+
+Drive, Coach and Paper resolve the same way: a device that has never
+touched the switch follows the pack's `modes` block (absent means off).
+Once someone flips the switch, that choice is pinned on the device,
+either way — it survives installing another pack from the library and
+"Reset all local progress", because it is about the device and who is
+holding it, not about any pack. The timed exam is the other way round:
+only the pack can create a sitting (it needs the exam's real length),
+and the device may only hide the tile.
+
+**Worked example — the home app at https://app.quizmill.dev.** It is
+built from the bundled solar-system demo pack, whose manifest declares:
+
+```json
+"exam":  { "label": "Mock exam", "passPct": 70, "questionCount": 9, "durationMinutes": 15 },
+"modes": { "drive": true, "coach": true, "paper": true }
+```
+
+So on a fresh phone the rail shows all four tiles: Drive, Coach, Paper
+and Mock exam ("9 Qs · 15:00" — the sitting deals from the hardest
+level, Advanced, which holds exactly nine questions). Settings → This
+device lists the four cards, all on. Switch Coach off and its tile
+goes, and stays gone on that phone until it is switched back on, even
+after installing a different pack. Switch Timed exam off and the Mock
+exam tile goes too, but Progress still shows exam readiness and
+`/practice/exam/` still answers. A certification pack that declares
+`exam` and no `modes` starts with just its exam tile; a kids' pack
+might declare `"modes": { "paper": true }` alone; a pack with neither
+shows no rail at all until the learner opens Settings.
 
 ## Deploying a pack as its own app
 
