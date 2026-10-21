@@ -278,25 +278,32 @@ holding it, not about any pack. The timed exam is the other way round:
 only the pack can create a sitting (it needs the exam's real length),
 and the device may only hide the tile.
 
-**Worked example — the home app at https://app.quizmill.dev.** It is
-built from the bundled solar-system demo pack, whose manifest declares:
+**Worked example — the home app at https://app.quizmill.dev.** It opens
+on the bundled starter pack, which declares neither `exam` nor `modes`,
+so a fresh phone sees no rail at all — the starter's job is to get a
+pack in, not to quiz. Open Settings → This device there and switch
+Paper practice on: a Paper tile appears, and it stays on that phone
+for every pack installed after it. Insert a pack and the rail follows
+that pack's manifest. The bundled solar-system demo pack (the one PR
+previews and the E2E suite are built from) declares:
 
 ```json
 "exam":  { "label": "Mock exam", "passPct": 70, "questionCount": 9, "durationMinutes": 15 },
 "modes": { "drive": true, "coach": true, "paper": true }
 ```
 
-So on a fresh phone the rail shows all four tiles: Drive, Coach, Paper
-and Mock exam ("9 Qs · 15:00" — the sitting deals from the hardest
-level, Advanced, which holds exactly nine questions). Settings → This
-device lists the four cards, all on. Switch Coach off and its tile
-goes, and stays gone on that phone until it is switched back on, even
-after installing a different pack. Switch Timed exam off and the Mock
-exam tile goes too, but Progress still shows exam readiness and
-`/practice/exam/` still answers. A certification pack that declares
-`exam` and no `modes` starts with just its exam tile; a kids' pack
-might declare `"modes": { "paper": true }` alone; a pack with neither
-shows no rail at all until the learner opens Settings.
+So with the demo active, a fresh phone's rail shows all four tiles:
+Drive, Coach, Paper and Mock exam ("9 Qs · 15:00" — the sitting deals
+from the hardest level, Advanced, which holds exactly nine questions).
+Settings → This device lists the four cards, all on. Switch Coach off
+and its tile goes, and stays gone on that phone until it is switched
+back on, even after installing a different pack. Switch Timed exam off
+and the Mock exam tile goes too, but Progress still shows exam
+readiness and `/practice/exam/` still answers. A certification pack
+that declares `exam` and no `modes` starts with just its exam tile; a
+kids' pack might declare `"modes": { "paper": true }` alone; a pack
+with neither — the starter, say — shows no rail until the learner
+opens Settings.
 
 ## Deploying a pack as its own app
 

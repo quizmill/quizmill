@@ -162,6 +162,12 @@ All five accepted (2026-10-16) and built on the same branch:
    Advanced band, so nothing is pro-rated.
 
 How the four ways now fit together — who switches each on, and what a
-fresh phone sees on the home app at app.quizmill.dev — is written up
-for authors and learners in the README's "Ways to practise" section
-(2026-10-21).
+fresh phone sees on the home app at app.quizmill.dev (the starter
+pack, since #213: no rail until a pack is in or a switch is flipped)
+and on the demo — is written up for authors and learners in the
+README's "Ways to practise" section (2026-10-21).
+
+Review follow-up (2026-10-21): the rail's tiles had kept the tones of
+the full-width cards they replaced (Drive dark, Coach brand-tinted,
+the rest neutral), so Coach looked selected. Every tile now wears the
+same neutral tone.
