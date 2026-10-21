@@ -98,13 +98,16 @@ export function normalizeLicenceKey(raw: string): string | null {
  * The stored keys a raw input may name, in lookup order: the input
  * exactly as given (stored keys are opaque, so a key in another
  * provider's format matches only this way), then — when it reads as a
- * typed QL key and differs — its canonical form. Empty for input that
- * is empty or over-long, which is refused without a lookup.
+ * typed QL key and differs — its canonical form. Whitespace around the
+ * input is a paste artefact, never part of a key, and is dropped first.
+ * Empty for input that is empty or over-long, which is refused without
+ * a lookup.
  */
 export function licenceKeyCandidates(raw: string): string[] {
-  if (raw.length === 0 || raw.length > MAX_LICENCE_KEY_LENGTH) return [];
-  const canonical = normalizeLicenceKey(raw);
-  return canonical && canonical !== raw ? [raw, canonical] : [raw];
+  const key = raw.trim();
+  if (key.length === 0 || key.length > MAX_LICENCE_KEY_LENGTH) return [];
+  const canonical = normalizeLicenceKey(key);
+  return canonical && canonical !== key ? [key, canonical] : [key];
 }
 
 // ── Ids and labels ──────────────────────────────────────────────────────

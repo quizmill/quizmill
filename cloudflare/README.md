@@ -237,8 +237,8 @@ capability to *download one pack*, never anyone's practice history. The
 stored key is **opaque**, though: the routes match it exactly as given
 first (so a key in another provider's format, written straight to the
 table, unlocks and revokes as-is) and fall back to the folded QL form
-for typed keys; only empty and over-long (> 128 chars) input is refused
-outright.
+for typed keys; whitespace around the key is trimmed first, and only
+empty and over-long (> 128 chars) input is refused outright.
 
 | Route | Auth | Purpose |
 | --- | --- | --- |
