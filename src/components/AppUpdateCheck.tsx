@@ -1,9 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { checkForAppUpdate, reloadApp, type AppUpdateResult } from '@/lib/appUpdate';
+import {
+  checkForAppUpdate,
+  isUpdateReady,
+  reloadApp,
+  subscribeUpdateReady,
+  type AppUpdateResult,
+} from '@/lib/appUpdate';
 
 type Status = 'idle' | 'checking' | AppUpdateResult;
 
@@ -20,15 +26,20 @@ const MESSAGE: Record<Exclude<Status, 'idle'>, string> = {
  * for the browser to notice one (src/lib/appUpdate.ts explains why that
  * can take weeks on an installed app). One tap, one line of outcome, and
  * a Refresh button when a new build has landed — the same reload the
- * bottom banner offers, which also appears, since both watch the one
- * registration.
+ * bottom banner offers, which also appears, since both share the one
+ * page-lifetime "update ready" flag (src/lib/appUpdate.ts). That flag,
+ * not the last check's answer, decides whether Refresh shows: once a new
+ * build has installed behind this page nothing but a reload changes that,
+ * however a later check comes out.
  */
 export function AppUpdateCheck() {
-  const [status, setStatus] = useState<Status>('idle');
+  const [checked, setChecked] = useState<Status>('idle');
+  const ready = useSyncExternalStore(subscribeUpdateReady, isUpdateReady, () => false);
+  const status: Status = ready ? 'update-ready' : checked;
 
   const check = async () => {
-    setStatus('checking');
-    setStatus(await checkForAppUpdate());
+    setChecked('checking');
+    setChecked(await checkForAppUpdate());
   };
 
   return (

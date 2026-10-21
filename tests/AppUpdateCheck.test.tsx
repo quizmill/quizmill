@@ -17,6 +17,7 @@ let container: HTMLDivElement;
 let root: Root | undefined;
 
 beforeEach(() => {
+  appUpdate.resetUpdateReadyForTests();
   container = document.createElement('div');
   document.body.appendChild(container);
 });
@@ -80,6 +81,26 @@ describe('AppUpdateCheck', () => {
       refresh!.click();
     });
     expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  // Once the page knows a new build has landed (this button, or the
+  // foreground re-check in UpdateNotifier), only a reload fixes it. The
+  // Refresh stays whatever a later check says — the worker has activated
+  // by then and a re-fetch of sw.js would find it unchanged.
+  it('keeps offering Refresh once an update is known, whatever a later check says', async () => {
+    vi.spyOn(appUpdate, 'checkForAppUpdate').mockResolvedValue('up-to-date');
+    await render(<AppUpdateCheck />);
+    expect(container.querySelector('[data-testid="update-refresh"]')).toBeNull();
+
+    await act(async () => {
+      appUpdate.markUpdateReady();
+    });
+    expect(status()?.textContent).toMatch(/new version/i);
+    expect(container.querySelector('[data-testid="update-refresh"]')).not.toBeNull();
+
+    await check();
+    expect(status()?.textContent).toMatch(/new version/i);
+    expect(container.querySelector('[data-testid="update-refresh"]')).not.toBeNull();
   });
 
   it('explains an offline check and a browser that cannot check', async () => {

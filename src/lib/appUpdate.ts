@@ -30,6 +30,44 @@ function browserContainer(): Container | undefined {
   return 'serviceWorker' in navigator ? navigator.serviceWorker : undefined;
 }
 
+/*
+ * "A new build has landed; this page needs a reload" — remembered for the
+ * page's lifetime, by whoever notices first (this check, or the foreground
+ * re-check in UpdateNotifier). It can't be re-derived from the registration:
+ * sw.js skips waiting and claims the page, so the found worker ACTIVATES
+ * and both `installing`/`waiting` empty while the page still runs the old
+ * chunks. A later `update()` then re-fetches a byte-identical (now
+ * current) sw.js and would say "up to date" — the one answer that's wrong
+ * until the page reloads. The reload clears it, by definition.
+ */
+let updateReady = false;
+const listeners = new Set<() => void>();
+
+/** True once a newer build has installed behind this page. */
+export function isUpdateReady(): boolean {
+  return updateReady;
+}
+
+/** Record that a newer build has installed behind this page. */
+export function markUpdateReady(): void {
+  if (updateReady) return;
+  updateReady = true;
+  for (const l of listeners) l();
+}
+
+/** useSyncExternalStore-shaped subscription to `isUpdateReady`. */
+export function subscribeUpdateReady(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/** Tests share one module instance; this is the "page reload" between them. */
+export function resetUpdateReadyForTests(): void {
+  updateReady = false;
+}
+
 /**
  * Ask the browser for a newer build. Resolves once the answer is known —
  * including the install of a freshly found worker, so 'update-ready' means
@@ -39,6 +77,9 @@ function browserContainer(): Container | undefined {
 export async function checkForAppUpdate(
   container: Container | undefined = browserContainer(),
 ): Promise<AppUpdateResult> {
+  // Already found (by an earlier check or the foreground re-check) and
+  // possibly activated since — only a reload answers this, not the server.
+  if (updateReady) return 'update-ready';
   if (!container) return 'unsupported';
   let reg: ServiceWorkerRegistration | undefined;
   try {
@@ -49,7 +90,10 @@ export async function checkForAppUpdate(
   if (!reg) return 'unsupported';
   // Already fetched and installed (a previous check, or the browser's own)
   // — no need to ask the server again.
-  if (reg.waiting) return 'update-ready';
+  if (reg.waiting) {
+    markUpdateReady();
+    return 'update-ready';
+  }
   try {
     await reg.update();
   } catch {
@@ -59,7 +103,9 @@ export async function checkForAppUpdate(
   // (`installing` is set by then); unchanged → neither slot is filled.
   const fresh = reg.installing ?? reg.waiting;
   if (!fresh) return 'up-to-date';
-  return settled(fresh);
+  const result = await settled(fresh);
+  if (result === 'update-ready') markUpdateReady();
+  return result;
 }
 
 /** 'update-ready' once the worker leaves 'installing' for anything but

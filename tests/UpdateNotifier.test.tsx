@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { UpdateNotifier } from '@/components/UpdateNotifier';
+import { isUpdateReady, markUpdateReady, resetUpdateReadyForTests } from '@/lib/appUpdate';
 
 // An installed app seldom navigates, so the browser's own once-a-day
 // service-worker check rarely fires: a pushed update can sit unseen for
@@ -27,6 +28,7 @@ let reg: FakeRegistration;
 let visibility: DocumentVisibilityState;
 
 beforeEach(() => {
+  resetUpdateReadyForTests();
   container = document.createElement('div');
   document.body.appendChild(container);
   reg = new FakeRegistration();
@@ -101,6 +103,18 @@ describe('UpdateNotifier', () => {
     await act(async () => {
       reg.installing.state = 'installed';
       reg.installing.dispatchEvent(new Event('statechange'));
+    });
+    expect(container.textContent).toMatch(/new version/i);
+    // …and the Settings check now answers from the same page-lifetime
+    // flag, so it can't contradict the banner once the worker activates.
+    expect(isUpdateReady()).toBe(true);
+  });
+
+  it('shows the banner when the Settings check found the update', async () => {
+    await render();
+    expect(container.textContent).not.toMatch(/new version/i);
+    await act(async () => {
+      markUpdateReady();
     });
     expect(container.textContent).toMatch(/new version/i);
   });
