@@ -197,7 +197,7 @@ describe('/unlock#key=…', () => {
     expect(replaceState).toHaveBeenCalledWith(null, '', '/unlock/');
     // One request, to the contract's URL, with the key.
     expect(fetched).toEqual([
-      `https://unlock.example.com/v1/unlock?pack=solar-system-full&key=${GOOD}`,
+      `https://unlock.example.com/v1/unlock?key=${GOOD}&pack=solar-system-full`,
     ]);
     // Inserted and active, key under the unlocked pack.
     expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('solar-system-full');
@@ -354,7 +354,7 @@ describe('Packs → Have a licence key?', () => {
     await typeKey(` ${GOOD} `);
     await pressUnlock();
     expect(fetched).toEqual([
-      `https://unlock.example.com/v1/unlock?pack=solar-system-full&key=${GOOD}`,
+      `https://unlock.example.com/v1/unlock?key=${GOOD}&pack=solar-system-full`,
     ]);
     expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('solar-system-full');
     expect(localStorage.getItem(licenceKeyStorageKey('solar-system-full'))).toBe(GOOD);

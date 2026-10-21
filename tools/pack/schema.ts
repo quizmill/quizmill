@@ -176,28 +176,23 @@ export const packUpgradeSchema = z.object({
   price: z.string().min(1).max(24).optional(),
   /** One or two sentences on what the upgrade adds. */
   blurb: z.string().min(1).max(240).optional(),
-  /** The id of the pack a licence key unlocks — the fuller edition this
-   *  pack is a taste of. With `unlockUrl`, the app's /unlock route and the
-   *  "Have a licence key?" entry on /packs fetch that pack from the
-   *  author's endpoint, insert it and make it active in one step. */
+  /** A hint for licence unlock: the id of the pack a key entered in this
+   *  app is expected to unlock — the fuller edition this pack is a taste
+   *  of. The app sends it as `pack=` so the service refuses a key for any
+   *  other pack, and refuses any other bundle itself. Without it the key
+   *  alone says which pack (the bundle's manifest does). Both optional:
+   *  the /unlock route and "Have a licence key?" exist in every build. */
   packId: z.string().regex(slug).max(40).optional(),
-  /** Base URL of the author's unlock endpoint (https). The app calls
-   *  `<unlockUrl>/v1/unlock?pack=<packId>&key=<licence-key>` and expects a
-   *  pack bundle (200), a refusal text (403 `{ error }`) or 404. How keys
+  /** Base URL of the author's own unlock endpoint (https), overriding the
+   *  build's default service. The app calls
+   *  `<unlockUrl>/v1/unlock?key=<licence-key>[&pack=<packId>]` and expects
+   *  a pack bundle (200), a refusal text (403 `{ error }`) or 404. How keys
    *  are issued is the author's business — the engine never learns. */
   unlockUrl: z
     .string()
     .url()
     .refine((u) => u.startsWith('https://'), { message: 'must be an https URL' })
     .optional(),
-}).superRefine((u, ctx) => {
-  if (u.unlockUrl && !u.packId) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['packId'],
-      message: 'required with unlockUrl — the id of the pack a licence key unlocks',
-    });
-  }
 });
 
 export const packManifestSchema = z

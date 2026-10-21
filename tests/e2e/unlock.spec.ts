@@ -2,20 +2,26 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 import { bodyText, waitForText } from './helpers';
 
 /**
- * Unlocking a pack with a licence key, against a STUBBED endpoint: the
- * active pack is a "sampler" that declares `upgrade.packId` +
- * `upgrade.unlockUrl`, and Playwright answers the endpoint's requests
- * itself (200 with a bundle for the good key, 403 with a reason for any
- * other). `/unlock#key=GOOD` must land on Home with the unlocked pack
- * active and counted — no Packs visit; `#key=BAD` stays put with the
- * refusal and the key entry; the entry under Packs ends the same way as
- * the link. And the key must never be in a URL after load, nor in the
- * console.
+ * Unlocking a pack with a licence key, against a STUBBED endpoint that
+ * Playwright answers itself (200 with a bundle for the good key, 403 with
+ * a reason for any other). Two set-ups: the plain demo pack, which
+ * declares nothing — the route and the Packs entry exist anyway, the key
+ * alone goes to the build's default endpoint and the bundle names the
+ * pack; and a "sampler" whose manifest hints at its full bank
+ * (`upgrade.packId`) on the author's own endpoint (`upgrade.unlockUrl`),
+ * so `pack=` travels too. `/unlock#key=GOOD` must land on Home with the
+ * unlocked pack active and counted — no Packs visit; `#key=BAD` stays put
+ * with the refusal and the key entry; the entry under Packs ends the same
+ * way as the link. And the key must never be in a URL after load, nor in
+ * the console.
  */
 
 const GOOD = 'QM-GOOD-E2E';
 const BAD = 'QM-BAD-E2E';
+/** The sampler's own endpoint. */
 const UNLOCK_BASE = 'https://unlock.test';
+/** The build's default endpoint (NEXT_PUBLIC_UNLOCK_URL is unset here). */
+const DEFAULT_BASE = 'https://sync.quizmill.dev';
 
 /** The sampler: three questions, and the contract for the fuller pack. */
 const SAMPLER = {
@@ -113,101 +119,130 @@ test.beforeEach(async ({ page }) => {
   endpointHits = [];
   page.on('console', (msg) => consoleText.push(msg.text()));
   await page.route(`${UNLOCK_BASE}/v1/unlock**`, stubEndpoint);
-  await page.goto('/');
-  // The sampler is the active pack — exactly what "Make active" writes.
-  await page.evaluate((p) => {
-    localStorage.setItem(`quizmill.packLibrary.pack.${p.manifest.id}.v1`, JSON.stringify(p));
-    localStorage.setItem(
-      'quizmill.packLibrary.index.v1',
-      JSON.stringify([
-        {
-          id: p.manifest.id,
-          title: p.manifest.title,
-          description: p.manifest.description,
-          themeColor: p.manifest.themeColor,
-          questionCount: p.questions.length,
-          categoryCount: 1,
-          insertedAt: Date.now(),
-        },
-      ]),
-    );
-    localStorage.setItem('quizmill.activePackId', p.manifest.id);
-  }, SAMPLER);
+  await page.route(`${DEFAULT_BASE}/v1/unlock**`, stubEndpoint);
 });
 
-test('/unlock#key=GOOD lands on Home with the unlocked pack active — no Packs visit', async ({
+test('the demo pack declares nothing: /unlock still works, the key alone names the pack', async ({
   page,
 }) => {
+  await page.goto('/');
   await page.goto(`/unlock/#key=${GOOD}`, { waitUntil: 'networkidle' });
-  // The unlock navigates to Home on its own.
   await expect(page.locator('h1')).toHaveText('Solar System Full Course', { timeout: 20_000 });
   await waitForText(page, 'Unlocked: 7 questions');
-  // Home (#191) shows the counts per category card; the full pack has one.
-  expect(await bodyText(page)).toContain('7 questions available');
-
-  // One request, to the contract's URL — and no key anywhere after load.
-  expect(endpointHits).toEqual([`${UNLOCK_BASE}/v1/unlock?pack=solar-system-full&key=${GOOD}`]);
+  // The key alone, to the default endpoint — no pack= without a hint.
+  expect(endpointHits).toEqual([`${DEFAULT_BASE}/v1/unlock?key=${GOOD}`]);
   expect(page.url()).not.toContain('key=');
-  expect(page.url().endsWith('/')).toBe(true);
   expect(consoleText.join('\n')).not.toContain(GOOD);
-
-  // Active and remembered for this pack; the toast shows exactly once.
-  const state = await page.evaluate(() => ({
-    active: localStorage.getItem('quizmill.activePackId'),
-    licence: localStorage.getItem('quizmill.solar-system-full.licence'),
-    toast: sessionStorage.getItem('quizmill.unlocked.v1'),
-    events: localStorage.getItem('quizmill.solar-sampler.events.v1') ?? '',
-  }));
-  expect(state.active).toBe('solar-system-full');
-  expect(state.licence).toBe(GOOD);
-  expect(state.toast).toBeNull();
-  expect(state.events).toContain('pack_unlocked');
-  expect(state.events).not.toContain(GOOD);
-
-  await page.reload({ waitUntil: 'networkidle' });
-  await expect(page.locator('h1')).toHaveText('Solar System Full Course', { timeout: 20_000 });
-  await expect(page.locator('[data-testid="unlocked-toast"]')).toHaveCount(0);
-});
-
-test('/unlock#key=BAD stays put: the refusal, the file fallback, the key entry', async ({
-  page,
-}) => {
-  await page.goto(`/unlock/#key=${BAD}`, { waitUntil: 'networkidle' });
-  await waitForText(page, 'This key has been used on too many devices.', 20_000);
-  const body = await bodyText(page);
-  expect(body).toContain('You can also insert the file under Packs.');
-  expect(body).toContain('Installed the app on your home screen?');
-  await expect(page.locator('[data-testid="unlock-key-value"]')).toHaveText(BAD);
-  await expect(keyInput(page)).toHaveValue(BAD);
-
-  // The fragment was wiped on load, and nothing was stored.
-  expect(page.url()).not.toContain('key=');
   expect(
     await page.evaluate(() => ({
       active: localStorage.getItem('quizmill.activePackId'),
       licence: localStorage.getItem('quizmill.solar-system-full.licence'),
     })),
-  ).toEqual({ active: 'solar-sampler', licence: null });
-  expect(consoleText.join('\n')).not.toContain(BAD);
+  ).toEqual({ active: 'solar-system-full', licence: GOOD });
 
-  // Fix the key in place: same handler, same ending as the link.
-  await keyInput(page).fill(GOOD);
-  await expect(keyInput(page)).toHaveValue(GOOD);
-  await page.click('[data-testid="licence-key-go"]');
-  await waitForText(page, 'Unlocked: 7 questions', 20_000);
-  expect(endpointHits).toHaveLength(2);
-});
-
-test('Packs → Have a licence key? ends the same way', async ({ page }) => {
+  // And the entry is on /packs for the demo pack too.
   await page.goto('/packs/', { waitUntil: 'networkidle' });
   await waitForText(page, 'Have a licence key?', 20_000);
-  await keyInput(page).fill(GOOD);
-  await page.click('[data-testid="licence-key-go"]');
-  await waitForText(page, 'Unlocked: 7 questions', 20_000);
-  await expect(page.locator('h1')).toHaveText('Solar System Full Course');
-  expect(page.url()).not.toContain('key=');
-  expect(consoleText.join('\n')).not.toContain(GOOD);
-  expect(
-    await page.evaluate(() => localStorage.getItem('quizmill.solar-system-full.licence')),
-  ).toBe(GOOD);
+});
+
+test.describe('a sampler that hints at its full bank on its own endpoint', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    // The sampler is the active pack — exactly what "Make active" writes.
+    await page.evaluate((p) => {
+      localStorage.setItem(`quizmill.packLibrary.pack.${p.manifest.id}.v1`, JSON.stringify(p));
+      localStorage.setItem(
+        'quizmill.packLibrary.index.v1',
+        JSON.stringify([
+          {
+            id: p.manifest.id,
+            title: p.manifest.title,
+            description: p.manifest.description,
+            themeColor: p.manifest.themeColor,
+            questionCount: p.questions.length,
+            categoryCount: 1,
+            insertedAt: Date.now(),
+          },
+        ]),
+      );
+      localStorage.setItem('quizmill.activePackId', p.manifest.id);
+    }, SAMPLER);
+  });
+
+  test('/unlock#key=GOOD lands on Home with the unlocked pack active — no Packs visit', async ({
+    page,
+  }) => {
+    await page.goto(`/unlock/#key=${GOOD}`, { waitUntil: 'networkidle' });
+    // The unlock navigates to Home on its own.
+    await expect(page.locator('h1')).toHaveText('Solar System Full Course', { timeout: 20_000 });
+    await waitForText(page, 'Unlocked: 7 questions');
+    // Home (#191) shows the counts per category card; the full pack has one.
+    expect(await bodyText(page)).toContain('7 questions available');
+
+    // One request, to the contract's URL — and no key anywhere after load.
+    expect(endpointHits).toEqual([`${UNLOCK_BASE}/v1/unlock?key=${GOOD}&pack=solar-system-full`]);
+    expect(page.url()).not.toContain('key=');
+    expect(page.url().endsWith('/')).toBe(true);
+    expect(consoleText.join('\n')).not.toContain(GOOD);
+
+    // Active and remembered for this pack; the toast shows exactly once.
+    const state = await page.evaluate(() => ({
+      active: localStorage.getItem('quizmill.activePackId'),
+      licence: localStorage.getItem('quizmill.solar-system-full.licence'),
+      toast: sessionStorage.getItem('quizmill.unlocked.v1'),
+      events: localStorage.getItem('quizmill.solar-sampler.events.v1') ?? '',
+    }));
+    expect(state.active).toBe('solar-system-full');
+    expect(state.licence).toBe(GOOD);
+    expect(state.toast).toBeNull();
+    expect(state.events).toContain('pack_unlocked');
+    expect(state.events).not.toContain(GOOD);
+
+    await page.reload({ waitUntil: 'networkidle' });
+    await expect(page.locator('h1')).toHaveText('Solar System Full Course', { timeout: 20_000 });
+    await expect(page.locator('[data-testid="unlocked-toast"]')).toHaveCount(0);
+  });
+
+  test('/unlock#key=BAD stays put: the refusal, the file fallback, the key entry', async ({
+    page,
+  }) => {
+    await page.goto(`/unlock/#key=${BAD}`, { waitUntil: 'networkidle' });
+    await waitForText(page, 'This key has been used on too many devices.', 20_000);
+    const body = await bodyText(page);
+    expect(body).toContain('You can also insert the file under Packs.');
+    expect(body).toContain('Installed the app on your home screen?');
+    await expect(page.locator('[data-testid="unlock-key-value"]')).toHaveText(BAD);
+    await expect(keyInput(page)).toHaveValue(BAD);
+
+    // The fragment was wiped on load, and nothing was stored.
+    expect(page.url()).not.toContain('key=');
+    expect(
+      await page.evaluate(() => ({
+        active: localStorage.getItem('quizmill.activePackId'),
+        licence: localStorage.getItem('quizmill.solar-system-full.licence'),
+      })),
+    ).toEqual({ active: 'solar-sampler', licence: null });
+    expect(consoleText.join('\n')).not.toContain(BAD);
+
+    // Fix the key in place: same handler, same ending as the link.
+    await keyInput(page).fill(GOOD);
+    await expect(keyInput(page)).toHaveValue(GOOD);
+    await page.click('[data-testid="licence-key-go"]');
+    await waitForText(page, 'Unlocked: 7 questions', 20_000);
+    expect(endpointHits).toHaveLength(2);
+  });
+
+  test('Packs → Have a licence key? ends the same way', async ({ page }) => {
+    await page.goto('/packs/', { waitUntil: 'networkidle' });
+    await waitForText(page, 'Have a licence key?', 20_000);
+    await keyInput(page).fill(GOOD);
+    await page.click('[data-testid="licence-key-go"]');
+    await waitForText(page, 'Unlocked: 7 questions', 20_000);
+    await expect(page.locator('h1')).toHaveText('Solar System Full Course');
+    expect(page.url()).not.toContain('key=');
+    expect(consoleText.join('\n')).not.toContain(GOOD);
+    expect(
+      await page.evaluate(() => localStorage.getItem('quizmill.solar-system-full.licence')),
+    ).toBe(GOOD);
+  });
 });

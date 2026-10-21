@@ -7,13 +7,12 @@ import { unlockConfig } from '@/lib/unlock';
 /**
  * "Have a licence key?" on /packs — the typed-key twin of the /unlock
  * link, for a second device and for an installed PWA (whose storage the
- * link, opened in the browser, never reaches). Rendered only when the
- * active pack declares an unlock endpoint; otherwise nothing, and the
- * shelf is exactly as before.
+ * link, opened in the browser, never reaches). Rendered in every build:
+ * the key alone says which pack, so no pack has to declare anything for
+ * a learner to unlock one here.
  */
 export function LicenceKeyCard() {
   const config = unlockConfig();
-  if (!config) return null;
   return (
     <section
       data-testid="licence-key-card"

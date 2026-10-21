@@ -61,9 +61,10 @@ export type PackUpgrade = {
   url: string;
   price?: string;
   blurb?: string;
-  /** The pack a licence key unlocks (see src/lib/unlock.ts). */
+  /** A hint: the pack a licence key entered here is expected to unlock —
+   *  the fuller edition this pack is a taste of (see src/lib/unlock.ts). */
   packId?: string;
-  /** Base URL of the author's unlock endpoint; present only with packId. */
+  /** Base URL of the author's own unlock endpoint, overriding the build's. */
   unlockUrl?: string;
 };
 

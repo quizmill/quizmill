@@ -39,8 +39,9 @@ export function resetUnlockPageForTests(): void {
  * storage — the key is the bridge: copy it, open the app, paste it under
  * Packs → Have a licence key?
  *
- * The route exists in every build and gates on the ACTIVE pack at render
- * time: a pack with no unlock endpoint gets a plain explanation.
+ * The route exists and works in every build: the key alone says which
+ * pack, so nothing about the active pack decides whether a learner can
+ * unlock one here (see src/lib/unlock.ts for how the endpoint is chosen).
  */
 export function UnlockPage() {
   const mounted = useMounted();
@@ -96,70 +97,52 @@ export function UnlockPage() {
           Unlock a pack
         </h1>
         <p className="mt-1 text-ink-500">
-          {config
-            ? 'A licence key fetches the pack it unlocks and makes it active on this device.'
-            : 'This pack has no licence unlock.'}
+          A licence key fetches the pack it unlocks and makes it active on this device.
         </p>
       </div>
 
-      {!config ? (
+      {mounted && key ? (
         <section
-          data-testid="unlock-unavailable"
-          className="rounded-2xl border border-ink-200 bg-surface p-5 text-sm text-ink-600 shadow-xs"
+          data-testid="unlock-key"
+          className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs"
         >
-          The active pack does not take licence keys. You can still insert a pack
-          from its files under{' '}
-          <Link href="/packs" className="underline">
-            Packs
-          </Link>
-          .
-        </section>
-      ) : (
-        <>
-          {mounted && key ? (
-            <section
-              data-testid="unlock-key"
-              className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs"
+          <p className="text-xs font-semibold uppercase tracking-wider text-ink-500">
+            Your licence key
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <code
+              data-testid="unlock-key-value"
+              className="min-w-0 flex-1 select-all break-all rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 text-sm text-ink-800"
             >
-              <p className="text-xs font-semibold uppercase tracking-wider text-ink-500">
-                Your licence key
-              </p>
-              <div className="mt-2 flex items-center gap-2">
-                <code
-                  data-testid="unlock-key-value"
-                  className="min-w-0 flex-1 select-all break-all rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 text-sm text-ink-800"
-                >
-                  {key}
-                </code>
-                <Button size="sm" variant="secondary" onClick={() => void copy()} data-testid="unlock-key-copy">
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  {copied ? 'Copied' : 'Copy'}
-                </Button>
-              </div>
-              <p className="mt-3 text-xs text-ink-600">
-                Installed the app on your home screen? Paste this key under Packs →
-                Enter a licence key.
-              </p>
-            </section>
-          ) : null}
+              {key}
+            </code>
+            <Button size="sm" variant="secondary" onClick={() => void copy()} data-testid="unlock-key-copy">
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copied ? 'Copied' : 'Copy'}
+            </Button>
+          </div>
+          <p className="mt-3 text-xs text-ink-600">
+            Installed the app on your home screen? Paste this key under Packs →
+            Enter a licence key.
+          </p>
+        </section>
+      ) : null}
 
-          <section className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs">
-            <h2 className="text-lg font-semibold text-ink-900">Enter a licence key</h2>
-            <p className="mt-1 text-sm text-ink-600">
-              {key
-                ? 'The key from your link is filled in below.'
-                : 'Paste the licence key you were given.'}
-            </p>
-            <div className="mt-4">
-              {/* Keyed on the URL key so a key arriving after mount starts a
-                  fresh form that submits it once. */}
-              {mounted ? (
-                <LicenceKeyForm key={key ?? ''} config={config} autoKey={key ?? undefined} />
-              ) : null}
-            </div>
-          </section>
-        </>
-      )}
+      <section className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs">
+        <h2 className="text-lg font-semibold text-ink-900">Enter a licence key</h2>
+        <p className="mt-1 text-sm text-ink-600">
+          {key
+            ? 'The key from your link is filled in below.'
+            : 'Paste the licence key you were given.'}
+        </p>
+        <div className="mt-4">
+          {/* Keyed on the URL key so a key arriving after mount starts a
+              fresh form that submits it once. */}
+          {mounted ? (
+            <LicenceKeyForm key={key ?? ''} config={config} autoKey={key ?? undefined} />
+          ) : null}
+        </div>
+      </section>
     </main>
   );
 }

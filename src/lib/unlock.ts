@@ -7,14 +7,24 @@
  * (a second device, or an installed PWA whose storage is separate from
  * the browser the link opened in).
  *
- * The contract the app codes against — the endpoint is the AUTHOR's,
- * declared by the active pack's manifest (`upgrade.unlockUrl`, with
- * `upgrade.packId` naming the pack it serves):
+ * The key alone says which pack: the endpoint answers with the bundle
+ * the key opens, and the pack's id is the one in that bundle's manifest.
+ * So the route works and the entry renders in EVERY build, whatever the
+ * active pack declares — a private pack needs no other pack edited to
+ * point at it. The contract the app codes against:
  *
- *   GET <unlockUrl>/v1/unlock?pack=<packId>&key=<licence-key>
+ *   GET <unlockUrl>/v1/unlock?key=<licence-key>[&pack=<packId>]
  *     200  application/json  a pack bundle (as `quizmill bundle` writes)
  *     403  { "error": "<text the app may show>" }  key unknown / revoked
- *     404  unknown pack
+ *     404  `pack` was passed and the key does not open that pack
+ *
+ * Where `unlockUrl` is the build's default endpoint (NEXT_PUBLIC_UNLOCK_URL,
+ * falling back to the hosted service at sync.quizmill.dev) unless the
+ * active pack's manifest overrides it with `upgrade.unlockUrl` (an author
+ * hosting their own). `pack` is sent only when the manifest hints at the
+ * pack a key is expected to open (`upgrade.packId`, the sampler → full
+ * bank case); the server then refuses a key for any other pack, and the
+ * app refuses a bundle for any other pack before it touches storage.
  *
  * CORS `*`, no cookies. How keys are issued is none of the engine's
  * business, and the key itself goes exactly three places: the request
@@ -22,18 +32,24 @@
  * learner is looking at. Never an event, never a beacon, never a URL
  * after load (the route reads it from the FRAGMENT — which no server or
  * log ever sees — and clears it at once; a `?key=` is cleared too, but
- * never used). The bundle must be the pack the manifest named: any other
- * id is refused before it touches storage.
+ * never used).
  *
  * Pure where it can be: the fetch is injectable, so every outcome is
  * unit-tested without a browser.
  */
 import { APP_CONFIG } from '@/config';
+import type { PackUpgrade } from '@/pack/data';
 import { recordEvent } from './storage';
 import { activatePack, insertPack, type PackLibraryEntry } from './packLibrary';
 
 /** The route a licence-key link opens; the key rides in its fragment. */
 export const UNLOCK_PATH = '/unlock';
+
+/** Build-time override of the default unlock endpoint. */
+export const UNLOCK_URL_ENV = 'NEXT_PUBLIC_UNLOCK_URL';
+
+/** The hosted unlock service every build talks to unless told otherwise. */
+export const DEFAULT_UNLOCK_URL = 'https://sync.quizmill.dev';
 
 /** sessionStorage: the confirmation Home shows once after an unlock
  *  (the unlock ends in a full navigation, so React state can't carry it). */
@@ -45,17 +61,31 @@ export function licenceKeyStorageKey(packId: string): string {
 }
 
 export interface UnlockConfig {
-  /** The pack the key unlocks (manifest `upgrade.packId`). */
-  packId: string;
-  /** The author's endpoint base (manifest `upgrade.unlockUrl`). */
+  /** The endpoint base: the manifest's `upgrade.unlockUrl`, else the build's. */
   unlockUrl: string;
+  /** The pack a key is expected to open (manifest `upgrade.packId`), when
+   *  the active pack hints at one; sent as `pack=` and checked against
+   *  the bundle. Absent, the bundle's manifest alone names the pack. */
+  packId?: string;
 }
 
-/** The active pack's unlock contract, or null when it declares none. */
-export function unlockConfig(): UnlockConfig | null {
-  const u = APP_CONFIG.upgrade;
-  if (!u?.packId || !u.unlockUrl) return null;
-  return { packId: u.packId, unlockUrl: u.unlockUrl };
+/**
+ * The unlock contract for an active pack's `upgrade` block and the
+ * build's endpoint setting — always something: the per-pack override
+ * wins, then the build's NEXT_PUBLIC_UNLOCK_URL, then the hosted default.
+ */
+export function resolveUnlockConfig(
+  upgrade: Pick<PackUpgrade, 'packId' | 'unlockUrl'> | undefined,
+  envUrl: string | undefined,
+): UnlockConfig {
+  const fromEnv = envUrl?.trim();
+  const unlockUrl = upgrade?.unlockUrl || (fromEnv ? fromEnv : DEFAULT_UNLOCK_URL);
+  return { unlockUrl, ...(upgrade?.packId ? { packId: upgrade.packId } : {}) };
+}
+
+/** The ACTIVE pack's unlock contract — never null (see resolveUnlockConfig). */
+export function unlockConfig(): UnlockConfig {
+  return resolveUnlockConfig(APP_CONFIG.upgrade, process.env.NEXT_PUBLIC_UNLOCK_URL);
 }
 
 /**
@@ -94,20 +124,20 @@ export function stripKeyFromLocation(): void {
   window.history.replaceState(null, '', pathname + (rest ? `?${rest}` : ''));
 }
 
-/** The exact request the contract above describes. */
+/** The exact request the contract above describes: `pack=` only with a hint. */
 export function unlockEndpoint(config: UnlockConfig, key: string): string {
   const url = new URL('v1/unlock', config.unlockUrl.replace(/\/*$/, '/'));
-  url.searchParams.set('pack', config.packId);
   url.searchParams.set('key', key);
+  if (config.packId) url.searchParams.set('pack', config.packId);
   return url.toString();
 }
 
 export type UnlockFailure =
   | 'offline' // the endpoint could not be reached
   | 'denied' // 403 — the key was refused; the message is the endpoint's
-  | 'unknown-pack' // 404
+  | 'unknown-pack' // 404 — the key does not open the pack that was asked for
   | 'bad-response' // not a pack bundle, or an unexpected status
-  | 'wrong-pack' // a bundle, but not the pack the key is for
+  | 'wrong-pack' // a bundle, but not the pack the manifest said the key is for
   | 'invalid-pack' // a bundle that failed validation
   | 'storage' // validated, but could not be stored (quota)
   | 'cancelled'; // the caller gave up before the bundle arrived — not an event
@@ -189,7 +219,13 @@ export async function fetchUnlockBundle(
     };
   }
   if (res.status === 404) {
-    return { ok: false, reason: 'unknown-pack', message: 'The unlock service does not know this pack.' };
+    return {
+      ok: false,
+      reason: 'unknown-pack',
+      message: config.packId
+        ? 'That licence key does not open the pack this app is asking for.'
+        : 'The unlock service does not know this pack.',
+    };
   }
   if (!res.ok) {
     return {
@@ -207,7 +243,9 @@ export async function fetchUnlockBundle(
 /**
  * The whole unlock, start to finish: fetch → validate + insert → activate
  * → keep the key → record `pack_unlocked`. On any failure `unlock_failed`
- * is recorded with the reason (never the key) and nothing is stored.
+ * is recorded with the reason (never the key) and nothing is stored; its
+ * `pack` is the bundle's id once one has arrived, else the manifest's
+ * hint, else nothing (a refused key names no pack).
  * The caller navigates to Home afterwards — a full load, so every module
  * rebinds to the new pack.
  *
@@ -229,9 +267,10 @@ export async function unlockPack(
   const fail = (
     reason: UnlockFailure,
     message: string,
+    pack: string | undefined,
     errors?: string[],
   ): UnlockOutcome => {
-    recordEvent('unlock_failed', { pack: config.packId, reason });
+    recordEvent('unlock_failed', { ...(pack ? { pack } : {}), reason });
     return { ok: false, reason, message, ...(errors ? { errors } : {}) };
   };
 
@@ -239,12 +278,19 @@ export async function unlockPack(
   // Checked before any side effect: a response that arrives after the
   // caller moved on must not touch storage.
   if (signal?.aborted) return CANCELLED;
-  if (!fetched.ok) return fail(fetched.reason, fetched.message);
+  if (!fetched.ok) return fail(fetched.reason, fetched.message, config.packId);
 
-  // The endpoint serves one pack per key; a bundle for any other pack is
-  // a misconfiguration, not something to install under a surprise id.
-  if (manifestId(fetched.candidate as { manifest: unknown }) !== config.packId) {
-    return fail('wrong-pack', 'The unlock service sent a different pack than this key is for.');
+  // The key says which pack: the bundle's manifest names it. When the
+  // active pack hinted at the pack it expects (a sampler and its full
+  // bank), a bundle for any other pack is a misconfiguration, not
+  // something to install under a surprise id.
+  const arriving = manifestId(fetched.candidate as { manifest: unknown }) ?? undefined;
+  if (config.packId && arriving !== config.packId) {
+    return fail(
+      'wrong-pack',
+      'The unlock service sent a different pack than this key is for.',
+      config.packId,
+    );
   }
 
   // `origin` is informational on the shelf and must not be a URL: the
@@ -259,6 +305,7 @@ export async function unlockPack(
     return fail(
       quota ? 'storage' : 'invalid-pack',
       quota ? inserted.errors[0] : 'The pack the service sent did not validate.',
+      arriving ?? config.packId,
       inserted.errors,
     );
   }

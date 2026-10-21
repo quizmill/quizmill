@@ -612,16 +612,22 @@ describe('validatePack', () => {
     ).toBe(true);
   });
 
-  it('rejects an unlockUrl without the packId it would fetch', () => {
-    const input = loadDemo();
-    (input.manifest as { upgrade?: unknown }).upgrade = {
+  it('accepts an unlockUrl on its own, and a packId on its own — each is an independent hint', () => {
+    const urlOnly = loadDemo();
+    (urlOnly.manifest as { upgrade?: unknown }).upgrade = {
       title: 'Get the full course',
       url: 'https://example.com/course',
       unlockUrl: 'https://unlock.example.com',
     };
-    const result = validatePack(input);
-    expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.includes('upgrade.packId'))).toBe(true);
+    expect(validatePack(urlOnly).ok).toBe(true);
+
+    const idOnly = loadDemo();
+    (idOnly.manifest as { upgrade?: unknown }).upgrade = {
+      title: 'Get the full course',
+      url: 'https://example.com/course',
+      packId: 'solar-system-full',
+    };
+    expect(validatePack(idOnly).ok).toBe(true);
   });
 
   it('rejects an upgrade packId that is not a slug or is the pack itself', () => {

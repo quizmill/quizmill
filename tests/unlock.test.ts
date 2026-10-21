@@ -6,10 +6,12 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  DEFAULT_UNLOCK_URL,
   UNLOCKED_TOAST_KEY,
   fetchUnlockBundle,
   licenceKeyStorageKey,
   readKeyFromHash,
+  resolveUnlockConfig,
   stashUnlockedToast,
   stripKeyFromLocation,
   takeUnlockedToast,
@@ -20,10 +22,13 @@ import {
 import { getActivePackPointer, getInsertedPack, listInsertedPacks } from '@/lib/packLibrary';
 import { loadEvents } from '@/lib/storage';
 
+/** A sampler that hints at the pack its keys open, on the author's own endpoint. */
 const CONFIG: UnlockConfig = {
   packId: 'solar-system-full',
   unlockUrl: 'https://unlock.example.com',
 };
+/** Any other pack: no hint — the key alone says which pack. */
+const NO_HINT: UnlockConfig = { unlockUrl: 'https://unlock.example.com' };
 const KEY = 'QM-7F3A-TEST-KEY';
 
 function fakeStorage() {
@@ -146,17 +151,51 @@ describe('stripKeyFromLocation', () => {
   });
 });
 
+describe('resolveUnlockConfig', () => {
+  it('is never null: the hosted default when the pack and the build say nothing', () => {
+    expect(resolveUnlockConfig(undefined, undefined)).toEqual({ unlockUrl: DEFAULT_UNLOCK_URL });
+    expect(resolveUnlockConfig({}, '')).toEqual({ unlockUrl: DEFAULT_UNLOCK_URL });
+    expect(resolveUnlockConfig({ packId: undefined, unlockUrl: undefined }, '  ')).toEqual({
+      unlockUrl: DEFAULT_UNLOCK_URL,
+    });
+    expect(DEFAULT_UNLOCK_URL).toBe('https://sync.quizmill.dev');
+  });
+
+  it('the build’s NEXT_PUBLIC_UNLOCK_URL beats the default; the pack’s unlockUrl beats both', () => {
+    expect(resolveUnlockConfig(undefined, 'https://unlock.build.test')).toEqual({
+      unlockUrl: 'https://unlock.build.test',
+    });
+    expect(
+      resolveUnlockConfig({ unlockUrl: 'https://author.test' }, 'https://unlock.build.test'),
+    ).toEqual({ unlockUrl: 'https://author.test' });
+  });
+
+  it('carries the pack hint only when the manifest gives one', () => {
+    expect(resolveUnlockConfig({ packId: 'solar-system-full' }, undefined)).toEqual({
+      unlockUrl: DEFAULT_UNLOCK_URL,
+      packId: 'solar-system-full',
+    });
+    expect(resolveUnlockConfig({ unlockUrl: 'https://author.test' }, undefined)).not.toHaveProperty(
+      'packId',
+    );
+  });
+});
+
 describe('unlockEndpoint', () => {
-  it('builds GET <base>/v1/unlock?pack=&key= with both values encoded', () => {
-    expect(unlockEndpoint(CONFIG, 'a b&c')).toBe(
-      'https://unlock.example.com/v1/unlock?pack=solar-system-full&key=a+b%26c',
-    );
+  it('builds GET <base>/v1/unlock?key= with the key encoded — no pack without a hint', () => {
+    expect(unlockEndpoint(NO_HINT, 'a b&c')).toBe('https://unlock.example.com/v1/unlock?key=a+b%26c');
     // A trailing slash or a path on the base is fine either way.
-    expect(unlockEndpoint({ ...CONFIG, unlockUrl: 'https://x.test/api/' }, 'k')).toBe(
-      'https://x.test/api/v1/unlock?pack=solar-system-full&key=k',
+    expect(unlockEndpoint({ unlockUrl: 'https://x.test/api/' }, 'k')).toBe(
+      'https://x.test/api/v1/unlock?key=k',
     );
-    expect(unlockEndpoint({ ...CONFIG, unlockUrl: 'https://x.test/api' }, 'k')).toBe(
-      'https://x.test/api/v1/unlock?pack=solar-system-full&key=k',
+    expect(unlockEndpoint({ unlockUrl: 'https://x.test/api' }, 'k')).toBe(
+      'https://x.test/api/v1/unlock?key=k',
+    );
+  });
+
+  it('adds &pack= when the manifest hints at the pack the key should open', () => {
+    expect(unlockEndpoint(CONFIG, 'a b&c')).toBe(
+      'https://unlock.example.com/v1/unlock?key=a+b%26c&pack=solar-system-full',
     );
   });
 });
@@ -188,8 +227,14 @@ describe('fetchUnlockBundle', () => {
 
   it('maps 404, other statuses, non-bundles and network failures to reasons', async () => {
     expect((await fetchUnlockBundle(CONFIG, KEY, respond(404, undefined))).ok).toBe(false);
+    // With a pack hint, 404 means "this key does not open that pack".
     expect(await fetchUnlockBundle(CONFIG, KEY, respond(404, undefined))).toMatchObject({
       reason: 'unknown-pack',
+      message: expect.stringContaining('does not open the pack'),
+    });
+    expect(await fetchUnlockBundle(NO_HINT, KEY, respond(404, undefined))).toMatchObject({
+      reason: 'unknown-pack',
+      message: 'The unlock service does not know this pack.',
     });
     expect(await fetchUnlockBundle(CONFIG, KEY, respond(500, undefined))).toMatchObject({
       reason: 'bad-response',
@@ -279,7 +324,52 @@ describe('unlockPack', () => {
     ]);
   });
 
-  it('refuses a bundle whose manifest id is not the pack the key is for — before anything is stored', async () => {
+  it('without a hint, the key alone says which pack: the bundle’s manifest id is taken as is', async () => {
+    const r = await unlockPack(KEY, {
+      config: NO_HINT,
+      buildPackId: 'solar-system-demo',
+      fetchImpl: respond(200, bundle('some-private-pack')),
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.entry.id).toBe('some-private-pack');
+    expect(calls[0].url).toBe('https://unlock.example.com/v1/unlock?key=QM-7F3A-TEST-KEY');
+    expect(getActivePackPointer()).toBe('some-private-pack');
+    expect(storage.getItem(licenceKeyStorageKey('some-private-pack'))).toBe(KEY);
+    expect(loadEvents().map((e) => [e.type, e.data])).toEqual([
+      ['pack_unlocked', { pack: 'some-private-pack' }],
+    ]);
+  });
+
+  it('without a hint, a refusal names no pack — the event carries the reason only', async () => {
+    const r = await unlockPack(KEY, {
+      config: NO_HINT,
+      buildPackId: 'solar-system-demo',
+      fetchImpl: respond(403, { error: 'Key revoked.' }),
+    });
+    expect(r).toEqual({ ok: false, reason: 'denied', message: 'Key revoked.' });
+    expect(loadEvents().map((e) => [e.type, e.data])).toEqual([
+      ['unlock_failed', { reason: 'denied' }],
+    ]);
+    expect(storage.dump()).not.toContain(KEY);
+  });
+
+  it('without a hint, a bundle that fails validation is filed under the pack it claimed to be', async () => {
+    const broken = bundle('some-private-pack');
+    broken.questions[0].correctKey = 'Z';
+    const r = await unlockPack(KEY, {
+      config: NO_HINT,
+      buildPackId: 'solar-system-demo',
+      fetchImpl: respond(200, broken),
+    });
+    expect(r).toMatchObject({ ok: false, reason: 'invalid-pack' });
+    expect(listInsertedPacks()).toEqual([]);
+    expect(loadEvents().map((e) => [e.type, e.data])).toEqual([
+      ['unlock_failed', { pack: 'some-private-pack', reason: 'invalid-pack' }],
+    ]);
+  });
+
+  it('with a hint, refuses a bundle whose manifest id is another pack — before anything is stored', async () => {
     const r = await unlockPack(KEY, {
       config: CONFIG,
       buildPackId: 'solar-system-demo',
