@@ -130,6 +130,27 @@ describe('insertPack', () => {
     expect(entries[0].questionCount).toBe(2);
     expect(getInsertedPack('capitals-mini')?.questions).toHaveLength(2);
   });
+
+  it('keeps the bundle’s packVersion (and an explicit one wins) so an update check can compare it', () => {
+    // A bundle envelope (quizmill bundle) carries packVersion next to the content.
+    insertPack(
+      { ...validPack(), format: 'quizmill-pack-bundle', packVersion: 'abc1234' },
+      { buildPackId: BUILD_PACK_ID },
+    );
+    expect(listInsertedPacks()[0].packVersion).toBe('abc1234');
+    // The unlock path knows better: the endpoint's ETag is the version it compares.
+    insertPack(
+      { ...validPack(), packVersion: 'abc1234-dirty' },
+      { buildPackId: BUILD_PACK_ID, packVersion: 'etag-hash', unlockUrl: 'https://unlock.test' },
+    );
+    expect(listInsertedPacks()[0]).toMatchObject({
+      packVersion: 'etag-hash',
+      unlockUrl: 'https://unlock.test',
+    });
+    // Picked pack files have no version — the field is simply absent.
+    insertPack(validPack('other-pack'), { buildPackId: BUILD_PACK_ID });
+    expect(listInsertedPacks().find((e) => e.id === 'other-pack')).not.toHaveProperty('packVersion');
+  });
 });
 
 describe('activatePack', () => {

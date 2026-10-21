@@ -93,7 +93,8 @@ export type AppEventType =
   | 'upsell_clicked' // …and tapped
   | 'bundle_inserted' // a pack was inserted into the library ({ pack })
   | 'pack_unlocked' // a licence key fetched + activated a pack ({ pack })
-  | 'unlock_failed'; // …or the endpoint refused ({ pack, reason }) — never the key
+  | 'unlock_failed' // …or the endpoint refused ({ pack, reason }) — never the key
+  | 'pack_updated'; // the daily check fetched a newer bundle of an unlocked pack ({ pack })
 
 export interface AppEvent {
   id: string; // crypto.randomUUID()

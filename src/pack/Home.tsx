@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
 import { UnlockedToast } from '@/components/UnlockedToast';
+import { PackUpdatedNotice } from '@/components/PackUpdatedNotice';
 import { useStorageData } from '@/lib/useStorage';
 import { useClientState, useMounted } from '@/lib/useMounted';
 import { unresolvedMistakeCount } from '@/lib/mistakes';
@@ -213,6 +214,9 @@ export default function PackHome() {
       {/* One-time "Unlocked: N questions" after a licence-key unlock landed
           here (sessionStorage; see UnlockedToast). */}
       <UnlockedToast />
+      {/* One-time "Updated: now N questions" after an unlocked pack's daily
+          check fetched a newer bundle (sessionStorage; see PackUpdatedNotice). */}
+      <PackUpdatedNotice />
 
       {mistakeCount > 0 ? (
         <HomeCard
