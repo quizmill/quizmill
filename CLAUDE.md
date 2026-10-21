@@ -19,6 +19,11 @@ code or in `docs/investigations/`.
   seeds it from the committed demo `content/pack-demo/` (solar system, a
   schema-v2 showcase) via the `predev`/`prebuild`/`pretest` hooks;
   `npm run pack:use <dir | owner/repo | URL>` swaps in a validated pack.
+- `content/pack-start/` — the home app's STARTER pack (`deploy-apps.yml`
+  builds app.quizmill.dev from it): titled "quizmill", a few questions
+  about using the app, mill-wheel `assets/icon.svg`. Home recognises it
+  by id (`src/pack/starter.ts`) and shows the add-a-pack card; the demo
+  stays the showcase for tests/E2E, so never point them at the starter.
 - `tools/pack/` — `schema.ts` (Zod pack format, schemaVersion 2 only, and
   `validatePack` cross-file checks; the validator CLI is the contract an
   authoring agent loops against), `registry.json` (published packs),

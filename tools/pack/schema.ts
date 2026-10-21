@@ -11,6 +11,8 @@ import { z } from 'zod';
  *   scenarios.json   optional shared scenario stems (may be `[]` / absent)
  *   concepts.json    optional teaching cards (may be `[]` / absent)
  *   assets/          optional images referenced by `image` paths
+ *   assets/icon.svg  optional app icon for the pack's build (replaces the
+ *                    generated initials-on-theme-colour icon)
  *
  * The shape is a generalised MCQ format proven by several hundred
  * imported/generated questions in the engine's ancestor project; categories
@@ -32,7 +34,8 @@ import { z } from 'zod';
  *
  * Packs are PRIVATE by default: the active pack lives at gitignored
  * `content/pack/`, authored packs under gitignored `packs/`. Only the
- * demo pack (`content/pack-demo/`) is committed.
+ * demo pack (`content/pack-demo/`) and the home app's starter pack
+ * (`content/pack-start/`) are committed.
  */
 
 const slug = /^[a-z0-9][a-z0-9-]*$/;

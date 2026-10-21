@@ -50,6 +50,7 @@ import { formatClock } from '@/lib/examClock';
 import { HomeCard, ModeTile } from '@/pack/HomeCard';
 import { StreakChip } from '@/pack/StreakChip';
 import { UpgradeCard } from '@/pack/UpgradeCard';
+import { StarterPackCard } from '@/pack/StarterCard';
 import { recordLevelCrossings } from '@/pack/useLevelUp';
 
 /** Runtime-pack mode (quizmill-cloud's served engine): the pack is injected at
@@ -217,6 +218,10 @@ export default function PackHome() {
       {/* One-time "Updated: now N questions" after an unlocked pack's daily
           check fetched a newer bundle (sessionStorage; see PackUpdatedNotice). */}
       <PackUpdatedNotice />
+
+      {/* The home app's starter pack only: how a pack gets in, above the
+          practice loop. Any other active pack renders nothing here. */}
+      <StarterPackCard />
 
       {mistakeCount > 0 ? (
         <HomeCard

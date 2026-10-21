@@ -1,0 +1,450 @@
+[
+  {
+    "id": "start-practising-001",
+    "categoryKey": "practising",
+    "difficulty": 1,
+    "prompt": "What happens when you tap \"Review mistakes\" on the Home screen?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Your wrong answers are deleted so your accuracy goes back up",
+        "explanation": "Nothing is ever deleted — your history is the whole point."
+      },
+      {
+        "key": "B",
+        "text": "The app shows you the correct answers to read through",
+        "explanation": "Reading an answer is not the same as being able to give it."
+      },
+      {
+        "key": "C",
+        "text": "The questions you got wrong are asked again until you get them right",
+        "explanation": "That is the mill wheel: answer, review, retry."
+      },
+      {
+        "key": "D",
+        "text": "A fresh set of questions on the same topics is picked for you",
+        "explanation": "Review re-asks the very questions you missed, not look-alikes."
+      }
+    ],
+    "correctKey": "C",
+    "explanation": "Review is the retry step of the practice loop. Every question you answered wrong joins a review queue and is asked again — the same question, not a similar one — until you answer it correctly. A correct answer rescues it and it leaves the queue. Nothing is deleted: your attempts stay in your history, and accuracy on the Progress tab is derived from them.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "start-practising-002",
+    "categoryKey": "practising",
+    "difficulty": 2,
+    "prompt": "In which order does the review queue bring back your mistakes?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Oldest mistake first",
+        "explanation": "A stale mistake should not stay buried under today's slips."
+      },
+      {
+        "key": "B",
+        "text": "Most recent mistake first",
+        "explanation": "That would keep re-asking what you just saw and bury older gaps."
+      },
+      {
+        "key": "C",
+        "text": "Hardest question first",
+        "explanation": "Difficulty does not decide the order."
+      },
+      {
+        "key": "D",
+        "text": "Random order every time",
+        "explanation": "The order is deliberate, not shuffled."
+      }
+    ],
+    "correctKey": "A",
+    "explanation": "The review queue is sorted by when the wrong answer happened, oldest first. A review session takes the first ten, so a mistake you made a week ago resurfaces before the one you made a minute ago. That is the spaced-repetition intuition: the gaps you have had longest are the ones most worth closing, and they must not stay hidden under today's slip-ups.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "start-practising-003",
+    "categoryKey": "practising",
+    "difficulty": 2,
+    "prompt": "How many questions does one practice session deal, and which ones does it favour?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Twenty, favouring the hardest questions",
+        "explanation": "Sessions are shorter than that, and difficulty is not the bias."
+      },
+      {
+        "key": "B",
+        "text": "Ten, favouring questions you have not seen yet",
+        "explanation": "Short enough to fit a break, new material first."
+      },
+      {
+        "key": "C",
+        "text": "Five, favouring the ones you got right before",
+        "explanation": "Re-serving what you already know would be a waste of a session."
+      },
+      {
+        "key": "D",
+        "text": "As many as the category holds, in the pack's order",
+        "explanation": "A whole category in one go would be a slog, not a session."
+      }
+    ],
+    "correctKey": "B",
+    "explanation": "A practice session is ten questions (fewer only when the category holds fewer). The selection is random but weighted toward questions you have never attempted, so a new pack is covered steadily rather than by luck. Once you have seen everything, repeats are ordered to be useful: questions whose latest answer was wrong come first, then the ones you saw longest ago.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "start-practising-004",
+    "categoryKey": "practising",
+    "difficulty": 1,
+    "prompt": "How many questions do you need to answer in a day for it to count toward your streak?",
+    "options": [
+      {
+        "key": "A",
+        "text": "One",
+        "explanation": "A single tap would make the streak meaningless."
+      },
+      {
+        "key": "B",
+        "text": "Five",
+        "explanation": "Half a session — not quite the daily goal."
+      },
+      {
+        "key": "C",
+        "text": "Twenty",
+        "explanation": "Two full sessions is more than the goal asks."
+      },
+      {
+        "key": "D",
+        "text": "Ten",
+        "explanation": "One full practice session."
+      }
+    ],
+    "correctKey": "D",
+    "explanation": "The daily goal is ten questions — exactly one practice session. Answer ten on a day and that day counts toward your streak; the streak chip in the Home header counts down the ones still to go (\"9 more today\") and shows the streak once the goal is met. Packs that switch on XP also award a bonus for each day the goal is reached.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "start-practising-005",
+    "categoryKey": "practising",
+    "difficulty": 3,
+    "prompt": "You practised every day for two weeks, then missed one day. What happens to your streak?",
+    "options": [
+      {
+        "key": "A",
+        "text": "It resets to zero",
+        "explanation": "A hard reset is the loss-aversion mechanic quizmill deliberately avoids."
+      },
+      {
+        "key": "B",
+        "text": "It is halved",
+        "explanation": "No partial penalties either."
+      },
+      {
+        "key": "C",
+        "text": "It survives: one missed day is bridged by a grace day",
+        "explanation": "A single swimming lesson does not wipe out two weeks of practice."
+      },
+      {
+        "key": "D",
+        "text": "It pauses until you practise ten days in a row again",
+        "explanation": "There is no probation period; the next practised day simply continues the run."
+      }
+    ],
+    "correctKey": "C",
+    "explanation": "The streak is deliberately forgiving. A single missed day is bridged automatically by a grace day, so a two-week run survives one day off. The grace is limited — at most one per seven counted days — so two missed days close together do end the run. The softening is a choice about how practice should feel: a streak that resets to zero drives practice by fear of losing a number, and quizmill does not want that.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "start-practising-006",
+    "categoryKey": "practising",
+    "difficulty": 2,
+    "prompt": "After you answer a question, where does the explanation appear?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Only at the end of the session, in a summary",
+        "explanation": "By then you have forgotten why you picked what you picked."
+      },
+      {
+        "key": "B",
+        "text": "Straight away, under the question, before the next one",
+        "explanation": "Feedback lands while the reasoning is still fresh."
+      },
+      {
+        "key": "C",
+        "text": "Only for questions you got wrong",
+        "explanation": "A right answer for the wrong reason deserves the explanation too."
+      },
+      {
+        "key": "D",
+        "text": "Nowhere — the app only tells you right or wrong",
+        "explanation": "Every question in a pack carries an explanation; it is the point of the pack."
+      }
+    ],
+    "correctKey": "B",
+    "explanation": "Every question in a quizmill pack carries an explanation, and the app shows it immediately after you answer — right or wrong — under the options, before you move on. Options can carry their own short verdicts too, so you also learn why the tempting distractor was wrong. Immediate feedback is what turns a quiz into practice: you correct the reasoning while it is still in your head.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "start-practising-007",
+    "categoryKey": "practising",
+    "difficulty": 3,
+    "prompt": "You can leave a note on a question while practising. What is the note for?",
+    "options": [
+      {
+        "key": "A",
+        "text": "It reports the question to the pack's author",
+        "explanation": "Reporting is a separate thumbs-down vote."
+      },
+      {
+        "key": "B",
+        "text": "It hides the question from future sessions",
+        "explanation": "Questions are never hidden; mistakes are retried."
+      },
+      {
+        "key": "C",
+        "text": "It is a study note for you — collected on the Notes tab, where you can practise the noted questions",
+        "explanation": "Your own margin notes, kept with the question."
+      },
+      {
+        "key": "D",
+        "text": "It changes the correct answer on this device",
+        "explanation": "A pack's answers are the pack's; a note never alters a question."
+      }
+    ],
+    "correctKey": "C",
+    "explanation": "A note is your own margin note on a question — a doubt, a mnemonic, a \"look this up\". The Notes tab collects every noted question for the active pack, and from there you can practise exactly those questions. Notes are part of your progress: they sync between devices with your attempts and travel in a progress export. They never change the question itself.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "start-packs-001",
+    "categoryKey": "packs",
+    "difficulty": 1,
+    "prompt": "What is a learning pack?",
+    "options": [
+      {
+        "key": "A",
+        "text": "A paid subscription to the app",
+        "explanation": "A pack is content, not a plan."
+      },
+      {
+        "key": "B",
+        "text": "A directory of JSON files: a manifest plus a bank of multiple-choice questions",
+        "explanation": "pack.json names and brands it, questions.json is the bank."
+      },
+      {
+        "key": "C",
+        "text": "A video course with quizzes at the end of each chapter",
+        "explanation": "Packs are questions with explanations, nothing to watch."
+      },
+      {
+        "key": "D",
+        "text": "A saved copy of your practice history",
+        "explanation": "That is a progress export, which lives alongside a pack, not inside it."
+      }
+    ],
+    "correctKey": "B",
+    "explanation": "A learning pack is a directory of JSON: a manifest (pack.json — title, colour, categories) and a bank of multiple-choice questions (questions.json), each with an explanation; optional shared scenarios, concept cards and an assets folder of images. This app is the same engine for every pack: swap the pack in and the practice loop, review queue, streak and progress all work on it.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "start-packs-002",
+    "categoryKey": "packs",
+    "difficulty": 1,
+    "prompt": "Which of these is NOT a way to get a pack into this app?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Choose the pack's files, or a single bundle file, under Packs",
+        "explanation": "The file route — AirDrop a bundle, pick it, done."
+      },
+      {
+        "key": "B",
+        "text": "Paste the URL of a pack repo on GitHub under Packs",
+        "explanation": "A public pack repo inserts straight from its URL."
+      },
+      {
+        "key": "C",
+        "text": "Type the pack's questions into the app one by one",
+        "explanation": "There is no in-app editor; packs are authored outside, often by an AI agent."
+      },
+      {
+        "key": "D",
+        "text": "Enter a licence key, or open a link that carries one",
+        "explanation": "The key fetches the pack it unlocks and makes it active."
+      }
+    ],
+    "correctKey": "C",
+    "explanation": "Packs arrive from outside the app, never by typing inside it. Under Packs you can pick the pack's files or one bundle file, paste the URL of a pack repo, insert a published pack from the registry with one tap, or enter a licence key; a share link that carries a key does the same in one tap. Authoring happens elsewhere — by hand, or by an AI agent using the quizmill authoring skill — and the validator checks the result.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "start-packs-003",
+    "categoryKey": "packs",
+    "difficulty": 2,
+    "prompt": "What does a licence key do when you enter it under Packs or open a link that carries one?",
+    "options": [
+      {
+        "key": "A",
+        "text": "It removes the adverts from the app",
+        "explanation": "There are none to remove."
+      },
+      {
+        "key": "B",
+        "text": "It fetches the pack the key unlocks, puts it on your shelf and makes it active",
+        "explanation": "One key, one pack, straight to that pack's Home."
+      },
+      {
+        "key": "C",
+        "text": "It links this device's progress to another device",
+        "explanation": "That is the sync key, a different key with a QM- prefix."
+      },
+      {
+        "key": "D",
+        "text": "It unlocks every pack in the registry at once",
+        "explanation": "A key opens exactly the pack it was issued for."
+      }
+    ],
+    "correctKey": "B",
+    "explanation": "A licence key is how a private pack reaches you without a file. Enter it (or open a link that carries it) and the app asks the pack's unlock service for the bundle that key opens, validates it, inserts it on your shelf and makes it active — you land on that pack's Home with \"Unlocked: N questions\". The key is kept on the device, so the pack can quietly fetch a newer edition later. It is not the sync key, which links devices.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "start-packs-004",
+    "categoryKey": "packs",
+    "difficulty": 2,
+    "prompt": "What is a sync key (the one that starts with QM-)?",
+    "options": [
+      {
+        "key": "A",
+        "text": "A password for your quizmill account",
+        "explanation": "There is no account and no email — the key is the whole identity."
+      },
+      {
+        "key": "B",
+        "text": "A random key that links devices: enter the same key on your tablet and your phone and they share one practice history",
+        "explanation": "Like a Wi-Fi password for your progress."
+      },
+      {
+        "key": "C",
+        "text": "A code that unlocks a private pack",
+        "explanation": "That is a licence key; sync keys carry progress, not packs."
+      },
+      {
+        "key": "D",
+        "text": "A one-time code that expires after you use it",
+        "explanation": "It keeps working for as long as you keep it."
+      }
+    ],
+    "correctKey": "B",
+    "explanation": "Sync in quizmill has no accounts. A device holds a random, high-entropy key (QM- followed by four groups of five letters and digits, chosen to survive being read aloud or handwritten), and every sync request carries it. Enter the same key on a second device and the two share one history — attempts, stickers, notes. Anyone holding the key can read that history, so treat it like a password: share it with your own devices and nobody else.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "start-packs-005",
+    "categoryKey": "packs",
+    "difficulty": 2,
+    "prompt": "You eject a pack from the shelf under Packs. What happens to the progress you made on it?",
+    "options": [
+      {
+        "key": "A",
+        "text": "It is deleted with the pack",
+        "explanation": "Ejecting removes the questions, never the history."
+      },
+      {
+        "key": "B",
+        "text": "It is kept — insert the pack again and you pick up where you left off",
+        "explanation": "Progress is stored per pack, separately from the pack's content."
+      },
+      {
+        "key": "C",
+        "text": "It is merged into the next pack you make active",
+        "explanation": "Each pack's progress stays its own."
+      },
+      {
+        "key": "D",
+        "text": "It is kept only if sync is switched on",
+        "explanation": "It is kept on the device regardless; sync just copies it elsewhere too."
+      }
+    ],
+    "correctKey": "B",
+    "explanation": "Progress is stored per pack, keyed by the pack's id and kept apart from the pack's questions. Ejecting removes the questions from the shelf to free space; your attempts, stickers and notes for that pack stay on the device. Insert the same pack again — from a file, a URL or a key — and the history is still there. The same rule means switching between packs loses nothing: each keeps its own.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "start-packs-006",
+    "categoryKey": "packs",
+    "difficulty": 3,
+    "prompt": "A pack you unlocked with a licence key gets new questions from its author. How do they reach you?",
+    "options": [
+      {
+        "key": "A",
+        "text": "You must enter the licence key again",
+        "explanation": "The key is kept from the first unlock; re-entering it is never required."
+      },
+      {
+        "key": "B",
+        "text": "The app checks once a day and quietly swaps in the newer edition, keeping your progress",
+        "explanation": "A one-line notice on Home says what changed."
+      },
+      {
+        "key": "C",
+        "text": "They never do — a pack is fixed once inserted",
+        "explanation": "Only packs inserted from files are frozen; unlocked ones follow their author."
+      },
+      {
+        "key": "D",
+        "text": "The author emails you a new file",
+        "explanation": "No email is involved anywhere in quizmill."
+      }
+    ],
+    "correctKey": "B",
+    "explanation": "An unlocked pack keeps its licence key on the device and, about once a day, asks the unlock service whether a newer bundle exists for it. If so the new edition replaces the old one on the shelf and Home shows a one-line notice with the new question count. Your progress is untouched: the pack keeps its id, and progress is stored by id. A pack inserted from a file has no service to ask, so it stays as inserted.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "start-packs-007",
+    "categoryKey": "packs",
+    "difficulty": 1,
+    "prompt": "Does the app need an internet connection to practise a pack that is already on the shelf?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Yes — every question is fetched when it is shown",
+        "explanation": "The whole pack lives on the device once inserted."
+      },
+      {
+        "key": "B",
+        "text": "Yes, unless you have paid for offline mode",
+        "explanation": "There is no offline mode to pay for; offline is the default."
+      },
+      {
+        "key": "C",
+        "text": "No — the pack and your progress are stored on the device, and the app itself works offline once installed",
+        "explanation": "A plane, a tunnel, a cottage: practice keeps going."
+      },
+      {
+        "key": "D",
+        "text": "Only for packs you inserted from a file",
+        "explanation": "Packs from a URL or a key are stored the same way."
+      }
+    ],
+    "correctKey": "C",
+    "explanation": "quizmill is an offline-first app. Install it on your home screen and the app shell is cached; every pack on the shelf is stored on the device in full, images included, and your attempts are written locally first. Practice, review and progress all work with no connection. Only the extras need the network: inserting a new pack, syncing between devices, and the daily check for a newer edition of an unlocked pack.",
+    "source": "original",
+    "reviewStatus": "approved"
+  }
+]

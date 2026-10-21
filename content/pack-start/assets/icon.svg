@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- The quizmill mill-wheel mark (eight paddles, one golden — the turn of
+       the wheel), the same mark as the footer, on the starter pack's
+       neutral slate. -->
+  <rect width="512" height="512" rx="96" fill="#334155"/>
+  <g transform="translate(96 96) scale(5)" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round">
+    <path stroke="#b45309" d="M 25.79 8.82 A 24 24 0 0 1 38.21 8.82"/>
+    <path d="M 44.00 11.22 A 24 24 0 0 1 52.78 20.00"/>
+    <path d="M 55.18 25.79 A 24 24 0 0 1 55.18 38.21"/>
+    <path d="M 52.78 44.00 A 24 24 0 0 1 44.00 52.78"/>
+    <path d="M 38.21 55.18 A 24 24 0 0 1 25.79 55.18"/>
+    <path d="M 20.00 52.78 A 24 24 0 0 1 11.22 44.00"/>
+    <path d="M 8.82 38.21 A 24 24 0 0 1 8.82 25.79"/>
+    <path d="M 11.22 20.00 A 24 24 0 0 1 20.00 11.22"/>
+  </g>
+  <circle cx="256" cy="256" r="25" fill="#ffffff"/>
+</svg>
