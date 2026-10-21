@@ -8,7 +8,7 @@
  * one-tap off switch in Settings. The payload is exactly
  * `{ event, packId, deviceId, appBuild, ts }` — plus, for the events
  * that are ABOUT another pack arriving (`bundle_inserted`,
- * `pack_unlocked`, `unlock_failed`), that pack's id as `pack`, so an
+ * `pack_unlocked`, `unlock_failed`, `pack_updated`), that pack's id as `pack`, so an
  * insert is not filed under whatever pack happened to be active. No
  * progress, no answers, no user agent, never a licence key. Dormant
  * unless NEXT_PUBLIC_ANALYTICS_URL is set at build time, the same
@@ -74,6 +74,7 @@ export const FUNNEL_EVENTS: readonly AppEventType[] = [
   'bundle_inserted',
   'pack_unlocked',
   'unlock_failed',
+  'pack_updated',
 ];
 
 /** The funnel events that are about ANOTHER pack arriving — the only ones
@@ -82,6 +83,7 @@ const PACK_TARGETED_EVENTS: readonly AppEventType[] = [
   'bundle_inserted',
   'pack_unlocked',
   'unlock_failed',
+  'pack_updated',
 ];
 
 export interface AnalyticsBeacon {

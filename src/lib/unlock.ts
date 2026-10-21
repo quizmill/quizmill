@@ -60,6 +60,13 @@ export function licenceKeyStorageKey(packId: string): string {
   return `quizmill.${packId}.licence`;
 }
 
+/** Where the daily update check keeps its record for a pack (when it last
+ *  asked, and whether the key was refused) — see src/lib/packUpdates.ts.
+ *  A fresh unlock clears it, so a key entered again resumes the checks. */
+export function updateCheckStorageKey(packId: string): string {
+  return `quizmill.${packId}.packUpdate.v1`;
+}
+
 export interface UnlockConfig {
   /** The endpoint base: the manifest's `upgrade.unlockUrl`, else the build's. */
   unlockUrl: string;
@@ -140,7 +147,8 @@ export type UnlockFailure =
   | 'wrong-pack' // a bundle, but not the pack the manifest said the key is for
   | 'invalid-pack' // a bundle that failed validation
   | 'storage' // validated, but could not be stored (quota)
-  | 'cancelled'; // the caller gave up before the bundle arrived — not an event
+  | 'cancelled' // the caller gave up before the bundle arrived — not an event
+  | 'not-modified'; // 304 — only ever answered to an If-None-Match (the update check)
 
 export type UnlockOutcome =
   | { ok: true; entry: PackLibraryEntry }
@@ -178,23 +186,39 @@ function manifestId(bundle: { manifest: unknown }): string | null {
 
 const CANCELLED = { ok: false, reason: 'cancelled', message: '' } as const satisfies UnlockOutcome;
 
+/** The version an `ETag: "<version>"` header names, or undefined. */
+function etagVersion(res: Response): string | undefined {
+  const etag = res.headers.get('etag')?.trim().replace(/^W\//, '');
+  if (!etag) return undefined;
+  const version = etag.replace(/^"|"$/g, '');
+  return version ? version : undefined;
+}
+
 /**
  * Fetch the bundle the key unlocks. Every non-200 is turned into a
  * reason + a sentence the learner can act on; nothing throws. An aborted
  * `signal` ends in `cancelled`, which the caller treats as silence.
+ * `ifNoneMatch` (the update check) sends the version the device holds;
+ * the endpoint's 304 comes back as `not-modified`. A 200 carries the
+ * served `version` (the ETag) when the endpoint sets one.
  */
 export async function fetchUnlockBundle(
   config: UnlockConfig,
   key: string,
   fetchImpl: typeof fetch = fetch,
   signal?: AbortSignal,
-): Promise<{ ok: true; candidate: unknown } | { ok: false; reason: UnlockFailure; message: string }> {
+  ifNoneMatch?: string,
+): Promise<
+  | { ok: true; candidate: unknown; version?: string }
+  | { ok: false; reason: UnlockFailure; message: string }
+> {
   let res: Response;
   try {
     // No cookies, ever: the key is the credential and travels in the URL.
     res = await fetchImpl(unlockEndpoint(config, key), {
       credentials: 'omit',
       mode: 'cors',
+      ...(ifNoneMatch ? { headers: { 'if-none-match': `"${ifNoneMatch}"` } } : {}),
       ...(signal ? { signal } : {}),
     });
   } catch {
@@ -205,6 +229,7 @@ export async function fetchUnlockBundle(
       message: 'Could not reach the unlock service — check your connection and try again.',
     };
   }
+  if (res.status === 304) return { ok: false, reason: 'not-modified', message: '' };
   let body: unknown = undefined;
   try {
     body = await res.json();
@@ -237,7 +262,8 @@ export async function fetchUnlockBundle(
   if (!isBundle(body)) {
     return { ok: false, reason: 'bad-response', message: 'The unlock service did not return a pack.' };
   }
-  return { ok: true, candidate: body };
+  const version = etagVersion(res);
+  return { ok: true, candidate: body, ...(version ? { version } : {}) };
 }
 
 /**
@@ -296,9 +322,14 @@ export async function unlockPack(
   // `origin` is informational on the shelf and must not be a URL: the
   // runtime derives an assets location from URL-shaped origins, and the
   // endpoint is not where a bundle's images live (they travel inside it).
+  // The endpoint itself and the version it served ride in their own
+  // fields — the daily update check asks the same place with that
+  // version (src/lib/packUpdates.ts).
   const inserted = insertPack(fetched.candidate, {
     origin: `licence key · ${new URL(config.unlockUrl).host}`,
     buildPackId: opts.buildPackId,
+    unlockUrl: config.unlockUrl,
+    ...(fetched.version ? { packVersion: fetched.version } : {}),
   });
   if (!inserted.ok) {
     const quota = inserted.errors.some((e) => e.includes('storage space'));
@@ -314,6 +345,8 @@ export async function unlockPack(
   activatePack(entry.id);
   try {
     window.localStorage.setItem(licenceKeyStorageKey(entry.id), key);
+    // A key entered again lifts a refusal the update check may have hit.
+    window.localStorage.removeItem(updateCheckStorageKey(entry.id));
   } catch {
     // the pack is in; a key that can't be kept just means typing it again
   }

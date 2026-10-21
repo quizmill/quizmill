@@ -134,7 +134,7 @@ describe('beacon payload', () => {
   });
 
   it('names the ARRIVING pack for insert and unlock events, and nothing else from data', () => {
-    for (const type of ['bundle_inserted', 'pack_unlocked', 'unlock_failed'] as const) {
+    for (const type of ['bundle_inserted', 'pack_unlocked', 'unlock_failed', 'pack_updated'] as const) {
       const payload = beaconFor(
         { id: 'e1', type, at: 1, data: { pack: 'full-pack', reason: 'denied' } },
         'dev-1',

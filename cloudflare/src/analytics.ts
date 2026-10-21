@@ -9,7 +9,8 @@
  *                                 no auth (devices hold no key); 204 or 400
  *                                 `pack` = the ARRIVING pack's id, sent only
  *                                 for bundle_inserted / pack_unlocked /
- *                                 unlock_failed (packId is the active pack)
+ *                                 unlock_failed / pack_updated (packId is
+ *                                 the active pack)
  *   GET  /v1/analytics/summary?pack=<id>&days=<n>
  *                                 per-event totals + distinct devices, and
  *                                 a per-day device series, over the events
@@ -33,6 +34,7 @@ export const FUNNEL_EVENTS = [
   'bundle_inserted',
   'pack_unlocked',
   'unlock_failed',
+  'pack_updated',
 ] as const;
 export type FunnelEvent = (typeof FUNNEL_EVENTS)[number];
 
