@@ -6,9 +6,9 @@ import PackHome from '@/pack/Home';
 import {
   ATTEMPTS_KEY,
   loadAchievements,
-  saveDriveModeEnabled,
   saveLevelFilter,
 } from '@/lib/storage';
+import { saveDriveModeEnabled } from '@/lib/drive';
 import { saveCoachModeEnabled } from '@/lib/coach';
 import { savePaperModeEnabled } from '@/lib/paper';
 import type { Attempt } from '@/data/types';
@@ -232,17 +232,21 @@ describe('PackHome category stats', () => {
 });
 
 describe('PackHome timed exam tile', () => {
-  it('links to the sitting with its size and clock (the demo declares 30 min)', async () => {
+  it('links to the sitting with its size and clock (the demo declares 15 min)', async () => {
     await render();
     const card = container.querySelector('[data-testid="exam-card"]');
     expect(card).toBeTruthy();
     expect(card!.getAttribute('href')).toBe('/practice/exam');
     expect(card!.textContent).toContain('Mock exam');
-    // 9 Advanced questions at 20-in-30-min pace = 13:30.
-    expect(card!.textContent).toContain('9 Qs · 13:30');
+    // The demo declares exactly its 9 Advanced questions in 15 minutes.
+    expect(card!.textContent).toContain('9 Qs · 15:00');
   });
 
   it('is the only tile in the rail when no device mode is on', async () => {
+    // The demo ships Drive, Coach and Paper on; this device switched them off.
+    saveDriveModeEnabled(false);
+    saveCoachModeEnabled(false);
+    savePaperModeEnabled(false);
     await render();
     const rail = container.querySelector('[data-testid="mode-rail"]');
     expect(rail).toBeTruthy();
@@ -276,5 +280,27 @@ describe('PackHome mode cards', () => {
     await expect(cards.map((c) => c!.outerHTML).join('\n')).toMatchFileSnapshot(
       './__snapshots__/home-mode-cards.html',
     );
+  });
+
+  it('gives every tile in the rail the same look — none is highlighted', async () => {
+    // Four tiles side by side read as one set of equals; a tinted Coach
+    // tile among three plain ones looked like a selection (#193 review).
+    saveDriveModeEnabled(true);
+    saveCoachModeEnabled(true);
+    savePaperModeEnabled(true);
+    await render();
+    const tiles = Array.from(
+      container.querySelectorAll('[data-testid="mode-rail"] a'),
+    );
+    expect(tiles.map((a) => a.getAttribute('data-testid'))).toEqual([
+      'drive-card',
+      'coach-card',
+      'paper-card',
+      'exam-card',
+    ]);
+    const looks = new Set(tiles.map((a) => a.className));
+    expect(looks.size, [...looks].join('\n')).toBe(1);
+    const bubbles = new Set(tiles.map((a) => a.querySelector('span')!.className));
+    expect(bubbles.size).toBe(1);
   });
 });

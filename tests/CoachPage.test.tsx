@@ -9,6 +9,7 @@ import { SettingsPage } from '@/components/SettingsPage';
 import { ATTEMPTS_KEY, SESSIONS_KEY, loadAttempts, loadSessions } from '@/lib/storage';
 import { COACH_KEY, loadCoachModeEnabled, saveCoachModeEnabled } from '@/lib/coach';
 import { packQuestions } from '@/pack/data';
+import { APP_CONFIG } from '@/config';
 import type { Attempt, Session } from '@/data/types';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -20,15 +21,19 @@ if (!globalThis.crypto?.randomUUID) {
 
 let container: HTMLDivElement;
 let root: Root | undefined;
+// The demo ships Coach on; these tests are about a pack that does not.
+const demoModes = APP_CONFIG.modes;
 
 beforeEach(() => {
   localStorage.clear();
+  APP_CONFIG.modes = undefined;
   window.location.hash = '';
   container = document.createElement('div');
   document.body.appendChild(container);
 });
 
 afterEach(async () => {
+  APP_CONFIG.modes = demoModes;
   await act(async () => {
     root?.unmount();
   });
@@ -116,7 +121,8 @@ describe('Coach mode setting', () => {
     expect(localStorage.getItem(COACH_KEY)).toBe('1');
     expect(loadCoachModeEnabled()).toBe(true);
     saveCoachModeEnabled(false);
-    expect(localStorage.getItem(COACH_KEY)).toBeNull();
+    expect(localStorage.getItem(COACH_KEY)).toBe('0');
+    expect(loadCoachModeEnabled()).toBe(false);
     expect(COACH_KEY.startsWith('quizmill.coach')).toBe(true);
   });
 

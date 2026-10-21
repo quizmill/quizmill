@@ -2,9 +2,9 @@ import { expect, test } from '@playwright/test';
 import { bodyText, clickButtonByText, pickOptionA, readStorage, waitForText } from './helpers';
 
 /**
- * The timed exam against the demo pack: its manifest declares a 20-question,
- * 30-minute mock exam and 9 Advanced questions, so one sitting is 9
- * questions in 13:30.
+ * The timed exam against the demo pack: its manifest declares a 9-question,
+ * 15-minute mock exam and holds 9 Advanced questions, so one sitting is 9
+ * questions in 15:00.
  */
 const SESSIONS_KEY = 'quizmill.solar-system-demo.sessions.v1';
 const ATTEMPTS_KEY = 'quizmill.solar-system-demo.attempts.v1';
@@ -23,11 +23,11 @@ test.describe('timed exam', () => {
     await waitForText(page, 'Start exam');
     const intro = await bodyText(page);
     expect(intro).toContain('9');
-    expect(intro).toContain('13:30');
+    expect(intro).toContain('15:00');
     expect(intro).toContain('70%');
 
     await clickButtonByText(page, 'Start exam');
-    await expect(page.locator(tid('exam-clock'))).toHaveText(/13:[0-2]\d/);
+    await expect(page.locator(tid('exam-clock'))).toHaveText(/1[45]:[0-5]\d/);
 
     // Pause hides the question; resume brings it back.
     await clickButtonByText(page, 'Pause');

@@ -28,9 +28,9 @@ import {
   saveLevelFilter,
   loadDismissedNudge,
   saveDismissedNudge,
-  loadDriveModeEnabled,
 } from '@/lib/storage';
 import { levelNudge } from '@/lib/stats';
+import { loadDriveModeEnabled } from '@/lib/drive';
 import { loadCoachModeEnabled } from '@/lib/coach';
 import { loadPaperModeEnabled } from '@/lib/paper';
 import { latestColdLook } from '@/lib/readiness';
@@ -46,6 +46,7 @@ import {
   PACK_LEVEL_BY_QUESTION_ID,
 } from '@/pack/data';
 import { EXAM_SITTING } from '@/pack/exam';
+import { loadExamShown } from '@/lib/examPref';
 import { formatClock } from '@/lib/examClock';
 import { HomeCard, ModeTile } from '@/pack/HomeCard';
 import { StreakChip } from '@/pack/StreakChip';
@@ -103,13 +104,16 @@ export default function PackHome() {
   // from localStorage after mount so SSR/first paint stay stable.
   const [level, setLevelState] = useClientState(loadLevelFilter, null);
   const [dismissedNudge, setDismissedNudge] = useClientState(loadDismissedNudge, null);
-  // Drive Mode is opt-in (Settings toggle) — the Home card only shows
-  // once it's switched on. Read after mount like the other prefs.
+  // Drive Mode is opt-in (Settings toggle, or the pack's `modes` default)
+  // — the tile only shows once it's on. Read after mount like the other prefs.
   const [driveMode] = useClientState(loadDriveModeEnabled, false);
   // Coach mode is the same kind of opt-in, for the parent's device.
   const [coachMode] = useClientState(loadCoachModeEnabled, false);
   // Paper practice too — print sheets, mark them back in.
   const [paperMode] = useClientState(loadPaperModeEnabled, false);
+  // The timed sitting is the pack's; a device may only hide its tile.
+  const [examShown] = useClientState(loadExamShown, true);
+  const examSitting = examShown ? EXAM_SITTING : null;
   // In runtime-pack mode, hold the first paint until mount (see RUNTIME_PACK_MODE).
   const mounted = useMounted() || !RUNTIME_PACK_MODE;
   useEffect(() => {
@@ -386,9 +390,10 @@ export default function PackHome() {
       </section>
 
       {/* The occasional modes as a rail of tiles — one row however many are
-          on. Drive, Coach and Paper are device opt-ins (Settings); the
-          timed sitting shows for packs that declare an exam length. */}
-      {driveMode || coachMode || paperMode || EXAM_SITTING ? (
+          on. Drive, Coach and Paper are device opt-ins (Settings) that a
+          pack may ship on; the timed sitting shows for packs that declare
+          an exam length, unless this device has hidden it. */}
+      {driveMode || coachMode || paperMode || examSitting ? (
         <section className="flex flex-col gap-3" data-testid="mode-rail">
           <h2 className="text-lg font-semibold text-ink-700">More ways to practise</h2>
           <div className="flex gap-2">
@@ -396,7 +401,6 @@ export default function PackHome() {
               <ModeTile
                 href="/drive/"
                 testid="drive-card"
-                tone="night"
                 icon={Car}
                 label="Drive"
                 caption="By voice"
@@ -406,7 +410,6 @@ export default function PackHome() {
               <ModeTile
                 href="/coach/"
                 testid="coach-card"
-                tone="brand"
                 icon={GraduationCap}
                 label="Coach"
                 caption="Replay"
@@ -416,20 +419,18 @@ export default function PackHome() {
               <ModeTile
                 href="/paper/"
                 testid="paper-card"
-                tone="ink"
                 icon={Printer}
                 label="Paper"
                 caption="Print & mark"
               />
             ) : null}
-            {EXAM_SITTING ? (
+            {examSitting ? (
               <ModeTile
                 href="/practice/exam/"
                 testid="exam-card"
-                tone="ink"
                 icon={Timer}
                 label={APP_CONFIG.exam?.label ?? 'Timed exam'}
-                caption={`${EXAM_SITTING.count} Qs · ${formatClock(EXAM_SITTING.durationSeconds)}`}
+                caption={`${examSitting.count} Qs · ${formatClock(examSitting.durationSeconds)}`}
               />
             ) : null}
           </div>
