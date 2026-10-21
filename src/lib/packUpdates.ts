@@ -23,6 +23,14 @@
  * from before versions were kept sends no If-None-Match, gets a 200, and
  * is compared by content so an unchanged bundle is noted, not announced.
  *
+ * The key goes ONLY to the endpoint that accepted it: the one the unlock
+ * recorded on the entry (`unlockUrl`). An entry without one (from before
+ * the endpoint was kept) is never asked about — the active pack's
+ * manifest may name an endpoint of its own, and that publisher must not
+ * receive another pack's key — until a key is entered again, which
+ * records the endpoint. A response for a pack that was ejected while
+ * the request was in flight is dropped whole.
+ *
  * The active pack is bound once per page load (src/pack/source.ts), so
  * updating it in storage is not enough for Home to show the new count:
  * the notice says so (`reload`) and PackUpdatedNotice reloads Home once
@@ -39,12 +47,7 @@ import {
   type PackLibraryEntry,
 } from './packLibrary';
 import { recordEvent } from './storage';
-import {
-  fetchUnlockBundle,
-  licenceKeyStorageKey,
-  unlockConfig,
-  updateCheckStorageKey,
-} from './unlock';
+import { fetchUnlockBundle, licenceKeyStorageKey, updateCheckStorageKey } from './unlock';
 
 /** How long a pack rests between two checks. */
 export const PACK_UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -71,6 +74,7 @@ export type PackUpdateOutcome =
   | 'current' // 304
   | 'denied' // 403/404 — checks stop for this pack
   | 'offline' // the endpoint could not be reached — still due
+  | 'ejected' // the pack left the shelf while the endpoint was answering — nothing stored
   | 'error'; // an odd status or an unusable bundle — nothing changed
 
 export interface PackUpdatedNotice {
@@ -116,11 +120,12 @@ function licenceKeyFor(packId: string): string | null {
   }
 }
 
-/** Whether a pack is due: it holds a key, was not refused, and has not been
- *  asked about within the interval. */
-export function updateDue(packId: string, now: number): boolean {
-  if (!licenceKeyFor(packId)) return false;
-  const state = loadUpdateCheck(packId);
+/** Whether a pack is due: it holds a key, knows the endpoint that accepted
+ *  it, was not refused, and has not been asked about within the interval. */
+export function updateDue(entry: PackLibraryEntry, now: number): boolean {
+  if (!entry.unlockUrl) return false;
+  if (!licenceKeyFor(entry.id)) return false;
+  const state = loadUpdateCheck(entry.id);
   if (!state) return true;
   if (state.denied) return false;
   return now - state.checkedAt >= PACK_UPDATE_INTERVAL_MS;
@@ -151,11 +156,10 @@ export async function checkPackUpdate(
 ): Promise<PackUpdateOutcome> {
   const now = opts.now ?? Date.now();
   const key = licenceKeyFor(entry.id);
-  if (!key) return 'error';
-  // The endpoint the pack came from; an entry from before it was kept
-  // falls back to the build's (the active pack's override, else the
-  // build's setting, else the hosted default).
-  const unlockUrl = entry.unlockUrl ?? unlockConfig().unlockUrl;
+  // Only the endpoint that accepted the key — never one picked from
+  // whichever pack happens to be active.
+  const unlockUrl = entry.unlockUrl;
+  if (!key || !unlockUrl) return 'error';
   const fetched = await fetchUnlockBundle(
     { unlockUrl, packId: entry.id },
     key,
@@ -163,6 +167,14 @@ export async function checkPackUpdate(
     undefined,
     entry.packVersion,
   );
+
+  // The learner may have ejected the pack while the endpoint was
+  // answering: whatever it said, a pack that is no longer on the shelf
+  // is not put back (the eject keeps the key and the progress, as every
+  // eject does, so a later insert or unlock picks them up).
+  const storageKey = insertedPackKey(entry.id);
+  const before = window.localStorage.getItem(storageKey);
+  if (before === null) return 'ejected';
 
   if (!fetched.ok) {
     if (fetched.reason === 'offline' || fetched.reason === 'cancelled') return 'offline';
@@ -185,8 +197,6 @@ export async function checkPackUpdate(
     return 'error';
   }
 
-  const storageKey = insertedPackKey(entry.id);
-  const before = window.localStorage.getItem(storageKey);
   const inserted = insertPack(fetched.candidate, {
     origin: entry.origin,
     buildPackId: opts.buildPackId,
@@ -203,7 +213,7 @@ export async function checkPackUpdate(
   // A 200 for content the device already holds (an entry that had no
   // version to send, or an endpoint that ignores If-None-Match) is not
   // news — the version is noted and nothing is announced.
-  if (before !== null && before === window.localStorage.getItem(storageKey)) return 'unchanged';
+  if (before === window.localStorage.getItem(storageKey)) return 'unchanged';
 
   recordEvent('pack_updated', { pack: entry.id });
   stashPackUpdatedNotice({
@@ -234,7 +244,7 @@ export async function checkPackUpdates(opts: {
   if (!online) return outcomes;
   const now = opts.now ?? Date.now();
   for (const entry of listInsertedPacks()) {
-    if (!updateDue(entry.id, now)) continue;
+    if (!updateDue(entry, now)) continue;
     outcomes[entry.id] = await checkPackUpdate(entry, { ...opts, now });
   }
   return outcomes;

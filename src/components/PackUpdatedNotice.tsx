@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import {
   PACK_UPDATED_EVENT,
@@ -9,7 +9,6 @@ import {
   writePackUpdatedNotices,
   type PackUpdatedNotice as Notice,
 } from '@/lib/packUpdates';
-import { useClientState } from '@/lib/useMounted';
 
 const NONE: Notice[] = [];
 
@@ -34,57 +33,51 @@ function collect(reload: () => void): Notice[] {
   return takePackUpdatedNotices();
 }
 
-// Collected once per page load and remembered: the take clears the slot,
-// and React re-invokes client reads in dev strict mode, so a second read
-// would lose the lines (or reload twice).
-let taken: Notice[] | undefined;
-let takenWith: (() => void) | undefined;
-function takeOnce(reload: () => void): Notice[] {
-  if (taken === undefined || takenWith !== reload) {
-    takenWith = reload;
-    taken = collect(reload);
-  }
-  return taken;
-}
-
-/** Test seam — forget the remembered lines so each test starts clean. */
-export function resetPackUpdatedNoticeForTests(): void {
-  taken = undefined;
-  takenWith = undefined;
-}
-
 /**
  * The one-line "Updated: now N questions" Home shows once after an
  * unlocked pack's daily check (src/lib/packUpdates.ts) fetched a newer
  * bundle — one line per updated pack. Nothing stashed → renders nothing.
- * The check may finish while Home is already up, so the slot is also
- * re-read on PACK_UPDATED_EVENT.
+ *
+ * The slot is read on EVERY mount (not once per page load): Home comes
+ * and goes with client-side navigation, and a check that finishes while
+ * the learner is in a runner has nobody listening — the next Home must
+ * find the line, and must do the active pack's reload. Reading in an
+ * effect keeps the server render and the hydration pass identical
+ * (no sessionStorage there), and the take clears the slot, so dev strict
+ * mode's second effect run finds nothing and changes nothing. The check
+ * may also finish while Home is up, so the slot is re-read on
+ * PACK_UPDATED_EVENT.
  */
 export function PackUpdatedNotice({ reload = reloadPage }: { reload?: () => void }) {
-  // Read after mount: SSG renders with no sessionStorage. The loader is
-  // stable per `reload` (a module function by default).
-  const load = useCallback(() => takeOnce(reload), [reload]);
-  const [initial] = useClientState(load, NONE);
-  const [later, setLater] = useState<Notice[]>(NONE);
+  const [notices, setNotices] = useState<Notice[]>(NONE);
   const [dismissed, setDismissed] = useState<string[]>([]);
+  // Once a reload was asked for, the page is on its way out: ignore
+  // anything the slot says after that (it holds the lines for the next
+  // render, which must not be taken by this one).
+  const reloading = useRef(false);
 
   useEffect(() => {
-    const onUpdated = () => {
-      const more = collect(reload);
-      if (more.length > 0) setLater((prev) => [...prev.filter((p) => !more.some((m) => m.id === p.id)), ...more]);
+    const absorb = () => {
+      if (reloading.current) return;
+      const more = collect(() => {
+        reloading.current = true;
+        reload();
+      });
+      // Later lines replace an earlier one for the same pack.
+      if (more.length > 0) {
+        setNotices((prev) => [...prev.filter((p) => !more.some((m) => m.id === p.id)), ...more]);
+      }
     };
-    window.addEventListener(PACK_UPDATED_EVENT, onUpdated);
-    return () => window.removeEventListener(PACK_UPDATED_EVENT, onUpdated);
+    absorb();
+    window.addEventListener(PACK_UPDATED_EVENT, absorb);
+    return () => window.removeEventListener(PACK_UPDATED_EVENT, absorb);
   }, [reload]);
 
-  // Later lines replace an earlier one for the same pack.
-  const notices = [...initial.filter((n) => !later.some((l) => l.id === n.id)), ...later].filter(
-    (n) => !dismissed.includes(n.id),
-  );
-  if (notices.length === 0) return null;
+  const shown = notices.filter((n) => !dismissed.includes(n.id));
+  if (shown.length === 0) return null;
   return (
     <div className="flex flex-col gap-2" data-testid="pack-updated-notices">
-      {notices.map((n) => (
+      {shown.map((n) => (
         <div
           key={n.id}
           data-testid="pack-updated-notice"

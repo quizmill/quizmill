@@ -76,7 +76,7 @@ async function stubEndpoint(route: Route): Promise<void> {
 /** Put the held pack on the shelf, active, with its licence and one answer. */
 async function seedUnlockedPack(page: Page, packVersion: string): Promise<void> {
   await page.evaluate(
-    ({ pack, key, version }) => {
+    ({ pack, key, version, unlockUrl }) => {
       localStorage.setItem(`quizmill.packLibrary.pack.${pack.manifest.id}.v1`, JSON.stringify(pack));
       localStorage.setItem(
         'quizmill.packLibrary.index.v1',
@@ -91,13 +91,16 @@ async function seedUnlockedPack(page: Page, packVersion: string): Promise<void> 
             insertedAt: Date.now(),
             origin: 'licence key · sync.quizmill.dev',
             packVersion: version,
+            // The endpoint that accepted the key — the only one the
+            // check will ask (an entry without one is never asked).
+            unlockUrl,
           },
         ]),
       );
       localStorage.setItem('quizmill.activePackId', pack.manifest.id);
       localStorage.setItem(`quizmill.${pack.manifest.id}.licence`, key);
     },
-    { pack: HELD, key: KEY, version: packVersion },
+    { pack: HELD, key: KEY, version: packVersion, unlockUrl: DEFAULT_BASE },
   );
   await seedAttempts(
     page,

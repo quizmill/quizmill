@@ -19,6 +19,7 @@ import {
 } from '@/lib/packUpdates';
 import {
   activatePack,
+  ejectPack,
   getActivePackPointer,
   getInsertedPack,
   insertPack,
@@ -94,13 +95,19 @@ function header(call: FetchCall, name: string): string | null {
   return new Headers(call.init?.headers).get(name);
 }
 
-/** An unlocked pack on the shelf: content, index entry, licence, progress. */
-function seedUnlocked(id: string, opts: { version?: string; unlockUrl?: string; active?: boolean } = {}) {
+/** An unlocked pack on the shelf: content, index entry (with the endpoint it
+ *  came from — `unlockUrl: null` for an entry from before that was kept),
+ *  licence, progress. */
+function seedUnlocked(
+  id: string,
+  opts: { version?: string; unlockUrl?: string | null; active?: boolean } = {},
+) {
+  const unlockUrl = opts.unlockUrl === undefined ? DEFAULT_UNLOCK_URL : opts.unlockUrl;
   const r = insertPack(bundle(id, 3), {
     origin: 'licence key · unlock.example.com',
     buildPackId: BUILD,
     ...(opts.version ? { packVersion: opts.version } : {}),
-    ...(opts.unlockUrl ? { unlockUrl: opts.unlockUrl } : {}),
+    ...(unlockUrl ? { unlockUrl } : {}),
   });
   if (!r.ok) throw new Error(r.errors.join('\n'));
   storage.setItem(licenceKeyStorageKey(id), KEY);
@@ -161,11 +168,31 @@ describe('checkPackUpdates — who is asked', () => {
     expect(calls[0].init?.credentials).toBe('omit');
   });
 
-  it('falls back to the build’s endpoint and sends no If-None-Match for an entry without a version', async () => {
+  it('sends no If-None-Match for an entry without a version', async () => {
     seedUnlocked('older-pack');
     await checkPackUpdates({ buildPackId: BUILD, fetchImpl: respond(304), now: NOW });
     expect(calls[0].url).toBe(`${DEFAULT_UNLOCK_URL}/v1/unlock?key=${KEY}&pack=older-pack`);
     expect(header(calls[0], 'if-none-match')).toBeNull();
+  });
+
+  it('never asks about a pack whose endpoint it does not know — the key goes only where it was accepted', async () => {
+    // An entry from before the endpoint was kept. The active pack's
+    // manifest may name an unlock endpoint of its own; that publisher
+    // must not receive another pack's key.
+    seedUnlocked('older-pack', { version: 'v1', unlockUrl: null });
+    expect(updateDue(listInsertedPacks()[0], NOW)).toBe(false);
+    expect(await checkPackUpdates({ buildPackId: BUILD, fetchImpl: respond(304), now: NOW })).toEqual({});
+    expect(calls).toHaveLength(0);
+    expect(loadUpdateCheck('older-pack')).toBeNull();
+
+    // A key entered again records where it was accepted, and the checks start.
+    const unlocked = await unlockPack(KEY, {
+      config: { unlockUrl: 'https://author.test/api' },
+      buildPackId: BUILD,
+      fetchImpl: respond(200, bundle('older-pack', 3), { etag: '"v2"' }),
+    });
+    expect(unlocked.ok).toBe(true);
+    expect(updateDue(listInsertedPacks()[0], Date.now() + PACK_UPDATE_INTERVAL_MS)).toBe(true);
   });
 
   it('does nothing at all while offline, and leaves the pack due', async () => {
@@ -292,8 +319,38 @@ describe('checkPackUpdates — what the endpoint says', () => {
     expect(unlocked.ok).toBe(true);
     expect(loadUpdateCheck('paid-pack')).toEqual({ checkedAt: expect.any(Number) });
     expect(listInsertedPacks()[0]).toMatchObject({ packVersion: 'v3', unlockUrl: DEFAULT_UNLOCK_URL });
-    expect(updateDue('paid-pack', Date.now())).toBe(false);
-    expect(updateDue('paid-pack', Date.now() + PACK_UPDATE_INTERVAL_MS)).toBe(true);
+    expect(updateDue(listInsertedPacks()[0], Date.now())).toBe(false);
+    expect(updateDue(listInsertedPacks()[0], Date.now() + PACK_UPDATE_INTERVAL_MS)).toBe(true);
+  });
+
+  it('a pack ejected while the endpoint was still answering stays ejected', async () => {
+    seedUnlocked('paid-pack', { version: 'v1' });
+    let release!: () => void;
+    const slow = ((input: RequestInfo | URL) =>
+      new Promise<Response>((resolve) => {
+        calls.push({ url: String(input) });
+        release = () =>
+          resolve(
+            new Response(JSON.stringify(bundle('paid-pack', 7)), {
+              status: 200,
+              headers: { 'content-type': 'application/json', etag: '"v2"' },
+            }),
+          );
+      })) as typeof fetch;
+    const sweep = checkPackUpdates({ buildPackId: BUILD, fetchImpl: slow, now: NOW });
+    expect(calls).toHaveLength(1);
+    ejectPack('paid-pack');
+    release();
+    expect(await sweep).toEqual({ 'paid-pack': 'ejected' });
+
+    expect(getInsertedPack('paid-pack')).toBeNull();
+    expect(listInsertedPacks()).toEqual([]);
+    expect(loadUpdateCheck('paid-pack')).toBeNull();
+    expect(loadEvents()).toEqual([]);
+    expect(takePackUpdatedNotices()).toEqual([]);
+    // Progress and the key wait for a re-insert, as after any eject.
+    expect(storage.getItem('quizmill.paid-pack.attempts.v1')).toContain('paid-pack-planets-001');
+    expect(storage.getItem(licenceKeyStorageKey('paid-pack'))).toBe(KEY);
   });
 
   it('404 (the key opens another pack now) is treated like a refusal', async () => {

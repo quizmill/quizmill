@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { PackUpdatedNotice, resetPackUpdatedNoticeForTests } from '@/components/PackUpdatedNotice';
+import { PackUpdatedNotice } from '@/components/PackUpdatedNotice';
 import {
   PACK_UPDATED_NOTICE_KEY,
   stashPackUpdatedNotice,
@@ -12,8 +12,9 @@ import {
 /**
  * The one-line "Updated: now N questions" on Home after an unlocked pack's
  * daily check fetched a newer bundle. The line is read from sessionStorage
- * exactly once; a notice for the ACTIVE pack reloads Home first (the pack
- * is bound once per page load), keeping the line for the render after.
+ * on every mount and shown exactly once; a notice for the ACTIVE pack
+ * reloads Home first (the pack is bound once per page load), keeping the
+ * line for the render after.
  */
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -30,7 +31,6 @@ async function render() {
 
 beforeEach(() => {
   window.sessionStorage.clear();
-  resetPackUpdatedNoticeForTests();
   reload = vi.fn();
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -78,6 +78,32 @@ describe('PackUpdatedNotice', () => {
     expect(container.textContent).toBe('');
     expect(JSON.parse(window.sessionStorage.getItem(PACK_UPDATED_NOTICE_KEY)!)).toEqual([
       { id: 'paid-pack', title: 'Full Course', count: 7, reload: false },
+    ]);
+  });
+
+  it('picks up a notice stashed while Home was away (a runner, client-side), on the next mount', async () => {
+    // Home opened with nothing pending, the learner moved on, and the
+    // check finished meanwhile — nobody was listening.
+    await render();
+    expect(container.textContent).toBe('');
+    await act(async () => root.unmount());
+    stashPackUpdatedNotice({ id: 'other', title: 'Other Pack', count: 4, reload: false });
+    root = createRoot(container);
+    await render();
+    expect(container.textContent).toContain('Updated: now 4 questions');
+    expect(window.sessionStorage.getItem(PACK_UPDATED_NOTICE_KEY)).toBeNull();
+    expect(reload).not.toHaveBeenCalled();
+
+    // …and the active pack's reload is not missed either: the next Home
+    // reloads first, keeping the line.
+    await act(async () => root.unmount());
+    stashPackUpdatedNotice({ id: 'paid-pack', title: 'Full Course', count: 9, reload: true });
+    root = createRoot(container);
+    await render();
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toBe('');
+    expect(JSON.parse(window.sessionStorage.getItem(PACK_UPDATED_NOTICE_KEY)!)).toEqual([
+      { id: 'paid-pack', title: 'Full Course', count: 9, reload: false },
     ]);
   });
 
