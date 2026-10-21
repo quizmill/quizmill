@@ -106,8 +106,10 @@ Pack repos carry their own licensing rules; two to keep in view:
   community banks with per-question `sourceRef` + NOTICE.md. Questions
   from `paullarionov/claude-certified-architect` are EXCLUDED (no
   upstream license) — don't re-add unless a license appears upstream.
-- `quizmill/pack-eleven-plus` (PRIVATE — must stay private). GL material
-  (© GL Assessment) is deliberately out.
+- Private pack repos (names deliberately not listed here) stay private
+  and are never named in this repo — not in issues, PR bodies, comments,
+  commit messages, docs or test fixtures. Say "a private pack". Material
+  © a third-party publisher is deliberately out of them.
 
 ## Surfaces
 
