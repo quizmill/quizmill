@@ -276,7 +276,7 @@ describe('unlock service end-to-end (worker ↔ real SQLite + in-memory R2)', ()
     const typed = key.toLowerCase().replace(/-/g, ' ').replace(/^ql/, '');
     expect((await call(`/v1/unlock?key=${encodeURIComponent(typed)}`)).status).toBe(200);
     expect((await call(`/v1/unlock?key=${key}&pack=exam-set`)).status).toBe(200);
-    const other = await call(`/v1/unlock?key=${key}&pack=eleven-plus`);
+    const other = await call(`/v1/unlock?key=${key}&pack=other-set`);
     expect(other.status).toBe(404);
     expect(other.body).toEqual({ error: KEY_OTHER_PACK });
   });
@@ -424,10 +424,10 @@ describe('unlock service end-to-end (worker ↔ real SQLite + in-memory R2)', ()
     await share('exam-set', { packVersion: 'abc1234' });
     const wrong = await call(
       '/v1/packs/exam-set',
-      admin({ method: 'PUT', body: JSON.stringify(bundle('eleven-plus')) }),
+      admin({ method: 'PUT', body: JSON.stringify(bundle('other-set')) }),
     );
     expect(wrong.status).toBe(400);
-    expect(wrong.body.error).toMatch(/for pack "eleven-plus"/);
+    expect(wrong.body.error).toMatch(/for pack "other-set"/);
     expect((await call('/v1/packs/exam-set', admin({ method: 'PUT', body: 'nope' }))).status).toBe(400);
     expect((await call('/v1/packs/Bad_Id', admin({ method: 'PUT', body: '{}' }))).status).toBe(400);
     const big = await call(
@@ -436,14 +436,14 @@ describe('unlock service end-to-end (worker ↔ real SQLite + in-memory R2)', ()
     );
     expect(big.status).toBe(413);
     expect(env.BUNDLES!.objects.get('exam-set.json')!.customMetadata.version).toBe('abc1234');
-    expect(env.BUNDLES!.objects.has('eleven-plus.json')).toBe(false);
+    expect(env.BUNDLES!.objects.has('other-set.json')).toBe(false);
   });
 
   it('a key cannot be minted for a pack that has no bundle', async () => {
-    const res = await call('/v1/packs/eleven-plus/keys', admin({ method: 'POST' }));
+    const res = await call('/v1/packs/other-set/keys', admin({ method: 'POST' }));
     expect(res.status).toBe(404);
     expect(res.body.error).toMatch(/share the pack first/);
-    expect((await call('/v1/packs/eleven-plus/keys', admin())).body).toEqual({ keys: [] });
+    expect((await call('/v1/packs/other-set/keys', admin())).body).toEqual({ keys: [] });
   });
 
   it('admin routes need the admin token; the service is absent without the bucket', async () => {
