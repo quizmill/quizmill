@@ -21,6 +21,7 @@ npx quizmill build my-topic      # static app in my-topic-app/ — deploy anywhe
 | `run [dir\|owner/repo]` | activate a pack and start the app |
 | `build [dir\|owner/repo]` | emit a deployable static app in `<pack-id>-app/` |
 | `bundle <dir> [--out file]` | validate + write one `<pack-id>.bundle.json` (images inside) that any quizmill app inserts at `/packs` |
+| `share <dir>` | validate + bundle + upload to the unlock service; prints a `…/unlock#key=…` link that installs the pack in one tap (`--new-key [label]`, `--list`, `--revoke <key>`, `--app`, `--endpoint`) |
 | `list` | published packs you can install |
 | `upgrade` | update the cached engine in `~/.quizmill` |
 

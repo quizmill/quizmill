@@ -32,6 +32,7 @@ npx quizmill build my-topic      # static app in my-topic-app/ — deploy anywhe
 | `run [dir\|owner/repo]` | activate a pack and start the app |
 | `build [dir\|owner/repo]` | emit a deployable static app in `<pack-id>-app/` |
 | `bundle <dir> [--out file]` | validate + write one `<pack-id>.bundle.json` to hand over (see [Share a pack as one file](#share-a-pack-as-one-file)) |
+| `share <dir>` | validate + bundle + upload behind a licence key; prints a one-tap install link (see [Share a private pack with a link](#share-a-private-pack-with-a-link)) |
 | `list` | published packs you can install |
 | `upgrade` | re-align the cached engine (see [Upgrading](#upgrading)) |
 
@@ -115,6 +116,47 @@ it's hosted at) — no CLI needed on the receiving end, and the pack
 works offline there because its images travel inside the file. Browsers
 keep an inserted pack in about 5 MiB of storage, so the bundler warns
 when the images push a bundle past 4 MiB.
+
+## Share a private pack with a link
+
+Handing a file to a phone is the weak step. `share` does what `bundle`
+does and then uploads the bundle to the **unlock service** (the sync
+worker in `cloudflare/`, see its README) behind a **licence key**, and
+prints a link to the home app that installs the pack in one tap:
+
+```
+npx quizmill share my-topic
+Uploaded my-topic (150 questions, 612 KiB)
+https://app.quizmill.dev/unlock#key=QL-7F3K-9Q2M-X4PD
+```
+
+Opening the link on a phone that has never seen the pack fetches the
+bundle with the key, inserts it and makes it active — no Packs visit,
+no file picker. The key rides in the URL fragment, which no server ever
+sees, and the same key typed under Packs → "Have a licence key?" in an
+installed app does the same. Run `share` again after editing the pack
+and the link serves the new bundle; the keys stay as they were, and
+(same pack id) learners keep their progress.
+
+```
+npx quizmill share my-topic --new-key "Leo"   # one more key (and link) for the pack
+npx quizmill share my-topic --list            # every key, its uses, revoked or live
+npx quizmill share --revoke QL-7F3K-9Q2M-X4PD # that link now opens nothing
+```
+
+`share` reads `~/.quizmill/config.json`:
+
+```json
+{ "unlock": { "endpoint": "https://sync.quizmill.dev",
+              "app": "https://app.quizmill.dev", "token": "…" } }
+```
+
+`token` is the service's `UNLOCK_ADMIN_TOKEN`; `endpoint` and `app`
+have those defaults and `--endpoint` / `--app` override them per run
+(an author hosting their own worker, or a pack app with its own
+origin). A key protects the download, not the content: anyone holding
+it gets the whole bundle, and on a device the pack is readable — the
+same caveat as a bundle file.
 
 ## Pack format
 
