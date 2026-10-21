@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 2,
+  "id": "quizmill-start",
+  "title": "quizmill",
+  "description": "The quizmill home app — insert a learning pack, unlock one with a licence key, or pick one from the registry.",
+  "homeSubtitle": "Insert a pack, unlock one with a key, or pick one from the registry.",
+  "themeColor": "#334155",
+  "categories": [
+    {
+      "key": "practising",
+      "label": "Practising",
+      "shortLabel": "Practise",
+      "icon": "🔁"
+    },
+    {
+      "key": "packs",
+      "label": "Packs & progress",
+      "shortLabel": "Packs",
+      "icon": "📦"
+    }
+  ],
+  "sources": [
+    {
+      "label": "Original",
+      "name": "Hand-authored",
+      "blurb": "Written for the starter pack from how the app itself behaves."
+    }
+  ]
+}

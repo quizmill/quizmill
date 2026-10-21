@@ -137,6 +137,13 @@ describe('pack:validate CLI', () => {
     expect(r.stdout).toContain('✓ valid pack');
   });
 
+  it('passes the home app’s starter pack with no warnings', () => {
+    const r = validate(path.join(ROOT, 'content', 'pack-start'));
+    expect(r.status).toBe(0);
+    expect(r.stderr).toBe('');
+    expect(r.stdout).toContain('✓ valid pack');
+  });
+
   // Warning, not error: packs that validated clean before keep exiting 0.
   it('warns, still exiting 0, about an image that is not in assets/', () => {
     const r = validate(writeMiniPack(['gone.svg', 'here.svg', 'here.svg'], ['here.svg']));
