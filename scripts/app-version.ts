@@ -39,3 +39,20 @@ export function gitShortSha(cwd?: string): string | undefined {
 export function appVersion(cwd?: string): string {
   return process.env.NEXT_PUBLIC_APP_VERSION || latestReleaseVersion(cwd) || pkg.version;
 }
+
+/** When this build was made, as an ISO timestamp — the "last updated" a
+ *  learner reads next to the version in Settings. The moment of the build
+ *  (not a commit date: a pack repo's deploy builds a months-old engine
+ *  with fresh content, and it's the deploy the learner cares about), so
+ *  it works outside a git checkout too. NEXT_PUBLIC_APP_BUILD_DATE pins
+ *  it; so does SOURCE_DATE_EPOCH, the reproducible-builds convention.
+ *  An unparseable override is ignored rather than stamped. */
+export function buildDate(): string {
+  const pinned = process.env.NEXT_PUBLIC_APP_BUILD_DATE;
+  if (pinned && !Number.isNaN(Date.parse(pinned))) return new Date(pinned).toISOString();
+  const epoch = Number(process.env.SOURCE_DATE_EPOCH);
+  if (process.env.SOURCE_DATE_EPOCH && Number.isFinite(epoch)) {
+    return new Date(epoch * 1000).toISOString();
+  }
+  return new Date().toISOString();
+}

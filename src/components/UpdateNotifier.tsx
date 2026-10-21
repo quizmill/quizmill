@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { RefreshCw } from 'lucide-react';
+import { isUpdateReady, markUpdateReady, subscribeUpdateReady } from '@/lib/appUpdate';
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
@@ -11,11 +12,19 @@ const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
  * still controlled by the old one, we surface a banner inviting a reload
  * so the kid actually picks up the new app.
  *
+ * The browser only re-fetches sw.js on a navigation, and at most once a
+ * day; an installed app seldom navigates, so a pushed update could sit
+ * unseen for weeks. Each return to the foreground therefore asks the
+ * registration to check again (Settings has a button for the same —
+ * src/lib/appUpdate.ts). Both record a find in the one page-lifetime flag
+ * there, so the banner and the Settings answer can't contradict each other
+ * once the new worker has activated and the registration looks idle.
+ *
  * Renders nothing when there's nothing to show — safe to mount near the
  * root of the layout.
  */
 export function UpdateNotifier() {
-  const [updateReady, setUpdateReady] = useState(false);
+  const updateReady = useSyncExternalStore(subscribeUpdateReady, isUpdateReady, () => false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -24,16 +33,25 @@ export function UpdateNotifier() {
     const url = `${BASE_PATH}/sw.js`;
     const scope = `${BASE_PATH}/`;
     let cancelled = false;
+    let onVisible: (() => void) | undefined;
 
     navigator.serviceWorker
       .register(url, { scope })
       .then((reg) => {
         if (cancelled) return;
 
+        // Back in the foreground — re-fetch sw.js. A find arrives through
+        // 'updatefound' below like any other; a failure (offline) is silence.
+        onVisible = () => {
+          if (document.visibilityState !== 'visible') return;
+          reg.update().catch(() => undefined);
+        };
+        document.addEventListener('visibilitychange', onVisible);
+
         // If there's already a worker waiting at registration time, that's
         // an update from a previous session — surface it immediately.
         if (reg.waiting && navigator.serviceWorker.controller) {
-          setUpdateReady(true);
+          markUpdateReady();
         }
 
         // Watch for new SWs that install during this session.
@@ -48,7 +66,7 @@ export function UpdateNotifier() {
               installing.state === 'installed' &&
               navigator.serviceWorker.controller
             ) {
-              setUpdateReady(true);
+              markUpdateReady();
             }
           });
         });
@@ -60,6 +78,7 @@ export function UpdateNotifier() {
 
     return () => {
       cancelled = true;
+      if (onVisible) document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
 

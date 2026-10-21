@@ -76,7 +76,10 @@ npx quizmill run my-topic            # activate + start the app
 ```
 
 Packs are **private by default** — they live wherever you put them and
-never enter this repo. Only the demo pack ships with the engine.
+never enter this repo. Only the demo pack ships with the engine, plus
+the small starter pack the home app (app.quizmill.dev) is built from
+(`content/pack-start/`: a few questions about using the app, and the
+ways a pack gets in on its Home).
 
 ## Publish a pack
 

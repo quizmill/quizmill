@@ -4,7 +4,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import pkg from '../package.json';
-import { appVersion, gitShortSha, latestReleaseVersion } from '../scripts/app-version';
+import {
+  appVersion,
+  buildDate,
+  gitShortSha,
+  latestReleaseVersion,
+} from '../scripts/app-version';
 
 // One reader for the facts next.config.ts, finalise-build.ts and the pack
 // bundler all stamp into their output — pinned here so the three callers
@@ -55,9 +60,15 @@ beforeAll(() => {
 });
 
 const saved = process.env.NEXT_PUBLIC_APP_VERSION;
+const savedDate = process.env.NEXT_PUBLIC_APP_BUILD_DATE;
+const savedEpoch = process.env.SOURCE_DATE_EPOCH;
 afterEach(() => {
   if (saved === undefined) delete process.env.NEXT_PUBLIC_APP_VERSION;
   else process.env.NEXT_PUBLIC_APP_VERSION = saved;
+  if (savedDate === undefined) delete process.env.NEXT_PUBLIC_APP_BUILD_DATE;
+  else process.env.NEXT_PUBLIC_APP_BUILD_DATE = savedDate;
+  if (savedEpoch === undefined) delete process.env.SOURCE_DATE_EPOCH;
+  else process.env.SOURCE_DATE_EPOCH = savedEpoch;
 });
 afterAll(() => {
   for (const dir of tmpDirs) fs.rmSync(dir, { recursive: true, force: true });
@@ -94,5 +105,29 @@ describe('app-version', () => {
     expect(appVersion(tagged)).toBe('1.2.3');
     expect(appVersion(untagged)).toBe(pkg.version);
     expect(appVersion(noGit)).toBe(pkg.version);
+  });
+
+  it('buildDate: the moment of the build as an ISO timestamp, git or no git', () => {
+    delete process.env.NEXT_PUBLIC_APP_BUILD_DATE;
+    delete process.env.SOURCE_DATE_EPOCH;
+    const before = Date.now();
+    const stamped = Date.parse(buildDate());
+    expect(stamped).toBeGreaterThanOrEqual(before - 1000);
+    expect(stamped).toBeLessThanOrEqual(Date.now() + 1000);
+    expect(buildDate()).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  });
+
+  it('buildDate: NEXT_PUBLIC_APP_BUILD_DATE wins, then SOURCE_DATE_EPOCH (reproducible builds)', () => {
+    process.env.SOURCE_DATE_EPOCH = '1760000000';
+    expect(buildDate()).toBe('2025-10-09T08:53:20.000Z');
+
+    process.env.NEXT_PUBLIC_APP_BUILD_DATE = '2026-10-21T03:14:15.000Z';
+    expect(buildDate()).toBe('2026-10-21T03:14:15.000Z');
+  });
+
+  it('buildDate: ignores an unparseable override rather than stamping garbage', () => {
+    delete process.env.NEXT_PUBLIC_APP_BUILD_DATE;
+    process.env.SOURCE_DATE_EPOCH = 'soon';
+    expect(Date.parse(buildDate())).not.toBeNaN();
   });
 });

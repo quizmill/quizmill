@@ -90,6 +90,15 @@ describe('PackHome is the practice loop only (#188)', () => {
     expect(container.querySelector('[data-testid="install-banner"]')).toBeNull();
   });
 
+  it('shows no "add a pack" card — that is the starter pack’s, not the demo’s', async () => {
+    // The home app's starter pack (content/pack-start) puts the insert /
+    // licence-key entry points on Home; any other active pack, the demo
+    // included, is unchanged (StarterCard.test.tsx covers the starter).
+    await render();
+    expect(container.querySelector('[data-testid="starter-card"]')).toBeNull();
+    expect(container.querySelector('[data-testid="licence-key-input"]')).toBeNull();
+  });
+
   it('keeps the four round header buttons for desktop, where there is no tab bar', async () => {
     await render();
     const nav = container.querySelector('header nav[aria-label="Pages"]');
