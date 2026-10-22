@@ -162,6 +162,47 @@ describe('composePaperSheet', () => {
   });
 });
 
+describe('a whole named paper as a sheet (#194)', () => {
+  const paperBank = ['p1-q1', 'p1-q2', 'p1-q3'].map((id) =>
+    question(id, { paperId: 'series-a-1', categoryKey: 'maths' }),
+  );
+
+  it('stores the paperId the sheet was composed from', () => {
+    const out = composePaperSheet(paperBank, new Map(), {
+      categoryKey: 'maths',
+      count: 'all',
+      paperId: 'series-a-1',
+    });
+    expect(out!.sheet.paperId).toBe('series-a-1');
+    expect(out!.sheet.questionIds).toEqual(['p1-q1', 'p1-q2', 'p1-q3']);
+    // A mixed sheet carries none.
+    expect(
+      composePaperSheet(paperBank, new Map(), { categoryKey: 'maths', count: 2 })!.sheet.paperId,
+    ).toBeUndefined();
+  });
+
+  it('carries the paper through the QR payload, so the marking device can name it', async () => {
+    const s = sheet({ paperId: 'series-a-1', categoryKey: 'maths' });
+    const payload = payloadFromSheet(s, 'my-pack');
+    expect(payload.p).toBe('series-a-1');
+    const decoded = await decodePaperPayload(await encodePaperPayload(payload));
+    expect(decoded).toEqual(payload);
+    expect(sheetFromPayload(decoded!).paperId).toBe('series-a-1');
+    // No paper → no `p` key at all (payload bytes are QR density).
+    const plain = payloadFromSheet(sheet(), 'my-pack');
+    expect('p' in plain).toBe(false);
+    expect(sheetFromPayload(plain).paperId).toBeUndefined();
+  });
+
+  it('rejects a payload whose paper marker is not a string', async () => {
+    const good = payloadFromSheet(sheet(), 'p');
+    const enc = (obj: object) => btoa(JSON.stringify(obj));
+    expect(await decodePaperPayload(enc({ ...good, p: 7 }))).toBeNull();
+    // …but still reads payloads printed before papers existed.
+    expect(await decodePaperPayload(enc(good))).toEqual(good);
+  });
+});
+
 describe('paper payload encode/decode', () => {
   it('round-trips a sheet through the QR payload', async () => {
     const s = sheet({ questionIds: ['q-ünïcode', 'q2'] });

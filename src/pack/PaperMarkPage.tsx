@@ -32,7 +32,7 @@ import { newlyEarnedAchievements } from '@/pack/achievements-engine';
 import {
   isMultiAnswer,
   packQuestions,
-  PACK_CATEGORY_LABEL,
+  sheetScopeLabel,
   type OptionKey,
 } from '@/pack/data';
 import { nextSelection } from '@/pack/runner';
@@ -326,8 +326,7 @@ export function PaperMarkPage() {
           ) : null}
         </div>
         <p className="mt-1 text-sm text-ink-500">
-          {PACK_CATEGORY_LABEL[sheet.categoryKey] ?? sheet.categoryKey} ·{' '}
-          {sheet.questionIds.length} questions · printed{' '}
+          {sheetScopeLabel(sheet)} · {sheet.questionIds.length} questions · printed{' '}
           {SHEET_DATE_FORMAT.format(sheet.createdAt)}
         </p>
         <p className="mt-2 text-sm text-ink-600">
