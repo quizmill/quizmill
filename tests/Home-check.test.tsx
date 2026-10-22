@@ -57,8 +57,8 @@ describe('PackHome readiness-check tile', () => {
     expect(card!.getAttribute('href')).toBe('/practice/check');
     // A one-word label: five tiles in the rail leave no room for "Readiness".
     expect(card!.textContent).toContain('Check');
-    // Sized and timed: the demo's mock exam paces 6 questions at 10 min.
-    expect(card!.textContent).toContain('6 Qs · ~10 min');
+    // Timed from the demo's mock exam pace: 6 questions in about 10 min.
+    expect(card!.textContent).toContain('~10 min');
     // Last in the rail, after the exam tile.
     const tiles = Array.from(container.querySelectorAll('[data-testid="mode-rail"] a')).map((a) =>
       a.getAttribute('data-testid'),

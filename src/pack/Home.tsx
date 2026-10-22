@@ -442,10 +442,10 @@ export default function PackHome() {
                 testid="check-card"
                 icon={Compass}
                 label="Check"
+                // Five tiles leave room for one fact: the minutes say
+                // "short" better than the count does.
                 caption={
-                  CHECK_PLAN.minutes !== null
-                    ? `${CHECK_PLAN.count} Qs · ~${CHECK_PLAN.minutes} min`
-                    : `Readiness · ${CHECK_PLAN.count} Qs`
+                  CHECK_PLAN.minutes !== null ? `~${CHECK_PLAN.minutes} min` : `${CHECK_PLAN.count} Qs`
                 }
               />
             ) : null}
