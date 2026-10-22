@@ -3,6 +3,7 @@ import type { Attempt, Session } from '@/data/types';
 import { seededRng } from '@/lib/selection';
 import {
   CHECK_DOMAIN_FLOOR,
+  CHECK_MAX_MINUTES,
   checkHistory,
   checkResult,
   compareChecks,
@@ -137,6 +138,100 @@ describe('planCheck', () => {
       { key: 'wide', count: 11 },
       { key: 'narrow', count: 3 },
     ]);
+  });
+
+  it('never runs past 30 minutes at the real exam\'s pace: the floor drops so every domain still gets a look', () => {
+    // A 75-question, 180-minute exam allows 2.4 min a question: 30 min
+    // buys 12, not the 30 the floor would ask for over ten domains.
+    const plan = planCheck(TEN, { questionCount: 75, durationMinutes: 180 })!;
+    expect(plan.count).toBe(12);
+    expect(plan.floor).toBe(1);
+    expect(plan.perDomain.reduce((s, d) => s + d.count, 0)).toBe(12);
+    expect(plan.perDomain.every((d) => d.count >= 1 && d.count <= 2)).toBe(true);
+    expect(plan.perDomain.filter((d) => d.count === 2)).toHaveLength(2);
+    expect(plan.minutes).toBe(29);
+    expect(plan.minutes!).toBeLessThanOrEqual(CHECK_MAX_MINUTES);
+  });
+
+  it('caps an unpaced pack at 30 questions, a minute each', () => {
+    const twelve: ReadinessDomainInput[] = Array.from({ length: 12 }, (_, i) => ({
+      key: `d${i}`,
+      label: `Domain ${i}`,
+      weight: 0,
+      available: 3,
+    }));
+    // The floor would want 36; the cap is 30, so two each and six extras.
+    const plan = planCheck(twelve, {})!;
+    expect(plan.count).toBe(30);
+    expect(plan.floor).toBe(2);
+    expect(plan.perDomain.map((d) => d.count)).toEqual([3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2]);
+    expect(plan.minutes).toBeNull();
+  });
+
+  it('always deals exactly the advertised count when floors and caps both bind', () => {
+    // A heavy domain pinned at its bank hands its share to a light one
+    // that the floor alone would have left at three.
+    let plan = planCheck(
+      [
+        { key: 'a', label: 'A', weight: 0.8, available: 4 },
+        { key: 'b', label: 'B', weight: 0.2, available: 50 },
+      ],
+      { questionCount: 30 },
+    )!;
+    expect(plan.count).toBe(10);
+    expect(plan.perDomain).toEqual([
+      { key: 'a', count: 4 },
+      { key: 'b', count: 6 },
+    ]);
+    // The light domain's floor binds; the heavy one takes the rest
+    // without overshooting the count.
+    plan = planCheck(
+      [
+        { key: 'a', label: 'A', weight: 0.99, available: 19 },
+        { key: 'b', label: 'B', weight: 0.01, available: 100 },
+      ],
+      { questionCount: 60 },
+    )!;
+    expect(plan.count).toBe(20);
+    expect(plan.perDomain).toEqual([
+      { key: 'a', count: 17 },
+      { key: 'b', count: 3 },
+    ]);
+  });
+
+  it('spends the whole budget within every domain\'s bounds, whatever the shape', () => {
+    // A few awkward shapes, checked for the invariants rather than the
+    // exact split: total = count, floor ≤ each ≤ bank.
+    const shapes: ReadinessDomainInput[][] = [
+      [
+        { key: 'a', label: 'A', weight: 0.9, available: 3 },
+        { key: 'b', label: 'B', weight: 0.05, available: 40 },
+        { key: 'c', label: 'C', weight: 0.05, available: 2 },
+      ],
+      [
+        { key: 'a', label: 'A', weight: 0, available: 1 },
+        { key: 'b', label: 'B', weight: 0, available: 1 },
+        { key: 'c', label: 'C', weight: 0, available: 60 },
+      ],
+      [
+        { key: 'a', label: 'A', weight: 1, available: 4 },
+        { key: 'b', label: 'B', weight: 1, available: 4 },
+        { key: 'c', label: 'C', weight: 1, available: 4 },
+        { key: 'd', label: 'D', weight: 1, available: 4 },
+      ],
+    ];
+    for (const domains of shapes) {
+      for (const questionCount of [0, 9, 24, 60, 300]) {
+        const plan = planCheck(domains, { questionCount })!;
+        const total = plan.perDomain.reduce((s, d) => s + d.count, 0);
+        expect(total, `count ${questionCount}`).toBe(plan.count);
+        for (const { key, count } of plan.perDomain) {
+          const d = domains.find((x) => x.key === key)!;
+          expect(count).toBeLessThanOrEqual(d.available);
+          expect(count).toBeGreaterThanOrEqual(Math.min(plan.floor, d.available));
+        }
+      }
+    }
   });
 
   it('skips empty domains and is null when the bank is empty', () => {
