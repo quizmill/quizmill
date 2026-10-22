@@ -85,6 +85,16 @@ picked ten minutes where twenty would have bought three a domain is
 read at two, with the misses ranked, rather than told every domain is
 thin.
 
+**The headline band.** Readiness sums each domain's Wilson band — fine
+over a dozen first attempts a domain, meaningless over one: ten
+domains at one question each span nearly 0–100 and called 2/9 "right
+on the line". The check is one stratified sample, so its band is the
+Wilson interval of the weighted estimate at the sitting's judged
+sample size (2/9 → 6–55%, *not ready yet*; 3/6 on the demo → 19–81%,
+still *right on the line*), and the verdict reads off it on
+readiness's own tiers (`verdictFor`). Per-domain standings are
+untouched.
+
 **How long is "about 30 minutes".** It is up to the learner, up to
 thirty: the intro offers ten, twenty or thirty minutes and the sitting
 runs under that clock. Thirty is the hard limit and there is no longer
