@@ -73,6 +73,34 @@ export const packLevelSchema = z.object({
   label: z.string().min(1).max(40),
 });
 
+/**
+ * A named paper (additive): a published practice paper, a mock exam, a
+ * worksheet — any set of questions a learner sits AS A WHOLE and may
+ * print as one sheet. Papers are the pack's second grouping axis next to
+ * `levels`, and the two are deliberately different shapes (#194):
+ * levels are a SHORT ORDERED difficulty ladder the learner climbs (the
+ * adaptive nudge walks it, the timed exam deals from its top rung);
+ * papers are MANY, UNORDERED and NAMED, grouped for display by `series`.
+ * Putting papers into `levels` made "Paper 2" read as the rung above
+ * "Paper 1" and ran out of the 8 slots — so they get their own block.
+ */
+export const packPaperSchema = z.object({
+  /** Stable key — referenced by a question's `paperId`. */
+  key: z.string().regex(slug).max(40),
+  /** How the paper is listed, e.g. "Paper 1", "Practice exam 2",
+   *  "Familiarisation 1". Keep the series name in `series`. */
+  label: z.string().min(1).max(60),
+  /** Optional display group: the book or series the paper comes from
+   *  ("Series A 10–11"). Papers sharing a series list together, in
+   *  manifest order; papers without one list ungrouped. */
+  series: z.string().min(1).max(60).optional(),
+  /** Optional owning category (a manifest category key) for a paper that
+   *  belongs to one subject — "Maths Paper 1" and "English Paper 1" are
+   *  different books. Every question in the paper must then carry that
+   *  categoryKey. Omit for a paper that spans categories (an exam mock). */
+  categoryKey: z.string().regex(slug).max(40).optional(),
+});
+
 export const packSourceSchema = z.object({
   /** Short chip label shown in the legend, e.g. "GL", "MIT", "Original". */
   label: z.string().min(1).max(24),
@@ -235,12 +263,23 @@ export const packManifestSchema = z
     categories: z.array(packCategorySchema).min(1).max(12),
     /** Optional ordered "level" bands — a coarse axis above difficulty
      *  you can filter practice by (Year groups, CEFR levels, …). Questions
-     *  tag one via `level`; declare none and there's no filter, as today. */
+     *  tag one via `level`; declare none and there's no filter, as today.
+     *  This is a LADDER, easiest first: the adaptive nudge suggests the
+     *  adjacent rung and the timed exam deals from the last one. Keep it
+     *  short — named papers and mocks belong in `papers`, not here. */
     levels: z.array(packLevelSchema).min(1).max(8).optional(),
     /** What the pack calls its level dimension, shown as the filter's
      *  label (e.g. "Year", "Grade", "CEFR"). Defaults to "Level". The
      *  engine ships no domain terminology — the pack names its own axis. */
     levelsLabel: z.string().min(1).max(24).optional(),
+    /** Optional named papers — see packPaperSchema. Questions join one
+     *  via `paperId`; the app lists them (grouped by `series`) as sets to
+     *  practise whole and to print as one sheet in bank order. */
+    papers: z.array(packPaperSchema).min(1).max(100).optional(),
+    /** What the pack calls its papers, as the heading of their list on
+     *  Home and in Paper practice (e.g. "Papers", "Practice exams",
+     *  "Mock tests"). Defaults to "Papers". */
+    papersLabel: z.string().min(1).max(24).optional(),
     /** Optional "Question sources" legend, rendered in Settings —
      *  where the bank's questions come from: repos, licences, credits. */
     sources: z.array(packSourceSchema).max(12).optional(),
@@ -269,6 +308,21 @@ export const packManifestSchema = z
       if (new Set(levelKeys).size !== levelKeys.length) {
         ctx.addIssue({ code: 'custom', message: 'level keys must be unique' });
       }
+    }
+    if (m.papers) {
+      const paperKeys = m.papers.map((p) => p.key);
+      if (new Set(paperKeys).size !== paperKeys.length) {
+        ctx.addIssue({ code: 'custom', message: 'paper keys must be unique' });
+      }
+      m.papers.forEach((p, i) => {
+        if (p.categoryKey !== undefined && !keys.includes(p.categoryKey)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['papers', i, 'categoryKey'],
+            message: `categoryKey "${p.categoryKey}" not declared in categories`,
+          });
+        }
+      });
     }
     if (m.upgrade?.packId === m.id) {
       ctx.addIssue({
@@ -336,6 +390,11 @@ export const packQuestionSchema = z
     conceptId: z.string().optional(),
     /** Optional level band — must reference a manifest level key. */
     level: z.string().optional(),
+    /** Optional paper this question is part of — must reference a
+     *  manifest `papers` key (cross-checked in validatePack). A paper's
+     *  questions should sit together in bank order: that is the order the
+     *  whole-paper sheet prints and numbers them in. */
+    paperId: z.string().optional(),
     difficulty: z.union([
       z.literal(1),
       z.literal(2),
@@ -436,6 +495,7 @@ export type PackGames = z.infer<typeof packGamesSchema>;
 export type PackUpgrade = z.infer<typeof packUpgradeSchema>;
 export type GameId = z.infer<typeof gameIdSchema>;
 export type PackLevel = z.infer<typeof packLevelSchema>;
+export type PackPaper = z.infer<typeof packPaperSchema>;
 export type PackSource = z.infer<typeof packSourceSchema>;
 export type PackManifest = z.infer<typeof packManifestSchema>;
 export type PackScenario = z.infer<typeof packScenarioSchema>;
@@ -461,7 +521,7 @@ export interface PackFiles {
 
 /**
  * Whole-pack validation: per-file schemas plus the cross-file checks a
- * single Zod schema can't express (unique ids, category/scenario
+ * single Zod schema can't express (unique ids, category/scenario/paper
  * references, weight sanity). Pure function over parsed JSON so it's
  * unit-testable and reusable by both the CLI and the use-pack script.
  */
@@ -591,6 +651,38 @@ export function validatePack(input: PackFiles): PackValidationResult {
       if (q.level && !levelKeys.has(q.level)) {
         errors.push(
           `questions.json[${q.id}]: level "${q.level}" not declared in pack.json levels`,
+        );
+      }
+    }
+
+    const papers = manifest.data.papers ?? [];
+    const paperByKey = new Map(papers.map((p) => [p.key, p]));
+    for (const q of questions) {
+      if (!q.paperId) continue;
+      const paper = paperByKey.get(q.paperId);
+      if (!paper) {
+        errors.push(
+          `questions.json[${q.id}]: paperId "${q.paperId}" not declared in pack.json papers`,
+        );
+      } else if (paper.categoryKey !== undefined && paper.categoryKey !== q.categoryKey) {
+        errors.push(
+          `questions.json[${q.id}]: categoryKey "${q.categoryKey}" differs from paper "${paper.key}" (category "${paper.categoryKey}") — a paper that spans categories should omit categoryKey`,
+        );
+      }
+    }
+    for (const p of papers) {
+      // Positions of the paper's questions in bank order: the whole-paper
+      // sheet prints and numbers them in that order, so a paper scattered
+      // through questions.json prints in a different order than the
+      // booklet it came from.
+      const positions = questions.flatMap((q, i) => (q.paperId === p.key ? [i] : []));
+      if (positions.length === 0) {
+        warnings.push(
+          `pack.json: paper "${p.key}" has no questions — it will list as an empty set`,
+        );
+      } else if (positions[positions.length - 1] - positions[0] + 1 !== positions.length) {
+        warnings.push(
+          `pack.json: paper "${p.key}" questions are not contiguous in questions.json — the printed sheet follows bank order, so keep a paper's questions together, in paper order`,
         );
       }
     }

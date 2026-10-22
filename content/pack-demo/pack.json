@@ -26,6 +26,11 @@
     { "key": "basics", "label": "Basics" },
     { "key": "advanced", "label": "Advanced" }
   ],
+  "papersLabel": "Papers",
+  "papers": [
+    { "key": "starter-paper-1", "label": "Paper 1", "series": "Starter papers", "categoryKey": "planets" },
+    { "key": "starter-paper-2", "label": "Paper 2", "series": "Starter papers", "categoryKey": "space-exploration" }
+  ],
   "exam": {
     "label": "Mock exam",
     "passPct": 70,
