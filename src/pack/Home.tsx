@@ -441,8 +441,8 @@ export default function PackHome() {
                 href="/practice/check/"
                 testid="check-card"
                 icon={Compass}
-                label="Readiness check"
-                caption={`${CHECK_PLAN.count} Qs · where to start`}
+                label="Check"
+                caption={`Readiness · ${CHECK_PLAN.count} Qs`}
               />
             ) : null}
           </div>

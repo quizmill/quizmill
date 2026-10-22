@@ -55,8 +55,9 @@ describe('PackHome readiness-check tile', () => {
     const card = container.querySelector('[data-testid="check-card"]');
     expect(card).toBeTruthy();
     expect(card!.getAttribute('href')).toBe('/practice/check');
-    expect(card!.textContent).toContain('Readiness check');
-    expect(card!.textContent).toContain('6 Qs');
+    // A one-word label: five tiles in the rail leave no room for "Readiness".
+    expect(card!.textContent).toContain('Check');
+    expect(card!.textContent).toContain('Readiness · 6 Qs');
     // Last in the rail, after the exam tile.
     const tiles = Array.from(container.querySelectorAll('[data-testid="mode-rail"] a')).map((a) =>
       a.getAttribute('data-testid'),
