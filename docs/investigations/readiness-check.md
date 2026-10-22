@@ -15,21 +15,36 @@ to practise*) for any pack with an `exam` block. Pure logic in
 runner and result page in `src/pack/CheckRunner.tsx` /
 `CheckResult.tsx`.
 
-- **A stratified sample, capped at thirty minutes.** Every domain
-  (= pack category) gets a floor of three questions so it can be judged
-  at all. The budget is the larger of *domains × floor* and *a third of
-  `exam.questionCount`*, capped at the in-scope bank and at **thirty
-  minutes of the real exam's pace** (`durationMinutes / questionCount`;
-  a minute a question when the pack declares no pace). When the cap
-  can't afford three per domain the floor drops uniformly — two, then
-  one — so the sitting still spans the whole blueprint; anything above
-  the floor follows the blueprint weights (bank size when the pack
-  declares none — the fallback readiness already uses). Water-filling:
-  each domain takes `level × share` clamped to [floor, bank] and the
-  level rises until the total meets the count, so a domain pinned at
-  either bound is reconsidered as the level moves and the sitting is
-  always exactly the advertised length. Unseen questions first, then
-  the hand is shuffled so domains are mixed as on the real exam.
+- **A stratified sample inside a time box the learner picks.** The
+  intro offers ten, twenty or thirty minutes (`CHECK_BUDGETS_MINUTES`;
+  the last is the ceiling and there is no longer option), opening on
+  the shortest that affords three questions per domain at the exam's
+  pace. The plan converts the budget into questions at **the real
+  exam's pace** (`durationMinutes / questionCount`; a minute a question
+  when the pack declares no pace), capped at the in-scope bank. Every
+  domain (= pack category) gets a floor of three so it can be judged at
+  all; when the budget can't afford that the floor drops uniformly —
+  two, then one, then none, in which case the heaviest domains get the
+  look — and anything above the floor follows the blueprint weights
+  (bank size when the pack declares none — the fallback readiness
+  already uses). Water-filling: each domain takes `level × share`
+  clamped to [floor, bank] and the level rises until the total meets
+  the count, so a domain pinned at either bound is reconsidered as the
+  level moves and the plan is always exactly the advertised length.
+- **Dealt in rounds, under a clock, as long as the time allows.** The
+  deck is the whole in-scope bank, ordered: the planned hand first, in
+  rounds — one question from every domain with a planned question
+  left, the domains shuffled within each round — so a sitting the clock
+  cuts short still spans the blueprint evenly; then the rest of the
+  bank apportioned by blueprint share (highest averages), for a learner
+  quicker than the exam's pace. Within a domain unseen questions come
+  first. After each answer the runner deals another only while the time
+  left holds one at the learner's own pace so far (answer plus
+  feedback), so the sitting ends cleanly with every answered question
+  counted; and the clock ends it outright when the budget is spent,
+  dropping the question on screen. Nothing ever asks for more time.
+  The session records the questions actually answered, so a cut-off
+  sitting reads back honestly.
 - **Feedback per question, as in practice.** The key, the explanation,
   the per-option verdicts, the concept card. What keeps it a cold look
   is that every question is asked exactly once — so each attempt is a
@@ -65,18 +80,22 @@ rather than a ranking, and the result page's footnote says how many
 questions each domain got. The floor is one constant
 (`CHECK_DOMAIN_FLOOR`) if it proves too blunt.
 
-**How long is "about 30 minutes".** Thirty minutes is the hard limit,
-measured at the real exam's pace (`durationMinutes / questionCount`,
-or a minute a question when the pack declares no pace), and the plan
-sizes the sitting down to fit: 6 questions / 10 min on the demo; on a
-ten-domain pack whose exam allows 2.4 minutes a question, 12 questions
-(one or two per domain) in about 29 min — the first version quoted 30
-questions at 72 min there, which was the full floor but not a
-temperature check. The check stays untimed and sized in questions; the
-intro quotes the minutes honestly and notes practice is usually
-quicker. The cap is one constant (`CHECK_MAX_MINUTES`); the other
-lever, if 12 questions over ten domains reads too thin, is to budget
-at a practice pace rather than the exam's.
+**How long is "about 30 minutes".** It is up to the learner, up to
+thirty: the intro offers ten, twenty or thirty minutes and the sitting
+runs under that clock. Thirty is the hard limit and there is no longer
+option; the clock never asks for more time, it ends the sitting. The
+budget is converted into an advertised question count at the real
+exam's pace (`durationMinutes / questionCount`, or a minute a question
+when the pack declares no pace): 6 questions for ten minutes on the
+demo (18, the whole in-scope bank, for thirty); on a ten-domain pack
+whose exam allows 2.4 minutes a question, 12 questions (one or two per
+domain) for thirty — the first version quoted 30 questions at 72 min
+there, which was the full floor but not a temperature check. The
+count is an estimate, not a contract: a learner quicker than the
+exam's pace is dealt more (the deck continues by blueprint share), a
+slower one fewer, and because the deck is dealt in rounds across the
+domains either way still spans the blueprint. The budgets are one
+constant (`CHECK_BUDGETS_MINUTES`).
 
 **Do the check's attempts feed normal readiness?** Yes, unchanged:
 they are first attempts with the real category, so the Progress panel
@@ -88,13 +107,24 @@ readiness's own fallback, and what the validator already warns about.
 On a sampler with equal banks the study order then ranks by shortfall
 alone.
 
+**Where the check is offered.** An exam pack's Home asks "could you
+pass today?" in a card above the practice loop — something to see and
+do, or see and close — rather than a tile the learner has to find or a
+switch in Settings. The card retires once a check has been sat (the
+result lives on the check page, reached from the rail's tile and the
+Progress panel) or when the learner says "not interested", which is
+remembered per pack in the pack's local prefs. The tile in *More ways
+to practise* stays either way.
+
 ## Not built, deliberately
 
 - **The adaptive second pass** (spend remaining budget on domains
-  whose band straddles the line). The fixed sample should be judged
-  first; the deal is one pure function, so a second pass is additive.
+  whose band straddles the line). The extension past the plan follows
+  blueprint share, not the live result; a second pass that targets
+  straddling domains is additive, since the deal is one pure function.
 - **A device switch to hide the tile.** The timed exam has one; the
-  check does not yet. One more `devicePref` if wanted.
+  check does not. Home's prompt card has its own close, which is the
+  opt-out that was asked for.
 - **Blueprint weights on exam packs that lack them.** Content, not
   engine: the result page is only as good as the weights the pack
   declares.
