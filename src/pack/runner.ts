@@ -66,6 +66,13 @@ export function bankForCategory(
   return questions.filter((q) => q.categoryKey === categoryKey);
 }
 
+/** The questions of one named paper, in BANK order — the order the paper
+ *  prints and numbers them in (the validator warns when a paper's
+ *  questions are scattered). Empty for an unknown key. */
+export function bankForPaper(questions: PackQuestion[], paperKey: string): PackQuestion[] {
+  return questions.filter((q) => q.paperId === paperKey);
+}
+
 /** Restrict a bank to one level band. A null/undefined level (the "All"
  *  filter, or a pack with no levels) returns the bank unchanged. */
 export function filterByLevel(
