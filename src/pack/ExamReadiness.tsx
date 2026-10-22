@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
 import type { Attempt } from '@/data/types';
 import {
@@ -9,7 +10,8 @@ import {
   type ReadinessReport,
   type ReadinessVerdict,
 } from '@/lib/readiness';
-import { EXAM_AVAILABLE_BY_CATEGORY, examInScope } from '@/pack/data';
+import { examInScope } from '@/pack/data';
+import { CHECK_PLAN, READINESS_DOMAINS } from '@/pack/check';
 import { cn } from '@/lib/cn';
 
 /** Build the readiness report for the active pack's exam goal, or null when
@@ -17,13 +19,7 @@ import { cn } from '@/lib/cn';
 export function readinessFor(attempts: readonly Attempt[]): ReadinessReport | null {
   const exam = APP_CONFIG.exam;
   if (!exam) return null;
-  const domains = APP_CONFIG.categories.map((c) => ({
-    key: c.key,
-    label: c.shortLabel ?? c.label,
-    weight: c.weight ?? 0,
-    available: EXAM_AVAILABLE_BY_CATEGORY[c.key] ?? 0,
-  }));
-  return computeReadiness(exam, domains, attempts, { inScope: examInScope });
+  return computeReadiness(exam, READINESS_DOMAINS, attempts, { inScope: examInScope });
 }
 
 /**
@@ -90,6 +86,27 @@ export default function ExamReadiness({ attempts }: { attempts: readonly Attempt
           </div>
         )}
 
+        {/* Before the blueprint is covered, the quickest way to an answer
+            is the readiness check: one sitting across every domain. */}
+        {report.verdict === 'no-data' && CHECK_PLAN ? (
+          <Link
+            href="/practice/check/"
+            data-testid="readiness-check-link"
+            className="tap-feedback flex items-center justify-between gap-3 rounded-xl border border-brand-500/30 bg-brand-50 p-3 transition hover:border-brand-400"
+          >
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-ink-900">
+                Take the readiness check
+              </div>
+              <div className="mt-0.5 text-xs text-ink-600">
+                {CHECK_PLAN.count} questions across every domain — a first answer in one
+                sitting, and where to study first.
+              </div>
+            </div>
+            <ArrowRight className="h-5 w-5 shrink-0 text-brand-600" />
+          </Link>
+        ) : null}
+
         {/* Per-domain readiness */}
         <div className="flex flex-col gap-3">
           {report.domains.map((d) => (
@@ -150,8 +167,15 @@ export default function ExamReadiness({ attempts }: { attempts: readonly Attempt
 }
 
 /** Horizontal gauge: a confidence band over a 0–100 track with the estimate
- *  marker and a dashed pass-line. CSS-only, no charting dep. */
-function ScoreGauge({ report, tone }: { report: ReadinessReport; tone: Tone }) {
+ *  marker and a dashed pass-line. CSS-only, no charting dep. Shared with
+ *  the readiness check's result page, so the two read the same way. */
+export function ScoreGauge({
+  report,
+  tone,
+}: {
+  report: Pick<ReadinessReport, 'lowPct' | 'highPct' | 'estimatePct' | 'passPct'>;
+  tone: Tone;
+}) {
   const { lowPct, highPct, estimatePct, passPct } = report;
   return (
     <div className="pt-1">
@@ -219,7 +243,7 @@ function DomainRow({ d, passPct }: { d: DomainReadiness; passPct: number }) {
   );
 }
 
-type Tone = 'success' | 'warn' | 'brand' | 'ink';
+export type Tone = 'success' | 'warn' | 'brand' | 'ink';
 
 const BAND_BG: Record<Tone, string> = {
   success: 'bg-success-200',
@@ -240,7 +264,7 @@ const DOMAIN_BG: Record<DomainReadiness['status'], string> = {
   untested: 'bg-ink-200',
 };
 
-interface VerdictMeta {
+export interface VerdictMeta {
   label: string;
   emoji: string;
   tone: Tone;
@@ -249,7 +273,9 @@ interface VerdictMeta {
   blurb: (r: ReadinessReport, examName: string) => string;
 }
 
-const VERDICT_META: Record<ReadinessVerdict, VerdictMeta> = {
+/** How each verdict reads — label, tone and the one-line blurb. The
+ *  readiness check's result page wears the same pills. */
+export const VERDICT_META: Record<ReadinessVerdict, VerdictMeta> = {
   ready: {
     label: 'Ready to pass',
     emoji: '🎯',

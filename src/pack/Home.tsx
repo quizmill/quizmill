@@ -6,6 +6,7 @@ import {
   ArrowRight,
   BarChart3,
   Car,
+  Compass,
   GraduationCap,
   NotebookPen,
   Printer,
@@ -46,6 +47,7 @@ import {
   PACK_LEVEL_BY_QUESTION_ID,
 } from '@/pack/data';
 import { EXAM_SITTING } from '@/pack/exam';
+import { CHECK_PLAN } from '@/pack/check';
 import { loadExamShown } from '@/lib/examPref';
 import { formatClock } from '@/lib/examClock';
 import { HomeCard, ModeTile } from '@/pack/HomeCard';
@@ -392,8 +394,9 @@ export default function PackHome() {
       {/* The occasional modes as a rail of tiles — one row however many are
           on. Drive, Coach and Paper are device opt-ins (Settings) that a
           pack may ship on; the timed sitting shows for packs that declare
-          an exam length, unless this device has hidden it. */}
-      {driveMode || coachMode || paperMode || examSitting ? (
+          an exam length, unless this device has hidden it; the readiness
+          check for any pack with an exam goal. */}
+      {driveMode || coachMode || paperMode || examSitting || CHECK_PLAN ? (
         <section className="flex flex-col gap-3" data-testid="mode-rail">
           <h2 className="text-lg font-semibold text-ink-700">More ways to practise</h2>
           <div className="flex gap-2">
@@ -431,6 +434,15 @@ export default function PackHome() {
                 icon={Timer}
                 label={APP_CONFIG.exam?.label ?? 'Timed exam'}
                 caption={`${examSitting.count} Qs · ${formatClock(examSitting.durationSeconds)}`}
+              />
+            ) : null}
+            {CHECK_PLAN ? (
+              <ModeTile
+                href="/practice/check/"
+                testid="check-card"
+                icon={Compass}
+                label="Readiness check"
+                caption={`${CHECK_PLAN.count} Qs · where to start`}
               />
             ) : null}
           </div>
