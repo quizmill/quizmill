@@ -56,6 +56,7 @@ export const SESSION_MODE_LABEL: Record<SessionMode, string> = {
   notes: 'Notes practice',
   paper: 'Paper sheet',
   exam: 'Timed exam',
+  check: 'Readiness check',
 };
 
 function byAnsweredAt(a: Attempt, b: Attempt): number {
