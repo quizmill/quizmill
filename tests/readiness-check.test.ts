@@ -400,6 +400,24 @@ describe('checkResult', () => {
     expect(r.studyOrder[0]).toMatchObject({ shortfallPct: 70, weightPct: 40 });
   });
 
+  it('reads the band off the sitting as a whole, not the sum of one-question domains', () => {
+    // Ten domains, one question each in nine of them, two right. Summing
+    // nine one-question Wilson bands spans nearly everything (0–80 on a
+    // miss, 21–100 on a hit) and would call 22% "borderline"; nine
+    // answers read as one sample put the whole band under a 70% line.
+    const attempts = TEN.slice(0, 9).flatMap((d, i) => answers(d.key, 1, i < 2 ? 1 : 0));
+    const r = checkResult(GOAL, TEN, attempts, 'check-1');
+    expect(r.report.estimatePct).toBe(22);
+    expect(r.report.judgedWeightPct).toBe(90);
+    expect(r.report.lowPct).toBeLessThanOrEqual(22);
+    expect(r.report.highPct).toBeGreaterThanOrEqual(22);
+    expect(r.report.highPct).toBeLessThan(GOAL.passPct);
+    expect(r.report.verdict).toBe('not-ready');
+    // Per-domain standings are untouched: nine judged on one answer each.
+    expect(r.domains.filter((d) => d.status === 'weak')).toHaveLength(7);
+    expect(r.domains.filter((d) => d.status === 'solid')).toHaveLength(2);
+  });
+
   it('reads the verdict off the check-sized band, so a blank sitting is not-ready', () => {
     const r = checkResult(GOAL, TWO, [...answers('planets', 3, 0), ...answers('space', 3, 0)], 'check-1');
     expect(r.report.verdict).toBe('not-ready');

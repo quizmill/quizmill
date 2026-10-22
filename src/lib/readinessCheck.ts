@@ -39,6 +39,8 @@
 import type { Attempt, Session, SessionMode } from '@/data/types';
 import {
   computeReadiness,
+  verdictFor,
+  wilsonInterval,
   type DomainReadiness,
   type ExamGoal,
   type ReadinessDomainInput,
@@ -351,7 +353,8 @@ export interface CheckStudyItem {
 export interface CheckResult {
   sessionId: string;
   /** The readiness report over this sitting alone, judged at the check
-   *  floor — its verdict is the headline, its band the gauge. */
+   *  floor, its band the Wilson interval of the sitting as one sample —
+   *  its verdict is the headline, its band the gauge. */
   report: ReadinessReport;
   domains: CheckDomainResult[];
   /** Weak domains, the one to study first at the top: ranked by
@@ -382,11 +385,23 @@ export function checkResult(
     .filter((a) => a.sessionId === sessionId)
     .sort((a, b) => a.answeredAt - b.answeredAt);
   const floor = opts.floor ?? Math.max(1, checkFloorFor(domains, own.length));
-  const report = computeReadiness(goal, domains, own, {
+  const perDomain = computeReadiness(goal, domains, own, {
     minDomainSample: floor,
     inScope: opts.inScope,
     maxNudges: domains.length,
   });
+  // readiness.ts sums each domain's Wilson band, which is honest over a
+  // dozen first attempts a domain and meaningless over one: ten domains
+  // of one question each span nearly 0–100 and call 2/9 "borderline". A
+  // check is one stratified sample, so its band is the Wilson interval
+  // of the weighted estimate at the sitting's judged sample size — tight
+  // enough to say something, still wide enough at nine answers to say it
+  // carefully — and the verdict reads off that band on readiness's tiers.
+  const judgedKeys = new Set(perDomain.domains.filter((d) => d.judged).map((d) => d.key));
+  const judgedN = own.filter((a) => judgedKeys.has(a.subject)).length;
+  const [lo, hi] = wilsonInterval((perDomain.estimatePct / 100) * judgedN, judgedN);
+  const band = { ...perDomain, lowPct: Math.round(lo * 100), highPct: Math.round(hi * 100) };
+  const report: ReadinessReport = { ...band, verdict: verdictFor(band, goal.passPct) };
 
   const missedBy = new Map<string, string[]>();
   for (const a of own) {
