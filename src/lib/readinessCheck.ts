@@ -171,12 +171,13 @@ export function dealCheck<Q extends SelectableQuestion & { categoryKey: string }
   rng: Rng = Math.random,
 ): Q[] {
   const dealt: Q[] = [];
+  const seen = new Set(attemptedIds);
   for (const { key, count } of plan.perDomain) {
     const pool = bank.filter((q) => q.categoryKey === key);
     dealt.push(
       ...pickSessionQuestions(pool, {
         count,
-        historicalAttemptedIds: attemptedIds,
+        historicalAttemptedIds: seen,
         currentSessionIds: new Set(),
         rng,
       }),
