@@ -78,7 +78,12 @@ still reaches the line. Under the time cap the floor can drop to one:
 then a domain's standing is one answer, the study order is a pointer
 rather than a ranking, and the result page's footnote says how many
 questions each domain got. The floor is one constant
-(`CHECK_DOMAIN_FLOOR`) if it proves too blunt.
+(`CHECK_DOMAIN_FLOOR`) if it proves too blunt. A result is judged at the
+floor *its own size* could afford (`checkFloorFor` over the questions
+answered, at least one), not at the recommended plan's: a learner who
+picked ten minutes where twenty would have bought three a domain is
+read at two, with the misses ranked, rather than told every domain is
+thin.
 
 **How long is "about 30 minutes".** It is up to the learner, up to
 thirty: the intro offers ten, twenty or thirty minutes and the sitting

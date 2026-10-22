@@ -170,6 +170,25 @@ export function checkPace(
 }
 
 /**
+ * The per-domain floor `count` questions can afford over the live
+ * domains: the full floor when every domain can have it (capped at its
+ * bank), else an equal share — two, one, none. The plan sizes with it
+ * and a result is judged with it over the questions actually answered,
+ * so a sitting the learner kept short, or the clock cut short, is read
+ * at the floor its own size allowed rather than a longer plan's.
+ */
+export function checkFloorFor(
+  domains: readonly ReadinessDomainInput[],
+  count: number,
+  wanted: number = CHECK_DOMAIN_FLOOR,
+): number {
+  const live = domains.filter((d) => d.available > 0);
+  if (live.length === 0) return 0;
+  const floorTotal = sum(live.map((d) => Math.min(wanted, d.available)));
+  return floorTotal <= count ? wanted : Math.floor(count / live.length);
+}
+
+/**
  * Size one check for an exam over its domains and a time budget: as
  * many questions as the budget buys at the real exam's pace (a minute a
  * question when the pack declares none), never more than the bank holds
@@ -191,9 +210,8 @@ export function planCheck(
 
   const timeCap = Math.max(1, Math.floor(minutes / checkPace(exam)));
   const totalAvailable = sum(live.map((d) => d.available));
-  const floorTotal = sum(live.map((d) => Math.min(wanted, d.available)));
   const count = Math.min(totalAvailable, timeCap);
-  const floor = floorTotal <= count ? wanted : Math.floor(count / live.length);
+  const floor = checkFloorFor(live, count, wanted);
 
   const alloc = allocate(live, count, floor);
   const share = shares(live);
@@ -348,6 +366,10 @@ export interface CheckResult {
 /**
  * Read one completed check: the verdict and band over its attempts, each
  * domain's standing with the questions it missed, and the study order.
+ * Domains are judged at the floor the sitting's own size could afford
+ * (`checkFloorFor`, at least one) unless `opts.floor` says otherwise: a
+ * learner who picked ten minutes, or was stopped by the clock, is read
+ * at the floor they had, not called thin everywhere by a longer plan's.
  */
 export function checkResult(
   goal: ExamGoal,
@@ -356,10 +378,10 @@ export function checkResult(
   sessionId: string,
   opts: { floor?: number; inScope?: (questionId: string) => boolean } = {},
 ): CheckResult {
-  const floor = opts.floor ?? CHECK_DOMAIN_FLOOR;
   const own = attempts
     .filter((a) => a.sessionId === sessionId)
     .sort((a, b) => a.answeredAt - b.answeredAt);
+  const floor = opts.floor ?? Math.max(1, checkFloorFor(domains, own.length));
   const report = computeReadiness(goal, domains, own, {
     minDomainSample: floor,
     inScope: opts.inScope,

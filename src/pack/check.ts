@@ -62,17 +62,14 @@ export function dealCheckSitting(
   return deck.length === 0 ? null : { plan, deck };
 }
 
-/** Read one check's result against the pack's exam goal, judging each
- *  domain at the floor the plan could afford (a one-question look still
- *  counts when the time cap allowed no more). */
+/** Read one check's result against the pack's exam goal, each domain
+ *  judged at the floor the sitting's own size could afford (a
+ *  one-question look still counts when the clock allowed no more). */
 export function checkResultFor(
   attempts: readonly Attempt[],
   sessionId: string,
 ): CheckResult | null {
   const exam = APP_CONFIG.exam;
   if (!exam || !CHECK_PLAN) return null;
-  return checkResult(exam, READINESS_DOMAINS, attempts, sessionId, {
-    inScope: examInScope,
-    floor: Math.max(1, CHECK_PLAN.floor),
-  });
+  return checkResult(exam, READINESS_DOMAINS, attempts, sessionId, { inScope: examInScope });
 }

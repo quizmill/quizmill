@@ -436,6 +436,36 @@ describe('checkResult', () => {
     expect(r.answered).toBe(6);
   });
 
+  it('judges at the floor the sitting itself could afford, not a longer plan\'s', () => {
+    // Four deep domains, no weights. The learner picked the short budget
+    // and answered eight — two a domain — where the recommended budget
+    // would have dealt three. Judged at three every domain is thin and
+    // there is nothing to study; the sitting could afford two, so it is
+    // judged at two and the misses rank.
+    const four: ReadinessDomainInput[] = Array.from({ length: 4 }, (_, i) => ({
+      key: `d${i}`,
+      label: `Domain ${i}`,
+      weight: 0,
+      available: 10,
+    }));
+    const attempts = [
+      ...answers('d0', 2, 2),
+      ...answers('d1', 2, 1),
+      ...answers('d2', 2, 2),
+      ...answers('d3', 2, 0),
+    ];
+    const r = checkResult(GOAL, four, attempts, 'check-1');
+    expect(r.domains.every((d) => d.judged)).toBe(true);
+    expect(r.studyOrder.map((s) => s.key)).toEqual(['d3', 'd1']);
+    // An explicit floor still wins.
+    expect(checkResult(GOAL, four, attempts, 'check-1', { floor: 3 }).studyOrder).toEqual([]);
+    // More domains than answers: a one-question look is still a look.
+    const one = checkResult(GOAL, TEN, [...answers('d0', 1, 0), ...answers('d1', 1, 1)], 'check-1');
+    expect(one.domains.find((d) => d.key === 'd0')!.status).toBe('weak');
+    expect(one.domains.find((d) => d.key === 'd1')!.status).toBe('solid');
+    expect(one.domains.find((d) => d.key === 'd2')!.status).toBe('untested');
+  });
+
   it('marks a domain thin when the bank could not reach the floor', () => {
     const domains: ReadinessDomainInput[] = [
       { key: 'planets', label: 'Planets', weight: 0.5, available: 13 },
