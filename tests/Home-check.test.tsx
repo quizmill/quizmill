@@ -57,7 +57,8 @@ describe('PackHome readiness-check tile', () => {
     expect(card!.getAttribute('href')).toBe('/practice/check');
     // A one-word label: five tiles in the rail leave no room for "Readiness".
     expect(card!.textContent).toContain('Check');
-    expect(card!.textContent).toContain('Readiness · 6 Qs');
+    // Sized and timed: the demo's mock exam paces 6 questions at 10 min.
+    expect(card!.textContent).toContain('6 Qs · ~10 min');
     // Last in the rail, after the exam tile.
     const tiles = Array.from(container.querySelectorAll('[data-testid="mode-rail"] a')).map((a) =>
       a.getAttribute('data-testid'),
@@ -73,7 +74,8 @@ describe('ExamReadiness → readiness check', () => {
     const link = container.querySelector('[data-testid="readiness-check-link"]');
     expect(link).toBeTruthy();
     expect(link!.getAttribute('href')).toBe('/practice/check');
-    expect(link!.textContent).toContain('6 questions across every domain');
+    expect(link!.textContent).toContain('6 questions across every domain in about 10 min');
+    expect(link!.textContent).toContain('a temperature check');
   });
 
   it('drops the link once enough history gives a real verdict', async () => {

@@ -99,8 +99,9 @@ export default function ExamReadiness({ attempts }: { attempts: readonly Attempt
                 Take the readiness check
               </div>
               <div className="mt-0.5 text-xs text-ink-600">
-                {CHECK_PLAN.count} questions across every domain — a first answer in one
-                sitting, and where to study first.
+                {CHECK_PLAN.count} questions across every domain
+                {CHECK_PLAN.minutes !== null ? ` in about ${CHECK_PLAN.minutes} min` : ''} — a
+                temperature check: a first answer in one sitting, and where to study first.
               </div>
             </div>
             <ArrowRight className="h-5 w-5 shrink-0 text-brand-600" />

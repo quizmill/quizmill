@@ -4,7 +4,9 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { webcrypto } from 'node:crypto';
 import { PackCheckRunner } from '@/pack/CheckRunner';
+import { CheckResultView } from '@/pack/CheckResult';
 import { CHECK_PLAN } from '@/pack/check';
+import type { Attempt } from '@/data/types';
 import { loadAttempts, loadSessions, loadAchievements } from '@/lib/storage';
 import { correctKeysOf, packQuestions } from '@/pack/data';
 
@@ -121,6 +123,7 @@ describe('PackCheckRunner', () => {
   it('explains the check before it starts, and records nothing', async () => {
     await render();
     expect(text()).toContain('Could you pass Mock exam today?');
+    expect(text()).toContain('A temperature check, not a mock exam');
     expect(text()).toContain('6 questions spread across all 2 domains');
     expect(text()).toContain('about 10 min');
     expect(text()).toContain('70%');
@@ -155,7 +158,7 @@ describe('PackCheckRunner', () => {
     // that still reaches the 70% line — "borderline", not a confident
     // "not ready"; the page says as much.
     expect(byId('check-verdict')!.getAttribute('data-verdict')).toBe('borderline');
-    expect(text()).toContain('A quick read, not a verdict');
+    expect(text()).toContain('A temperature check, not a verdict');
     expect(byId('check-domain-planets')!.getAttribute('data-status')).toBe('solid');
     expect(byId('check-domain-space-exploration')!.getAttribute('data-status')).toBe('weak');
     const study = byId('check-study-space-exploration')!;
@@ -228,5 +231,39 @@ describe('PackCheckRunner', () => {
     const ids = loadAttempts().map((a) => a.questionId);
     expect(new Set(ids).size).toBe(11);
     expect(loadSessions().filter((s) => s.mode === 'check' && s.endedAt !== null)).toHaveLength(2);
+  });
+});
+
+describe('CheckResultView', () => {
+  it('lists the question a solid domain still missed under that domain', async () => {
+    // Five of six Planets right clears the 70% line, so Planets is not
+    // in the study order — but its one miss must still be on the page.
+    const planets = packQuestions.filter((q) => q.categoryKey === 'planets').slice(0, 6);
+    const space = packQuestions.filter((q) => q.categoryKey === 'space-exploration').slice(0, 3);
+    const at = new Date('2026-10-22T19:00:00Z').getTime();
+    const attempts: Attempt[] = [...planets, ...space].map((q, i) => ({
+      id: `a${i}`,
+      sessionId: 'check-x',
+      questionId: q.id,
+      answeredAt: at + i * 1000,
+      selectedAnswer: 'A',
+      isCorrect: q.id !== planets[0].id,
+      timeTakenSeconds: 5,
+      subject: q.categoryKey,
+      topic: q.id,
+      difficulty: 2,
+      mode: 'check',
+    }));
+    await act(async () => {
+      root = createRoot(container);
+      root.render(<CheckResultView sessionId="check-x" previous={null} attempts={attempts} />);
+    });
+    const row = byId('check-domain-planets')!;
+    expect(row.getAttribute('data-status')).toBe('solid');
+    expect(byId('check-study-planets')).toBeNull();
+    expect(row.textContent).toContain('✗');
+    expect(row.textContent).toContain(planets[0].prompt.replace(/[#*_`>\[\]]/g, '').slice(0, 20));
+    // A domain with no misses lists nothing.
+    expect(byId('check-domain-space-exploration')!.textContent).not.toContain('✗');
   });
 });

@@ -170,14 +170,18 @@ export function CheckResultView({
                 style={{ left: `${report.passPct}%` }}
               />
             </div>
+            {/* Weak domains list their misses in the study order above;
+                a domain that cleared the line can still have missed one,
+                and that question belongs here. */}
+            {d.status !== 'weak' ? <MissedLine domain={d} /> : null}
           </div>
         ))}
         <p className="text-[11px] leading-relaxed text-ink-400">
-          A quick read, not a verdict: each domain got about {result.domains.length > 0 ? Math.max(...result.domains.map((d) => d.attempted)) : 0}{' '}
-          questions, so one miss moves it a long way. Weak means below the {report.passPct}%
-          pass line on this sitting; thin means too few questions to say. Every answer here
-          counts as a first attempt toward the readiness estimate on Progress, which needs
-          more per domain before it commits.
+          A temperature check, not a verdict: each domain got{' '}
+          {describeSample(result.domains.map((d) => d.attempted))}, so one miss moves it a
+          long way. Weak means below the {report.passPct}% pass line on this sitting; thin
+          means too few questions to say. Every answer here counts as a first attempt toward
+          the readiness estimate on Progress, which needs more per domain before it commits.
           {report.scaled
             ? ' This exam is scored on a scaled curve, so treat the pass mark as approximate.'
             : ''}
@@ -219,6 +223,19 @@ function MissedLine({ domain }: { domain: CheckResult['domains'][number] }) {
     </div>
   );
 }
+
+/** "three questions" / "one or two questions" / "one question" — the
+ *  per-domain sample the footnote owns up to. */
+function describeSample(attempted: readonly number[]): string {
+  const asked = attempted.filter((n) => n > 0);
+  const lo = asked.length ? Math.min(...asked) : 0;
+  const hi = asked.length ? Math.max(...asked) : 0;
+  const word = (n: number) => WORDS[n] ?? String(n);
+  if (hi <= 1) return 'one question';
+  if (lo === hi) return `${word(hi)} questions`;
+  return `${word(lo)} or ${word(hi)} questions`;
+}
+const WORDS: Record<number, string> = { 1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five' };
 
 function Delta({ value }: { value: number | null }) {
   if (value === null) return null;

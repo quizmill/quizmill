@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import Link from 'next/link';
-import { Compass, Home, Play, RefreshCw } from 'lucide-react';
+import { ArrowRight, Compass, Home, Play, RefreshCw } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
 import { Button } from '@/components/ui/Button';
 import {
@@ -155,18 +155,20 @@ export function PackCheckRunner() {
             </div>
           </dl>
           <p className="mt-4 text-sm leading-relaxed text-ink-600">
+            <strong className="font-semibold text-ink-900">A temperature check, not a mock exam:</strong>{' '}
             {plan.count} questions spread across all {domainCount} domains
             {plan.minutes !== null
-              ? ` — about ${formatSpan(plan.minutes * 60)} at the real exam's pace, usually quicker`
+              ? `, about ${formatSpan(plan.minutes * 60)} at the real exam's pace and usually quicker`
               : ''}
             . Questions you haven&apos;t seen come first. You get the answer and explanation
             after each one, as in practice; what makes it a cold look is that each question
             is asked once.
           </p>
           <p className="mt-2 text-sm leading-relaxed text-ink-600">
-            At the end: whether you&apos;d clear the {exam.passPct}% pass line today, and
-            which domains to study first — ranked by how much of the exam they are and how
-            far below the line you were.
+            At the end: a first read on whether you&apos;d clear the {exam.passPct}% pass line
+            today, and which domains to study first — ranked by how much of the exam they
+            are and how far below the line you were. Too few questions for a verdict; just
+            enough to know where to start.
           </p>
           <Button size="lg" block className="mt-5" onClick={handleStart}>
             <Play className="h-4 w-4" />
@@ -175,41 +177,44 @@ export function PackCheckRunner() {
         </div>
 
         {last && lastResult ? (
-          <section
-            className="flex items-center justify-between gap-3 rounded-2xl border border-ink-200 bg-surface p-4 shadow-xs"
+          /* The whole card opens the result; the verdict pill never
+             wraps and the score sits beside it, or below on a narrow
+             screen — no boxed button squeezed into the corner. */
+          <button
             data-testid="check-last"
+            onClick={() => {
+              setShownId(last.id);
+              setPhase('done');
+            }}
+            className="tap-feedback group flex w-full flex-col gap-2 rounded-2xl border border-ink-200 bg-surface p-4 text-left shadow-xs transition hover:border-brand-300 hover:shadow-md"
           >
-            <div className="min-w-0">
-              <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
+            <div className="flex w-full items-center justify-between gap-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-ink-500">
                 Last check · {formatDay(last.startedAt)}
-              </div>
-              <div className="mt-1 flex items-center gap-2">
-                <span
-                  className={cn(
-                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold',
-                    VERDICT_META[lastResult.report.verdict].pill,
-                  )}
-                >
-                  {VERDICT_META[lastResult.report.verdict].emoji}{' '}
-                  {VERDICT_META[lastResult.report.verdict].label}
-                </span>
-                <span className="text-sm text-ink-600">
-                  {lastResult.report.estimatePct}% · {lastResult.correct}/{lastResult.answered}{' '}
-                  correct
-                </span>
-              </div>
+              </span>
+              <span className="flex shrink-0 items-center gap-0.5 text-xs font-semibold text-brand-600 group-hover:underline">
+                See result
+                <ArrowRight className="h-3.5 w-3.5" />
+              </span>
             </div>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                setShownId(last.id);
-                setPhase('done');
-              }}
-            >
-              See result
-            </Button>
-          </section>
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <span
+                className={cn(
+                  'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold',
+                  VERDICT_META[lastResult.report.verdict].pill,
+                )}
+              >
+                {VERDICT_META[lastResult.report.verdict].emoji}{' '}
+                {VERDICT_META[lastResult.report.verdict].label}
+              </span>
+              <span className="text-sm tabular-nums text-ink-600">
+                <strong className="font-semibold text-ink-900">
+                  {lastResult.report.estimatePct}%
+                </strong>{' '}
+                · {lastResult.correct}/{lastResult.answered} correct
+              </span>
+            </div>
+          </button>
         ) : null}
       </main>
     );

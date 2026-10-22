@@ -442,7 +442,11 @@ export default function PackHome() {
                 testid="check-card"
                 icon={Compass}
                 label="Check"
-                caption={`Readiness · ${CHECK_PLAN.count} Qs`}
+                caption={
+                  CHECK_PLAN.minutes !== null
+                    ? `${CHECK_PLAN.count} Qs · ~${CHECK_PLAN.minutes} min`
+                    : `Readiness · ${CHECK_PLAN.count} Qs`
+                }
               />
             ) : null}
           </div>
