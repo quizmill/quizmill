@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { webcrypto } from 'node:crypto';
 import { PackCheckRunner } from '@/pack/CheckRunner';
 import { CheckResultView } from '@/pack/CheckResult';
-import { CHECK_PLAN } from '@/pack/check';
+import { CHECK_BANK, CHECK_PLAN, CHECK_RECOMMENDED_MINUTES } from '@/pack/check';
 import type { Attempt } from '@/data/types';
 import { loadAttempts, loadSessions, loadAchievements } from '@/lib/storage';
 import { correctKeysOf, packQuestions } from '@/pack/data';
@@ -86,9 +86,25 @@ async function pickOption(key: string) {
   await click(option!);
 }
 
+/** Let the (fake) clock run: the sitting's interval ticks and re-renders. */
+async function elapse(ms: number) {
+  await act(async () => {
+    vi.advanceTimersByTime(ms);
+  });
+}
+
+/** Seconds one answer takes in these tests, thinking plus reading the
+ *  feedback: six of them use 540 s of the default 600 s budget, so the
+ *  sixth is the last the clock allows — the planned six, as advertised. */
+const THINK_MS = 60_000;
+const READ_MS = 30_000;
+
 /** Answer the current question — right, or wrong for the categories in
  *  `wrongFor` — then move on. Returns the question's category. */
-async function answer(wrongFor: ReadonlySet<string>): Promise<string> {
+async function answer(
+  wrongFor: ReadonlySet<string>,
+  pace: { think: number; read: number } = { think: THINK_MS, read: READ_MS },
+): Promise<string> {
   const q = currentQuestion();
   const right = correctKeysOf(q);
   if (wrongFor.has(q.categoryKey)) {
@@ -97,7 +113,9 @@ async function answer(wrongFor: ReadonlySet<string>): Promise<string> {
   } else {
     for (const k of right) await pickOption(k);
   }
+  await elapse(pace.think);
   await click(control('Check answer')!);
+  await elapse(pace.read);
   await click((control('Next question') ?? control('See results'))!);
   return q.categoryKey;
 }
@@ -109,27 +127,48 @@ async function sitCheck(wrongFor: ReadonlySet<string>) {
 const plan = CHECK_PLAN!;
 
 describe('PackCheckRunner', () => {
-  it('sizes the check from the demo exam: three per domain, at the mock exam pace', async () => {
+  it('sizes the check from the demo exam: ten minutes buy three per domain at the mock exam pace', async () => {
     await render();
-    // 9-question, 15-minute mock exam over two domains: the floor wins.
+    // 9-question, 15-minute mock exam over two domains: ten minutes buy
+    // six at 1.67 min each — exactly the floor, so ten is recommended.
+    expect(CHECK_RECOMMENDED_MINUTES).toBe(10);
     expect(plan.count).toBe(6);
     expect(plan.perDomain).toEqual([
-      { key: 'planets', count: 3 },
-      { key: 'space-exploration', count: 3 },
+      { key: 'planets', count: 3, share: 0.6 },
+      { key: 'space-exploration', count: 3, share: 0.4 },
     ]);
     expect(plan.minutes).toBe(10);
   });
 
-  it('explains the check before it starts, and records nothing', async () => {
+  it('explains the check before it starts, offers the budgets, and records nothing', async () => {
     await render();
     expect(text()).toContain('Could you pass Mock exam today?');
     expect(text()).toContain('A temperature check, not a mock exam');
-    expect(text()).toContain('6 questions spread across all 2 domains');
-    expect(text()).toContain('about 10 min');
+    expect(text()).toContain('about 6 questions at the real exam');
+    expect(text()).toContain('spread across all 2 domains');
+    expect(text()).toContain('The clock stops the check at 10 min, never later');
     expect(text()).toContain('70%');
+    // Ten, twenty or thirty minutes, each with what it buys; ten is
+    // picked for the demo. There is no longer option.
+    const budgets = Array.from(container.querySelectorAll('[data-testid^="check-budget-"]'));
+    expect(budgets.map((b) => b.textContent)).toEqual(['10 min~6 Qs', '20 min~12 Qs', '30 min~18 Qs']);
+    expect(budgets.map((b) => b.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false']);
+    expect(byId('check-count')!.textContent).toBe('~6');
     expect(control('Start the check')).toBeTruthy();
     expect(byId('check-last')).toBeNull();
     expect(loadSessions()).toEqual([]);
+  });
+
+  it('re-sizes the check when a longer budget is picked', async () => {
+    await render();
+    await click(byId('check-budget-20')!);
+    expect(byId('check-budget-20')!.getAttribute('aria-checked')).toBe('true');
+    expect(byId('check-count')!.textContent).toBe('~12');
+    expect(text()).toContain('about 12 questions at the real exam');
+    expect(text()).toContain('The clock stops the check at 20 min, never later');
+    await click(control('Start the check')!);
+    expect(byId('check-clock')!.textContent).toBe('20:00');
+    expect(text()).toMatch(/Q\s*1\s*\/\s*12/);
   });
 
   it('deals every domain its share, gives feedback per question, and ends on the result page', async () => {
@@ -139,6 +178,7 @@ describe('PackCheckRunner', () => {
     expect(session).toMatchObject({ mode: 'check', subject: 'check', endedAt: null });
     expect(text()).toContain('Readiness check');
     expect(text()).toMatch(/Q\s*1\s*\/\s*6/);
+    expect(byId('check-clock')!.textContent).toBe('10:00');
 
     // Miss every Exploration question; feedback shows as in practice.
     const first = currentQuestion();
@@ -150,9 +190,15 @@ describe('PackCheckRunner', () => {
     for (let i = 1; i < plan.count; i++) seen.push(await answer(new Set(['space-exploration'])));
     expect(seen.filter((k) => k === 'planets')).toHaveLength(3);
     expect(seen.filter((k) => k === 'space-exploration')).toHaveLength(3);
+    // Rounds: the two domains alternate, so a cut-off sitting is even.
+    expect(new Set(seen.slice(0, 2)).size).toBe(2);
+    expect(new Set(seen.slice(2, 4)).size).toBe(2);
 
     // The result page: verdict, score, study order with Exploration first.
+    // No time's-up notice: the sitting ended cleanly before the bell.
     expect(byId('check-result')).toBeTruthy();
+    expect(byId('check-time-up')).toBeNull();
+    expect(loadSessions()[0].questionCount).toBe(6);
     expect(byId('check-score')!.textContent).toContain('3/6 correct');
     // 60% weighted estimate, but three questions per domain leave a band
     // that still reaches the 70% line — "borderline", not a confident
@@ -182,6 +228,77 @@ describe('PackCheckRunner', () => {
     expect(loadSessions()[0].endedAt).not.toBeNull();
     expect(loadSessions()[0].correctCount).toBe(3);
     expect(loadAchievements().some((a) => a.id.startsWith('level-'))).toBe(true);
+  });
+
+  it('deals more questions to a quicker learner, until the deck is spent', async () => {
+    await render();
+    await click(control('Start the check')!);
+    // Ten seconds a question: six leave nine minutes, so the sitting
+    // carries on past the advertised six — the chip's total grows with
+    // the projection — and only the in-scope bank (18) ends it.
+    const quick = { think: 5_000, read: 5_000 };
+    for (let i = 0; i < 6; i++) await answer(new Set(), quick);
+    expect(byId('check-result')).toBeNull();
+    expect(text()).toMatch(/Q\s*7\s*\/\s*18/);
+    let dealt = 6;
+    while (!byId('check-result') && dealt < 40) {
+      await answer(new Set(), quick);
+      dealt += 1;
+    }
+    expect(byId('check-result')).toBeTruthy();
+    expect(byId('check-time-up')).toBeNull();
+    expect(loadAttempts()).toHaveLength(CHECK_BANK.length);
+    expect(loadAttempts()).toHaveLength(18);
+    expect(new Set(loadAttempts().map((a) => a.questionId)).size).toBe(18);
+    expect(loadSessions()[0].questionCount).toBe(18);
+    expect(byId('check-score')!.textContent).toContain('18/18 correct');
+  });
+
+  it('stops dealing when the next question would not fit the time left', async () => {
+    await render();
+    await click(control('Start the check')!);
+    // Four minutes a question: after the second, two minutes remain —
+    // not enough for a third at that pace, so Next says "See results".
+    const slow = { think: 200_000, read: 40_000 };
+    await answer(new Set(), slow);
+    // Six minutes left after the first: a second is dealt.
+    expect(control('Check answer')).toBeTruthy();
+    expect(byId('check-result')).toBeNull();
+    const q = currentQuestion();
+    for (const k of correctKeysOf(q)) await pickOption(k);
+    await elapse(slow.think);
+    await click(control('Check answer')!);
+    await elapse(slow.read);
+    expect(control('Next question')).toBeUndefined();
+    await click(control('See results')!);
+    expect(byId('check-result')).toBeTruthy();
+    expect(byId('check-time-up')).toBeNull();
+    expect(loadAttempts()).toHaveLength(2);
+    expect(loadSessions()[0].questionCount).toBe(2);
+    expect(loadSessions()[0].endedAt).not.toBeNull();
+  });
+
+  it('ends the sitting outright when the clock runs out, dropping the unanswered question', async () => {
+    await render();
+    await click(control('Start the check')!);
+    await answer(new Set()); // 90 s used
+    // Stuck on the second question: at ten minutes the bell goes, the
+    // question on screen is dropped, and the result reads over the one
+    // answer — no extra time, ever.
+    await elapse(8 * 60_000);
+    expect(byId('check-clock')!.textContent).toBe('0:30');
+    expect(byId('check-timer')!.className).toContain('warn');
+    await elapse(30_000);
+    expect(byId('check-result')).toBeTruthy();
+    expect(byId('check-time-up')!.textContent).toContain('The check stopped at 10 min with 1 question answered');
+    expect(loadAttempts()).toHaveLength(1);
+    expect(loadSessions()[0].questionCount).toBe(1);
+    expect(loadSessions()[0].endedAt).not.toBeNull();
+    expect(byId('check-score')!.textContent).toContain('1/1 correct');
+    // Reopened from the intro, the past result shows no time's-up notice.
+    await click(control('Sit it again later')!);
+    await click(control('See result')!);
+    expect(byId('check-time-up')).toBeNull();
   });
 
   it('shows the feedback panel with the explanation after Check answer', async () => {

@@ -2,13 +2,18 @@ import { describe, expect, it } from 'vitest';
 import type { Attempt, Session } from '@/data/types';
 import { seededRng } from '@/lib/selection';
 import {
+  CHECK_BUDGETS_MINUTES,
   CHECK_DOMAIN_FLOOR,
   CHECK_MAX_MINUTES,
+  canDealAnother,
   checkHistory,
   checkResult,
   compareChecks,
   dealCheck,
   planCheck,
+  projectedCheckLength,
+  recommendedCheckMinutes,
+  type CheckPlan,
 } from '@/lib/readinessCheck';
 import type { ExamGoal, ReadinessDomainInput } from '@/lib/readiness';
 
@@ -37,6 +42,18 @@ function bankFor(domains: readonly ReadinessDomainInput[]): Q[] {
   return domains.flatMap((d) =>
     Array.from({ length: d.available }, (_, i) => ({ id: `${d.key}-${i}`, categoryKey: d.key })),
   );
+}
+
+/** The per-domain split without the shares, for exact comparisons. */
+function counts(plan: CheckPlan): { key: string; count: number }[] {
+  return plan.perDomain.map(({ key, count }) => ({ key, count }));
+}
+
+/** Questions per domain in a slice of a deck. */
+function tally(qs: readonly Q[]): Record<string, number> {
+  const t: Record<string, number> = {};
+  for (const q of qs) t[q.categoryKey] = (t[q.categoryKey] ?? 0) + 1;
+  return t;
 }
 
 let n = 0;
@@ -79,36 +96,41 @@ function session(id: string, startedAt: number, over: Partial<Session> = {}): Se
 }
 
 describe('planCheck', () => {
-  it('gives every domain the floor, then tops up to a third of the real exam by weight', () => {
-    // 9-question mock exam → a third is 3, but two domains need the floor
-    // each: 6 questions, no extras to share.
-    const plan = planCheck(TWO, { questionCount: 9, durationMinutes: 15 })!;
+  it('buys as many questions as the budget allows at the exam\'s pace, a floor per domain first', () => {
+    // The demo's 9-question, 15-minute mock exam: 10 minutes buy 6 at
+    // 1.67 min a question — exactly the floor for two domains.
+    const plan = planCheck(TWO, { questionCount: 9, durationMinutes: 15 }, { minutes: 10 })!;
     expect(plan.count).toBe(6);
-    expect(plan.perDomain).toEqual([
+    expect(counts(plan)).toEqual([
       { key: 'planets', count: 3 },
       { key: 'space', count: 3 },
     ]);
+    expect(plan.perDomain.map((d) => d.share)).toEqual([0.6, 0.4]);
     expect(plan.floor).toBe(CHECK_DOMAIN_FLOOR);
-    // 6 questions at 15 min / 9 questions = 10 min.
     expect(plan.minutes).toBe(10);
   });
 
   it('shares the questions by blueprint weight once every domain clears the floor', () => {
-    // A 30-question exam → 10 questions, split 60/40 → 6 and 4, both
-    // above the floor of 3.
-    const plan = planCheck(TWO, { questionCount: 30 })!;
+    // No pace declared → a minute a question: 10 minutes buy 10, split
+    // 60/40 → 6 and 4, both above the floor of 3.
+    const plan = planCheck(TWO, { questionCount: 30 }, { minutes: 10 })!;
     expect(plan.count).toBe(10);
-    expect(plan.perDomain).toEqual([
+    expect(counts(plan)).toEqual([
       { key: 'planets', count: 6 },
       { key: 'space', count: 4 },
     ]);
-    expect(plan.minutes).toBeNull();
   });
 
-  it('is the floor times the domains when the exam is unsized', () => {
-    const plan = planCheck(TEN, {})!;
+  it('defaults to the full budget and never exceeds it', () => {
+    // Ten domains of three at a minute each: the ceiling buys all 30.
+    let plan = planCheck(TEN, {})!;
     expect(plan.count).toBe(30);
+    expect(plan.minutes).toBe(CHECK_MAX_MINUTES);
     expect(plan.perDomain.every((d) => d.count === 3)).toBe(true);
+    // Asking for an hour is clamped to the ceiling: still 30.
+    plan = planCheck(TEN, {}, { minutes: 60 })!;
+    expect(plan.minutes).toBe(CHECK_MAX_MINUTES);
+    expect(plan.count).toBe(30);
   });
 
   it('never deals more than a domain holds, and spends the slack elsewhere', () => {
@@ -116,10 +138,10 @@ describe('planCheck', () => {
       { key: 'big', label: 'Big', weight: 0.5, available: 50 },
       { key: 'tiny', label: 'Tiny', weight: 0.5, available: 1 },
     ];
-    // Floor 3 + 1 = 4; a third of 24 is 8 → 4 extras, all to `big`
+    // Eight minutes buy 8: floor 3 + 1 = 4, the 4 extras all to `big`
     // because `tiny` is already exhausted.
-    const plan = planCheck(domains, { questionCount: 24 })!;
-    expect(plan.perDomain).toEqual([
+    const plan = planCheck(domains, { questionCount: 24 }, { minutes: 8 })!;
+    expect(counts(plan)).toEqual([
       { key: 'big', count: 7 },
       { key: 'tiny', count: 1 },
     ]);
@@ -131,16 +153,16 @@ describe('planCheck', () => {
       { key: 'wide', label: 'Wide', weight: 0, available: 30 },
       { key: 'narrow', label: 'Narrow', weight: 0, available: 10 },
     ];
-    // A third of 42 is 14, split 3:1 → 10.5 and 3.5; the odd question
-    // goes to the larger share.
-    const plan = planCheck(domains, { questionCount: 42 })!;
-    expect(plan.perDomain).toEqual([
+    // 14 questions split 3:1 → 10.5 and 3.5; the odd question goes to
+    // the larger share.
+    const plan = planCheck(domains, { questionCount: 42 }, { minutes: 14 })!;
+    expect(counts(plan)).toEqual([
       { key: 'wide', count: 11 },
       { key: 'narrow', count: 3 },
     ]);
   });
 
-  it('never runs past 30 minutes at the real exam\'s pace: the floor drops so every domain still gets a look', () => {
+  it('drops the floor when the budget can\'t afford it, so every domain still gets a look', () => {
     // A 75-question, 180-minute exam allows 2.4 min a question: 30 min
     // buys 12, not the 30 the floor would ask for over ten domains.
     const plan = planCheck(TEN, { questionCount: 75, durationMinutes: 180 })!;
@@ -149,8 +171,12 @@ describe('planCheck', () => {
     expect(plan.perDomain.reduce((s, d) => s + d.count, 0)).toBe(12);
     expect(plan.perDomain.every((d) => d.count >= 1 && d.count <= 2)).toBe(true);
     expect(plan.perDomain.filter((d) => d.count === 2)).toHaveLength(2);
-    expect(plan.minutes).toBe(29);
-    expect(plan.minutes!).toBeLessThanOrEqual(CHECK_MAX_MINUTES);
+    expect(plan.minutes).toBe(30);
+    // Ten minutes buy 4: more domains than questions, the floor is gone.
+    const short = planCheck(TEN, { questionCount: 75, durationMinutes: 180 }, { minutes: 10 })!;
+    expect(short.count).toBe(4);
+    expect(short.floor).toBe(0);
+    expect(short.perDomain.reduce((s, d) => s + d.count, 0)).toBe(4);
   });
 
   it('caps an unpaced pack at 30 questions, a minute each', () => {
@@ -165,7 +191,6 @@ describe('planCheck', () => {
     expect(plan.count).toBe(30);
     expect(plan.floor).toBe(2);
     expect(plan.perDomain.map((d) => d.count)).toEqual([3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2]);
-    expect(plan.minutes).toBeNull();
   });
 
   it('always deals exactly the advertised count when floors and caps both bind', () => {
@@ -177,9 +202,10 @@ describe('planCheck', () => {
         { key: 'b', label: 'B', weight: 0.2, available: 50 },
       ],
       { questionCount: 30 },
+      { minutes: 10 },
     )!;
     expect(plan.count).toBe(10);
-    expect(plan.perDomain).toEqual([
+    expect(counts(plan)).toEqual([
       { key: 'a', count: 4 },
       { key: 'b', count: 6 },
     ]);
@@ -191,9 +217,10 @@ describe('planCheck', () => {
         { key: 'b', label: 'B', weight: 0.01, available: 100 },
       ],
       { questionCount: 60 },
+      { minutes: 20 },
     )!;
     expect(plan.count).toBe(20);
-    expect(plan.perDomain).toEqual([
+    expect(counts(plan)).toEqual([
       { key: 'a', count: 17 },
       { key: 'b', count: 3 },
     ]);
@@ -221,10 +248,11 @@ describe('planCheck', () => {
       ],
     ];
     for (const domains of shapes) {
-      for (const questionCount of [0, 9, 24, 60, 300]) {
-        const plan = planCheck(domains, { questionCount })!;
+      for (const minutes of [1, 3, 8, 20, 30]) {
+        const plan = planCheck(domains, { questionCount: 100 }, { minutes })!;
         const total = plan.perDomain.reduce((s, d) => s + d.count, 0);
-        expect(total, `count ${questionCount}`).toBe(plan.count);
+        expect(total, `minutes ${minutes}`).toBe(plan.count);
+        expect(plan.count).toBeLessThanOrEqual(minutes);
         for (const { key, count } of plan.perDomain) {
           const d = domains.find((x) => x.key === key)!;
           expect(count).toBeLessThanOrEqual(d.available);
@@ -242,35 +270,78 @@ describe('planCheck', () => {
       ],
       {},
     )!;
-    expect(plan.perDomain).toEqual([{ key: 'a', count: 3 }]);
+    expect(counts(plan)).toEqual([{ key: 'a', count: 4 }]);
     expect(planCheck([{ key: 'a', label: 'A', weight: 1, available: 0 }], {})).toBeNull();
   });
 });
 
+describe('recommendedCheckMinutes', () => {
+  it('offers the shortest budget that affords the full floor, else the ceiling', () => {
+    expect(CHECK_BUDGETS_MINUTES).toEqual([10, 20, 30]);
+    // The demo: six questions fit in ten minutes.
+    expect(recommendedCheckMinutes(TWO, { questionCount: 9, durationMinutes: 15 })).toBe(10);
+    // Ten domains at a minute each need all thirty.
+    expect(recommendedCheckMinutes(TEN, {})).toBe(30);
+    // Ten domains at 2.4 min a question never fit the floor: the ceiling.
+    expect(recommendedCheckMinutes(TEN, { questionCount: 75, durationMinutes: 180 })).toBe(30);
+  });
+});
+
 describe('dealCheck', () => {
-  it('deals exactly the plan per domain, unseen questions first, mixed together', () => {
-    const plan = planCheck(TWO, { questionCount: 30 })!;
+  it('deals the plan first, in rounds across the domains, unseen questions first', () => {
+    const plan = planCheck(TWO, { questionCount: 30 }, { minutes: 10 })!;
     const bank = bankFor(TWO);
     // Three planets questions already seen: with 6 to deal from 13, all
     // six must come from the ten unseen.
     const seen = new Set(['planets-0', 'planets-1', 'planets-2']);
-    const dealt = dealCheck(plan, bank, seen, seededRng(7));
-    expect(dealt).toHaveLength(10);
-    expect(dealt.filter((q) => q.categoryKey === 'planets')).toHaveLength(6);
-    expect(dealt.filter((q) => q.categoryKey === 'space')).toHaveLength(4);
-    expect(new Set(dealt.map((q) => q.id)).size).toBe(10);
-    expect(dealt.some((q) => seen.has(q.id))).toBe(false);
-    // Not grouped by domain — the sitting mixes them like the real exam.
-    const keys = dealt.map((q) => q.categoryKey);
-    expect(keys.slice(0, 6)).not.toEqual(Array(6).fill('planets'));
+    const deck = dealCheck(plan, bank, seen, seededRng(7));
+    const hand = deck.slice(0, plan.count);
+    expect(tally(hand)).toEqual({ planets: 6, space: 4 });
+    expect(new Set(hand.map((q) => q.id)).size).toBe(10);
+    expect(hand.some((q) => seen.has(q.id))).toBe(false);
+    // Rounds: a sitting cut short after any even number of questions has
+    // dealt both domains the same, until the lighter one is spent.
+    expect(tally(hand.slice(0, 2))).toEqual({ planets: 1, space: 1 });
+    expect(tally(hand.slice(0, 4))).toEqual({ planets: 2, space: 2 });
+    expect(tally(hand.slice(0, 8))).toEqual({ planets: 4, space: 4 });
+    expect(hand.slice(8).every((q) => q.categoryKey === 'planets')).toBe(true);
+  });
+
+  it('continues past the plan with the rest of the bank, apportioned by share', () => {
+    const plan = planCheck(TWO, { questionCount: 30 }, { minutes: 10 })!;
+    const bank = bankFor(TWO);
+    const deck = dealCheck(plan, bank, new Set(), seededRng(3));
+    // The whole in-scope bank, each question once.
+    expect(deck).toHaveLength(18);
+    expect(new Set(deck.map((q) => q.id)).size).toBe(18);
+    // After 6/4 the highest average is planets (0.6/7 > 0.4/5), then
+    // space (0.4/5 > 0.6/8); space is spent at 5, the rest is planets.
+    const extension = deck.slice(plan.count).map((q) => q.categoryKey);
+    expect(extension.slice(0, 2)).toEqual(['planets', 'space']);
+    expect(tally(deck.slice(0, 14))).toEqual({ planets: 9, space: 5 });
+    expect(extension.slice(4).every((k) => k === 'planets')).toBe(true);
+  });
+
+  it('spans every domain in the first round even when the budget affords no floor', () => {
+    // Four questions over ten domains: the plan gives four domains one
+    // each, and the deck's first round is exactly those four.
+    const plan = planCheck(TEN, { questionCount: 75, durationMinutes: 180 }, { minutes: 10 })!;
+    const deck = dealCheck(plan, bankFor(TEN), new Set(), seededRng(5));
+    expect(deck).toHaveLength(30);
+    const first = deck.slice(0, 4).map((q) => q.categoryKey);
+    expect(new Set(first).size).toBe(4);
+    expect(first.sort()).toEqual(plan.perDomain.filter((d) => d.count > 0).map((d) => d.key).sort());
+    // The extension then gives every other domain its first look before
+    // any domain gets a second.
+    expect(new Set(deck.slice(0, 10).map((q) => q.categoryKey)).size).toBe(10);
   });
 
   it('falls back to seen questions once the unseen run out', () => {
-    const plan = planCheck(TWO, {})!;
+    const plan = planCheck(TWO, {}, { minutes: 6 })!;
     const bank = bankFor(TWO);
     const seen = new Set(bank.filter((q) => q.categoryKey === 'space').map((q) => q.id));
-    const dealt = dealCheck(plan, bank, seen, seededRng(1));
-    expect(dealt.filter((q) => q.categoryKey === 'space')).toHaveLength(3);
+    const deck = dealCheck(plan, bank, seen, seededRng(1));
+    expect(tally(deck.slice(0, plan.count))).toEqual({ planets: 3, space: 3 });
   });
 
   it('is deterministic for a given rng', () => {
@@ -279,6 +350,39 @@ describe('dealCheck', () => {
     const a = dealCheck(plan, bank, new Set(), seededRng(42)).map((q) => q.id);
     const b = dealCheck(plan, bank, new Set(), seededRng(42)).map((q) => q.id);
     expect(a).toEqual(b);
+  });
+});
+
+describe('canDealAnother', () => {
+  const budget = 600;
+  it('always deals the first question, then only while the learner\'s own pace fits the time left', () => {
+    expect(canDealAnother({ elapsedSeconds: 0, budgetSeconds: budget, answered: 0, deckSize: 18 })).toBe(true);
+    // 100 s a question so far, 500 s left: yes.
+    expect(canDealAnother({ elapsedSeconds: 100, budgetSeconds: budget, answered: 1, deckSize: 18 })).toBe(true);
+    // 250 s a question, 100 s left: no — the next one would not fit.
+    expect(canDealAnother({ elapsedSeconds: 500, budgetSeconds: budget, answered: 2, deckSize: 18 })).toBe(false);
+    // Exactly one more fits.
+    expect(canDealAnother({ elapsedSeconds: 300, budgetSeconds: budget, answered: 1, deckSize: 18 })).toBe(true);
+    // Time's up.
+    expect(canDealAnother({ elapsedSeconds: 600, budgetSeconds: budget, answered: 6, deckSize: 18 })).toBe(false);
+  });
+
+  it('stops when the deck is spent, however quick the learner', () => {
+    expect(canDealAnother({ elapsedSeconds: 30, budgetSeconds: budget, answered: 18, deckSize: 18 })).toBe(false);
+    expect(canDealAnother({ elapsedSeconds: 0, budgetSeconds: budget, answered: 0, deckSize: 0 })).toBe(false);
+  });
+});
+
+describe('projectedCheckLength', () => {
+  it('shows the plan until an answer is in, then the learner\'s pace over the time left', () => {
+    const base = { budgetSeconds: 600, deckSize: 18, planned: 6 };
+    expect(projectedCheckLength({ ...base, elapsedSeconds: 0, answered: 0, dealt: 1 })).toBe(6);
+    // 50 s a question: 11 more fit in the 550 s left → 12, capped by the deck of 18.
+    expect(projectedCheckLength({ ...base, elapsedSeconds: 50, answered: 1, dealt: 2 })).toBe(12);
+    // 20 s a question would project 30: the deck is the ceiling.
+    expect(projectedCheckLength({ ...base, elapsedSeconds: 20, answered: 1, dealt: 2 })).toBe(18);
+    // Slow: 250 s a question, 100 s left → 2, but 3 are already dealt.
+    expect(projectedCheckLength({ ...base, elapsedSeconds: 500, answered: 2, dealt: 3 })).toBe(3);
   });
 });
 

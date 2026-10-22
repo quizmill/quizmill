@@ -12,6 +12,7 @@ import {
 } from '@/lib/readiness';
 import { examInScope } from '@/pack/data';
 import { CHECK_PLAN, READINESS_DOMAINS } from '@/pack/check';
+import { CHECK_BUDGETS_MINUTES, CHECK_MAX_MINUTES } from '@/lib/readinessCheck';
 import { cn } from '@/lib/cn';
 
 /** Build the readiness report for the active pack's exam goal, or null when
@@ -99,9 +100,9 @@ export default function ExamReadiness({ attempts }: { attempts: readonly Attempt
                 Take the readiness check
               </div>
               <div className="mt-0.5 text-xs text-ink-600">
-                {CHECK_PLAN.count} questions across every domain
-                {CHECK_PLAN.minutes !== null ? ` in about ${CHECK_PLAN.minutes} min` : ''} — a
-                temperature check: a first answer in one sitting, and where to study first.
+                {CHECK_BUDGETS_MINUTES[0]} to {CHECK_MAX_MINUTES} minutes across every domain,
+                your choice of length — a temperature check: a first answer in one sitting, and
+                where to study first.
               </div>
             </div>
             <ArrowRight className="h-5 w-5 shrink-0 text-brand-600" />

@@ -48,6 +48,8 @@ import {
 } from '@/pack/data';
 import { EXAM_SITTING } from '@/pack/exam';
 import { CHECK_PLAN } from '@/pack/check';
+import { CHECK_BUDGETS_MINUTES, CHECK_MAX_MINUTES } from '@/lib/readinessCheck';
+import { CheckPromptCard } from '@/pack/CheckPromptCard';
 import { loadExamShown } from '@/lib/examPref';
 import { formatClock } from '@/lib/examClock';
 import { HomeCard, ModeTile } from '@/pack/HomeCard';
@@ -101,7 +103,7 @@ function HomeSkeleton() {
  * phone screen (issue #188).
  */
 export default function PackHome() {
-  const { attempts } = useStorageData();
+  const { attempts, sessions } = useStorageData();
   // Active level-band filter (a manifest level key) or null = All. Read
   // from localStorage after mount so SSR/first paint stay stable.
   const [level, setLevelState] = useClientState(loadLevelFilter, null);
@@ -228,6 +230,10 @@ export default function PackHome() {
       {/* The home app's starter pack only: how a pack gets in, above the
           practice loop. Any other active pack renders nothing here. */}
       <StarterPackCard />
+
+      {/* An exam pack's first question, above the loop: could you pass
+          today? Shown until the check is sat or the card is closed. */}
+      <CheckPromptCard sessions={sessions} />
 
       {mistakeCount > 0 ? (
         <HomeCard
@@ -443,10 +449,9 @@ export default function PackHome() {
                 icon={Compass}
                 label="Check"
                 // Five tiles leave room for one fact: the minutes say
-                // "short" better than the count does.
-                caption={
-                  CHECK_PLAN.minutes !== null ? `~${CHECK_PLAN.minutes} min` : `${CHECK_PLAN.count} Qs`
-                }
+                // "short" better than a count would, and the learner
+                // picks the length on the next screen.
+                caption={`${CHECK_BUDGETS_MINUTES[0]}–${CHECK_MAX_MINUTES} min`}
               />
             ) : null}
           </div>

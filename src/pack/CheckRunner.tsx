@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Compass, Home, Play, RefreshCw } from 'lucide-react';
+import { ArrowRight, Compass, Home, Play, RefreshCw, Timer } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
 import { Button } from '@/components/ui/Button';
 import {
@@ -11,6 +11,7 @@ import {
   useEndSession,
   useStorageData,
 } from '@/lib/useStorage';
+import { useLatest } from '@/lib/useLatest';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { useLevelUp } from '@/pack/useLevelUp';
 import {
@@ -24,11 +25,33 @@ import { amendAttempt, loadAttempts, loadSessions } from '@/lib/storage';
 import { sessionMistakeIds } from '@/lib/mistakes';
 import { totalXp } from '@/lib/xp';
 import { loadProgressionShown } from '@/lib/progressionPref';
-import { formatSpan } from '@/lib/duration';
-import { CHECK_MODE, CHECK_SUBJECT, checkHistory } from '@/lib/readinessCheck';
+import {
+  elapsedSeconds,
+  formatClock,
+  isTimeUp,
+  pauseClock,
+  remainingSeconds,
+  startClock,
+  type ExamClock,
+} from '@/lib/examClock';
+import {
+  CHECK_BUDGETS_MINUTES,
+  CHECK_MODE,
+  CHECK_SUBJECT,
+  canDealAnother,
+  checkHistory,
+  projectedCheckLength,
+  type CheckPlan,
+} from '@/lib/readinessCheck';
 import { cn } from '@/lib/cn';
 import { isMultiAnswer, progressionEnabled, type OptionKey } from '@/pack/data';
-import { CHECK_PLAN, checkResultFor, dealCheckSitting } from '@/pack/check';
+import {
+  CHECK_PLAN,
+  CHECK_RECOMMENDED_MINUTES,
+  checkPlanFor,
+  checkResultFor,
+  dealCheckSitting,
+} from '@/pack/check';
 import { CheckResultView } from '@/pack/CheckResult';
 import { VERDICT_META } from '@/pack/ExamReadiness';
 import {
@@ -37,29 +60,33 @@ import {
   buildSessionEnd,
   buildSessionStart,
   feedbackSecondsSince,
-  isLastQuestion,
   moveToNext,
   nextSelection,
   type RunnerState,
 } from './runner';
 
 type Phase =
-  | 'intro' // what the check is, the last result if any, and Start
-  | 'sitting' // the questions, with feedback as in practice
+  | 'intro' // what the check is, the budget to pick, the last result if any, and Start
+  | 'sitting' // the questions under the clock, with feedback as in practice
   | 'done'; // the result page
 
+type Ending = 'finished' | 'timeUp';
+
 /**
- * Readiness-check runner: one stratified sitting across every exam
- * domain (see src/pack/check.ts for the plan), feedback after each
- * answer exactly as in practice — the check is a learning session too —
- * and a result page built for planning rather than a score. Attempts
- * record as mode 'check' with each question's real category, so the
- * Progress readiness, mistakes and XP all count them; the session
- * carries the 'check' pseudo-subject. Sitting it again keeps the
- * previous result so the two can be compared.
+ * Readiness-check runner: one time-boxed sitting across every exam
+ * domain (see src/pack/check.ts for the plan and the deck), feedback
+ * after each answer exactly as in practice — the check is a learning
+ * session too — and a result page built for planning rather than a
+ * score. The learner picks the budget (ten, twenty or thirty minutes,
+ * never more); the deck is dealt one question at a time while the time
+ * left still holds another at the learner's own pace, and the clock
+ * ends the sitting outright when it runs out — nothing ever asks for
+ * more time. Attempts record as mode 'check' with each question's real
+ * category, so the Progress readiness, mistakes and XP all count them;
+ * the session carries the 'check' pseudo-subject. Sitting it again
+ * keeps the previous result so the two can be compared.
  */
 export function PackCheckRunner() {
-  const plan = CHECK_PLAN;
   const exam = APP_CONFIG.exam;
   const { attempts, sessions } = useStorageData();
   const recordAttempt = useRecordAttempt();
@@ -69,7 +96,14 @@ export function PackCheckRunner() {
   const { nextLevelUp, checkNow: checkLevelNow, clearNextLevelUp } = useLevelUp();
 
   const [phase, setPhase] = useState<Phase>('intro');
+  const [minutes, setMinutes] = useState<number>(CHECK_RECOMMENDED_MINUTES);
+  const [plan, setPlan] = useState<CheckPlan | null>(CHECK_PLAN);
   const [state, setState] = useState<RunnerState | null>(null);
+  const [clock, setClock] = useState<ExamClock | null>(null);
+  // Re-read once a second while sitting so the countdown moves; the clock
+  // itself is a pure value over Date.now() (src/lib/examClock.ts).
+  const [now, setNow] = useState(() => Date.now());
+  const [ending, setEnding] = useState<Ending>('finished');
   const [stage, setStage] = useState<Stage>('choosing');
   const [selected, setSelected] = useState<OptionKey[]>([]);
   const [xpGained, setXpGained] = useState<number | null>(null);
@@ -80,8 +114,50 @@ export function PackCheckRunner() {
   const lastAttemptRef = useRef<{ id: string; answeredAt: number } | null>(null);
 
   const history = checkHistory(sessions);
+  const budgetSeconds = minutes * 60;
 
-  if (!plan || !exam) {
+  /** Close the sitting over the questions actually answered: the
+   *  session's count is what the clock allowed, not the deck. */
+  function finish(finalState: RunnerState, answered: number, how: Ending) {
+    const t = Date.now();
+    if (lastAttemptRef.current) {
+      amendAttempt(lastAttemptRef.current.id, {
+        feedbackSeconds: feedbackSecondsSince(lastAttemptRef.current.answeredAt, t),
+      });
+      lastAttemptRef.current = null;
+    }
+    const closed = { ...finalState, questions: finalState.questions.slice(0, answered) };
+    endSession(buildSessionEnd(closed, CHECK_SUBJECT, t, CHECK_MODE));
+    // Session-shaped stickers can only unlock once the end record is written.
+    checkNow(loadSessions(), loadAttempts());
+    setState(closed);
+    // Freeze the clock so the result page reports the time used at the
+    // finish, however long it then stays open.
+    setClock((c) => (c ? pauseClock(c, t) : c));
+    setEnding(how);
+    setShownId(finalState.sessionId);
+    setPhase('done');
+  }
+
+  // The interval outlives the render it was created in, so it reads the
+  // latest state through refs rather than closing over a stale sitting.
+  const latest = useLatest({ state, clock, stage, finish });
+  useEffect(() => {
+    if (phase !== 'sitting') return;
+    const id = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      const { state: s, clock: c, stage: st, finish: f } = latest.current;
+      // Time's up: the question on screen is dropped unless it was
+      // already answered (feedback showing) — nothing after the bell counts.
+      if (s && c && isTimeUp(c, budgetSeconds, t)) {
+        f(s, s.currentIndex + (st === 'feedback' ? 1 : 0), 'timeUp');
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [phase, budgetSeconds, latest]);
+
+  if (!CHECK_PLAN || !exam) {
     return (
       <main className="flex flex-col gap-5">
         <BackLink />
@@ -100,22 +176,25 @@ export function PackCheckRunner() {
   }
 
   const examName = exam.label ?? 'the exam';
-  const domainCount = plan.perDomain.length;
 
   function handleStart() {
-    const picked = dealCheckSitting(attempts);
-    if (picked === null) return;
+    const dealt = dealCheckSitting(attempts, minutes);
+    if (dealt === null) return;
     const t = Date.now();
     const initial: RunnerState = {
       sessionId: crypto.randomUUID(),
-      questions: picked,
+      questions: dealt.deck,
       currentIndex: 0,
       correctCount: 0,
       startedAt: t,
       questionShownAt: t,
     };
     startSession(buildSessionStart(initial, CHECK_SUBJECT, CHECK_MODE));
+    setPlan(dealt.plan);
     setState(initial);
+    setClock(startClock(t));
+    setNow(t);
+    setEnding('finished');
     setStage('choosing');
     setSelected([]);
     setXpGained(null);
@@ -126,6 +205,9 @@ export function PackCheckRunner() {
   if (phase === 'intro') {
     const last = history[0] ?? null;
     const lastResult = last ? checkResultFor(attempts, last.id) : null;
+    const chosen = checkPlanFor(minutes) ?? CHECK_PLAN;
+    const domainCount = chosen.perDomain.filter((d) => d.count > 0).length;
+    const allDomains = CHECK_PLAN.perDomain.length;
     return (
       <main className="flex flex-col gap-5">
         <BackLink />
@@ -134,18 +216,61 @@ export function PackCheckRunner() {
             Readiness check
           </div>
           <h1 className="mt-1 text-2xl font-bold text-ink-900">Could you pass {examName} today?</h1>
+
+          {/* The one choice: how long. The ceiling is the ceiling — there
+              is no longer option, and the sitting never runs past it. */}
+          <div className="mt-4">
+            <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
+              How long do you have?
+            </div>
+            <div
+              className="mt-1.5 flex gap-1 rounded-full bg-ink-100 p-1"
+              role="radiogroup"
+              aria-label="Time for the check"
+              data-testid="check-budget"
+            >
+              {CHECK_BUDGETS_MINUTES.map((m) => {
+                const active = minutes === m;
+                const p = checkPlanFor(m);
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    data-testid={`check-budget-${m}`}
+                    onClick={() => setMinutes(m)}
+                    className={cn(
+                      'tap-feedback flex flex-1 flex-col items-center rounded-full px-2 py-1.5 leading-tight transition-colors',
+                      active ? 'bg-surface text-ink-900 shadow-xs' : 'text-ink-600 hover:text-ink-900',
+                    )}
+                  >
+                    <span className="text-sm font-semibold">{m} min</span>
+                    <span className="text-[11px] text-ink-500">
+                      {p ? `~${p.count} Qs` : '—'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
             <div className="rounded-xl bg-ink-50 p-3">
               <dt className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">
                 Questions
               </dt>
-              <dd className="mt-0.5 text-xl font-bold text-ink-900">{plan.count}</dd>
+              <dd className="mt-0.5 text-xl font-bold text-ink-900" data-testid="check-count">
+                ~{chosen.count}
+              </dd>
             </div>
             <div className="rounded-xl bg-ink-50 p-3">
               <dt className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">
                 Domains
               </dt>
-              <dd className="mt-0.5 text-xl font-bold text-ink-900">{domainCount}</dd>
+              <dd className="mt-0.5 text-xl font-bold text-ink-900">
+                {domainCount < allDomains ? `${domainCount}/${allDomains}` : allDomains}
+              </dd>
             </div>
             <div className="rounded-xl bg-ink-50 p-3">
               <dt className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">
@@ -156,13 +281,12 @@ export function PackCheckRunner() {
           </dl>
           <p className="mt-4 text-sm leading-relaxed text-ink-600">
             <strong className="font-semibold text-ink-900">A temperature check, not a mock exam:</strong>{' '}
-            {plan.count} questions spread across all {domainCount} domains
-            {plan.minutes !== null
-              ? `, about ${formatSpan(plan.minutes * 60)} at the real exam's pace and usually quicker`
-              : ''}
-            . Questions you haven&apos;t seen come first. You get the answer and explanation
-            after each one, as in practice; what makes it a cold look is that each question
-            is asked once.
+            about {chosen.count} questions at the real exam&apos;s pace, spread across{' '}
+            {domainCount < allDomains ? `${domainCount} of the ${allDomains}` : `all ${allDomains}`}{' '}
+            domains — more if you&apos;re quicker, fewer if you&apos;re not. The clock stops the
+            check at {minutes} min, never later. Questions you haven&apos;t seen come first,
+            and you get the answer and explanation after each one, as in practice; what makes
+            it a cold look is that each question is asked once.
           </p>
           <p className="mt-2 text-sm leading-relaxed text-ink-600">
             At the end: a first read on whether you&apos;d clear the {exam.passPct}% pass line
@@ -227,6 +351,7 @@ export function PackCheckRunner() {
     const idx = history.findIndex((s) => s.id === id);
     const previous = idx >= 0 ? (history[idx + 1] ?? null) : (history[0] ?? null);
     const mistakes = sessionMistakeIds(attempts, id).length;
+    const justSat = state !== null && id === state.sessionId;
     return (
       <main className="flex flex-col gap-5">
         <RunnerCelebrations
@@ -236,6 +361,20 @@ export function PackCheckRunner() {
           clearNextLevelUp={clearNextLevelUp}
         />
         <BackLink />
+        {justSat && ending === 'timeUp' ? (
+          <div
+            data-testid="check-time-up"
+            className="flex items-center gap-3 rounded-2xl border border-warn-500/40 bg-warn-100/60 p-3 text-sm text-ink-700 shadow-xs"
+          >
+            <Timer className="h-5 w-5 shrink-0 text-warn-700" />
+            <span>
+              <strong className="font-semibold text-ink-900">Time&apos;s up.</strong> The check
+              stopped at {minutes} min with {state.questions.length}{' '}
+              {state.questions.length === 1 ? 'question' : 'questions'} answered; the result
+              reads over those.
+            </span>
+          </div>
+        ) : null}
         <CheckResultView sessionId={id} previous={previous} attempts={attempts} />
         <div className="flex flex-col gap-2">
           {mistakes > 0 ? (
@@ -252,6 +391,7 @@ export function PackCheckRunner() {
             block
             onClick={() => {
               setState(null);
+              setClock(null);
               setShownId(null);
               setPhase('intro');
             }}
@@ -270,10 +410,25 @@ export function PackCheckRunner() {
     );
   }
 
-  if (!state) return null;
+  if (!state || !clock || !plan) return null;
 
   const current = state.questions[state.currentIndex];
   const multi = isMultiAnswer(current);
+  const elapsed = elapsedSeconds(clock, now);
+  const remaining = remainingSeconds(clock, budgetSeconds, now);
+  // Last minute, or last tenth of a short sitting — the clock turns amber.
+  const lowTime = remaining <= Math.max(60, budgetSeconds / 10);
+  const answered = state.currentIndex + (stage === 'feedback' ? 1 : 0);
+  const deckSize = state.questions.length;
+  const pacing = { elapsedSeconds: elapsed, budgetSeconds, answered, deckSize };
+  // Once this question is answered, is there time for another? Read
+  // live, so the Next button says "See results" as the clock runs down.
+  const isLast = stage === 'feedback' && !canDealAnother(pacing);
+  const total = projectedCheckLength({
+    ...pacing,
+    dealt: state.currentIndex + 1,
+    planned: plan.count,
+  });
 
   function handleSelect(key: OptionKey) {
     if (stage !== 'choosing') return;
@@ -282,7 +437,14 @@ export function PackCheckRunner() {
   }
 
   function handleCheck() {
-    if (!state || selected.length === 0) return;
+    if (!state || !clock || selected.length === 0) return;
+    const t = Date.now();
+    // The interval only polls once a second, so an answer sent between
+    // the bell and the next tick must still be refused.
+    if (isTimeUp(clock, budgetSeconds, t)) {
+      finish(state, state.currentIndex, 'timeUp');
+      return;
+    }
     const showXp = progressionEnabled && loadProgressionShown();
     const xpBefore = showXp ? totalXp(loadAttempts()) : 0;
     const attempt = buildAttempt({
@@ -292,7 +454,7 @@ export function PackCheckRunner() {
       // The question's real category, so readiness and per-category
       // stats see the check as ordinary first attempts.
       categoryKey: current.categoryKey,
-      now: Date.now(),
+      now: t,
       attemptId: crypto.randomUUID(),
       mode: CHECK_MODE,
       firstSelected: firstSelectedRef.current ?? undefined,
@@ -310,27 +472,62 @@ export function PackCheckRunner() {
   }
 
   function handleNext() {
-    if (!state) return;
+    if (!state || !clock) return;
+    const t = Date.now();
+    const done = state.currentIndex + 1;
+    // Deal another only while the time left holds one at the learner's
+    // own pace so far (answer plus feedback); otherwise the sitting ends
+    // here, cleanly, with every answered question counted.
+    const another = canDealAnother({
+      elapsedSeconds: elapsedSeconds(clock, t),
+      budgetSeconds,
+      answered: done,
+      deckSize,
+    });
+    if (!another) {
+      finish(state, done, isTimeUp(clock, budgetSeconds, t) ? 'timeUp' : 'finished');
+      return;
+    }
     if (lastAttemptRef.current) {
       amendAttempt(lastAttemptRef.current.id, {
-        feedbackSeconds: feedbackSecondsSince(lastAttemptRef.current.answeredAt),
+        feedbackSeconds: feedbackSecondsSince(lastAttemptRef.current.answeredAt, t),
       });
       lastAttemptRef.current = null;
     }
     firstSelectedRef.current = null;
     setXpGained(null);
-    if (isLastQuestion(state)) {
-      endSession(buildSessionEnd(state, CHECK_SUBJECT, Date.now(), CHECK_MODE));
-      // Session-shaped stickers can only unlock once the end record is written.
-      checkNow(loadSessions(), loadAttempts());
-      setShownId(state.sessionId);
-      setPhase('done');
-      return;
-    }
-    setState(moveToNext(state));
+    setState(moveToNext(state, t));
     setStage('choosing');
     setSelected([]);
   }
+
+  const timer = (
+    <div
+      data-testid="check-timer"
+      className={cn(
+        'flex items-center justify-between gap-3 rounded-2xl border px-3 py-2 shadow-xs',
+        lowTime ? 'border-warn-500/40 bg-warn-100/60' : 'border-ink-200 bg-surface',
+      )}
+    >
+      <div className="flex items-center gap-2.5">
+        <Timer className={cn('h-4.5 w-4.5 shrink-0', lowTime ? 'text-warn-700' : 'text-ink-500')} />
+        <span
+          data-testid="check-clock"
+          className={cn(
+            'text-lg font-bold leading-none tabular-nums',
+            lowTime ? 'text-warn-700' : 'text-ink-900',
+          )}
+          aria-live="off"
+        >
+          {formatClock(remaining)}
+        </span>
+        <span className="text-xs text-ink-500">left of {minutes} min</span>
+      </div>
+      <span className="text-xs text-ink-500">
+        {answered} answered
+      </span>
+    </div>
+  );
 
   return (
     <main className="flex flex-col gap-5">
@@ -343,10 +540,11 @@ export function PackCheckRunner() {
       <QuestionPanel
         question={current}
         position={state.currentIndex + 1}
-        total={state.questions.length}
+        total={total}
         selected={selected}
         stage={stage}
         onSelect={handleSelect}
+        banner={timer}
         badge={
           <span className="rounded-full border border-ink-400/40 bg-ink-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-700">
             Readiness check
@@ -359,7 +557,7 @@ export function PackCheckRunner() {
         stage={stage}
         verdict={{ correct: 'Correct.', wrong: 'Not quite.' }}
         xpGained={xpGained}
-        isLast={isLastQuestion(state)}
+        isLast={isLast}
         onCheck={handleCheck}
         onNext={handleNext}
       />

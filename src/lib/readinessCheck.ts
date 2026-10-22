@@ -11,11 +11,20 @@
  * the blueprint weights (or bank size when the pack declares none —
  * the same fallback readiness uses), and unseen questions come first so
  * the sitting is a cold look. The floor is deliberately lower than the
- * readiness gate — three questions per domain, not twelve — and the
- * whole sitting is capped at thirty minutes of the real exam's pace,
- * dropping the floor further when it must. That is why the result is
- * labelled a temperature check and ranks domains by point estimate
- * rather than pretending the per-domain bands are tight.
+ * readiness gate — three questions per domain, not twelve — and it
+ * drops further when the time budget can't afford it. That is why the
+ * result is labelled a temperature check and ranks domains by point
+ * estimate rather than pretending the per-domain bands are tight.
+ *
+ * The sitting is TIME-BOXED, not question-counted. The learner picks how
+ * long they have (`CHECK_BUDGETS_MINUTES`, never more than
+ * `CHECK_MAX_MINUTES`); the plan says how many questions that buys at
+ * the real exam's pace, and the deck is dealt in ROUNDS — one question
+ * per domain, then a second per domain, … — so that however many the
+ * clock allows, the questions reached still span the blueprint. A
+ * quicker learner runs past the plan into an extension apportioned by
+ * blueprint share; a slower one is stopped by the clock, and the result
+ * reads over what was answered. Nothing ever asks for more time.
  *
  * The check is a learning session too: feedback after every question,
  * as in practice. What keeps it honest is that each question is asked
@@ -45,32 +54,32 @@ export const CHECK_SUBJECT = 'check';
 /** First attempts per domain the check aims for — enough to notice a
  *  domain is weak, far from enough for a tight band (see the header). */
 export const CHECK_DOMAIN_FLOOR = 3;
-/** Share of the real exam's length the check targets when the pack
- *  declares `questionCount`. */
-export const CHECK_EXAM_FRACTION = 1 / 3;
-/** The hard ceiling on a sitting, at the real exam's pace: the check is
- *  a temperature check, not a mock exam, and must fit in a lunch break.
- *  When the budget can't afford the floor for every domain, the floor
- *  drops (to two, then one) so the sitting still spans the blueprint. */
-export const CHECK_MAX_MINUTES = 30;
+/** The time budgets a learner can pick for one sitting, in minutes. The
+ *  last is the hard ceiling: the check is a temperature check, not a
+ *  mock exam, and must fit in a lunch break. When a budget can't afford
+ *  the floor for every domain, the floor drops (to two, then one) so the
+ *  sitting still spans the blueprint. */
+export const CHECK_BUDGETS_MINUTES = [10, 20, 30] as const;
+export const CHECK_MAX_MINUTES: number = CHECK_BUDGETS_MINUTES[CHECK_BUDGETS_MINUTES.length - 1];
 /** Minutes per question assumed when the pack declares no exam pace
  *  (`durationMinutes` + `questionCount`) — a practice pace, with
  *  feedback read. */
 export const CHECK_DEFAULT_MINUTES_PER_QUESTION = 1;
 
 export interface CheckPlan {
-  /** Questions the sitting deals in total. */
+  /** Questions the budget buys at the real exam's pace — the advertised
+   *  size; the clock decides the real one (see `canDealAnother`). */
   count: number;
-  /** Questions per domain, in the order the domains were given; domains
-   *  with an empty bank are left out. */
-  perDomain: { key: string; count: number }[];
+  /** Questions per domain, in the order the domains were given, with the
+   *  domain's blueprint share (weights, else bank size — readiness's
+   *  rule); domains with an empty bank are left out. */
+  perDomain: { key: string; count: number; share: number }[];
   /** The per-domain floor the plan honours — `CHECK_DOMAIN_FLOOR` unless
-   *  the time cap forced it down (0 when there are more domains than
+   *  the budget forced it down (0 when there are more domains than
    *  questions, in which case the heaviest domains get the look). */
   floor: number;
-  /** Minutes at the real exam's pace when the pack declares both
-   *  `durationMinutes` and `questionCount`; null when it can't be known. */
-  minutes: number | null;
+  /** The time budget the plan was sized for — the sitting's hard stop. */
+  minutes: number;
 }
 
 /** Blueprint share per domain: weights when any are set, else bank
@@ -149,50 +158,79 @@ function allocate(
   return whole;
 }
 
+/** Minutes one question takes at the real exam's pace — what a time
+ *  budget is converted into questions with. A minute a question when
+ *  the pack declares no pace. */
+export function checkPace(
+  exam: Pick<ExamGoal, 'questionCount'> & { durationMinutes?: number },
+): number {
+  return exam.questionCount && exam.durationMinutes
+    ? exam.durationMinutes / exam.questionCount
+    : CHECK_DEFAULT_MINUTES_PER_QUESTION;
+}
+
 /**
- * Size one check for an exam over its domains: a floor per domain so
- * each can be judged, topped up to about a third of the real exam when
- * the pack says how long that is, never more than the bank holds, and
- * never more than `CHECK_MAX_MINUTES` at the real exam's pace (a minute
- * a question when the pack declares none). When the time cap can't
- * afford the floor for every domain, the floor drops uniformly so the
- * sitting still spans the whole blueprint before weight decides the
- * rest. Null when no domain has a question.
+ * Size one check for an exam over its domains and a time budget: as
+ * many questions as the budget buys at the real exam's pace (a minute a
+ * question when the pack declares none), never more than the bank holds
+ * and never more than `CHECK_MAX_MINUTES` worth. A floor per domain so
+ * each can be judged; when the budget can't afford the floor for every
+ * domain, the floor drops uniformly so the sitting still spans the
+ * whole blueprint before weight decides the rest. Null when no domain
+ * has a question.
  */
 export function planCheck(
   domains: readonly ReadinessDomainInput[],
   exam: Pick<ExamGoal, 'questionCount'> & { durationMinutes?: number },
-  opts: { floor?: number; fraction?: number; maxMinutes?: number } = {},
+  opts: { floor?: number; minutes?: number } = {},
 ): CheckPlan | null {
   const wanted = opts.floor ?? CHECK_DOMAIN_FLOOR;
-  const fraction = opts.fraction ?? CHECK_EXAM_FRACTION;
-  const maxMinutes = opts.maxMinutes ?? CHECK_MAX_MINUTES;
+  const minutes = Math.min(CHECK_MAX_MINUTES, Math.max(1, opts.minutes ?? CHECK_MAX_MINUTES));
   const live = domains.filter((d) => d.available > 0);
   if (live.length === 0) return null;
 
-  const pace =
-    exam.questionCount && exam.durationMinutes
-      ? exam.durationMinutes / exam.questionCount
-      : null;
-  const timeCap = Math.max(1, Math.floor(maxMinutes / (pace ?? CHECK_DEFAULT_MINUTES_PER_QUESTION)));
-
+  const timeCap = Math.max(1, Math.floor(minutes / checkPace(exam)));
   const totalAvailable = sum(live.map((d) => d.available));
   const floorTotal = sum(live.map((d) => Math.min(wanted, d.available)));
-  const target = exam.questionCount ? Math.round(exam.questionCount * fraction) : 0;
-  const count = Math.min(totalAvailable, timeCap, Math.max(floorTotal, target));
+  const count = Math.min(totalAvailable, timeCap);
   const floor = floorTotal <= count ? wanted : Math.floor(count / live.length);
 
   const alloc = allocate(live, count, floor);
-  const perDomain = live.map((d, i) => ({ key: d.key, count: alloc[i] }));
-  const minutes = pace !== null ? Math.round(count * pace) : null;
+  const share = shares(live);
+  const perDomain = live.map((d, i) => ({ key: d.key, count: alloc[i], share: share[i] }));
   return { count, perDomain, floor, minutes };
 }
 
 /**
- * Deal the sitting from an in-scope bank: per domain, the planned
- * number of questions with unseen ones first (the selection engine's
- * rule), then the whole hand shuffled so the domains are mixed as on
- * the real exam.
+ * The budget to offer first: the shortest that affords the full floor
+ * for every domain at the exam's pace (the demo's two domains fit in
+ * ten minutes), else the ceiling — a ten-domain pack at 2.4 minutes a
+ * question needs all thirty and still gets one or two per domain.
+ */
+export function recommendedCheckMinutes(
+  domains: readonly ReadinessDomainInput[],
+  exam: Pick<ExamGoal, 'questionCount'> & { durationMinutes?: number },
+  budgets: readonly number[] = CHECK_BUDGETS_MINUTES,
+): number {
+  for (const minutes of budgets) {
+    const plan = planCheck(domains, exam, { minutes });
+    if (!plan || plan.floor >= CHECK_DOMAIN_FLOOR) return minutes;
+  }
+  return budgets[budgets.length - 1] ?? CHECK_MAX_MINUTES;
+}
+
+/**
+ * Deal the whole deck for a sitting from an in-scope bank. The planned
+ * hand comes first, in ROUNDS — one question from every domain that
+ * still has a planned question, the domains shuffled within each round
+ * so the sitting mixes them as on the real exam — so that a sitting the
+ * clock cuts short still spans the blueprint evenly. Beyond the plan,
+ * for a learner quicker than the exam's pace, the rest of the bank
+ * follows as an extension apportioned by blueprint share (highest-
+ * averages rule: the next question goes to the domain with the largest
+ * share per question already dealt). Within a domain unseen questions
+ * come first (the selection engine's rule). The runner deals from the
+ * front and stops when the clock says so (`canDealAnother`).
  */
 export function dealCheck<Q extends SelectableQuestion & { categoryKey: string }>(
   plan: CheckPlan,
@@ -200,20 +238,82 @@ export function dealCheck<Q extends SelectableQuestion & { categoryKey: string }
   attemptedIds: ReadonlySet<Q['id']>,
   rng: Rng = Math.random,
 ): Q[] {
-  const dealt: Q[] = [];
   const seen = new Set(attemptedIds);
-  for (const { key, count } of plan.perDomain) {
+  const domains = plan.perDomain.map(({ key, count, share }) => {
     const pool = bank.filter((q) => q.categoryKey === key);
-    dealt.push(
-      ...pickSessionQuestions(pool, {
-        count,
-        historicalAttemptedIds: seen,
-        currentSessionIds: new Set(),
-        rng,
-      }),
-    );
+    const queue = pickSessionQuestions(pool, {
+      count: pool.length,
+      historicalAttemptedIds: seen,
+      currentSessionIds: new Set(),
+      rng,
+    });
+    return { key, share, planned: Math.min(count, queue.length), dealt: 0, queue };
+  });
+
+  const deck: Q[] = [];
+  const rounds = Math.max(0, ...domains.map((d) => d.planned));
+  for (let r = 0; r < rounds; r++) {
+    for (const d of shuffle(domains.filter((d) => d.planned > r), rng)) {
+      deck.push(d.queue[d.dealt++]);
+    }
   }
-  return shuffle(dealt, rng);
+  for (;;) {
+    let best = -1;
+    let bestScore = -1;
+    domains.forEach((d, i) => {
+      if (d.dealt >= d.queue.length) return;
+      const score = d.share / (d.dealt + 1);
+      if (score > bestScore) {
+        best = i;
+        bestScore = score;
+      }
+    });
+    if (best < 0) break;
+    deck.push(domains[best].queue[domains[best].dealt++]);
+  }
+  return deck;
+}
+
+/**
+ * Whether the sitting should deal one more question: only while the
+ * budget still holds another at the learner's own pace so far (answer
+ * plus feedback), and the deck has one. The first question is always
+ * dealt. Nothing here ever extends the budget — the clock is the hard
+ * stop, this is the clean one.
+ */
+export function canDealAnother(args: {
+  elapsedSeconds: number;
+  budgetSeconds: number;
+  answered: number;
+  deckSize: number;
+}): boolean {
+  const { elapsedSeconds, budgetSeconds, answered, deckSize } = args;
+  if (answered >= deckSize) return false;
+  if (answered === 0) return true;
+  const perQuestion = elapsedSeconds / answered;
+  return budgetSeconds - elapsedSeconds >= perQuestion;
+}
+
+/**
+ * How many questions the sitting looks like running to, for the
+ * progress chip: the plan's estimate until an answer is in, then the
+ * learner's own pace projected over the time left — never fewer than
+ * already dealt, never more than the deck.
+ */
+export function projectedCheckLength(args: {
+  elapsedSeconds: number;
+  budgetSeconds: number;
+  answered: number;
+  dealt: number;
+  deckSize: number;
+  planned: number;
+}): number {
+  const { elapsedSeconds, budgetSeconds, answered, dealt, deckSize, planned } = args;
+  const guess =
+    answered === 0 || elapsedSeconds <= 0
+      ? planned
+      : answered + Math.floor(Math.max(0, budgetSeconds - elapsedSeconds) / (elapsedSeconds / answered));
+  return Math.max(dealt, Math.min(deckSize, guess));
 }
 
 export interface CheckDomainResult extends DomainReadiness {

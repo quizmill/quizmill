@@ -9,9 +9,11 @@ import { APP_CONFIG } from '@/config';
 import type { Attempt } from '@/data/types';
 import type { ReadinessDomainInput } from '@/lib/readiness';
 import {
+  CHECK_BUDGETS_MINUTES,
   checkResult,
   dealCheck,
   planCheck,
+  recommendedCheckMinutes,
   type CheckPlan,
   type CheckResult,
 } from '@/lib/readinessCheck';
@@ -31,21 +33,33 @@ export const READINESS_DOMAINS: ReadinessDomainInput[] = APP_CONFIG.categories.m
 /** Questions the check may deal: the exam's scope (readiness's rule). */
 export const CHECK_BANK: PackQuestion[] = packQuestions.filter((q) => examInScope(q.id));
 
-/** The ACTIVE pack's check, or null when it declares no exam goal or
- *  has nothing in scope to deal. */
-export const CHECK_PLAN: CheckPlan | null = APP_CONFIG.exam
-  ? planCheck(READINESS_DOMAINS, APP_CONFIG.exam)
-  : null;
+/** The ACTIVE pack's check sized for one time budget, or null when the
+ *  pack declares no exam goal or has nothing in scope to deal. */
+export function checkPlanFor(minutes: number): CheckPlan | null {
+  return APP_CONFIG.exam ? planCheck(READINESS_DOMAINS, APP_CONFIG.exam, { minutes }) : null;
+}
 
-/** Deal one sitting, unseen questions first given the learner's history. */
+/** The budget the intro offers first (see `recommendedCheckMinutes`). */
+export const CHECK_RECOMMENDED_MINUTES: number = APP_CONFIG.exam
+  ? recommendedCheckMinutes(READINESS_DOMAINS, APP_CONFIG.exam)
+  : CHECK_BUDGETS_MINUTES[CHECK_BUDGETS_MINUTES.length - 1];
+
+/** The ACTIVE pack's check at the recommended budget — what Home and
+ *  Progress describe, and the floor a result is judged at. */
+export const CHECK_PLAN: CheckPlan | null = checkPlanFor(CHECK_RECOMMENDED_MINUTES);
+
+/** Deal one sitting's deck for a budget, unseen questions first given the
+ *  learner's history (see `dealCheck` for the order). */
 export function dealCheckSitting(
   attempts: readonly Attempt[],
+  minutes: number,
   rng?: () => number,
-): PackQuestion[] | null {
-  if (!CHECK_PLAN) return null;
+): { plan: CheckPlan; deck: PackQuestion[] } | null {
+  const plan = checkPlanFor(minutes);
+  if (!plan) return null;
   const seen = new Set(attemptHistory([...attempts]).keys());
-  const dealt = dealCheck(CHECK_PLAN, CHECK_BANK, seen, rng);
-  return dealt.length === 0 ? null : dealt;
+  const deck = dealCheck(plan, CHECK_BANK, seen, rng);
+  return deck.length === 0 ? null : { plan, deck };
 }
 
 /** Read one check's result against the pack's exam goal, judging each
