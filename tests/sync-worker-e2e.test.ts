@@ -25,6 +25,8 @@ import {
 } from '../src/lib/backends/httpBackend';
 import { generateSyncKey } from '../src/lib/syncKey';
 import * as storage from '../src/lib/storage';
+import { CHECK_MODE, CHECK_SUBJECT, checkHistory } from '../src/lib/readinessCheck';
+import type { Attempt } from '../src/data/types';
 
 // node:sqlite is a real builtin (node 22.5+), but vite's resolver doesn't
 // know it yet — createRequire sidesteps the bundler entirely.
@@ -220,6 +222,68 @@ describe('notes sync end-to-end (client engine ↔ real worker ↔ real SQLite)'
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+});
+
+describe('readiness check sync end-to-end (#215)', () => {
+  // The check is not a separate store: its session and attempts are
+  // ordinary rows (mode 'check', the real category on each attempt), so
+  // they ride the same two tables as practice. Only the Home card's
+  // "not interested" close is a local pref, deliberately not synced.
+  it('a check sat on device A lands in the cloud and reads back as a check on device B', async () => {
+    const key = generateSyncKey();
+
+    await useDevice(key);
+    storage.saveSession({
+      id: 'check-1',
+      subject: CHECK_SUBJECT,
+      startedAt: 1000,
+      endedAt: 1000 + 9 * 60_000,
+      questionCount: 2,
+      correctCount: 1,
+      mode: CHECK_MODE,
+    });
+    const attempt = (n: number, subject: string, isCorrect: boolean): Attempt => ({
+      id: `check-1-a${n}`,
+      sessionId: 'check-1',
+      questionId: `q-${subject}-${n}`,
+      answeredAt: 1000 + n * 60_000,
+      selectedAnswer: 'a',
+      isCorrect,
+      timeTakenSeconds: 40,
+      subject,
+      topic: `q-${subject}-${n}`,
+      difficulty: 2,
+      position: n,
+      mode: CHECK_MODE,
+    });
+    storage.saveAttempt(attempt(1, 'planets', true));
+    storage.saveAttempt(attempt(2, 'moons', false));
+    storage.saveCheckPromptDismissed(true);
+    for (const row of storage.loadSessions()) {
+      await httpBackend.runOp({ t: 'sessions', op: 'upsert', row }, 'unused');
+    }
+    for (const row of storage.loadAttempts()) {
+      await httpBackend.runOp({ t: 'attempts', op: 'upsert', row }, 'unused');
+    }
+
+    await useDevice(key);
+    const pulled = await httpBackend.pullAll('unused');
+    expect(pulled.sessions).toHaveLength(1);
+    expect(pulled.attempts).toHaveLength(2);
+    storage.mergeRemote(pulled);
+
+    // Device B sees the sitting as a completed check with every attempt…
+    const history = checkHistory(storage.loadSessions());
+    expect(history.map((s) => s.id)).toEqual(['check-1']);
+    expect(history[0].mode).toBe('check');
+    const attempts = storage.loadAttempts().filter((a) => a.sessionId === 'check-1');
+    expect(attempts.map((a) => [a.subject, a.mode, a.isCorrect])).toEqual([
+      ['planets', 'check', true],
+      ['moons', 'check', false],
+    ]);
+    // …so its result and the Home card's retirement follow; the close does not.
+    expect(storage.loadCheckPromptDismissed()).toBe(false);
   });
 });
 

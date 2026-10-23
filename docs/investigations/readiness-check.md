@@ -63,6 +63,17 @@ runner and result page in `src/pack/CheckRunner.tsx` /
   pseudo-subject on the session (the timed exam's pattern). A past
   check reads back from its session id; nothing new is stored or
   synced.
+- **It syncs because of that.** The sync engine mirrors the sessions
+  and attempts stores as they are, and neither it nor the worker looks
+  at `mode` or `subject`, so a sitting rides the same two tables as
+  practice and reads back as a check on every device holding the key:
+  the last-check card, the comparison and Progress's readiness all
+  follow it across devices, and the Home card retires everywhere once a
+  check exists anywhere. The only piece that stays on the device is the
+  Home card's *Not interested* close, a local pref like the level filter.
+  `tests/sync-worker-e2e.test.ts` pins this against the real worker and
+  schema. Nothing on the server changes; the usage report counts a
+  check's rows as sessions and attempts like any other.
 
 ## The open questions, answered for now
 
