@@ -77,6 +77,7 @@ if(l==='poster'){document.documentElement.setAttribute('data-look','poster')}
 // scripts/pack-assets.ts, so the installed shortcut's title, icon, and
 // theme colour always match the pack.
 const ICON_PATH = `${BASE_PATH}/icon.svg`;
+const APPLE_ICON_PATH = `${BASE_PATH}/apple-touch-icon.png`;
 const MANIFEST_PATH = `${BASE_PATH}/manifest.webmanifest`;
 
 export const metadata: Metadata = {
@@ -85,8 +86,9 @@ export const metadata: Metadata = {
   manifest: MANIFEST_PATH,
   icons: {
     icon: ICON_PATH,
-    // apple-touch-icon for the iOS Add-to-Home Screen tile.
-    apple: ICON_PATH,
+    // apple-touch-icon for the iOS Add-to-Home Screen tile — a PNG, as
+    // iOS ignores an SVG here and falls back to a page screenshot.
+    apple: APPLE_ICON_PATH,
   },
 };
 
@@ -100,22 +102,19 @@ export const viewport: Viewport = {
   themeColor: APP_CONFIG.themeColor,
 };
 
-/** The quizmill mill-wheel mark (eight paddles, one golden — the turn
- *  of the wheel), inline so it inherits no asset pipeline. */
+/** The quizmill millstone mark — the runner stone seen from three-quarters
+ *  above, its thickness showing, the eye in the middle — as a one-colour
+ *  glyph (the full-colour tile is the starter pack's icon.svg), inline so
+ *  it inherits no asset pipeline. */
 function MillMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 64 64" className={className} aria-hidden>
-      <g fill="none" stroke="currentColor" strokeWidth="9" strokeLinecap="round">
-        <path stroke="#b45309" d="M 25.79 8.82 A 24 24 0 0 1 38.21 8.82" />
-        <path d="M 44.00 11.22 A 24 24 0 0 1 52.78 20.00" />
-        <path d="M 55.18 25.79 A 24 24 0 0 1 55.18 38.21" />
-        <path d="M 52.78 44.00 A 24 24 0 0 1 44.00 52.78" />
-        <path d="M 38.21 55.18 A 24 24 0 0 1 25.79 55.18" />
-        <path d="M 20.00 52.78 A 24 24 0 0 1 11.22 44.00" />
-        <path d="M 8.82 38.21 A 24 24 0 0 1 8.82 25.79" />
-        <path d="M 11.22 20.00 A 24 24 0 0 1 20.00 11.22" />
+      <g fill="none" stroke="currentColor" strokeWidth="5" strokeLinejoin="round">
+        <path d="M 4 27.5 V 37 A 28 19 0 0 0 60 37 V 27.5" />
+        <ellipse cx="32" cy="27.5" rx="28" ry="19" />
+        <path d="M 32 8.5 V 19 M 32 36 V 46.5 M 4 27.5 H 20 M 44 27.5 H 60" />
       </g>
-      <circle cx="32" cy="32" r="5" fill="currentColor" />
+      <ellipse cx="32" cy="27.5" rx="7" ry="4.8" fill="currentColor" />
     </svg>
   );
 }
