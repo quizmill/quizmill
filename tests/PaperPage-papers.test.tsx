@@ -53,6 +53,20 @@ function q(sel: string): HTMLElement {
   return el;
 }
 
+/** Poll (settling React between ticks) until `probe` returns a value —
+ *  the QR payload encode rides zlib, which completes on a macrotask. */
+async function waitFor<T>(probe: () => T | null | undefined | false, ms = 2000): Promise<T> {
+  const deadline = Date.now() + ms;
+  for (;;) {
+    const found = probe();
+    if (found) return found;
+    if (Date.now() > deadline) throw new Error('waitFor: timed out');
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+}
+
 async function pickPaper(key: string) {
   const select = q('[data-testid="paper-pick"]') as HTMLSelectElement;
   await act(async () => {
@@ -107,6 +121,31 @@ describe('PaperPage paper picker', () => {
     const printed = q('[data-testid="paper-sheet"]').textContent ?? '';
     expect(printed).toContain('Starter papers · Paper 1');
     expect(printed).toContain('6 questions');
+  });
+
+  it('still opens a paper too long for a QR, with a note where the code would be', async () => {
+    // A hundred UUID ids barely compress; the marking URL overruns what a
+    // QR code can hold (~2.3 KB at level M). The sheet must still open and
+    // print — marking stays possible from this device via "Mark answers".
+    const sheet: PaperSheet = {
+      id: 'paper-sheet-too-long',
+      code: 'P-LONG',
+      createdAt: Date.now(),
+      categoryKey: 'planets',
+      paperId: 'starter-paper-1',
+      questionIds: Array.from({ length: 100 }, () => crypto.randomUUID()),
+    };
+    savePaperSheet(sheet);
+    window.location.hash = `#sheet=${sheet.id}`;
+    await render(<PaperPage />);
+    expect(q('[data-testid="paper-sheet"]').textContent).toContain('100 questions');
+    // The async payload encode lands on a macrotask; give it a few ticks.
+    const note = await waitFor(() =>
+      container.querySelector<HTMLElement>('[data-testid="qr-too-long"]'),
+    );
+    expect(note.textContent).toContain('Mark answers');
+    expect(container.querySelector('[data-testid="paper-sheet"] svg')).toBeNull();
+    expect(q('[data-testid="mark-sheet"]')).toBeDefined();
   });
 
   it('heads the marking page with the paper too', async () => {

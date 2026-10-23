@@ -568,9 +568,18 @@ export function PaperWriteView({
               tablet to enter the answers — just like marking a printout.
             </p>
             {markUrl ? (
-              <div className="rounded-xl bg-white p-1 text-neutral-900">
-                <QrCode value={markUrl} className="h-48 w-48" />
-              </div>
+              <QrCode
+                value={markUrl}
+                className="h-48 w-48 rounded-xl bg-white p-1 text-neutral-900"
+                // Past QR capacity (a very long sheet) the button below is
+                // the way in; say so instead of showing nothing.
+                fallback={
+                  <p className="text-sm text-ink-600" data-testid="qr-too-long">
+                    This sheet is too long for a QR code — enter the answers
+                    on this device instead.
+                  </p>
+                }
+              />
             ) : null}
             <span className="font-mono text-sm font-bold text-ink-700">{sheet.code}</span>
             <Link

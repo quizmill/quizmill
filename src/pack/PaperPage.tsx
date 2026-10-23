@@ -771,7 +771,24 @@ function PrintableSheet({
           )}
         </div>
         <div className="flex flex-col items-center">
-          {markUrl ? <QrCode value={markUrl} className="paper-qr h-28 w-28" /> : null}
+          {markUrl ? (
+            <QrCode
+              value={markUrl}
+              className="paper-qr h-28 w-28"
+              // A long sheet of ids that barely compress can overrun what
+              // a QR holds. The sheet still prints and marks — from the
+              // device that made it (the sheet list → Mark answers).
+              fallback={
+                <p
+                  className="w-28 text-center text-[10px] leading-snug text-neutral-500"
+                  data-testid="qr-too-long"
+                >
+                  Too long for a QR code — open this sheet in Paper practice
+                  and tap Mark answers.
+                </p>
+              }
+            />
+          ) : null}
           <span className="mt-1 whitespace-nowrap font-mono text-sm font-bold">
             {sheet.code}
           </span>

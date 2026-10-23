@@ -1,5 +1,5 @@
 import qrcodegen from 'qrcode-generator';
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 
 /** Quiet-zone width in modules on each side. The QR spec requires 4 —
@@ -8,38 +8,65 @@ import { cn } from '@/lib/cn';
 export const QR_QUIET_ZONE = 4;
 
 /**
- * Render a QR code as an inline SVG — one path of dark modules, filled
- * with currentColor so it prints pure black under the paper-sheet print
- * rules and follows the text colour on screen. Type number 0 = pick the
- * smallest version that fits; level M survives a phone photo of a
- * slightly crumpled worksheet. The spec's 4-module quiet zone is part
- * of the SVG itself, so no surrounding layout can crowd it away.
+ * Lay out a value as QR modules: one SVG path of dark modules (quiet
+ * zone included) and the symbol's side in modules. Type number 0 = pick
+ * the smallest version that fits; level M survives a phone photo of a
+ * slightly crumpled worksheet. Null when NO version holds the value —
+ * byte mode at level M tops out at 2,331 bytes (version 40), which a
+ * marking URL for a long sheet of poorly compressing ids can exceed.
+ * The generator signals that by throwing from `make()`, so it's caught
+ * here rather than in render.
  */
-export function QrCode({ value, className }: { value: string; className?: string }) {
-  const { path, size } = useMemo(() => {
-    const qr = qrcodegen(0, 'M');
-    qr.addData(value, 'Byte');
+export function qrModules(value: string): { path: string; size: number } | null {
+  const qr = qrcodegen(0, 'M');
+  qr.addData(value, 'Byte');
+  try {
     qr.make();
-    const n = qr.getModuleCount();
-    let d = '';
-    for (let r = 0; r < n; r++) {
-      for (let c = 0; c < n; c++) {
-        if (qr.isDark(r, c)) {
-          d += `M${c + QR_QUIET_ZONE} ${r + QR_QUIET_ZONE}h1v1h-1z`;
-        }
+  } catch {
+    return null;
+  }
+  const n = qr.getModuleCount();
+  let d = '';
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      if (qr.isDark(r, c)) {
+        d += `M${c + QR_QUIET_ZONE} ${r + QR_QUIET_ZONE}h1v1h-1z`;
       }
     }
-    return { path: d, size: n + QR_QUIET_ZONE * 2 };
-  }, [value]);
+  }
+  return { path: d, size: n + QR_QUIET_ZONE * 2 };
+}
+
+/**
+ * Render a QR code as an inline SVG — one path of dark modules, filled
+ * with currentColor so it prints pure black under the paper-sheet print
+ * rules and follows the text colour on screen. The spec's 4-module
+ * quiet zone is part of the SVG itself, so no surrounding layout can
+ * crowd it away. A value too long for any QR version renders
+ * `fallback` (nothing by default) instead of throwing — the page around
+ * it must keep working without the code.
+ */
+export function QrCode({
+  value,
+  className,
+  fallback = null,
+}: {
+  value: string;
+  className?: string;
+  /** What to show when the value exceeds QR capacity. */
+  fallback?: ReactNode;
+}) {
+  const modules = useMemo(() => qrModules(value), [value]);
+  if (!modules) return <>{fallback}</>;
   return (
     <svg
-      viewBox={`0 0 ${size} ${size}`}
+      viewBox={`0 0 ${modules.size} ${modules.size}`}
       className={cn(className)}
       shapeRendering="crispEdges"
       role="img"
       aria-label="QR code linking to the marking page for this sheet"
     >
-      <path d={path} fill="currentColor" />
+      <path d={modules.path} fill="currentColor" />
     </svg>
   );
 }
