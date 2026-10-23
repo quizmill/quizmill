@@ -14,8 +14,11 @@
  *  attempts carry the marking time, and timeTakenSeconds 1 (unmeasured).
  *  'exam' = a timed sitting at the pack's declared exam pace: no
  *  feedback between questions, so its attempts never carry
- *  feedbackSeconds. */
-export type SessionMode = 'practice' | 'review' | 'drive' | 'notes' | 'paper' | 'exam';
+ *  feedbackSeconds.
+ *  'check' = the readiness check: one stratified sitting across the
+ *  exam's domains, feedback as in practice, each question asked once
+ *  (src/lib/readinessCheck.ts). */
+export type SessionMode = 'practice' | 'review' | 'drive' | 'notes' | 'paper' | 'exam' | 'check';
 
 export interface Attempt {
   id: string; // crypto.randomUUID() at write time
@@ -53,9 +56,9 @@ export interface Attempt {
 
 export interface Session {
   id: string; // crypto.randomUUID()
-  /** Pack category key (see Attempt.subject), or 'drive' / 'exam' for
-   *  Drive Mode and timed-exam sessions (which mix categories; their
-   *  attempts keep real keys). */
+  /** Pack category key (see Attempt.subject), or 'drive' / 'exam' /
+   *  'check' for Drive Mode, timed-exam and readiness-check sessions
+   *  (which mix categories; their attempts keep real keys). */
   subject: string;
   startedAt: number;
   endedAt: number | null;

@@ -12,7 +12,10 @@ import { z } from 'zod';
  *   concepts.json    optional teaching cards (may be `[]` / absent)
  *   assets/          optional images referenced by `image` paths
  *   assets/icon.svg  optional app icon for the pack's build (replaces the
- *                    generated initials-on-theme-colour icon)
+ *                    generated initials-on-theme-colour icon); may bring
+ *                    `icon-maskable.svg` (full-bleed, for launchers that
+ *                    cut their own shape) and `icon.png` (the iOS
+ *                    home-screen tile, 180 × 180) along
  *
  * The shape is a generalised MCQ format proven by several hundred
  * imported/generated questions in the engine's ancestor project; categories

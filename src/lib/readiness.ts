@@ -227,6 +227,30 @@ export function coldLookByCategory(
 }
 
 /**
+ * The verdict reads the confidence band AND the point estimate against the
+ * pass line, so a high estimate with a wide band isn't mislabelled. Tiers,
+ * most confident first:
+ *   ready     — whole band clears the line (low ≥ pass): confident pass
+ *   likely    — estimate clears it but the band dips below (low < pass ≤ est):
+ *               on track, just not yet certain (usually thin coverage)
+ *   borderline— estimate below but band reaches above (est < pass ≤ high)
+ *   not-ready — whole band below the line (high < pass)
+ * Exported so a report whose band is re-derived (the readiness check reads
+ * one sitting as a single sample) lands on the same tiers.
+ */
+export function verdictFor(
+  band: Pick<ReadinessReport, 'estimatePct' | 'lowPct' | 'highPct' | 'judgedWeightPct'>,
+  passPct: number,
+  minJudgedWeightPct: number = DEFAULT_MIN_JUDGED_WEIGHT_PCT,
+): ReadinessVerdict {
+  if (band.judgedWeightPct < minJudgedWeightPct) return 'no-data';
+  if (band.lowPct >= passPct) return 'ready';
+  if (band.estimatePct >= passPct) return 'likely';
+  if (band.highPct >= passPct) return 'borderline';
+  return 'not-ready';
+}
+
+/**
  * Build the full readiness report for an exam goal over its domains.
  *
  * `domains` carries each category's blueprint weight and in-scope bank size;
@@ -320,20 +344,11 @@ export function computeReadiness(
     highPct = pct(hi);
   }
 
-  // Verdict reads the confidence band AND the point estimate against the pass
-  // line, so a high estimate with a wide band isn't mislabelled. Tiers, most
-  // confident first:
-  //   ready     — whole band clears the line (low ≥ pass): confident pass
-  //   likely    — estimate clears it but the band dips below (low < pass ≤ est):
-  //               on track, just not yet certain (usually thin coverage)
-  //   borderline— estimate below but band reaches above (est < pass ≤ high)
-  //   not-ready — whole band below the line (high < pass)
-  let verdict: ReadinessVerdict;
-  if (judgedWeightPct < minJudgedWeightPct) verdict = 'no-data';
-  else if (lowPct >= goal.passPct) verdict = 'ready';
-  else if (estimatePct >= goal.passPct) verdict = 'likely';
-  else if (highPct >= goal.passPct) verdict = 'borderline';
-  else verdict = 'not-ready';
+  const verdict = verdictFor(
+    { estimatePct, lowPct, highPct, judgedWeightPct },
+    goal.passPct,
+    minJudgedWeightPct,
+  );
 
   // Nudges: one per domain that needs work, urgency = blueprint share × the
   // gap below the pass line. For a judged-weak domain that gap is CONFIRMED

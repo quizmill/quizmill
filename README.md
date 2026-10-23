@@ -276,6 +276,7 @@ in Settings → This device.**
 | Way | What it is | Who switches it on | Card in Settings → This device |
 |---|---|---|---|
 | **Timed exam** | one sitting at the real exam's pace — no feedback until the end, then a pass verdict and a review of the mistakes | **the pack**, by declaring `exam.durationMinutes` | **Timed exam** — shown by default; off only hides the tile |
+| **Readiness check** | a temperature check: one time-boxed sitting across every exam domain — the learner picks 10, 20 or 30 minutes (never more), the plan says how many questions that buys at the exam's pace (three per domain where it can, more by blueprint weight; the floor drops to fit), dealt in rounds so a cut-off sitting still spans the blueprint, more questions while the learner's own pace leaves room, and the clock ends it outright — feedback after every answer, then a result page: a first read on whether you'd pass today, and a study order of the weak domains ranked by weight × shortfall, each a tap into practice; sit it again and the two are compared. Home asks "could you pass today?" until the check is sat or the card is closed | **the pack**, by declaring `exam` (a pass line is enough) | none |
 | **Drive mode** | hands-free voice quiz for the car: questions read aloud, answers by voice | **the device**; a pack may start it on with `modes.drive` | **Drive mode** |
 | **Coach mode** | a parent or tutor replays a past session with the learner, answers hidden until revealed; nothing is recorded | **the device**; `modes.coach` | **Coach mode** |
 | **Paper practice** | print a worksheet (or write on it on a tablet), then mark the answers back in as a normal session | **the device**; `modes.paper` | **Paper practice** |
@@ -325,7 +326,10 @@ npx quizmill build my-topic          # or: npx quizmill build owner/repo
 
 Each deployment is one pack. The PWA name, icon, and theme colour are
 generated from the pack manifest, so every pack gets its own
-installable app identity.
+installable app identity. A pack can bring its own artwork instead:
+`assets/icon.svg` (the app icon), `assets/icon-maskable.svg` (a
+full-bleed copy for launchers that cut their own shape) and
+`assets/icon.png` (the iOS home-screen tile, 180 × 180).
 
 **Browser floor.** The engine's stylesheet (Tailwind CSS 4) relies on
 `color-mix()`, `@property` and cascade layers, so learners need Safari
