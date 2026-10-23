@@ -105,16 +105,25 @@ export const viewport: Viewport = {
 /** The quizmill millstone mark — the runner stone seen from three-quarters
  *  above, its thickness showing, the eye in the middle — as a one-colour
  *  glyph (the full-colour tile is the starter pack's icon.svg), inline so
- *  it inherits no asset pipeline. */
+ *  it inherits no asset pipeline. A solid face with the eye punched out
+ *  (even-odd, so the hole shows whatever is behind it): at the footer's
+ *  14px anything drawn on the face reads as a grin, a slab reads as a
+ *  stone. */
 function MillMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 64 64" className={className} aria-hidden>
-      <g fill="none" stroke="currentColor" strokeWidth="5" strokeLinejoin="round">
-        <path d="M 4 27.5 V 37 A 28 19 0 0 0 60 37 V 27.5" />
-        <ellipse cx="32" cy="27.5" rx="28" ry="19" />
-        <path d="M 32 8.5 V 19 M 32 36 V 46.5 M 4 27.5 H 20 M 44 27.5 H 60" />
-      </g>
-      <ellipse cx="32" cy="27.5" rx="7" ry="4.8" fill="currentColor" />
+      <path
+        d="M 4 27.5 V 38 A 28 19 0 0 0 60 38 V 27.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="5"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M 4 27.5 A 28 19 0 1 0 60 27.5 A 28 19 0 1 0 4 27.5 Z M 23 27.5 A 9 6 0 1 0 41 27.5 A 9 6 0 1 0 23 27.5 Z"
+        fill="currentColor"
+        fillRule="evenodd"
+      />
     </svg>
   );
 }
