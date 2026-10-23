@@ -62,11 +62,24 @@ describe('the starter pack', () => {
     expect(letters.size).toBeGreaterThanOrEqual(3);
   });
 
-  it('ships the mill-wheel mark as its app icon', () => {
-    const icon = fs.readFileSync(path.join(START, 'assets', 'icon.svg'), 'utf8');
-    expect(icon).toContain('<svg');
-    // The golden paddle — the turn of the wheel — same mark as the footer.
-    expect(icon).toContain('#b45309');
+  it('ships the millstone mark as its app icon, in all three forms', () => {
+    const assets = path.join(START, 'assets');
+    const icon = fs.readFileSync(path.join(assets, 'icon.svg'), 'utf8');
+    const maskable = fs.readFileSync(path.join(assets, 'icon-maskable.svg'), 'utf8');
+    for (const svg of [icon, maskable]) {
+      expect(svg).toContain('<svg');
+      // Eight harps, one per brand colour — the logo is the palette.
+      for (const c of ['#ff4d1c', '#ffc803', '#8bd90c', '#00b478', '#17a6f5', '#2d4bff', '#8b3dff', '#ff2e88']) {
+        expect(svg).toContain(c);
+      }
+    }
+    // The tile is a rounded paper slab; the maskable copy is full-bleed.
+    expect(icon).toMatch(/<rect width="512" height="512" rx="\d+" fill="#fffcf4"\/>/);
+    expect(maskable).toMatch(/<rect width="512" height="512" fill="#fffcf4"\/>/);
+    // And a raster for iOS, which ignores SVG apple-touch-icons.
+    const png = fs.readFileSync(path.join(assets, 'icon.png'));
+    expect(png.subarray(1, 4).toString()).toBe('PNG');
+    expect(png.readUInt32BE(16)).toBe(180);
   });
 });
 

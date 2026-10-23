@@ -1,17 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- The quizmill mill-wheel mark (eight paddles, one golden — the turn of
-       the wheel), the same mark as the footer, on the starter pack's
-       neutral slate. -->
-  <rect width="512" height="512" rx="96" fill="#334155"/>
-  <g transform="translate(96 96) scale(5)" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round">
-    <path stroke="#b45309" d="M 25.79 8.82 A 24 24 0 0 1 38.21 8.82"/>
-    <path d="M 44.00 11.22 A 24 24 0 0 1 52.78 20.00"/>
-    <path d="M 55.18 25.79 A 24 24 0 0 1 55.18 38.21"/>
-    <path d="M 52.78 44.00 A 24 24 0 0 1 44.00 52.78"/>
-    <path d="M 38.21 55.18 A 24 24 0 0 1 25.79 55.18"/>
-    <path d="M 20.00 52.78 A 24 24 0 0 1 11.22 44.00"/>
-    <path d="M 8.82 38.21 A 24 24 0 0 1 8.82 25.79"/>
-    <path d="M 11.22 20.00 A 24 24 0 0 1 20.00 11.22"/>
+  <!-- The quizmill mark — a millstone in the round: the runner stone seen
+       from three-quarters above, dressed in eight harps, one per brand
+       colour, the eye (the hole the grain drops through) in the middle.
+       On a paper slab with an ink border, like every surface on the site.
+       Mirrors the website's components/Wheel.tsx; pre-squashed here so
+       the strokes stay uniform. Generated, not hand-drawn — the numbers
+       are the website's. -->
+  <rect width="512" height="512" rx="112" fill="#fffcf4"/>
+  <rect x="7" y="7" width="498" height="498" rx="106" fill="none" stroke="#14110d" stroke-width="14"/>
+  <g transform="translate(97 97) scale(4.97)">
+    <path d="M 2.5 27.5 V 36.5 A 29.5 20.06 0 0 0 61.5 36.5 V 27.5 Z" fill="#fffcf4" stroke="#14110d" stroke-width="2.2" stroke-linejoin="round"/>
+    <g stroke="#14110d" stroke-width="2.2" stroke-linejoin="round">
+      <path d="M 40.2 27.5 L 40.2 46.77 A 29.5 20.06 0 0 1 17.76 45.07 L 37.8 31.44 A 8.2 5.58 0 0 0 40.2 27.5 Z" fill="#ff4d1c"/>
+      <path d="M 37.8 31.44 L 17.76 45.07 A 29.5 20.06 0 0 1 3.66 33.08 L 32 33.08 A 8.2 5.58 0 0 0 37.8 31.44 Z" fill="#ffc803"/>
+      <path d="M 32 33.08 L 3.66 33.08 A 29.5 20.06 0 0 1 6.16 17.82 L 26.2 31.44 A 8.2 5.58 0 0 0 32 33.08 Z" fill="#8bd90c"/>
+      <path d="M 26.2 31.44 L 6.16 17.82 A 29.5 20.06 0 0 1 23.8 8.23 L 23.8 27.5 A 8.2 5.58 0 0 0 26.2 31.44 Z" fill="#00b478"/>
+      <path d="M 23.8 27.5 L 23.8 8.23 A 29.5 20.06 0 0 1 46.24 9.93 L 26.2 23.56 A 8.2 5.58 0 0 0 23.8 27.5 Z" fill="#17a6f5"/>
+      <path d="M 26.2 23.56 L 46.24 9.93 A 29.5 20.06 0 0 1 60.34 21.92 L 32 21.92 A 8.2 5.58 0 0 0 26.2 23.56 Z" fill="#2d4bff"/>
+      <path d="M 32 21.92 L 60.34 21.92 A 29.5 20.06 0 0 1 57.84 37.18 L 37.8 23.56 A 8.2 5.58 0 0 0 32 21.92 Z" fill="#8b3dff"/>
+      <path d="M 37.8 23.56 L 57.84 37.18 A 29.5 20.06 0 0 1 40.2 46.77 L 40.2 27.5 A 8.2 5.58 0 0 0 37.8 23.56 Z" fill="#ff2e88"/>
+    </g>
+    <path d="M 33.2 34.57 L 33.2 47.55 M 26.2 39.33 L 26.2 47.17 M 25.49 33.08 L 12 42.25 M 15.6 33.08 L 7.45 38.62 M 21.6 28.32 L 2.52 28.32 M 14.6 23.56 L 3.08 23.56 M 23.8 23.08 L 10.31 13.9 M 23.8 16.34 L 15.65 10.81 M 30.8 20.43 L 30.8 7.45 M 37.8 15.67 L 37.8 7.83 M 38.51 21.92 L 52 12.75 M 48.4 21.92 L 56.55 16.38 M 42.4 26.68 L 61.48 26.68 M 49.4 31.44 L 60.92 31.44 M 40.2 31.92 L 53.69 41.1 M 40.2 38.66 L 48.35 44.19" fill="none" stroke="#14110d" stroke-width="1.5" opacity="0.5"/>
+    <ellipse cx="32" cy="27.5" rx="8.5" ry="5.78" fill="#fffcf4" stroke="#14110d" stroke-width="2.2"/>
+    <rect x="28.8" y="25.32" width="6.4" height="4.35" fill="#14110d"/>
   </g>
-  <circle cx="256" cy="256" r="25" fill="#ffffff"/>
 </svg>

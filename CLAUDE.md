@@ -21,7 +21,9 @@ code or in `docs/investigations/`.
   `npm run pack:use <dir | owner/repo | URL>` swaps in a validated pack.
 - `content/pack-start/` — the home app's STARTER pack (`deploy-apps.yml`
   builds app.quizmill.dev from it): titled "quizmill", a few questions
-  about using the app, mill-wheel `assets/icon.svg`. Home recognises it
+  about using the app, the millstone mark as `assets/icon.svg` (plus
+  `icon-maskable.svg` and `icon.png`, see `scripts/pack-assets.ts`;
+  the website's `components/Wheel.tsx` is the source). Home recognises it
   by id (`src/pack/starter.ts`) and shows the add-a-pack card; the demo
   stays the showcase for tests/E2E, so never point them at the starter.
 - `tools/pack/` — `schema.ts` (Zod pack format, schemaVersion 2 only, and
