@@ -52,6 +52,7 @@ import {
   nextSelection,
   pickSessionFromBank,
   scoreSummary,
+  QUESTION_COUNT,
   type RunnerState,
 } from './runner';
 
@@ -142,7 +143,14 @@ export function PackPracticeRunner(props: Props) {
     if (!mounted || state) return;
     // A paper may span categories, so its history is not narrowed by one.
     const history = attemptHistory(attempts, categoryKey);
-    const picked = pickSessionFromBank(bank, history);
+    // A paper is sat WHOLE — every question, however many — where a
+    // category round is the usual ten.
+    const picked = pickSessionFromBank(
+      bank,
+      history,
+      undefined,
+      paperKey !== undefined ? bank.length : QUESTION_COUNT,
+    );
     if (picked === null) {
       setOutOfQuestions(true);
       return;
