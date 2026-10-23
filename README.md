@@ -314,7 +314,10 @@ npx quizmill build my-topic          # or: npx quizmill build owner/repo
 
 Each deployment is one pack. The PWA name, icon, and theme colour are
 generated from the pack manifest, so every pack gets its own
-installable app identity.
+installable app identity. A pack can bring its own artwork instead:
+`assets/icon.svg` (the app icon), `assets/icon-maskable.svg` (a
+full-bleed copy for launchers that cut their own shape) and
+`assets/icon.png` (the iOS home-screen tile, 180 × 180).
 
 **Browser floor.** The engine's stylesheet (Tailwind CSS 4) relies on
 `color-mix()`, `@property` and cascade layers, so learners need Safari
