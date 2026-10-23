@@ -30,6 +30,13 @@
       "url": "https://aws-genai.quizmill.dev"
     },
     {
+      "id": "eleven-plus-practice",
+      "title": "11+ Practice",
+      "description": "11+ practice for Years 4 to 6 — English, maths, verbal reasoning and non-verbal reasoning (with diagrams), each question with a worked explanation and concept cards. A 28-question sample, seven per subject across every question type; the app's upgrade card links to the full bank, inserted as a separate pack.",
+      "repo": "quizmill/pack-eleven-plus-sample",
+      "url": "https://eleven-plus.quizmill.dev"
+    },
+    {
       "id": "music-theory",
       "title": "Music Theory Practice",
       "description": "Visual music-theory practice — read staves, key signatures, intervals and chords. 102 questions across five categories and three levels (Beginner → Advanced); 84 carry generated staff and keyboard diagrams, and four answer with images.",
