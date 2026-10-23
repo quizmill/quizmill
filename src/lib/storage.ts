@@ -125,6 +125,9 @@ export interface PackPrefs {
   /** The last adaptive level nudge the user dismissed, as "from>to", so the
    *  same suggestion doesn't keep re-appearing. */
   dismissedNudge?: string;
+  /** Home's "could you pass today?" card was closed with "not interested"
+   *  for this pack; the check stays a tile in the rail. */
+  checkPromptDismissed?: boolean;
   /** LEGACY: where the Drive switch lived before it became an app-level
    *  device pref (src/lib/drive.ts). Read once there, promoted, removed. */
   driveMode?: boolean;
@@ -158,6 +161,15 @@ export function loadDismissedNudge(): string | null {
 
 export function saveDismissedNudge(key: string | null): void {
   patchPrefs('dismissedNudge', key);
+}
+
+/** Whether Home's readiness-check prompt was closed for this pack. */
+export function loadCheckPromptDismissed(): boolean {
+  return loadPrefs().checkPromptDismissed === true;
+}
+
+export function saveCheckPromptDismissed(dismissed: boolean): void {
+  patchPrefs('checkPromptDismissed', dismissed || null);
 }
 
 /** The old per-pack Drive switch, if this pack's prefs still carry it. */

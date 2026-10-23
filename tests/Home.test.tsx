@@ -242,15 +242,18 @@ describe('PackHome timed exam tile', () => {
     expect(card!.textContent).toContain('9 Qs · 15:00');
   });
 
-  it('is the only tile in the rail when no device mode is on', async () => {
-    // The demo ships Drive, Coach and Paper on; this device switched them off.
+  it('shares the rail with only the readiness check when no device mode is on', async () => {
+    // The demo ships Drive, Coach and Paper on; this device switched them
+    // off. The exam goal still offers its two sittings.
     saveDriveModeEnabled(false);
     saveCoachModeEnabled(false);
     savePaperModeEnabled(false);
     await render();
     const rail = container.querySelector('[data-testid="mode-rail"]');
     expect(rail).toBeTruthy();
-    expect(rail!.querySelectorAll('a')).toHaveLength(1);
+    expect(
+      Array.from(rail!.querySelectorAll('a')).map((a) => a.getAttribute('data-testid')),
+    ).toEqual(['exam-card', 'check-card']);
   });
 });
 
@@ -297,6 +300,7 @@ describe('PackHome mode cards', () => {
       'coach-card',
       'paper-card',
       'exam-card',
+      'check-card',
     ]);
     const looks = new Set(tiles.map((a) => a.className));
     expect(looks.size, [...looks].join('\n')).toBe(1);
