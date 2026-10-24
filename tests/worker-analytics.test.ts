@@ -11,9 +11,12 @@ import path from 'node:path';
 import worker from '../cloudflare/src/worker';
 import {
   FUNNEL_EVENTS as WORKER_FUNNEL_EVENTS,
+  DEFAULT_RETENTION_DAYS,
   MAX_BEACON_BYTES,
   parseBeacon,
+  parseRetentionDays,
   parseSummaryQuery,
+  purgeStatement,
   statementsForBeacon,
   summaryStatements,
 } from '../cloudflare/src/analytics';
@@ -125,6 +128,63 @@ describe('parseSummaryQuery', () => {
       expect(s.sql).toContain('received_at >= ?');
       expect(s.params).toEqual(['demo', 'demo', 1_000]);
     }
+  });
+});
+
+describe('retention purge', () => {
+  const DAY = 86_400_000;
+
+  it('keeps a year by default and reads the window from ANALYTICS_RETENTION_DAYS', () => {
+    expect(DEFAULT_RETENTION_DAYS).toBe(365);
+    expect(parseRetentionDays(undefined)).toBe(365);
+    expect(parseRetentionDays('')).toBe(365);
+    expect(parseRetentionDays('90')).toBe(90);
+    expect(parseRetentionDays('30.7')).toBe(30);
+    // A typo must never widen into "delete everything".
+    expect(parseRetentionDays('0')).toBe(365);
+    expect(parseRetentionDays('-5')).toBe(365);
+    expect(parseRetentionDays('a year')).toBe(365);
+  });
+
+  it('deletes only rows received before the cut-off, from schema.sql in SQLite', () => {
+    const db = new DatabaseSync(':memory:');
+    db.exec(fs.readFileSync(path.join(__dirname, '..', 'cloudflare', 'schema.sql'), 'utf8'));
+    const now = 1_800_000_000_000;
+    const cutoff = now - 365 * DAY;
+    const insert = db.prepare(
+      `INSERT INTO analytics_events (event, pack_id, device_id, ts, received_at) VALUES (?, ?, ?, ?, ?)`,
+    );
+    insert.run('app_open', 'demo', 'old-1', 0, cutoff - 400 * DAY);
+    insert.run('app_open', 'demo', 'old-2', 0, cutoff - 1);
+    insert.run('app_open', 'demo', 'edge', 0, cutoff);
+    insert.run('app_open', 'demo', 'new', 0, now - DAY);
+
+    const stmt = purgeStatement(now, 365);
+    db.prepare(stmt.sql).run(...(stmt.params as never[]));
+
+    const left = db.prepare('SELECT device_id FROM analytics_events ORDER BY id').all();
+    expect(left).toEqual([{ device_id: 'edge' }, { device_id: 'new' }]);
+    db.close();
+  });
+
+  it('the scheduled handler purges with the configured window', async () => {
+    const db = new DatabaseSync(':memory:');
+    db.exec(fs.readFileSync(path.join(__dirname, '..', 'cloudflare', 'schema.sql'), 'utf8'));
+    const now = Date.now();
+    const insert = db.prepare(
+      `INSERT INTO analytics_events (event, pack_id, device_id, ts, received_at) VALUES (?, ?, ?, ?, ?)`,
+    );
+    insert.run('app_open', 'demo', 'old', 0, now - 40 * DAY);
+    insert.run('app_open', 'demo', 'new', 0, now - 20 * DAY);
+
+    await worker.scheduled(
+      { scheduledTime: now, cron: '17 3 * * *' },
+      { DB: makeD1(db), ANALYTICS_RETENTION_DAYS: '30' } as never,
+    );
+    expect(db.prepare('SELECT device_id FROM analytics_events').all()).toEqual([
+      { device_id: 'new' },
+    ]);
+    db.close();
   });
 });
 

@@ -36,7 +36,9 @@ import {
   MAX_BEACON_BYTES,
   buildSummary,
   parseBeacon,
+  parseRetentionDays,
   parseSummaryQuery,
+  purgeStatement,
   statementsForBeacon,
   summaryStatements,
 } from './analytics';
@@ -96,6 +98,9 @@ interface Env {
    *  analytics summary needs it as a bearer token. Unset = the aggregate
    *  counts are readable by anyone who knows a pack id. */
   ANALYTICS_READ_TOKEN?: string;
+  /** Optional (wrangler.toml `[vars]`): days an analytics row is kept
+   *  before the daily purge deletes it. Unset = 365 (analytics.ts). */
+  ANALYTICS_RETENTION_DAYS?: string;
   /** Pack bundles for licence-key unlock (wrangler.toml `[[r2_buckets]]`);
    *  without the binding the unlock routes answer 404 like any other
    *  unknown path. */
@@ -507,6 +512,13 @@ const worker = {
       return json({ error: 'internal error' }, 500);
     }
     return json({ error: 'not found' }, 404);
+  },
+
+  /** The Cron Trigger in wrangler.toml: drop analytics rows past their
+   *  retention, so the privacy page's promise keeps itself. */
+  async scheduled(controller: { scheduledTime: number; cron: string }, env: Env): Promise<void> {
+    const days = parseRetentionDays(env.ANALYTICS_RETENTION_DAYS);
+    await env.DB.batch(bindAll(env, [purgeStatement(controller.scheduledTime, days)]));
   },
 };
 

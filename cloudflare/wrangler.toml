@@ -19,6 +19,15 @@ compatibility_date = "2026-06-01"
 routes = [{ pattern = "sync.quizmill.dev", custom_domain = true }]
 workers_dev = true
 
+# Daily purge of anonymous analytics rows older than the retention window
+# (the worker's `scheduled` handler, src/analytics.ts purgeStatement).
+[triggers]
+crons = ["17 3 * * *"]
+
+[vars]
+# Days an analytics_events row is kept — match your privacy page.
+ANALYTICS_RETENTION_DAYS = "365"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "quizmill-sync"

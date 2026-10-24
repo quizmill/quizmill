@@ -171,6 +171,32 @@ export interface Summary {
   daily: { day: string; event: FunnelEvent; devices: number }[];
 }
 
+/**
+ * How long a beacon row is kept: the retention a hosted app's privacy page
+ * (NEXT_PUBLIC_PRIVACY_URL) promises. A worker operator whose page says
+ * something else sets ANALYTICS_RETENTION_DAYS (wrangler.toml `[vars]`).
+ */
+export const DEFAULT_RETENTION_DAYS = 365;
+
+/** The configured window in whole days. Anything unset, non-numeric or
+ *  under one day falls back to the default — a typo must never turn the
+ *  purge into "delete everything". */
+export function parseRetentionDays(raw: string | undefined): number {
+  const n = Math.floor(Number(raw));
+  return Number.isFinite(n) && n >= 1 ? n : DEFAULT_RETENTION_DAYS;
+}
+
+/** Delete every row received more than `days` before `nowMs` (server
+ *  receipt time, like the summary window). Run by the worker's daily Cron
+ *  Trigger; a full scan once a day is cheaper than another index written
+ *  on every beacon. */
+export function purgeStatement(nowMs: number, days: number): SqlStatement {
+  return {
+    sql: 'DELETE FROM analytics_events WHERE received_at < ?',
+    params: [nowMs - days * 86_400_000],
+  };
+}
+
 /** Assemble the response from the two result sets. */
 export function buildSummary(
   query: SummaryQuery,

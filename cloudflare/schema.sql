@@ -45,7 +45,9 @@ CREATE TABLE IF NOT EXISTS profiles (
 -- pack, a random device id the learner can regenerate, the app build, the
 -- client's timestamp and the server's receipt time (both unix ms; the
 -- summary windows on received_at). Deliberately NOT joined to `rows` or
--- `profiles`: a device id never meets a sync key.
+-- `profiles`: a device id never meets a sync key. Rows older than
+-- ANALYTICS_RETENTION_DAYS (default 365) are deleted by the worker's daily
+-- Cron Trigger (wrangler.toml).
 --
 -- target_pack_id names the pack an event is ABOUT when that is not the
 -- active one (bundle_inserted / pack_unlocked / unlock_failed carry the
