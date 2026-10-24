@@ -86,6 +86,11 @@ describe('builtinRegistry', () => {
     expect(ids).toContain('world-capitals');
     expect(ids).toContain('claude-cert');
   });
+
+  it('lists every published AWS cert pack', () => {
+    const ids = builtinRegistry().map((p) => p.id);
+    expect(ids).toEqual(expect.arrayContaining(['aws-arch-pro', 'aws-genai', 'aws-saa']));
+  });
 });
 
 describe('registryRepoUrl', () => {
