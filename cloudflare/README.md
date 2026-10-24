@@ -192,6 +192,23 @@ a bearer token. **Upgrading an existing deployment:** the table lives in
 the worker is redeployed the apps' beacons simply 404 and nothing is
 lost that matters (they are fire-and-forget).
 
+### Retention
+
+Analytics rows are kept for **365 days** (by server receipt time,
+`received_at`), then deleted: a Cron Trigger in `wrangler.toml` runs the
+worker's `scheduled` handler once a day (03:17 UTC), which deletes every
+`analytics_events` row older than the window. Sync rows are never
+touched. If your privacy page states a different period, change
+`ANALYTICS_RETENTION_DAYS` under `[vars]` in `wrangler.toml` (whole days;
+anything unset, non-numeric or below 1 falls back to 365) and
+`npx wrangler deploy`. To purge by hand instead — say on a deployment
+with the trigger removed — run the same statement directly:
+
+```sh
+npx wrangler d1 execute quizmill-sync --remote --command \
+  "DELETE FROM analytics_events WHERE received_at < (unixepoch('now') - 365 * 86400) * 1000"
+```
+
 ## Usage report (read-only, Markdown)
 
 Every learner with a sync key mirrors their sessions, attempts and app
