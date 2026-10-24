@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import { APP_CONFIG } from '@/config';
 import { PackPracticeRunner } from '@/pack/PracticeRunner';
+import { PACK_PAPER_BY_KEY } from '@/pack/data';
 import { useSearchParams } from 'next/navigation';
 
 /**
@@ -14,6 +15,9 @@ import { useSearchParams } from 'next/navigation';
  * runtime. A query param means one statically exported route (`/practice/`)
  * serves ANY pack's categories. (The param is named `subject` for
  * engine-historical reasons; it carries the pack category key.)
+ *
+ * `?paper=<key>` instead practises one of the pack's named papers whole
+ * (manifest `papers`, #194) — same route, same reasoning.
  */
 export default function PracticePage() {
   return (
@@ -24,7 +28,22 @@ export default function PracticePage() {
 }
 
 function PracticeForSubject() {
-  const subject = useSearchParams().get('subject') ?? '';
+  const params = useSearchParams();
+  const paper = params.get('paper');
+  if (paper !== null) {
+    if (paper === '' || !(paper in PACK_PAPER_BY_KEY)) {
+      return (
+        <Shell>
+          <p className="text-ink-600">That paper isn’t in this pack.</p>
+          <Link href="/" className="mt-3 inline-block font-semibold text-brand-600">
+            ← Back to home
+          </Link>
+        </Shell>
+      );
+    }
+    return <PackPracticeRunner paperKey={paper} />;
+  }
+  const subject = params.get('subject') ?? '';
   const valid = subject !== '' && APP_CONFIG.categories.some((c) => c.key === subject);
   if (!valid) {
     return (

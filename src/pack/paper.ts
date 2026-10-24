@@ -39,6 +39,10 @@ export interface PaperSheet {
   /** Level-band filter the sheet was composed with, when the pack has
    *  levels — informational only. */
   level?: string;
+  /** The manifest paper this sheet prints whole (#194), when it is one —
+   *  names the sheet instead of category + level. The question list is
+   *  still what marks; this is a label. */
+  paperId?: string;
   questionIds: string[];
   /** Stamped once the sheet has been marked on this device. */
   markedAt?: number;
@@ -84,8 +88,9 @@ export function newSheetCode(rng: () => number = Math.random): string {
 /**
  * Compose a new sheet from a bank (already filtered to the category and
  * level, exactly like a practice session) using the same unseen-biased
- * selection — or, for `count: 'all'`, the whole bank in pack order.
- * Returns null when the bank is empty.
+ * selection — or, for `count: 'all'`, the whole bank in pack order. A
+ * named paper is the latter with `paperId` set and the bank being that
+ * paper's questions (`bankForPaper`). Returns null when the bank is empty.
  */
 export function composePaperSheet(
   bank: PackQuestion[],
@@ -94,6 +99,7 @@ export function composePaperSheet(
     categoryKey: string;
     count: PaperCount;
     level?: string;
+    paperId?: string;
     id?: string;
     code?: string;
     now?: number;
@@ -114,6 +120,7 @@ export function composePaperSheet(
       createdAt: options.now ?? Date.now(),
       categoryKey: options.categoryKey,
       ...(options.level ? { level: options.level } : {}),
+      ...(options.paperId ? { paperId: options.paperId } : {}),
       questionIds: questions.map((q) => q.id),
     },
     questions,
@@ -205,6 +212,10 @@ export interface PaperPayload {
   /** createdAt, unix ms. */
   t: number;
   qs: string[];
+  /** The manifest paper the sheet prints whole, when it is one — so the
+   *  marking device can head the sheet by name. Absent on mixed sheets
+   *  and on payloads printed before papers existed. */
+  p?: string;
 }
 
 export function payloadFromSheet(sheet: PaperSheet, packId: string): PaperPayload {
@@ -216,6 +227,7 @@ export function payloadFromSheet(sheet: PaperSheet, packId: string): PaperPayloa
     cat: sheet.categoryKey,
     t: sheet.createdAt,
     qs: sheet.questionIds,
+    ...(sheet.paperId ? { p: sheet.paperId } : {}),
   };
 }
 
@@ -225,6 +237,7 @@ export function sheetFromPayload(payload: PaperPayload): PaperSheet {
     code: payload.code,
     createdAt: payload.t,
     categoryKey: payload.cat,
+    ...(payload.p ? { paperId: payload.p } : {}),
     questionIds: payload.qs,
   };
 }
@@ -320,7 +333,8 @@ export async function decodePaperPayload(encoded: string): Promise<PaperPayload 
       typeof p.t !== 'number' ||
       !Array.isArray(p.qs) ||
       p.qs.length === 0 ||
-      !p.qs.every((q): q is string => typeof q === 'string')
+      !p.qs.every((q): q is string => typeof q === 'string') ||
+      (p.p !== undefined && typeof p.p !== 'string')
     ) {
       return null;
     }
@@ -332,6 +346,7 @@ export async function decodePaperPayload(encoded: string): Promise<PaperPayload 
       cat: p.cat,
       t: p.t,
       qs: p.qs,
+      ...(typeof p.p === 'string' ? { p: p.p } : {}),
     };
   } catch {
     return null;

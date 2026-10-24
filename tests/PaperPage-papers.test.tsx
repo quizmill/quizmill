@@ -1,0 +1,166 @@
+// @vitest-environment happy-dom
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { webcrypto } from 'node:crypto';
+import { PaperPage } from '@/pack/PaperPage';
+import { PaperMarkPage } from '@/pack/PaperMarkPage';
+import { APP_CONFIG } from '@/config';
+import { packQuestions } from '@/pack/data';
+import { savePaperSheet, type PaperSheet } from '@/pack/paper';
+
+// Printing a whole named paper (#194): the compose card offers the pack's
+// papers in a select grouped by series (a pill row cannot hold dozens of
+// long labels); picking one prints the entire paper in bank order and
+// the sheet is headed by the paper, not a category + level.
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
+  true;
+
+if (!globalThis.crypto?.randomUUID) {
+  Object.defineProperty(globalThis, 'crypto', { value: webcrypto });
+}
+
+let container: HTMLDivElement;
+let root: Root | undefined;
+
+beforeEach(() => {
+  localStorage.clear();
+  window.location.hash = '';
+  container = document.createElement('div');
+  document.body.appendChild(container);
+});
+
+afterEach(async () => {
+  await act(async () => {
+    root?.unmount();
+  });
+  root = undefined;
+  container.remove();
+});
+
+async function render(el: React.ReactElement) {
+  await act(async () => {
+    root = createRoot(container);
+    root.render(el);
+  });
+  await act(async () => {});
+}
+
+function q(sel: string): HTMLElement {
+  const el = container.querySelector<HTMLElement>(sel);
+  if (!el) throw new Error(`missing ${sel}`);
+  return el;
+}
+
+/** Poll (settling React between ticks) until `probe` returns a value —
+ *  the QR payload encode rides zlib, which completes on a macrotask. */
+async function waitFor<T>(probe: () => T | null | undefined | false, ms = 2000): Promise<T> {
+  const deadline = Date.now() + ms;
+  for (;;) {
+    const found = probe();
+    if (found) return found;
+    if (Date.now() > deadline) throw new Error('waitFor: timed out');
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+}
+
+async function pickPaper(key: string) {
+  const select = q('[data-testid="paper-pick"]') as HTMLSelectElement;
+  await act(async () => {
+    select.value = key;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
+function storedSheets(): PaperSheet[] {
+  return JSON.parse(
+    localStorage.getItem(`quizmill.${APP_CONFIG.packId}.paperSheets.v1`) ?? '[]',
+  );
+}
+
+const PAPER_1_IDS = packQuestions.filter((x) => x.paperId === 'starter-paper-1').map((x) => x.id);
+
+describe('PaperPage paper picker', () => {
+  it('offers the pack’s papers grouped by series, defaulting to a mixed sheet', async () => {
+    await render(<PaperPage />);
+    const select = q('[data-testid="paper-pick"]') as HTMLSelectElement;
+    expect(select.value).toBe('');
+    const groups = Array.from(select.querySelectorAll('optgroup'));
+    expect(groups.map((g) => g.getAttribute('label'))).toEqual(['Starter papers']);
+    const options = Array.from(select.querySelectorAll('option')).map((o) => o.value);
+    expect(options).toEqual(['', 'starter-paper-1', 'starter-paper-2']);
+    // Two books can both be "Paper 1": the owning category disambiguates.
+    expect(select.textContent).toContain('Paper 1 · Planets');
+    // The mixed-sheet controls are all still there.
+    expect(container.querySelector('[role="radiogroup"][aria-label="Category"]')).toBeTruthy();
+    expect(container.querySelector('[role="radiogroup"][aria-label="Level"]')).toBeTruthy();
+    expect(container.querySelector('[role="radiogroup"][aria-label="Question count"]')).toBeTruthy();
+  });
+
+  it('prints a chosen paper whole, in bank order, under the paper’s heading', async () => {
+    await render(<PaperPage />);
+    await pickPaper('starter-paper-1');
+    // A paper is the unit: no category, level or count to choose.
+    expect(container.querySelector('[role="radiogroup"][aria-label="Category"]')).toBeNull();
+    expect(container.querySelector('[role="radiogroup"][aria-label="Level"]')).toBeNull();
+    expect(container.querySelector('[role="radiogroup"][aria-label="Question count"]')).toBeNull();
+    expect(q('[data-testid="create-sheet"]').textContent).toContain('all 6, in order');
+
+    await act(async () => {
+      q('[data-testid="create-sheet"]').click();
+    });
+    const [sheet] = storedSheets();
+    expect(sheet.paperId).toBe('starter-paper-1');
+    expect(sheet.categoryKey).toBe('planets');
+    expect(sheet.level).toBeUndefined();
+    expect(sheet.questionIds).toEqual(PAPER_1_IDS);
+
+    const printed = q('[data-testid="paper-sheet"]').textContent ?? '';
+    expect(printed).toContain('Starter papers · Paper 1');
+    expect(printed).toContain('6 questions');
+  });
+
+  it('still opens a paper too long for a QR, with a note where the code would be', async () => {
+    // A hundred UUID ids barely compress; the marking URL overruns what a
+    // QR code can hold (~2.3 KB at level M). The sheet must still open and
+    // print — marking stays possible from this device via "Mark answers".
+    const sheet: PaperSheet = {
+      id: 'paper-sheet-too-long',
+      code: 'P-LONG',
+      createdAt: Date.now(),
+      categoryKey: 'planets',
+      paperId: 'starter-paper-1',
+      questionIds: Array.from({ length: 100 }, () => crypto.randomUUID()),
+    };
+    savePaperSheet(sheet);
+    window.location.hash = `#sheet=${sheet.id}`;
+    await render(<PaperPage />);
+    expect(q('[data-testid="paper-sheet"]').textContent).toContain('100 questions');
+    // The async payload encode lands on a macrotask; give it a few ticks.
+    const note = await waitFor(() =>
+      container.querySelector<HTMLElement>('[data-testid="qr-too-long"]'),
+    );
+    expect(note.textContent).toContain('Mark answers');
+    expect(container.querySelector('[data-testid="paper-sheet"] svg')).toBeNull();
+    expect(q('[data-testid="mark-sheet"]')).toBeDefined();
+  });
+
+  it('heads the marking page with the paper too', async () => {
+    const sheet: PaperSheet = {
+      id: 'paper-sheet-under-test',
+      code: 'P-PAPR',
+      createdAt: Date.now(),
+      categoryKey: 'planets',
+      paperId: 'starter-paper-1',
+      questionIds: PAPER_1_IDS,
+    };
+    savePaperSheet(sheet);
+    window.location.hash = `#sheet=${sheet.id}`;
+    await render(<PaperMarkPage />);
+    expect(container.textContent).toContain('P-PAPR');
+    expect(container.textContent).toContain('Starter papers · Paper 1');
+  });
+});

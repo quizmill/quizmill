@@ -31,6 +31,19 @@ export type PackLevel = {
   label: string;
 };
 
+/** A named paper — a set of questions sat as a whole and printable as
+ *  one sheet (a published practice paper, an exam mock). Unordered, many,
+ *  grouped for display by `series`; the ordered ladder is `levels`. */
+export type PackPaper = {
+  key: string;
+  label: string;
+  /** Display group — the book or series the paper comes from. */
+  series?: string;
+  /** Owning category, when the paper belongs to one subject; absent for a
+   *  paper that spans categories. */
+  categoryKey?: string;
+};
+
 /** A "Question sources" legend entry, shown in Settings. */
 export type PackSource = { label: string; name?: string; blurb?: string; url?: string };
 
@@ -90,6 +103,8 @@ export type PackManifest = {
   categories: PackCategory[];
   levels?: PackLevel[];
   levelsLabel?: string;
+  papers?: PackPaper[];
+  papersLabel?: string;
   sources?: PackSource[];
   exam?: PackExam;
   games?: PackGames;
@@ -138,6 +153,8 @@ export type PackQuestion = {
   scenarioId?: string;
   conceptId?: string;
   level?: string;
+  /** The manifest paper this question is part of, if any. */
+  paperId?: string;
   difficulty: 1 | 2 | 3 | 4 | 5;
   prompt: string;
   image?: string;
@@ -221,6 +238,27 @@ const LEVEL_TONES = [
 export const PACK_LEVEL_TONE: Record<string, string> = Object.fromEntries(
   packLevels.map((l, i) => [l.key, LEVEL_TONES[i % LEVEL_TONES.length]]),
 );
+
+/** The pack's named papers, in manifest order (empty when it has none). */
+export const packPapers: PackPaper[] = packManifest.papers ?? [];
+/** What the pack calls its papers — the heading of their list. */
+export const packPapersLabel = packManifest.papersLabel ?? 'Papers';
+
+/** Paper key → paper, for the practice route and the sheet picker. */
+export const PACK_PAPER_BY_KEY: Record<string, PackPaper> = Object.fromEntries(
+  packPapers.map((p) => [p.key, p]),
+);
+
+/** Paper key → label, for chips and sheet headings. */
+export const PACK_PAPER_LABEL: Record<string, string> = Object.fromEntries(
+  packPapers.map((p) => [p.key, p.label]),
+);
+
+/** Question id → its paper key. Attempts store only the category, so
+ *  per-paper progress joins back through this. */
+export const PACK_PAPER_BY_QUESTION_ID: Record<string, string> = Object.fromEntries(
+  packQuestions.flatMap((q) => (q.paperId ? [[q.id, q.paperId] as const] : [])),
+);
 export const packScenarios = activeScenarios;
 export const packConcepts = activeConcepts;
 
@@ -233,6 +271,27 @@ export const PACK_CONCEPT_BY_ID: Record<string, PackConcept> = Object.fromEntrie
 export const PACK_CATEGORY_LABEL: Record<string, string> = Object.fromEntries(
   packManifest.categories.map((c) => [c.key, c.shortLabel ?? c.label]),
 );
+
+/**
+ * What a paper sheet (or a sitting) is OF, for its headings: the paper's
+ * series and label when it is a whole named paper, otherwise its category
+ * and, when it was composed with one, its level band. A cross-category
+ * paper carries the `paper` pseudo-subject as categoryKey, which never
+ * shows — the paper label does.
+ */
+export function sheetScopeLabel(s: {
+  categoryKey: string;
+  level?: string;
+  paperId?: string;
+}): string {
+  if (s.paperId) {
+    const paper = PACK_PAPER_BY_KEY[s.paperId];
+    if (paper) return paper.series ? `${paper.series} · ${paper.label}` : paper.label;
+    return s.paperId;
+  }
+  const category = PACK_CATEGORY_LABEL[s.categoryKey] ?? s.categoryKey;
+  return s.level ? `${category} · ${PACK_LEVEL_LABEL[s.level] ?? s.level}` : category;
+}
 
 /**
  * Whether a question counts toward exam readiness. When the exam declares a

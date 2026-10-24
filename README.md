@@ -170,7 +170,7 @@ needs the number changed, nothing else):
 
 | File | What |
 |---|---|
-| `pack.json` | manifest — title, description, theme colour, categories, optional `levels` + `sources`, optional `upgrade` |
+| `pack.json` | manifest — title, description, theme colour, categories, optional `levels`, `papers` + `sources`, optional `upgrade` |
 | `questions.json` | the bank: multiple-choice (2–6 options keyed A–F), explanation, difficulty 1–5, provenance |
 | `scenarios.json` | optional shared scenario stems for case-study style questions |
 | `concepts.json` | optional concept cards surfaced in the answer panel (`conceptId` on a question) |
@@ -189,7 +189,18 @@ Beyond the required fields, all optional:
   points at one with `conceptId` and it shows in the answer panel
 - **levels** — a second axis beside category: manifest `levels`
   (`[{key,label}]`) + `levelsLabel` (the axis name, e.g. "Year" or
-  "Difficulty band") + a `level` on each question, exposed as a filter
+  "Difficulty band") + a `level` on each question, exposed as a filter.
+  A short ORDERED ladder, easiest first — the adaptive nudge suggests the
+  next rung and the timed exam deals from the last; at most 8
+- **papers** — named sets a learner sits whole: manifest `papers`
+  (`[{key,label,series?,categoryKey?}]`) + `papersLabel` (the list's
+  heading, e.g. "Papers" or "Practice exams") + a `paperId` on each
+  question. Unordered and many (a published paper, a mock exam, one per
+  `series` group), listed on Home to practise whole and offered in Paper
+  practice to print as one sheet in bank order — so keep a paper's
+  questions together in `questions.json`, in paper order (the validator
+  warns otherwise). A paper owned by one category names it; one that
+  spans categories omits `categoryKey`
 - **source legend** — manifest `sources` (`[{label,name,blurb,url}]`)
   renders a "Question sources" card in Settings; questions reference an
   entry by `sourceRef`
@@ -231,7 +242,7 @@ Beyond the required fields, all optional:
   business.
 
 The validator (`npx quizmill validate <dir>`) cross-checks ids,
-category / scenario / concept / level references, image paths, and
+category / scenario / concept / level / paper references, image paths, and
 weights, and exits non-zero with per-question errors — agents loop on
 it until the pack is clean, so malformed content can't reach the app.
 It also warns about every referenced image that isn't a file under

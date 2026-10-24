@@ -32,12 +32,15 @@ import {
   packQuestions,
   progressionEnabled,
   PACK_CATEGORY_LABEL,
+  PACK_PAPER_BY_KEY,
   type OptionKey,
 } from '@/pack/data';
+import { paperSubject } from '@/pack/papers';
 import {
   advanceAfterAnswer,
   attemptHistory,
   bankForCategory,
+  bankForPaper,
   buildAttempt,
   buildSessionEnd,
   buildSessionStart,
@@ -49,20 +52,40 @@ import {
   nextSelection,
   pickSessionFromBank,
   scoreSummary,
+  QUESTION_COUNT,
   type RunnerState,
 } from './runner';
 
-interface Props {
-  /** Pack category key from the manifest, e.g. 'planets'. */
-  categoryKey: string;
-}
+/** What the runner deals from: one category (the level filter applies),
+ *  or one named paper — sat whole, whatever the level filter says. */
+type Props =
+  | {
+      /** Pack category key from the manifest, e.g. 'planets'. */
+      categoryKey: string;
+      paperKey?: undefined;
+    }
+  | {
+      /** Manifest `papers` key (#194). */
+      paperKey: string;
+      categoryKey?: undefined;
+    };
 
 /**
  * Practice runner: deals a round from one category (honouring the level
- * filter), records each answer, and celebrates stickers, level-ups and
- * the daily streak as they land.
+ * filter) or one named paper, records each answer, and celebrates
+ * stickers, level-ups and the daily streak as they land.
  */
-export function PackPracticeRunner({ categoryKey }: Props) {
+export function PackPracticeRunner(props: Props) {
+  // The scope's display label and the session's subject. A paper owned
+  // by one category is that category's session; a cross-category paper
+  // carries the `paper` pseudo-subject (attempts keep real categories).
+  const paper = props.paperKey !== undefined ? PACK_PAPER_BY_KEY[props.paperKey] : undefined;
+  const scopeLabel = paper
+    ? paper.label
+    : (PACK_CATEGORY_LABEL[props.categoryKey ?? ''] ?? props.categoryKey ?? props.paperKey);
+  const sessionSubject = paper
+    ? paperSubject(paper)
+    : (props.categoryKey ?? props.paperKey);
   const { attempts } = useStorageData();
   const recordAttempt = useRecordAttempt();
   const startSession = useStartSession();
@@ -99,9 +122,13 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   const firstSelectedRef = useRef<OptionKey | null>(null);
   const lastAttemptRef = useRef<{ id: string; answeredAt: number } | null>(null);
 
+  const { categoryKey, paperKey } = props;
   const bank = useMemo(
-    () => filterByLevel(bankForCategory(packQuestions, categoryKey), levelFilter),
-    [categoryKey, levelFilter],
+    () =>
+      paperKey !== undefined
+        ? bankForPaper(packQuestions, paperKey)
+        : filterByLevel(bankForCategory(packQuestions, categoryKey), levelFilter),
+    [categoryKey, paperKey, levelFilter],
   );
 
   // Pick a session after mount (so localStorage attempts are reflected),
@@ -114,8 +141,16 @@ export function PackPracticeRunner({ categoryKey }: Props) {
   /* eslint-disable react-hooks/set-state-in-effect -- see above */
   useEffect(() => {
     if (!mounted || state) return;
+    // A paper may span categories, so its history is not narrowed by one.
     const history = attemptHistory(attempts, categoryKey);
-    const picked = pickSessionFromBank(bank, history);
+    // A paper is sat WHOLE — every question, however many — where a
+    // category round is the usual ten.
+    const picked = pickSessionFromBank(
+      bank,
+      history,
+      undefined,
+      paperKey !== undefined ? bank.length : QUESTION_COUNT,
+    );
     if (picked === null) {
       setOutOfQuestions(true);
       return;
@@ -131,10 +166,10 @@ export function PackPracticeRunner({ categoryKey }: Props) {
       startedAt: now,
       questionShownAt: now,
     };
-    startSession(buildSessionStart(initial, categoryKey));
+    startSession(buildSessionStart(initial, sessionSubject));
     setState(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted, bank, categoryKey, state]);
+  }, [mounted, bank, categoryKey, paperKey, state]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   if (outOfQuestions) {
@@ -142,11 +177,9 @@ export function PackPracticeRunner({ categoryKey }: Props) {
       <main className="flex flex-col gap-5">
         <BackLink />
         <div className="rounded-2xl border border-ink-200 bg-surface p-6 text-center shadow-xs">
-          <h1 className="text-2xl font-bold text-ink-900">
-            No {PACK_CATEGORY_LABEL[categoryKey] ?? categoryKey} questions yet
-          </h1>
+          <h1 className="text-2xl font-bold text-ink-900">No {scopeLabel} questions yet</h1>
           <p className="mt-2 text-ink-600">
-            This pack has no questions for this category yet.
+            This pack has no questions for this {paperKey !== undefined ? 'paper' : 'category'} yet.
           </p>
           <Link href="/" className="mt-4 inline-block">
             <Button size="lg">Back to home</Button>
@@ -192,7 +225,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
       <RunnerResults
         eyebrow="Practice complete"
         score={scoreSummary(state)}
-        note={PACK_CATEGORY_LABEL[categoryKey] ?? categoryKey}
+        note={scopeLabel}
         celebrations={celebrations}
       >
         <Button
@@ -237,7 +270,9 @@ export function PackPracticeRunner({ categoryKey }: Props) {
       state,
       question: current,
       selected,
-      categoryKey,
+      // The question's own category — in a category round they agree; in
+      // a cross-category paper this is what keeps category stats honest.
+      categoryKey: current.categoryKey,
       now: Date.now(),
       attemptId: crypto.randomUUID(),
       mode: 'practice',
@@ -276,7 +311,7 @@ export function PackPracticeRunner({ categoryKey }: Props) {
     firstSelectedRef.current = null;
     setXpGained(null);
     if (isLastQuestion(state)) {
-      endSession(buildSessionEnd(state, categoryKey, Date.now()));
+      endSession(buildSessionEnd(state, sessionSubject, Date.now()));
       // Session-shaped stickers (first session, flawless round, daily
       // streak) can only unlock once the end record is written.
       checkNow(loadSessions(), loadAttempts());

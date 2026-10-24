@@ -26,15 +26,19 @@ import {
   isMultiAnswer,
   packLevels,
   packManifest,
+  packPapers,
+  packPapersLabel,
   packQuestions,
   packScenarios,
+  sheetScopeLabel,
   PACK_CATEGORY_ICON,
   PACK_CATEGORY_LABEL,
   PACK_CATEGORY_TONE,
   PACK_CONCEPT_BY_ID,
-  PACK_LEVEL_LABEL,
+  PACK_PAPER_BY_KEY,
 } from '@/pack/data';
-import { attemptHistory, bankForCategory, filterByLevel } from '@/pack/runner';
+import { groupPapers, paperSubject } from '@/pack/papers';
+import { attemptHistory, bankForCategory, bankForPaper, filterByLevel } from '@/pack/runner';
 import { PackImage } from '@/pack/PackImage';
 import { PaperWriteView } from '@/pack/PaperWriteView';
 import { deleteSheetInk, hasSheetInk, pruneSheetInk } from '@/pack/paperInk';
@@ -94,6 +98,9 @@ async function targetFromHash(): Promise<HashTarget> {
 }
 
 const SCENARIOS_BY_ID = new Map(packScenarios.map((s) => [s.id, s]));
+
+/** The pack's papers grouped by series, for the compose card's select. */
+const PAPER_GROUPS = groupPapers(packPapers);
 
 /**
  * Paper practice — print a worksheet (or write on it on screen), then
@@ -275,8 +282,7 @@ export function PaperPage() {
                       ) : null}
                     </div>
                     <div className="mt-0.5 truncate text-sm text-ink-500">
-                      {PACK_CATEGORY_LABEL[s.categoryKey] ?? s.categoryKey} ·{' '}
-                      {s.questionIds.length} questions ·{' '}
+                      {sheetScopeLabel(s)} · {s.questionIds.length} questions ·{' '}
                       {SHEET_DATE_FORMAT.format(s.createdAt)}
                     </div>
                   </div>
@@ -291,7 +297,8 @@ export function PaperPage() {
   );
 }
 
-/** Category + level + count picker; creates and stores a sheet. */
+/** Category + level + count picker — or one of the pack's named papers,
+ *  printed whole — creates and stores a sheet. */
 function ComposeCard({
   attempts,
   onCreated,
@@ -306,25 +313,42 @@ function ComposeCard({
   // learner is working on.
   const [level, setLevel] = useClientState(loadLevelFilter, null);
   const [chosenCount, setCount] = useState<PaperCount>(DEFAULT_PAPER_COUNT);
+  // A named paper to print whole (manifest `papers`, #194), or null for
+  // a mixed sheet from the category/level/count controls. Not remembered:
+  // a paper is printed once; the next sheet is usually a different one.
+  const [paperKey, setPaperKey] = useState<string | null>(null);
+  const paper = paperKey ? PACK_PAPER_BY_KEY[paperKey] : undefined;
 
-  const bank = filterByLevel(bankForCategory(packQuestions, categoryKey), level);
+  const mixedBank = filterByLevel(bankForCategory(packQuestions, categoryKey), level);
+  // A paper is the unit — every question, in bank order, however many —
+  // so its sheet is always "all". The QR is dense for a long paper, but
+  // sequential paper ids compress well (see encodePaperPayload).
+  const bank = paper ? bankForPaper(packQuestions, paper.key) : mixedBank;
   // "All" prints a whole level in pack order (a past paper as written) —
   // only for a single level small enough for the QR to stay scannable. A
   // one-level pack has no level row to pick from (#201), but its whole bank
   // IS that one level, so "All" stays reachable without a saved filter.
   const singleLevel = level !== null || packLevels.length === 1;
   const allAvailable = singleLevel && bank.length > 0 && bank.length <= PAPER_ALL_MAX;
-  const count: PaperCount =
-    chosenCount === 'all' && !allAvailable ? DEFAULT_PAPER_COUNT : chosenCount;
+  const count: PaperCount = paper
+    ? 'all'
+    : chosenCount === 'all' && !allAvailable
+      ? DEFAULT_PAPER_COUNT
+      : chosenCount;
   const sheetSize = count === 'all' ? bank.length : Math.min(count, bank.length);
 
   const create = () => {
-    const history = attemptHistory([...attempts], categoryKey);
-    const composed = composePaperSheet(bank, history, {
-      categoryKey,
-      count,
-      ...(level ? { level } : {}),
-    });
+    const composed = paper
+      ? composePaperSheet(bank, attemptHistory([...attempts]), {
+          categoryKey: paperSubject(paper),
+          count: 'all',
+          paperId: paper.key,
+        })
+      : composePaperSheet(bank, attemptHistory([...attempts], categoryKey), {
+          categoryKey,
+          count,
+          ...(level ? { level } : {}),
+        });
     if (!composed) return;
     savePaperSheet(composed.sheet);
     // The sheet list is capped — ink of a sheet that just aged out goes too.
@@ -342,6 +366,44 @@ function ComposeCard({
         New sheet
       </h2>
 
+      {/* The pack's papers, grouped by series — a select, not a pill row:
+          there may be dozens with long names. The default stays the mixed
+          sheet so the controls below keep their meaning. */}
+      {PAPER_GROUPS.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          <label htmlFor="paper-pick" className="text-sm font-medium text-ink-600">
+            {packPapersLabel}
+          </label>
+          <select
+            id="paper-pick"
+            data-testid="paper-pick"
+            value={paperKey ?? ''}
+            onChange={(e) => setPaperKey(e.target.value || null)}
+            className="w-full rounded-xl border border-ink-200 bg-surface px-3 py-2 text-sm font-semibold text-ink-900"
+          >
+            <option value="">A mixed sheet — pick below</option>
+            {PAPER_GROUPS.map((group) => {
+              const options = group.papers.map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.label}
+                  {p.categoryKey && APP_CONFIG.categories.length > 1
+                    ? ` · ${PACK_CATEGORY_LABEL[p.categoryKey] ?? p.categoryKey}`
+                    : ''}
+                </option>
+              ));
+              return group.series ? (
+                <optgroup key={group.series} label={group.series}>
+                  {options}
+                </optgroup>
+              ) : (
+                options
+              );
+            })}
+          </select>
+        </div>
+      ) : null}
+
+      {paper ? null : (
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium text-ink-600">Category</span>
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Category">
@@ -369,9 +431,10 @@ function ComposeCard({
           })}
         </div>
       </div>
+      )}
 
       {/* Same rule as Home: one level is nothing to filter by (#201). */}
-      {packLevels.length > 1 ? (
+      {!paper && packLevels.length > 1 ? (
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium text-ink-600">
             {packManifest.levelsLabel ?? 'Level'}
@@ -402,6 +465,7 @@ function ComposeCard({
         </div>
       ) : null}
 
+      {paper ? null : (
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium text-ink-600">Questions</span>
         <div className="flex gap-2" role="radiogroup" aria-label="Question count">
@@ -424,6 +488,7 @@ function ComposeCard({
           ))}
         </div>
       </div>
+      )}
 
       <Button
         onClick={create}
@@ -565,9 +630,8 @@ function SheetView({
           ) : null}
         </div>
         <p className="text-sm text-ink-500">
-          {PACK_CATEGORY_LABEL[sheet.categoryKey] ?? sheet.categoryKey}
-          {sheet.level ? ` · ${PACK_LEVEL_LABEL[sheet.level] ?? sheet.level}` : ''} ·{' '}
-          {sheet.questionIds.length} questions · {SHEET_DATE_FORMAT.format(sheet.createdAt)}
+          {sheetScopeLabel(sheet)} · {sheet.questionIds.length} questions ·{' '}
+          {SHEET_DATE_FORMAT.format(sheet.createdAt)}
         </p>
         {missing > 0 ? (
           <p className="text-sm text-warn-600">
@@ -692,11 +756,7 @@ function PrintableSheet({
         <div className="min-w-0">
           <div className="text-lg font-bold">{APP_CONFIG.title}</div>
           <div className="mt-0.5 text-sm text-neutral-600">
-            {PACK_CATEGORY_LABEL[sheet.categoryKey] ?? sheet.categoryKey}
-            {sheet.level
-              ? ` · ${PACK_LEVEL_LABEL[sheet.level] ?? sheet.level}`
-              : ''}{' '}
-            · {sheet.questionIds.length} questions
+            {sheetScopeLabel(sheet)} · {sheet.questionIds.length} questions
           </div>
           {screen ? (
             <div className="mt-2 text-sm text-neutral-600">
@@ -711,7 +771,24 @@ function PrintableSheet({
           )}
         </div>
         <div className="flex flex-col items-center">
-          {markUrl ? <QrCode value={markUrl} className="paper-qr h-28 w-28" /> : null}
+          {markUrl ? (
+            <QrCode
+              value={markUrl}
+              className="paper-qr h-28 w-28"
+              // A long sheet of ids that barely compress can overrun what
+              // a QR holds. The sheet still prints and marks — from the
+              // device that made it (the sheet list → Mark answers).
+              fallback={
+                <p
+                  className="w-28 text-center text-[10px] leading-snug text-neutral-500"
+                  data-testid="qr-too-long"
+                >
+                  Too long for a QR code — open this sheet in Paper practice
+                  and tap Mark answers.
+                </p>
+              }
+            />
+          ) : null}
           <span className="mt-1 whitespace-nowrap font-mono text-sm font-bold">
             {sheet.code}
           </span>
@@ -831,11 +908,7 @@ function PrintableAnswerKey({ sheet }: { sheet: PaperSheet }) {
             Answer key · for the coach
           </div>
           <div className="mt-0.5 text-sm text-neutral-600">
-            {PACK_CATEGORY_LABEL[sheet.categoryKey] ?? sheet.categoryKey}
-            {sheet.level
-              ? ` · ${PACK_LEVEL_LABEL[sheet.level] ?? sheet.level}`
-              : ''}{' '}
-            · {sheet.questionIds.length} questions ·{' '}
+            {sheetScopeLabel(sheet)} · {sheet.questionIds.length} questions ·{' '}
             {SHEET_DATE_FORMAT.format(sheet.createdAt)}
           </div>
         </div>

@@ -3,13 +3,15 @@ import {
   PACK_CATEGORY_LABEL,
   PACK_LEVEL_LABEL,
   PACK_LEVEL_TONE,
+  PACK_PAPER_BY_KEY,
   type PackQuestion,
 } from '@/pack/data';
 
 /**
  * The metadata chip row above a question: its category, level band (if the
- * pack defines levels), and any tags (topic, source marker, …). All
- * pack-driven — the engine carries no domain terminology.
+ * pack defines levels), the paper it belongs to (if the pack defines
+ * papers), and any tags (topic, source marker, …). All pack-driven — the
+ * engine carries no domain terminology.
  */
 export function QuestionMeta({
   question,
@@ -24,6 +26,9 @@ export function QuestionMeta({
   // on a question that the manifest doesn't declare renders nothing).
   const level = question.level;
   const levelLabel = level ? PACK_LEVEL_LABEL[level] : undefined;
+  // Likewise a paper chip only for a declared paper; "Series · Paper 1",
+  // since two books can both have a Paper 1.
+  const paper = question.paperId ? PACK_PAPER_BY_KEY[question.paperId] : undefined;
   const tags = hideTags ? [] : (question.tags ?? []);
   return (
     <>
@@ -38,6 +43,14 @@ export function QuestionMeta({
           )}
         >
           {levelLabel}
+        </span>
+      ) : null}
+      {paper ? (
+        <span
+          className="rounded-full border border-ink-300 bg-surface px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-700"
+          data-testid="paper-chip"
+        >
+          {paper.series ? `${paper.series} · ${paper.label}` : paper.label}
         </span>
       ) : null}
       {tags.map((tag) => (

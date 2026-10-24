@@ -7,6 +7,7 @@ import {
   BarChart3,
   Car,
   Compass,
+  FileText,
   GraduationCap,
   NotebookPen,
   Printer,
@@ -41,11 +42,16 @@ import {
   packLevels,
   packLevelKeys,
   packManifest,
+  packPapers,
+  packPapersLabel,
+  PACK_CATEGORY_LABEL,
   PACK_CATEGORY_TONE,
   PACK_CATEGORY_ICON,
   PACK_LEVEL_LABEL,
   PACK_LEVEL_BY_QUESTION_ID,
+  PACK_PAPER_BY_QUESTION_ID,
 } from '@/pack/data';
+import { groupPapers, paperProgress } from '@/pack/papers';
 import { EXAM_SITTING } from '@/pack/exam';
 import { CHECK_PLAN } from '@/pack/check';
 import { CHECK_BUDGETS_MINUTES, CHECK_MAX_MINUTES } from '@/lib/readinessCheck';
@@ -69,6 +75,14 @@ import { recordLevelCrossings } from '@/pack/useLevelUp';
  *  only exists so a dedicated runtime-pack build never paints the demo
  *  pack first.) */
 const RUNTIME_PACK_MODE = process.env.NEXT_PUBLIC_RUNTIME_PACK === '1';
+
+/** The pack's papers grouped by series, and each paper's size — fixed
+ *  for the active pack, so computed once at module load. */
+const PAPER_GROUPS = groupPapers(packPapers);
+const PAPER_SIZE: Record<string, number> = {};
+for (const q of packQuestions) {
+  if (q.paperId) PAPER_SIZE[q.paperId] = (PAPER_SIZE[q.paperId] ?? 0) + 1;
+}
 
 /** The header's round page buttons (desktop; phones use the tab bar). */
 const PAGE_LINKS = [
@@ -185,6 +199,15 @@ export default function PackHome() {
     if (!slot) continue;
     slot.answered++;
     if (a.isCorrect) slot.correct++;
+  }
+  // Per-paper progress — one cold look per question, like the categories,
+  // but over the WHOLE paper: the level filter never narrows a paper.
+  const paperLooks = new Map<string, { isCorrect: boolean }[]>();
+  for (const a of latestColdLook(attempts, (id) => id in PACK_PAPER_BY_QUESTION_ID)) {
+    const key = PACK_PAPER_BY_QUESTION_ID[a.questionId];
+    const list = paperLooks.get(key);
+    if (list) list.push(a);
+    else paperLooks.set(key, [a]);
   }
 
   if (!mounted) return <HomeSkeleton />;
@@ -396,6 +419,84 @@ export default function PackHome() {
           })}
         </div>
       </section>
+
+      {/* The pack's named papers (manifest `papers`): sets a learner sits
+          whole — a published practice paper, an exam mock. A list grouped
+          by series, never a pill row: there may be dozens, their labels
+          are long, and they are not rungs of a ladder (that is the level
+          row above). Each row practises that paper; a group with a series
+          name folds up so a pack with many papers still fits a phone
+          screen, and stays open when it is the only group. */}
+      {PAPER_GROUPS.length > 0 ? (
+        <section className="flex flex-col gap-3" data-testid="paper-list">
+          <h2 className="text-lg font-semibold text-ink-700">{packPapersLabel}</h2>
+          {PAPER_GROUPS.map((group) => {
+            const rows = (
+              <ul className="flex flex-col gap-2">
+                {group.papers.map((paper) => {
+                  const p = paperProgress(
+                    PAPER_SIZE[paper.key] ?? 0,
+                    paperLooks.get(paper.key) ?? [],
+                  );
+                  const category = paper.categoryKey
+                    ? PACK_CATEGORY_LABEL[paper.categoryKey]
+                    : undefined;
+                  return (
+                    <li key={paper.key}>
+                      <Link
+                        href={`/practice/?paper=${paper.key}`}
+                        data-testid={`paper-row-${paper.key}`}
+                        className="tap-feedback group flex items-center justify-between gap-3 rounded-2xl border border-ink-400/25 bg-ink-50 p-3.5 shadow-xs transition hover:shadow-md"
+                      >
+                        <span
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ink-200 text-ink-700"
+                          aria-hidden
+                        >
+                          <FileText className="h-5 w-5" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span className="text-base font-semibold text-ink-900">
+                              {paper.label}
+                            </span>
+                            {category ? (
+                              <span className="rounded-full bg-ink-200 px-1.5 py-0.5 text-[10px] font-semibold text-ink-700">
+                                {category}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="mt-0.5 text-sm text-ink-500">
+                            {p.answered === 0
+                              ? `${p.total} questions`
+                              : `${p.answered}/${p.total} answered · ${p.pct}%`}
+                          </div>
+                        </div>
+                        <ArrowRight className="h-5 w-5 shrink-0 text-ink-400 transition group-hover:text-ink-600" />
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            );
+            if (group.series === null) return <div key="__none">{rows}</div>;
+            return (
+              <details
+                key={group.series}
+                open={PAPER_GROUPS.length === 1}
+                className="group/series flex flex-col gap-2"
+              >
+                <summary className="tap-feedback flex cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-1 py-1 text-sm font-semibold text-ink-700 marker:content-none">
+                  <span>{group.series}</span>
+                  <span className="text-xs font-medium text-ink-500">
+                    {group.papers.length} {group.papers.length === 1 ? 'paper' : 'papers'}
+                  </span>
+                </summary>
+                <div className="mt-2">{rows}</div>
+              </details>
+            );
+          })}
+        </section>
+      ) : null}
 
       {/* The occasional modes as a rail of tiles — one row however many are
           on. Drive, Coach and Paper are device opt-ins (Settings) that a

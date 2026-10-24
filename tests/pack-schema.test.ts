@@ -474,6 +474,145 @@ describe('validatePack', () => {
     expect(result.errors.some((e) => e.includes('level keys must be unique'))).toBe(true);
   });
 
+  // ——— schema v2: papers (named, unordered sets — #194) ———
+
+  /** The demo's committed papers, replaced by `papers` for the test. */
+  function setPapers(input: ReturnType<typeof loadDemo>, papers: unknown): void {
+    (input.manifest as { papers?: unknown }).papers = papers;
+    for (const q of input.questions as { paperId?: string }[]) delete q.paperId;
+  }
+
+  function setPaper(input: ReturnType<typeof loadDemo>, index: number, paperId: string): void {
+    (input.questions as { paperId?: string }[])[index].paperId = paperId;
+  }
+
+  it('the demo pack declares papers and tags questions with them (the showcase)', () => {
+    const input = loadDemo();
+    const manifest = input.manifest as { papers?: { key: string }[] };
+    expect(manifest.papers?.length).toBeGreaterThan(0);
+    const tagged = (input.questions as { paperId?: string }[]).filter((q) => q.paperId);
+    expect(tagged.length).toBeGreaterThan(0);
+  });
+
+  it('accepts manifest papers and questions that belong to one', () => {
+    const input = loadDemo();
+    setPapers(input, [
+      { key: 'series-a-paper-1', label: 'Series A · Paper 1', series: 'Series A', categoryKey: 'planets' },
+      { key: 'mock-1', label: 'Practice exam 1' },
+    ]);
+    setPaper(input, 0, 'series-a-paper-1');
+    setPaper(input, 1, 'series-a-paper-1');
+    // A paper with no categoryKey may span categories (an exam mock) —
+    // move an exploration question next to a planets one to prove it.
+    const questions = input.questions as { categoryKey: string }[];
+    const [explore] = questions.splice(11, 1); // demo-explore-001
+    questions.splice(3, 0, explore);
+    setPaper(input, 2, 'mock-1');
+    setPaper(input, 3, 'mock-1');
+    const result = validatePack(input);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('rejects a paperId not declared in the manifest', () => {
+    const input = loadDemo();
+    setPapers(input, [{ key: 'p1', label: 'Paper 1' }]);
+    setPaper(input, 0, 'ghost-paper');
+    const result = validatePack(input);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.includes('ghost-paper'))).toBe(true);
+  });
+
+  it('rejects a paperId when the manifest declares no papers at all', () => {
+    const input = loadDemo();
+    setPapers(input, undefined);
+    setPaper(input, 0, 'p1');
+    expect(validatePack(input).ok).toBe(false);
+  });
+
+  it('rejects duplicate paper keys in the manifest', () => {
+    const input = loadDemo();
+    setPapers(input, [
+      { key: 'dup', label: 'One' },
+      { key: 'dup', label: 'Two' },
+    ]);
+    const result = validatePack(input);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.includes('paper keys must be unique'))).toBe(true);
+  });
+
+  it('rejects a paper categoryKey that is not a manifest category', () => {
+    const input = loadDemo();
+    setPapers(input, [{ key: 'p1', label: 'Paper 1', categoryKey: 'not-a-category' }]);
+    const result = validatePack(input);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.includes('not-a-category'))).toBe(true);
+  });
+
+  it("rejects a question in a paper whose categoryKey differs from the paper's", () => {
+    const input = loadDemo();
+    setPapers(input, [{ key: 'p1', label: 'Paper 1', categoryKey: 'planets' }]);
+    setPaper(input, 11, 'p1'); // demo-explore-001 is space-exploration
+    const result = validatePack(input);
+    expect(result.ok).toBe(false);
+    expect(
+      result.errors.some((e) => e.includes('demo-explore-001') && e.includes('planets')),
+    ).toBe(true);
+  });
+
+  it('warns (not errors) on a paper with no questions', () => {
+    const input = loadDemo();
+    setPapers(input, [{ key: 'empty-paper', label: 'Paper 9' }]);
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    expect(result.warnings.some((w) => w.includes('empty-paper'))).toBe(true);
+  });
+
+  it("warns when a paper's questions are not contiguous in bank order", () => {
+    // The in-order print sheet and numbering follow bank order, so a paper
+    // scattered through questions.json prints in a different order than
+    // the original booklet.
+    const input = loadDemo();
+    setPapers(input, [{ key: 'p1', label: 'Paper 1' }]);
+    setPaper(input, 0, 'p1');
+    setPaper(input, 2, 'p1');
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    expect(result.warnings.some((w) => w.includes('p1') && w.includes('contiguous'))).toBe(true);
+  });
+
+  it('rejects a malformed paper (bad key, empty label) and an over-long papers list', () => {
+    const badKey = loadDemo();
+    setPapers(badKey, [{ key: 'Not A Slug', label: 'Paper 1' }]);
+    expect(validatePack(badKey).ok).toBe(false);
+
+    const noLabel = loadDemo();
+    setPapers(noLabel, [{ key: 'p1', label: '' }]);
+    expect(validatePack(noLabel).ok).toBe(false);
+
+    const tooMany = loadDemo();
+    setPapers(
+      tooMany,
+      Array.from({ length: 101 }, (_, i) => ({ key: `p${i}`, label: `Paper ${i}` })),
+    );
+    expect(validatePack(tooMany).ok).toBe(false);
+  });
+
+  it('accepts a papersLabel naming the axis', () => {
+    const input = loadDemo();
+    (input.manifest as { papersLabel?: string }).papersLabel = 'Practice exams';
+    expect(validatePack(input).ok).toBe(true);
+  });
+
+  it('keeps levels capped at 8 — papers are the axis for many named sets', () => {
+    const input = loadDemo();
+    (input.manifest as { levels?: unknown }).levels = Array.from({ length: 9 }, (_, i) => ({
+      key: `l${i}`,
+      label: `Level ${i}`,
+    }));
+    expect(validatePack(input).ok).toBe(false);
+  });
+
   // ——— schema v2: source legend ———
 
   it('accepts a sources legend', () => {

@@ -10,7 +10,7 @@
  * Checks the per-file Zod schemas (manifest incl. the optional `exam`,
  * `games`, `progression` and `upgrade` blocks — an `upgrade.url` must be
  * https), then the cross-file references: unique ids, category / scenario
- * / concept / level keys, image paths, category weights. Finally, with the
+ * / concept / level / paper keys, image paths, category weights. Finally, with the
  * directory in hand, it warns about every referenced image that isn't a
  * file under `<pack-dir>/assets/` — `validatePack` can't (it also runs in
  * the browser on insert), and without this the author only finds out from
