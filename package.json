@@ -34,7 +34,7 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "tailwind-merge": "^3.7.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",
@@ -45,7 +45,7 @@
     "esbuild": "^0.28.2",
     "eslint": "^9.39.5",
     "eslint-config-next": "16.4.3",
-    "happy-dom": "^20.14.6",
+    "happy-dom": "^21.0.4",
     "http-server": "^14.1.1",
     "jsqr": "^1.4.0",
     "postcss": "^8.5.29",
