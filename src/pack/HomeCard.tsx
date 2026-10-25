@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { ArrowRight, type LucideIcon } from 'lucide-react';
+import { ArrowRight, Lock, type LucideIcon } from 'lucide-react';
 
 /**
  * The Home screen's mode surfaces. `HomeCard` is the full-width row — an
@@ -129,5 +129,53 @@ export function ModeTile({
         {caption}
       </span>
     </Link>
+  );
+}
+
+/**
+ * A mode the pack's fuller edition has and this one does not — the timed
+ * exam of a sample too small to sit. Same face as `ModeTile`, plus a lock
+ * on the caption and a `note` line; a button, not a link, because there
+ * is nowhere in this app to go: `onSelect` points at the upgrade card.
+ */
+export function LockedModeTile({
+  icon: Icon,
+  label,
+  caption,
+  note,
+  onSelect,
+  testid,
+}: {
+  icon: LucideIcon;
+  label: ReactNode;
+  caption: ReactNode;
+  note: ReactNode;
+  onSelect: () => void;
+  testid?: string;
+}) {
+  const t = TONE.ink;
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      data-testid={testid}
+      className={`tap-feedback flex min-w-0 flex-1 flex-col items-center gap-1.5 rounded-2xl border border-dashed ${t.card} px-2 py-3 text-center shadow-xs`}
+    >
+      <span
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${t.bubble}`}
+      >
+        <Icon className="h-4.5 w-4.5" />
+      </span>
+      <span className={`line-clamp-2 w-full text-[13px] font-semibold leading-tight ${t.title}`}>
+        {label}
+      </span>
+      <span
+        className={`flex w-full items-center justify-center gap-1 text-[11px] leading-tight ${t.blurb}`}
+      >
+        <Lock className="h-3 w-3 shrink-0" aria-label="Locked" data-testid="locked-icon" />
+        <span className="truncate">{caption}</span>
+      </span>
+      <span className={`w-full text-[11px] leading-tight ${t.arrow}`}>{note}</span>
+    </button>
   );
 }

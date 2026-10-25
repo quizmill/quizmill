@@ -127,8 +127,8 @@ export function PackExamRunner() {
         <div className="rounded-2xl border border-ink-200 bg-surface p-6 text-center shadow-xs">
           <h1 className="text-2xl font-bold text-ink-900">No timed exam in this pack</h1>
           <p className="mt-2 text-ink-600">
-            This pack doesn&apos;t declare an exam length, so there&apos;s nothing to
-            sit against the clock.
+            This pack doesn&apos;t declare an exam length, or holds too few questions
+            for a real sitting, so there&apos;s nothing to sit against the clock.
           </p>
           <Link href="/" className="mt-4 inline-block">
             <Button size="lg">Back to home</Button>

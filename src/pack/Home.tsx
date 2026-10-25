@@ -52,13 +52,13 @@ import {
   PACK_PAPER_BY_QUESTION_ID,
 } from '@/pack/data';
 import { groupPapers, paperProgress } from '@/pack/papers';
-import { EXAM_SITTING } from '@/pack/exam';
+import { EXAM_SITTING, EXAM_WITHHELD } from '@/pack/exam';
 import { CHECK_PLAN } from '@/pack/check';
 import { CHECK_BUDGETS_MINUTES, CHECK_MAX_MINUTES } from '@/lib/readinessCheck';
 import { CheckPromptCard } from '@/pack/CheckPromptCard';
 import { loadExamShown } from '@/lib/examPref';
 import { formatClock } from '@/lib/examClock';
-import { HomeCard, ModeTile } from '@/pack/HomeCard';
+import { HomeCard, LockedModeTile, ModeTile } from '@/pack/HomeCard';
 import { StreakChip } from '@/pack/StreakChip';
 import { UpgradeCard } from '@/pack/UpgradeCard';
 import { StarterPackCard } from '@/pack/StarterCard';
@@ -132,6 +132,9 @@ export default function PackHome() {
   // The timed sitting is the pack's; a device may only hide its tile.
   const [examShown] = useClientState(loadExamShown, true);
   const examSitting = examShown ? EXAM_SITTING : null;
+  // A sample too small to sit (see EXAM_SITTING_MIN_FRACTION) that names
+  // its fuller edition shows the real exam as a locked tile instead.
+  const examLocked = APP_CONFIG.upgrade?.packId ? EXAM_WITHHELD : null;
   // In runtime-pack mode, hold the first paint until mount (see RUNTIME_PACK_MODE).
   const mounted = useMounted() || !RUNTIME_PACK_MODE;
   useEffect(() => {
@@ -501,9 +504,10 @@ export default function PackHome() {
       {/* The occasional modes as a rail of tiles — one row however many are
           on. Drive, Coach and Paper are device opt-ins (Settings) that a
           pack may ship on; the timed sitting shows for packs that declare
-          an exam length, unless this device has hidden it; the readiness
+          an exam length, unless this device has hidden it (or, locked, for a
+          sample too small to sit that names its full pack); the readiness
           check for any pack with an exam goal. */}
-      {driveMode || coachMode || paperMode || examSitting || CHECK_PLAN ? (
+      {driveMode || coachMode || paperMode || examSitting || examLocked || CHECK_PLAN ? (
         <section className="flex flex-col gap-3" data-testid="mode-rail">
           <h2 className="text-lg font-semibold text-ink-700">More ways to practise</h2>
           <div className="flex gap-2">
@@ -541,6 +545,19 @@ export default function PackHome() {
                 icon={Timer}
                 label={APP_CONFIG.exam?.label ?? 'Timed exam'}
                 caption={`${examSitting.count} Qs · ${formatClock(examSitting.durationSeconds)}`}
+              />
+            ) : examLocked ? (
+              <LockedModeTile
+                testid="exam-locked-card"
+                icon={Timer}
+                label={APP_CONFIG.exam?.label ?? 'Timed exam'}
+                caption={`${examLocked.count} Qs · ${formatClock(examLocked.durationSeconds)}`}
+                note="With the full pack"
+                onSelect={() => {
+                  const card = document.getElementById('upgrade-card-home');
+                  card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  card?.focus({ preventScroll: true });
+                }}
               />
             ) : null}
             {CHECK_PLAN ? (
