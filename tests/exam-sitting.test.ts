@@ -10,6 +10,11 @@ import {
   EXAM_WITHHELD,
 } from '@/pack/exam';
 import { packQuestions, type PackQuestion } from '@/pack/data';
+import { packManifestSchema } from '../tools/pack/schema';
+import sampleManifestJson from './pack-sample/pack.json';
+import sampleQuestions from './pack-sample/questions.json';
+
+const sampleManifest = packManifestSchema.parse(sampleManifestJson);
 
 function q(id: string, level?: string): PackQuestion {
   return {
@@ -170,6 +175,22 @@ describe('the demo pack sitting', () => {
     expect(EXAM_SITTING!.count).toBe(advanced);
     expect(EXAM_SITTING!.count).toBe(9);
     expect(EXAM_SITTING!.durationSeconds).toBe(15 * 60);
+  });
+});
+
+describe('the sample fixture pack (tests/pack-sample)', () => {
+  // The demo pack with the real exam declared bigger than its bank — 30
+  // questions in 45 min against 9 Advanced — and an upgrade naming the
+  // full pack: the shape the locked Home tile is for.
+  it('has no sitting, and withholds the full declared exam', () => {
+    const levelKeys = sampleManifest.levels!.map((l) => l.key);
+    const qs = sampleQuestions as PackQuestion[];
+    expect(buildSitting(sampleManifest.exam, levelKeys, qs)).toBeNull();
+    expect(withheldSitting(sampleManifest.exam, levelKeys, qs)).toEqual({
+      count: 30,
+      durationSeconds: 45 * 60,
+    });
+    expect(sampleManifest.upgrade?.packId).toBeTruthy();
   });
 });
 
