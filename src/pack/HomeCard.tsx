@@ -135,7 +135,7 @@ export function ModeTile({
 /**
  * A mode the pack's fuller edition has and this one does not — the timed
  * exam of a sample too small to sit. Same face as `ModeTile`, plus a lock
- * on the caption and a `note` line; a button, not a link, because there
+ * badge on the icon, a dashed border and a `note` line; a button, not a link, because there
  * is nowhere in this app to go: `onSelect` points at the upgrade card.
  */
 export function LockedModeTile({
@@ -162,20 +162,18 @@ export function LockedModeTile({
       className={`tap-feedback flex min-w-0 flex-1 flex-col items-center gap-1.5 rounded-2xl border border-dashed ${t.card} px-2 py-3 text-center shadow-xs`}
     >
       <span
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${t.bubble}`}
+        className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${t.bubble}`}
       >
         <Icon className="h-4.5 w-4.5" />
+        <span className="absolute -right-1 -bottom-1 flex h-4.5 w-4.5 items-center justify-center rounded-full border border-ink-400/25 bg-surface text-ink-700">
+          <Lock className="h-2.5 w-2.5" aria-label="Locked" data-testid="locked-icon" />
+        </span>
       </span>
       <span className={`line-clamp-2 w-full text-[13px] font-semibold leading-tight ${t.title}`}>
         {label}
       </span>
-      <span
-        className={`flex w-full items-center justify-center gap-1 text-[11px] leading-tight ${t.blurb}`}
-      >
-        <Lock className="h-3 w-3 shrink-0" aria-label="Locked" data-testid="locked-icon" />
-        <span className="truncate">{caption}</span>
-      </span>
-      <span className={`w-full text-[11px] leading-tight ${t.arrow}`}>{note}</span>
+      <span className={`w-full truncate text-[11px] leading-tight ${t.blurb}`}>{caption}</span>
+      <span className={`line-clamp-2 w-full text-[11px] leading-tight ${t.arrow}`}>{note}</span>
     </button>
   );
 }
