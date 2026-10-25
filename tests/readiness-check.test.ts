@@ -7,7 +7,9 @@ import {
   CHECK_MAX_MINUTES,
   canDealAnother,
   checkHistory,
+  checkPaceHint,
   checkResult,
+  checkVerdictGap,
   compareChecks,
   dealCheck,
   planCheck,
@@ -383,6 +385,57 @@ describe('projectedCheckLength', () => {
     expect(projectedCheckLength({ ...base, elapsedSeconds: 20, answered: 1, dealt: 2 })).toBe(18);
     // Slow: 250 s a question, 100 s left → 2, but 3 are already dealt.
     expect(projectedCheckLength({ ...base, elapsedSeconds: 500, answered: 2, dealt: 3 })).toBe(3);
+  });
+});
+
+describe('checkPaceHint', () => {
+  it('names the plan before an answer, then what is left at the learner\'s pace — never a bare total', () => {
+    expect(checkPaceHint({ answered: 0, dealt: 1, projected: 14 })).toBe("about 14 at the exam's pace");
+    expect(checkPaceHint({ answered: 12, dealt: 13, projected: 16 })).toBe('about 3 more at your pace');
+    expect(checkPaceHint({ answered: 13, dealt: 13, projected: 14 })).toBe('about 1 more at your pace');
+    expect(checkPaceHint({ answered: 13, dealt: 13, projected: 13 })).toBe('last one at your pace');
+  });
+});
+
+describe('checkVerdictGap', () => {
+  const plan: CheckPlan = {
+    count: 6,
+    floor: 3,
+    minutes: 10,
+    perDomain: [
+      { key: 'planets', count: 3, share: 0.6 },
+      { key: 'space', count: 3, share: 0.4 },
+    ],
+  };
+  it('counts the answers still short of the plan\'s floor in every domain it dealt', () => {
+    expect(checkVerdictGap(plan, [])).toBe(6);
+    expect(checkVerdictGap(plan, ['planets', 'space', 'planets'])).toBe(3);
+    // Extra answers in one domain don't make up for another's gap.
+    expect(checkVerdictGap(plan, ['planets', 'planets', 'planets', 'planets', 'space'])).toBe(2);
+    expect(checkVerdictGap(plan, ['planets', 'space', 'planets', 'space', 'planets', 'space'])).toBe(0);
+  });
+
+  it('asks a domain for no more than the plan dealt it, and skips domains it left out', () => {
+    const short: CheckPlan = {
+      count: 3,
+      floor: 0,
+      minutes: 10,
+      perDomain: [
+        { key: 'a', count: 2, share: 0.5 },
+        { key: 'b', count: 1, share: 0.3 },
+        { key: 'c', count: 0, share: 0.2 },
+      ],
+    };
+    // Floor 0 still wants one look per dealt domain; 'c' was never dealt.
+    expect(checkVerdictGap(short, [])).toBe(2);
+    expect(checkVerdictGap(short, ['a'])).toBe(1);
+    expect(checkVerdictGap(short, ['a', 'b'])).toBe(0);
+  });
+
+  it('closes once checkResult can judge every domain', () => {
+    const attempts = [...answers('planets', 3, 2), ...answers('space', 3, 1)];
+    expect(checkVerdictGap(plan, attempts.map((a) => a.subject))).toBe(0);
+    expect(checkResult(GOAL, TWO, attempts, 'check-1').report.domains.every((d) => d.judged)).toBe(true);
   });
 });
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Compass, Home, Play, RefreshCw, Timer } from 'lucide-react';
+import { ArrowRight, Compass, Flag, Home, Play, RefreshCw, Timer } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
 import { Button } from '@/components/ui/Button';
 import {
@@ -40,6 +40,8 @@ import {
   CHECK_SUBJECT,
   canDealAnother,
   checkHistory,
+  checkPaceHint,
+  checkVerdictGap,
   projectedCheckLength,
   type CheckPlan,
 } from '@/lib/readinessCheck';
@@ -70,7 +72,9 @@ type Phase =
   | 'sitting' // the questions under the clock, with feedback as in practice
   | 'done'; // the result page
 
-type Ending = 'finished' | 'timeUp';
+/** How the sitting closed: dealt out, stopped by the clock, or ended by
+ *  the learner once the sample could carry a verdict. */
+type Ending = 'finished' | 'timeUp' | 'endedEarly';
 
 /**
  * Readiness-check runner: one time-boxed sitting across every exam
@@ -375,6 +379,21 @@ export function PackCheckRunner() {
             </span>
           </div>
         ) : null}
+        {justSat && ending === 'endedEarly' ? (
+          <div
+            data-testid="check-ended-early"
+            className="flex items-center gap-3 rounded-2xl border border-ink-200 bg-surface p-3 text-sm text-ink-700 shadow-xs"
+          >
+            <Flag className="h-5 w-5 shrink-0 text-ink-500" />
+            <span>
+              <strong className="font-semibold text-ink-900">
+                Ended early at {state.questions.length}{' '}
+                {state.questions.length === 1 ? 'question' : 'questions'}.
+              </strong>{' '}
+              The result reads over those, with the band that sample size allows.
+            </span>
+          </div>
+        ) : null}
         <CheckResultView sessionId={id} previous={previous} attempts={attempts} />
         <div className="flex flex-col gap-2">
           {mistakes > 0 ? (
@@ -424,11 +443,20 @@ export function PackCheckRunner() {
   // Once this question is answered, is there time for another? Read
   // live, so the Next button says "See results" as the clock runs down.
   const isLast = stage === 'feedback' && !canDealAnother(pacing);
-  const total = projectedCheckLength({
-    ...pacing,
-    dealt: state.currentIndex + 1,
-    planned: plan.count,
+  // The sitting is time-boxed, so progress is the clock; the projection
+  // is only a hint, worded as one, never shown as a total.
+  const dealt = state.currentIndex + 1;
+  const hint = checkPaceHint({
+    answered,
+    dealt,
+    projected: projectedCheckLength({ ...pacing, dealt, planned: plan.count }),
   });
+  // Ending early is open once every domain has the plan's floor — the
+  // point the result can say something; before it, the gap in words.
+  const gap = checkVerdictGap(
+    plan,
+    state.questions.slice(0, answered).map((q) => q.categoryKey),
+  );
 
   function handleSelect(key: OptionKey) {
     if (stage !== 'choosing') return;
@@ -471,6 +499,13 @@ export function PackCheckRunner() {
     setStage('feedback');
   }
 
+  /** End the sitting now, over the questions answered — as the bell
+   *  would, the question on screen is dropped unless already answered. */
+  function handleEndEarly() {
+    if (!state || gap > 0) return;
+    finish(state, answered, 'endedEarly');
+  }
+
   function handleNext() {
     if (!state || !clock) return;
     const t = Date.now();
@@ -509,19 +544,24 @@ export function PackCheckRunner() {
         lowTime ? 'border-warn-500/40 bg-warn-100/60' : 'border-ink-200 bg-surface',
       )}
     >
-      <div className="flex items-center gap-2.5">
-        <Timer className={cn('h-4.5 w-4.5 shrink-0', lowTime ? 'text-warn-700' : 'text-ink-500')} />
-        <span
-          data-testid="check-clock"
-          className={cn(
-            'text-lg font-bold leading-none tabular-nums',
-            lowTime ? 'text-warn-700' : 'text-ink-900',
-          )}
-          aria-live="off"
-        >
-          {formatClock(remaining)}
+      <div className="flex min-w-0 flex-col gap-1">
+        <div className="flex items-center gap-2.5">
+          <Timer className={cn('h-4.5 w-4.5 shrink-0', lowTime ? 'text-warn-700' : 'text-ink-500')} />
+          <span
+            data-testid="check-clock"
+            className={cn(
+              'text-lg font-bold leading-none tabular-nums',
+              lowTime ? 'text-warn-700' : 'text-ink-900',
+            )}
+            aria-live="off"
+          >
+            {formatClock(remaining)}
+          </span>
+          <span className="text-xs text-ink-500">left of {minutes} min</span>
+        </div>
+        <span data-testid="check-hint" className="text-xs text-ink-500">
+          {hint}
         </span>
-        <span className="text-xs text-ink-500">left of {minutes} min</span>
       </div>
       <span className="text-xs text-ink-500">
         {answered} answered
@@ -539,8 +579,8 @@ export function PackCheckRunner() {
       />
       <QuestionPanel
         question={current}
-        position={state.currentIndex + 1}
-        total={total}
+        position={dealt}
+        progress={budgetSeconds > 0 ? elapsed / budgetSeconds : 0}
         selected={selected}
         stage={stage}
         onSelect={handleSelect}
@@ -561,6 +601,19 @@ export function PackCheckRunner() {
         onCheck={handleCheck}
         onNext={handleNext}
       />
+      {/* Secondary, never the primary button; hidden once Next already
+          ends the sitting. */}
+      {isLast ? null : (
+        <div data-testid="check-end" className="flex flex-col items-center gap-0.5">
+          <Button variant="ghost" size="sm" onClick={handleEndEarly} disabled={gap > 0}>
+            <Flag className="h-4 w-4" />
+            End check
+          </Button>
+          <span data-testid="check-end-gap" className="text-xs text-ink-500">
+            {gap > 0 ? `${gap} more for a verdict` : 'Enough answered for a verdict'}
+          </span>
+        </div>
+      )}
     </main>
   );
 }
