@@ -231,6 +231,22 @@ describe('PackReviewRunner', () => {
     expect(optionKeys()).toEqual(onSheet.options.map((o) => o.key));
   });
 
+  it("shuffles an exam's or check's scoped review — only paper keeps its order", async () => {
+    // Regression: any `#session=` scope kept pack order, so reviews opened
+    // from exam and check results kept the answer-position cue.
+    const q = packQuestions.find((p) => canShuffleOptions(p) && p.options.length > 2)!;
+    localStorage.setItem(
+      ATTEMPTS_KEY,
+      JSON.stringify([{ ...wrong(q.id, 'exam-1', 1000, 1), mode: 'exam' }]),
+    );
+    window.location.hash = '#session=exam-1';
+    const spy = vi.spyOn(Math, 'random').mockReturnValue(0);
+    await render();
+    spy.mockRestore();
+    const bankKeys = q.options.map((o) => o.key);
+    expect(optionKeys()).toEqual([...bankKeys.slice(1), bankKeys[0]]);
+  });
+
   it('"Review more" after a scoped session moves on to the rest of the queue', async () => {
     seedOldMistakesAndASheet();
     window.location.hash = '#session=sheet-1';

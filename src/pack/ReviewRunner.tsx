@@ -71,7 +71,8 @@ function scopeFromHash(): string | null {
  * session's mistakes, all of them, in the order they were asked.
  *
  * Options are shuffled once per deal so a re-asked question can't be
- * answered from memory of its position (see `shuffleOptions`).
+ * answered from memory of its position (see `shuffleOptions`) — except
+ * in a paper sheet's review, which keeps the printed order.
  */
 export function PackReviewRunner() {
   const { attempts } = useStorageData();
@@ -121,12 +122,16 @@ export function PackReviewRunner() {
       return;
     }
     const byId = new Map(packQuestions.map((q) => [q.id, q]));
+    // A paper sheet's review follows a page the learner may hold in hand,
+    // so it keeps the printed order. Exam and check reviews (also scoped)
+    // were on screen, so they shuffle like the rest.
+    const paperSheet =
+      scope !== null &&
+      attempts.some((a) => a.sessionId === scope && a.mode === 'paper');
     const picked = ids
       .map((id) => byId.get(id))
       .filter((q): q is PackQuestion => q !== undefined)
-      // A scoped review follows a sheet the learner may hold in hand, so
-      // it keeps the printed order.
-      .map((q) => (scope === null ? shuffleOptions(q) : q));
+      .map((q) => (paperSheet ? q : shuffleOptions(q)));
     if (picked.length === 0) {
       setNothingToReview(true);
       return;
