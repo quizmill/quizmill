@@ -1,0 +1,611 @@
+[
+  {
+    "id": "demo-planets-001",
+    "categoryKey": "planets",
+    "level": "basics",
+    "paperId": "starter-paper-1",
+    "tags": [
+      "mercury",
+      "innermost"
+    ],
+    "difficulty": 1,
+    "prompt": "Which planet is closest to the Sun?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Venus",
+        "explanation": "Second from the Sun — hottest, but not closest."
+      },
+      {
+        "key": "B",
+        "text": "Mercury",
+        "explanation": "Innermost planet, about 58 million km out."
+      },
+      {
+        "key": "C",
+        "text": "Mars",
+        "explanation": "Fourth from the Sun, beyond Earth."
+      },
+      {
+        "key": "D",
+        "text": "Earth",
+        "explanation": "Third from the Sun."
+      }
+    ],
+    "correctKey": "B",
+    "explanation": "Mercury orbits at about 58 million km from the Sun, the innermost of the eight planets. Venus is second — it is the hottest planet, but not the closest, which is a common mix-up.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-planets-002",
+    "categoryKey": "planets",
+    "level": "basics",
+    "paperId": "starter-paper-1",
+    "difficulty": 2,
+    "prompt": "Which planet has the most confirmed moons as of the mid-2020s?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Jupiter",
+        "explanation": "Held the record for decades — the tempting pick."
+      },
+      {
+        "key": "B",
+        "text": "Uranus",
+        "explanation": "Fewer than 30 known moons."
+      },
+      {
+        "key": "C",
+        "text": "Saturn",
+        "explanation": "Passed 140 confirmed moons after a wave of small-moon finds."
+      },
+      {
+        "key": "D",
+        "text": "Neptune",
+        "explanation": "Only 16 known moons."
+      }
+    ],
+    "correctKey": "C",
+    "explanation": "Saturn overtook Jupiter after a wave of small-moon discoveries, passing 140 confirmed moons. Jupiter held the record for decades, which makes it the tempting distractor.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-planets-003",
+    "categoryKey": "planets",
+    "conceptId": "greenhouse-effect",
+    "level": "basics",
+    "paperId": "starter-paper-1",
+    "difficulty": 2,
+    "prompt": "Why does Venus have a higher average surface temperature than Mercury, despite being farther from the Sun?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Venus has a thick carbon dioxide atmosphere that traps heat"
+      },
+      {
+        "key": "B",
+        "text": "Venus is volcanically active and heated from inside"
+      },
+      {
+        "key": "C",
+        "text": "Venus rotates so slowly that one side always faces the Sun"
+      },
+      {
+        "key": "D",
+        "text": "Venus reflects less sunlight than Mercury"
+      }
+    ],
+    "correctKey": "A",
+    "explanation": "Venus's dense CO2 atmosphere produces a runaway greenhouse effect, keeping the surface around 465°C day and night. Mercury, with almost no atmosphere, swings between extremes but averages cooler.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-planets-004",
+    "categoryKey": "planets",
+    "level": "advanced",
+    "paperId": "starter-paper-1",
+    "difficulty": 3,
+    "prompt": "Which of these moons is known to have a subsurface liquid-water ocean and erupting water plumes?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Phobos, a moon of Mars",
+        "explanation": "A dry rubble pile — no ocean, no plumes."
+      },
+      {
+        "key": "B",
+        "text": "Enceladus, a moon of Saturn",
+        "explanation": "Cassini flew through its south-polar water plumes."
+      },
+      {
+        "key": "C",
+        "text": "Callisto, a moon of Jupiter",
+        "explanation": "May hide an ocean, but shows no plumes."
+      },
+      {
+        "key": "D",
+        "text": "Triton, a moon of Neptune",
+        "explanation": "Its geysers are nitrogen, not water."
+      }
+    ],
+    "correctKey": "B",
+    "explanation": "Cassini flew through Enceladus's south-polar water plumes, confirming a salty subsurface ocean. Triton has nitrogen geysers (not water), Callisto may hide an ocean but shows no plumes, and Phobos is a dry rubble pile.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-planets-005",
+    "categoryKey": "planets",
+    "level": "advanced",
+    "paperId": "starter-paper-1",
+    "difficulty": 3,
+    "prompt": "What primarily defines the difference between a planet and a dwarf planet like Pluto?",
+    "options": [
+      {
+        "key": "A",
+        "text": "A dwarf planet is smaller than any moon in the solar system",
+        "explanation": "Pluto is larger than several moons; size is not the test."
+      },
+      {
+        "key": "B",
+        "text": "A dwarf planet has not cleared other objects from its orbital neighbourhood",
+        "explanation": "The third IAU test — the one Pluto *fails*."
+      },
+      {
+        "key": "C",
+        "text": "A dwarf planet does not orbit the Sun directly",
+        "explanation": "Pluto orbits the Sun directly, like any planet."
+      },
+      {
+        "key": "D",
+        "text": "A dwarf planet lacks enough gravity to be round",
+        "explanation": "Pluto is round; it passes this test."
+      }
+    ],
+    "correctKey": "B",
+    "explanation": "Under the 2006 IAU definition, a planet must orbit the Sun, be massive enough to be round, **and** have cleared its orbital neighbourhood. Pluto fails only the third test — it shares the Kuiper belt with many similar bodies. It is round, and it is larger than several moons.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-planets-006",
+    "categoryKey": "planets",
+    "level": "advanced",
+    "paperId": "starter-paper-1",
+    "difficulty": 4,
+    "prompt": "Jupiter's Great Red Spot is best described as which of the following?",
+    "options": [
+      {
+        "key": "A",
+        "text": "A persistent anticyclonic storm larger than Earth"
+      },
+      {
+        "key": "B",
+        "text": "A volcanic hotspot seen through the cloud deck"
+      },
+      {
+        "key": "C",
+        "text": "An impact scar left by a comet collision"
+      },
+      {
+        "key": "D",
+        "text": "A region of red phosphorus deserts"
+      }
+    ],
+    "correctKey": "A",
+    "explanation": "The Great Red Spot is a high-pressure anticyclonic storm that has persisted for at least 190 years and is wider than Earth. Jupiter is a gas giant with no surface for volcanoes or deserts, and comet scars (like Shoemaker-Levy 9's) fade within months.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-planets-007",
+    "categoryKey": "planets",
+    "level": "basics",
+    "difficulty": 1,
+    "prompt": "True or false: the Sun is a star, not a planet.",
+    "options": [
+      {
+        "key": "A",
+        "text": "True"
+      },
+      {
+        "key": "B",
+        "text": "False"
+      }
+    ],
+    "correctKey": "A",
+    "explanation": "The Sun is a G-type main-sequence star — a vast ball of plasma fusing hydrogen into helium. The planets orbit it; it is not itself a planet. (A two-option question shows the engine isn't fixed to four choices.)",
+    "source": "generated",
+    "reviewStatus": "reviewed"
+  },
+  {
+    "id": "demo-planets-008",
+    "categoryKey": "planets",
+    "level": "advanced",
+    "difficulty": 2,
+    "prompt": "Which is the largest planet in the Solar System, by both mass and diameter?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Earth",
+        "explanation": "About a tenth of Jupiter’s diameter."
+      },
+      {
+        "key": "B",
+        "text": "Jupiter",
+        "explanation": "About 318 Earth masses and 11 Earth diameters."
+      },
+      {
+        "key": "C",
+        "text": "Saturn",
+        "explanation": "Second largest."
+      },
+      {
+        "key": "D",
+        "text": "Neptune",
+        "explanation": "Far smaller than either gas giant."
+      },
+      {
+        "key": "E",
+        "text": "Mars",
+        "explanation": "Smaller than Earth."
+      }
+    ],
+    "correctKey": "B",
+    "explanation": "Jupiter dominates the Solar System's planets at about 318 Earth masses and 11 Earth diameters. Saturn is the second largest; Neptune, Earth and Mars are far smaller. (A five-option question — A through E.)",
+    "source": "generated",
+    "reviewStatus": "reviewed"
+  },
+  {
+    "id": "demo-planets-009",
+    "categoryKey": "planets",
+    "level": "advanced",
+    "difficulty": 2,
+    "prompt": "Which of these planets has the most prominent ring system?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Saturn",
+        "image": "saturn.svg",
+        "explanation": "Broad, bright rings of ice and rock."
+      },
+      {
+        "key": "B",
+        "text": "Mars",
+        "image": "mars.svg",
+        "explanation": "No rings at all."
+      },
+      {
+        "key": "C",
+        "text": "Neptune",
+        "image": "neptune.svg",
+        "explanation": "Faint, dark ring arcs."
+      },
+      {
+        "key": "D",
+        "text": "Jupiter",
+        "image": "jupiter.svg",
+        "explanation": "A thin, dusty ring you can barely see."
+      }
+    ],
+    "correctKey": "A",
+    "explanation": "Saturn's bright, broad rings of ice and rock are by far the most prominent in the Solar System. The other giants have faint, dark rings and Mars has none. (The answers here are image tiles, not text.)",
+    "source": "generated",
+    "reviewStatus": "reviewed"
+  },
+  {
+    "id": "demo-planets-010",
+    "categoryKey": "planets",
+    "level": "advanced",
+    "difficulty": 2,
+    "prompt": "Which planet is shown in the figure above?",
+    "image": "saturn.svg",
+    "options": [
+      {
+        "key": "A",
+        "text": "Saturn"
+      },
+      {
+        "key": "B",
+        "text": "Jupiter"
+      },
+      {
+        "key": "C",
+        "text": "Mars"
+      },
+      {
+        "key": "D",
+        "text": "Neptune"
+      }
+    ],
+    "correctKey": "A",
+    "explanation": "The broad, bright ring system is the giveaway — this is Saturn. (This question carries a prompt image above plain text answers.)",
+    "source": "generated",
+    "reviewStatus": "reviewed"
+  },
+  {
+    "id": "demo-planets-011",
+    "categoryKey": "planets",
+    "level": "advanced",
+    "tags": [
+      "gas-giants",
+      "select-all"
+    ],
+    "difficulty": 3,
+    "prompt": "Which of these are gas giants? Select all that apply.",
+    "options": [
+      {
+        "key": "A",
+        "text": "Jupiter",
+        "explanation": "Mostly hydrogen and helium — a gas giant."
+      },
+      {
+        "key": "B",
+        "text": "Saturn",
+        "explanation": "Mostly hydrogen and helium — a gas giant."
+      },
+      {
+        "key": "C",
+        "text": "Neptune",
+        "explanation": "A giant, but an ice giant — the deliberate near miss."
+      },
+      {
+        "key": "D",
+        "text": "Mars",
+        "explanation": "A small rocky planet."
+      }
+    ],
+    "correctKeys": [
+      "A",
+      "B"
+    ],
+    "explanation": "The gas giants are Jupiter and Saturn — worlds made overwhelmingly of hydrogen and helium with no solid surface. Neptune is a giant planet too, but it and Uranus are classed as ice giants (much more water, ammonia and methane), so Neptune is a deliberate near-miss here. Mars is a small rocky (terrestrial) planet.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-explore-001",
+    "categoryKey": "space-exploration",
+    "level": "basics",
+    "paperId": "starter-paper-2",
+    "difficulty": 1,
+    "prompt": "Which mission first landed humans on the Moon?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Apollo 11"
+      },
+      {
+        "key": "B",
+        "text": "Apollo 13"
+      },
+      {
+        "key": "C",
+        "text": "Gemini 4"
+      },
+      {
+        "key": "D",
+        "text": "Mercury-Atlas 6"
+      }
+    ],
+    "correctKey": "A",
+    "explanation": "Apollo 11 landed Armstrong and Aldrin at Tranquility Base on 20 July 1969. Apollo 13 famously aborted its landing after an oxygen-tank explosion; Gemini and Mercury were earlier Earth-orbit programmes.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-explore-002",
+    "categoryKey": "space-exploration",
+    "level": "basics",
+    "paperId": "starter-paper-2",
+    "difficulty": 2,
+    "prompt": "Which two spacecraft are the only human-made objects to have entered interstellar space?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pioneer 10 and Pioneer 11",
+        "explanation": "Headed out, but fell silent before crossing."
+      },
+      {
+        "key": "B",
+        "text": "Voyager 1 and Voyager 2",
+        "explanation": "Crossed the heliopause in 2012 and 2018, still transmitting."
+      },
+      {
+        "key": "C",
+        "text": "New Horizons and Cassini",
+        "explanation": "Cassini ended at Saturn; New Horizons is still inside the heliosphere."
+      },
+      {
+        "key": "D",
+        "text": "Galileo and Juno",
+        "explanation": "Both orbiters, deliberately ended at Jupiter."
+      }
+    ],
+    "correctKey": "B",
+    "explanation": "Voyager 1 crossed the heliopause in 2012 and Voyager 2 in 2018, both still transmitting. The Pioneers are headed out but fell silent before crossing; Cassini, Galileo and Juno were orbiters deliberately ended at their planets; New Horizons is still inside the heliosphere.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-explore-003",
+    "categoryKey": "space-exploration",
+    "level": "advanced",
+    "paperId": "starter-paper-2",
+    "difficulty": 3,
+    "prompt": "Why do Mars rovers like Perseverance use a 'sky crane' landing system instead of airbags or simple parachutes?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Mars's atmosphere is too thick for parachutes to open safely"
+      },
+      {
+        "key": "B",
+        "text": "The rovers are too heavy for airbags, and the thin atmosphere makes parachutes alone insufficient"
+      },
+      {
+        "key": "C",
+        "text": "Airbag materials cannot survive the radiation on the way to Mars"
+      },
+      {
+        "key": "D",
+        "text": "The sky crane is reusable for return missions"
+      }
+    ],
+    "correctKey": "B",
+    "explanation": "Mars's atmosphere is thick enough to demand heat shielding but ~100× thinner than Earth's, so parachutes only slow a one-tonne rover to ~300 km/h. Airbags worked for the ~180 kg Spirit/Opportunity but cannot absorb a car-sized rover's impact — hence rocket-powered descent with the rover winched down on cables.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-explore-004",
+    "categoryKey": "space-exploration",
+    "level": "advanced",
+    "paperId": "starter-paper-2",
+    "difficulty": 4,
+    "prompt": "The James Webb Space Telescope orbits the Sun-Earth L2 point rather than orbiting Earth like Hubble. What is the main advantage of L2 for Webb?",
+    "options": [
+      {
+        "key": "A",
+        "text": "It allows the telescope to keep the Sun, Earth and Moon behind its sunshield at all times"
+      },
+      {
+        "key": "B",
+        "text": "It is close enough for astronauts to service the telescope"
+      },
+      {
+        "key": "C",
+        "text": "It eliminates the need for station-keeping fuel"
+      },
+      {
+        "key": "D",
+        "text": "It provides constant shadow, removing the need for a sunshield"
+      }
+    ],
+    "correctKey": "A",
+    "explanation": "At L2, all three bright/warm bodies — Sun, Earth, Moon — stay in roughly the same direction, so one fixed sunshield can block them while the cold side observes deep space. L2 is 1.5 million km away (no servicing), halo orbits still need station-keeping burns, and Webb sits in full sunlight, which is exactly why the sunshield exists.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-explore-005",
+    "categoryKey": "space-exploration",
+    "level": "basics",
+    "paperId": "starter-paper-2",
+    "tags": [
+      "agencies",
+      "select-all"
+    ],
+    "difficulty": 2,
+    "prompt": "Which of the following are government space agencies? Select all that apply.",
+    "options": [
+      {
+        "key": "A",
+        "text": "NASA (United States)",
+        "explanation": "A United States government agency."
+      },
+      {
+        "key": "B",
+        "text": "ESA (Europe)",
+        "explanation": "Funded by a consortium of European states."
+      },
+      {
+        "key": "C",
+        "text": "SpaceX",
+        "explanation": "The trap: launches under contract, but a private company."
+      },
+      {
+        "key": "D",
+        "text": "JAXA (Japan)",
+        "explanation": "Japan’s government agency."
+      }
+    ],
+    "correctKeys": [
+      "A",
+      "B",
+      "D"
+    ],
+    "explanation": "NASA, ESA and JAXA are public space agencies funded by governments (the United States, a consortium of European states, and Japan). SpaceX is the common trap: it launches astronauts and cargo under contract, but it is a private company, not a government agency.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
+    "id": "demo-planets-012",
+    "categoryKey": "planets",
+    "conceptId": "greenhouse-effect",
+    "level": "basics",
+    "difficulty": 2,
+    "prompt": "What makes Venus's greenhouse effect 'runaway' compared with Earth's milder version?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Venus's oceans boiled away, so no carbon could be locked into rocks, letting CO2 keep building up"
+      },
+      {
+        "key": "B",
+        "text": "Venus receives over ten times more sunlight than Earth"
+      },
+      {
+        "key": "C",
+        "text": "Venus's clouds of sulfuric acid generate their own heat"
+      },
+      {
+        "key": "D",
+        "text": "Venus's slow rotation lets heat accumulate on the day side"
+      }
+    ],
+    "correctKey": "A",
+    "explanation": "On Earth, oceans and rock weathering pull CO2 out of the air, keeping the greenhouse effect in check. Venus lost any liquid water early on, so its CO2 had nowhere to go and accumulated into a crushing heat-trapping atmosphere. Sunlight intensity (about twice Earth's, not ten times) and rotation speed don't drive the runaway process, and the acid clouds reflect light rather than make heat.",
+    "source": "generated",
+    "reviewStatus": "draft",
+    "tags": [
+      "from-notes",
+      "greenhouse-effect"
+    ],
+    "generatedFrom": {
+      "questionId": "demo-planets-003",
+      "note": "I keep mixing up Venus vs Mercury — I'd like more questions on greenhouse effects."
+    }
+  },
+  {
+    "id": "demo-planets-013",
+    "categoryKey": "planets",
+    "conceptId": "greenhouse-effect",
+    "level": "basics",
+    "difficulty": 3,
+    "prompt": "Mercury's daytime surface can reach about 430°C, yet its night side plunges to about -180°C. What explains this extreme swing?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Mercury has almost no atmosphere to hold on to heat after sunset"
+      },
+      {
+        "key": "B",
+        "text": "Mercury's iron core cools the surface at night"
+      },
+      {
+        "key": "C",
+        "text": "Solar wind strips heat away from the night side"
+      },
+      {
+        "key": "D",
+        "text": "Mercury's orbit takes it much farther from the Sun at night"
+      }
+    ],
+    "correctKey": "A",
+    "explanation": "Without a blanket of gas, heat radiates straight back into space the moment the Sun sets — the same reason cloudless deserts turn cold at night. This is the flip side of Venus: an atmosphere evens temperatures out (or, in Venus's case, traps heat everywhere). The core, solar wind, and orbital distance play no meaningful role in the day-night swing.",
+    "source": "generated",
+    "reviewStatus": "draft",
+    "tags": [
+      "from-notes",
+      "greenhouse-effect"
+    ],
+    "generatedFrom": {
+      "questionId": "demo-planets-003",
+      "note": "I keep mixing up Venus vs Mercury — I'd like more questions on greenhouse effects."
+    }
+  }
+]

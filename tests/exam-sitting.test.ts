@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { buildSitting, passed, sittingLevel, sittingPlan, EXAM_SITTING } from '@/pack/exam';
+import {
+  buildSitting,
+  passed,
+  sittingLevel,
+  sittingPlan,
+  withheldSitting,
+  EXAM_SITTING,
+  EXAM_SITTING_MIN_FRACTION,
+  EXAM_WITHHELD,
+} from '@/pack/exam';
 import { packQuestions, type PackQuestion } from '@/pack/data';
+import { packManifestSchema } from '../tools/pack/schema';
+import sampleManifestJson from './pack-sample/pack.json';
+import sampleQuestions from './pack-sample/questions.json';
+
+const sampleManifest = packManifestSchema.parse(sampleManifestJson);
 
 function q(id: string, level?: string): PackQuestion {
   return {
@@ -49,15 +63,70 @@ describe('sittingPlan', () => {
   });
 
   it('pro-rates the time when the band is smaller than the real exam', () => {
-    // 20 questions in 30 min = 90 s each; 9 available → 13 min 30 s.
-    expect(sittingPlan({ questionCount: 20, durationMinutes: 30 }, 9)).toEqual({
-      count: 9,
-      durationSeconds: 810,
+    // 20 questions in 30 min = 90 s each; 12 available → 18 min.
+    expect(sittingPlan({ questionCount: 20, durationMinutes: 30 }, 12)).toEqual({
+      count: 12,
+      durationSeconds: 1080,
     });
   });
 
   it('deals the whole band in the full time with no questionCount to pro-rate against', () => {
     expect(sittingPlan({ durationMinutes: 10 }, 7)).toEqual({ count: 7, durationSeconds: 600 });
+    expect(sittingPlan({ durationMinutes: 10 }, 1)).toEqual({ count: 1, durationSeconds: 600 });
+  });
+
+  describe('the floor: a band under half the real exam is no sitting', () => {
+    const exam = { questionCount: 75, durationMinutes: 180 };
+
+    it('is half the declared questionCount', () => {
+      expect(EXAM_SITTING_MIN_FRACTION).toBe(0.5);
+    });
+
+    it('withholds the sitting just below the floor', () => {
+      expect(sittingPlan(exam, 37)).toBeNull();
+      expect(sittingPlan(exam, 7)).toBeNull();
+    });
+
+    it('deals exactly at the floor', () => {
+      expect(sittingPlan(exam, 38)).toEqual({ count: 38, durationSeconds: 5472 });
+      expect(sittingPlan({ questionCount: 20, durationMinutes: 30 }, 10)).toEqual({
+        count: 10,
+        durationSeconds: 900,
+      });
+    });
+
+    it('keeps pro-rating above the floor — a 60-of-75 band is still a mock', () => {
+      expect(sittingPlan(exam, 60)).toEqual({ count: 60, durationSeconds: 144 * 60 });
+    });
+  });
+});
+
+describe('withheldSitting', () => {
+  // 3 hard questions against a declared 10-question, 20-minute exam.
+  const exam = { passPct: 70, questionCount: 10, durationMinutes: 20 };
+
+  it('is the full exam as declared when the floor withholds the sitting', () => {
+    expect(buildSitting(exam, ['easy', 'hard'], BANK)).toBeNull();
+    expect(withheldSitting(exam, ['easy', 'hard'], BANK)).toEqual({
+      count: 10,
+      durationSeconds: 1200,
+    });
+  });
+
+  it('is null when there is a sitting to take', () => {
+    const ok = { passPct: 70, questionCount: 6, durationMinutes: 12 };
+    expect(buildSitting(ok, ['easy', 'hard'], BANK)).not.toBeNull();
+    expect(withheldSitting(ok, ['easy', 'hard'], BANK)).toBeNull();
+  });
+
+  it('is null when no floor applies: no exam, no duration, or no questionCount', () => {
+    expect(withheldSitting(undefined, ['easy', 'hard'], BANK)).toBeNull();
+    expect(withheldSitting({ passPct: 70, questionCount: 10 }, ['easy', 'hard'], BANK)).toBeNull();
+    expect(withheldSitting({ passPct: 70, durationMinutes: 20 }, ['easy', 'hard'], BANK)).toBeNull();
+  });
+
+  it('is null for the demo pack, whose sitting is the whole declared exam', () => {
+    expect(EXAM_WITHHELD).toBeNull();
   });
 });
 
@@ -106,6 +175,22 @@ describe('the demo pack sitting', () => {
     expect(EXAM_SITTING!.count).toBe(advanced);
     expect(EXAM_SITTING!.count).toBe(9);
     expect(EXAM_SITTING!.durationSeconds).toBe(15 * 60);
+  });
+});
+
+describe('the sample fixture pack (tests/pack-sample)', () => {
+  // The demo pack with the real exam declared bigger than its bank — 30
+  // questions in 45 min against 9 Advanced — and an upgrade naming the
+  // full pack: the shape the locked Home tile is for.
+  it('has no sitting, and withholds the full declared exam', () => {
+    const levelKeys = sampleManifest.levels!.map((l) => l.key);
+    const qs = sampleQuestions as PackQuestion[];
+    expect(buildSitting(sampleManifest.exam, levelKeys, qs)).toBeNull();
+    expect(withheldSitting(sampleManifest.exam, levelKeys, qs)).toEqual({
+      count: 30,
+      durationSeconds: 45 * 60,
+    });
+    expect(sampleManifest.upgrade?.packId).toBeTruthy();
   });
 });
 
