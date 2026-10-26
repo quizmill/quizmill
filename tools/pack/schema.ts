@@ -522,6 +522,20 @@ export interface PackFiles {
   concepts?: unknown;
 }
 
+/** Lowercase letters and digits only, so `very-hard`, `Very hard` and
+ *  `VERY_HARD` all compare equal. */
+const normaliseTag = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/**
+ * Whether a tag just names this level (by key or label, normalised). The
+ * level already has its own chip, so such a tag shows the tier twice: the
+ * question header drops it and the validator warns about it (#238).
+ */
+export function tagNamesLevel(tag: string, level: Pick<PackLevel, 'key' | 'label'>): boolean {
+  const t = normaliseTag(tag);
+  return t !== '' && (t === normaliseTag(level.key) || t === normaliseTag(level.label));
+}
+
 /**
  * Whole-pack validation: per-file schemas plus the cross-file checks a
  * single Zod schema can't express (unique ids, category/scenario/paper
@@ -656,6 +670,21 @@ export function validatePack(input: PackFiles): PackValidationResult {
           `questions.json[${q.id}]: level "${q.level}" not declared in pack.json levels`,
         );
       }
+    }
+    // A tag that repeats the question's own level is redundant with the
+    // level chip. The app hides it, so this is a warning, one line per pack.
+    const levelByKey = new Map((manifest.data.levels ?? []).map((l) => [l.key, l]));
+    const repeatsLevel = questions.filter((q) => {
+      const level = q.level ? levelByKey.get(q.level) : undefined;
+      return level !== undefined && (q.tags ?? []).some((t) => tagNamesLevel(t, level));
+    });
+    if (repeatsLevel.length > 0) {
+      const ids = repeatsLevel.slice(0, 3).map((q) => q.id).join(', ');
+      const more = repeatsLevel.length > 3 ? ', …' : '';
+      const n = repeatsLevel.length;
+      warnings.push(
+        `questions.json: ${n} ${n === 1 ? 'question has tags' : 'questions have tags'} that repeat their level (${ids}${more}) — \`level\` is the tier; drop it from \`tags\``,
+      );
     }
 
     const papers = manifest.data.papers ?? [];
