@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Boxes,
   Car,
+  Crosshair,
   Gamepad2,
   GraduationCap,
   Monitor,
@@ -40,6 +41,7 @@ import {
 } from '@/lib/progressionPref';
 import { loadPaperModeEnabled, savePaperModeEnabled } from '@/lib/paper';
 import { gamesRevealedPref } from '@/lib/gamesReveal';
+import { WEAK_SPOT_CLEAR_CHOICES, weakSpotClearAfterPref } from '@/lib/weakSpotPref';
 import { useDevicePref } from '@/lib/useDevicePref';
 import {
   ANALYTICS_EVENT,
@@ -120,7 +122,7 @@ const LOOK_CHOICES: { value: LookPref; label: string }[] = [
  *                       declares one), question sources, `extras` slot
  *                       (e.g. the downvote browser)
  *  - Progress & sync  — SyncSettings, TransferSettings, the two resets
- *  - This device      — appearance, drive mode, coach mode, paper, XP,
+ *  - This device      — appearance, drive mode, coach mode, paper, weak spots, XP,
  *                       usage analytics (only in builds that configure it)
  *  - About            — version + build (tap the version to reveal games)
  */
@@ -271,6 +273,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
     true,
   );
   const [examShown, toggleExamShown] = useDeviceToggle(loadExamShown, saveExamShown, true);
+  const [clearAfter, setClearAfter] = useDevicePref(weakSpotClearAfterPref);
 
   // Usage analytics (device-level) — the anonymous funnel beacon a hosted
   // app sends its author. The card exists only in builds that configure
@@ -545,6 +548,48 @@ export function SettingsPage({ extras }: SettingsPageProps) {
             link={{ href: '/practice/exam/', label: 'Open the timed exam', testId: 'open-exam' }}
           />
         ) : null}
+
+        {/* How many right answers in a row take a question off the
+            weak-spot list. The list is derived, so this only changes
+            what it shows. */}
+        <div
+          data-testid="weak-spot-setting"
+          className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs"
+        >
+          <h3 className="flex items-center gap-2 text-lg font-semibold text-ink-900">
+            <Crosshair className="h-5 w-5 text-ink-500" />
+            Weak spots
+          </h3>
+          <p className="mt-1 text-sm text-ink-600">
+            A question you get wrong stays on your weak-spot list until you
+            answer it right this many times in a row. Changing it never
+            resets anything.
+          </p>
+          <div
+            role="radiogroup"
+            aria-label="Clear a weak spot after"
+            className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-ink-100 p-1"
+          >
+            {WEAK_SPOT_CLEAR_CHOICES.map((n) => (
+              <button
+                key={n}
+                type="button"
+                role="radio"
+                aria-checked={clearAfter === n}
+                data-testid={`weak-spot-clear-${n}`}
+                onClick={() => setClearAfter(n)}
+                className={cn(
+                  'tap-feedback flex items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold',
+                  clearAfter === n
+                    ? 'bg-surface text-ink-900 shadow-xs'
+                    : 'text-ink-500 hover:text-ink-700',
+                )}
+              >
+                {n === 1 ? '1 right' : `${n} in a row`}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Only for packs that opt into progression — the parent lever.
             Hiding is display-only: XP stays derived from history. */}

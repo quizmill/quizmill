@@ -118,7 +118,3 @@ export function sessionMistakeIds(
     .map((a) => a.questionId)
     .filter((id) => unresolved.has(id) && !seen.has(id) && seen.add(id));
 }
-
-export function unresolvedMistakeCount(attempts: readonly Attempt[]): number {
-  return unresolvedMistakeIds(attempts).length;
-}
