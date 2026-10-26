@@ -36,6 +36,13 @@
       "repo": "quizmill/pack-aws-saa"
     },
     {
+      "id": "aws-clf",
+      "title": "AWS Cloud Practitioner",
+      "description": "Unofficial practice for the AWS Certified Cloud Practitioner (CLF-C02) exam — a 30-question sample across the four exam domains (cloud concepts, security and compliance, cloud technology and services, billing, pricing and support), every question original and grounded in the AWS documentation.",
+      "repo": "quizmill/pack-aws-clf",
+      "url": "https://aws-clf.quizmill.dev"
+    },
+    {
       "id": "music-theory",
       "title": "Music Theory Practice",
       "description": "Visual music-theory practice — read staves, key signatures, intervals and chords. 102 questions across five categories and three levels (Beginner → Advanced); 84 carry generated staff and keyboard diagrams, and four answer with images.",
