@@ -1,3 +1,4 @@
+import { tagNamesLevel } from '../../tools/pack/schema';
 import { cn } from '@/lib/cn';
 import {
   PACK_CATEGORY_LABEL,
@@ -29,7 +30,13 @@ export function QuestionMeta({
   // Likewise a paper chip only for a declared paper; "Series · Paper 1",
   // since two books can both have a Paper 1.
   const paper = question.paperId ? PACK_PAPER_BY_KEY[question.paperId] : undefined;
-  const tags = hideTags ? [] : (question.tags ?? []);
+  // A tag that repeats the level would show the tier twice next to its
+  // chip; a tag naming some other level stays.
+  const tags = hideTags
+    ? []
+    : (question.tags ?? []).filter(
+        (tag) => !(level && levelLabel && tagNamesLevel(tag, { key: level, label: levelLabel })),
+      );
   return (
     <>
       <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand-700">

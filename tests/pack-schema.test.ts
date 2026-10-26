@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { validatePack } from '../tools/pack/schema';
+import { tagNamesLevel, validatePack } from '../tools/pack/schema';
 
 const DEMO = path.join(__dirname, '..', 'content', 'pack-demo');
 
@@ -909,5 +909,39 @@ describe('validatePack', () => {
       note: 'no origin id',
     };
     expect(validatePack(missing).ok).toBe(false);
+  });
+});
+
+describe('tags that repeat the level (#238)', () => {
+  const veryHard = { key: 'veryhard', label: 'Very hard' };
+
+  it('matches a tag on the level key or label, normalised', () => {
+    for (const tag of ['veryhard', 'very-hard', 'Very hard', 'VERY_HARD']) {
+      expect(tagNamesLevel(tag, veryHard)).toBe(true);
+    }
+    expect(tagNamesLevel('hard', veryHard)).toBe(false);
+    expect(tagNamesLevel('domain-3', veryHard)).toBe(false);
+    expect(tagNamesLevel('Exam prep', { key: 'exam', label: 'Exam prep' })).toBe(true);
+  });
+
+  it('warns (not errors) with the count and the first few ids', () => {
+    const input = loadDemo();
+    const questions = input.questions as { id: string; level?: string; tags?: string[] }[];
+    const leveled = questions.filter((q) => q.level);
+    for (const q of leveled.slice(0, 5)) q.tags = [...(q.tags ?? []), q.level!.toUpperCase()];
+    const result = validatePack(input);
+    expect(result.ok).toBe(true);
+    const warning = result.warnings.filter((w) => w.includes('repeat their level'));
+    expect(warning).toHaveLength(1);
+    expect(warning[0]).toContain('5 questions');
+    expect(warning[0]).toContain(leveled[0].id);
+    expect(warning[0]).not.toContain(leveled[4].id);
+  });
+
+  it('leaves a tag naming some other level alone', () => {
+    const input = loadDemo();
+    const questions = input.questions as { level?: string; tags?: string[] }[];
+    questions.find((q) => q.level === 'basics')!.tags = ['advanced'];
+    expect(validatePack(input).warnings).toEqual([]);
   });
 });
