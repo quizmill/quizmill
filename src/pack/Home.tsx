@@ -133,8 +133,10 @@ export default function PackHome() {
   const [examShown] = useClientState(loadExamShown, true);
   const examSitting = examShown ? EXAM_SITTING : null;
   // A sample too small to sit (see EXAM_SITTING_MIN_FRACTION) that names
-  // its fuller edition shows the real exam as a locked tile instead.
-  const examLocked = APP_CONFIG.upgrade?.packId ? EXAM_WITHHELD : null;
+  // its fuller edition shows the real exam as a locked tile instead —
+  // unless this device has hidden timed exams.
+  const examLocked =
+    examShown && APP_CONFIG.upgrade?.packId ? EXAM_WITHHELD : null;
   // In runtime-pack mode, hold the first paint until mount (see RUNTIME_PACK_MODE).
   const mounted = useMounted() || !RUNTIME_PACK_MODE;
   useEffect(() => {

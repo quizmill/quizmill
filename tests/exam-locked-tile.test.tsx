@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { webcrypto } from 'node:crypto';
 import PackHome from '@/pack/Home';
 import { PackExamRunner } from '@/pack/ExamRunner';
+import { saveExamShown } from '@/lib/examPref';
 
 // The demo pack's sitting is its whole declared exam, so a sample pack —
 // a band under the floor, the real 75-question exam declared — is
@@ -110,6 +111,13 @@ describe('Home with a sample pack whose band is below the exam floor', () => {
 
   it('shows no exam tile when the upgrade names no fuller pack', async () => {
     state.upgrade = { title: UPGRADE.title, url: UPGRADE.url };
+    await render(<PackHome />);
+    expect(container.querySelector('[data-testid="exam-locked-card"]')).toBeNull();
+  });
+
+  it('shows no locked tile when this device has hidden timed exams', async () => {
+    state.upgrade = UPGRADE;
+    saveExamShown(false);
     await render(<PackHome />);
     expect(container.querySelector('[data-testid="exam-locked-card"]')).toBeNull();
   });
