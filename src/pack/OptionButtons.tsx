@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Check, ChevronRight, X } from 'lucide-react';
+import { Check, ChevronRight, CornerDownRight, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { McqMarkdown } from '@/components/McqMarkdown';
 import { PackImage } from '@/pack/PackImage';
@@ -28,12 +28,17 @@ interface OptionButtonsProps {
  *   3 — the note as its own block under the option, outside the <button>
  *   4 — a "Why not?" disclosure per option, open on the picked-wrong one
  *   5 — verdict chips ("Your answer" / "Correct answer") + captioned notes
+ * Round 2 — 2's X on every distractor, with a lighter label than 1's
+ * caption line (no extra height):
+ *   6 — a run-in "Why not" / "Why" lead-in on the note's first line
+ *   7 — no words: a thin left rule in the state colour beside the note
+ *   8 — no words: a small ↳ icon leading the note
  */
-type NoteVariant = 0 | 1 | 2 | 3 | 4 | 5;
+type NoteVariant = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 function noteVariant(): NoteVariant {
   if (typeof window === 'undefined') return 0;
   const n = Number(new URLSearchParams(window.location.search).get('optv'));
-  return n >= 1 && n <= 5 ? (n as NoteVariant) : 0;
+  return n >= 1 && n <= 8 ? (n as NoteVariant) : 0;
 }
 
 /**
@@ -55,6 +60,8 @@ export function OptionButtons({
   const imageOptions = options.length > 0 && options.every((o) => o.image);
   const bubbleShape = multi ? 'rounded-md' : 'rounded-full';
   const variant = noteVariant();
+  // Variants that carry 2's muted X on every unpicked distractor.
+  const xAll = variant === 2 || variant >= 6;
 
   return (
     <div className={imageOptions ? 'grid grid-cols-2 gap-2.5' : 'flex flex-col gap-2.5'}>
@@ -86,7 +93,7 @@ export function OptionButtons({
             ? 'border-success-500 bg-success-500 text-white'
             : feedback && isThis
               ? 'border-warn-500 bg-warn-500 text-white'
-              : variant === 2 && otherWrong
+              : xAll && otherWrong
                 ? 'border-ink-300 bg-ink-100 text-ink-500'
                 : isThis
                   ? 'border-brand-500 bg-brand-500 text-white'
@@ -100,7 +107,7 @@ export function OptionButtons({
               bubbleState,
             )}
           >
-            {variant === 2 && otherWrong ? (
+            {xAll && otherWrong ? (
               <X className="h-3.5 w-3.5" aria-label={`${opt.key}, wrong`} />
             ) : (
               opt.key
@@ -158,11 +165,23 @@ export function OptionButtons({
                 'block w-full text-left text-[13px] font-normal leading-snug',
                 variant === 0 ? 'mt-1' : 'transition-opacity duration-500 starting:opacity-0',
                 (variant === 1 || variant === 5) && cn('mt-2 border-t pt-2', rule),
-                variant === 2 && 'mt-1',
-                variant === 2 && otherWrong ? 'text-ink-500' : tone,
+                (variant === 2 || variant === 6 || variant === 8) && 'mt-1',
+                variant === 7 && cn('mt-1.5 border-l-2 pl-2.5', rule),
+                xAll && otherWrong ? 'text-ink-500' : tone,
               )}
             >
               {(variant === 1 || variant === 5) && captionEl}
+              {variant === 6 && (
+                <span className="mr-1.5 text-[10.5px] font-bold uppercase tracking-wide opacity-80">
+                  {caption}
+                </span>
+              )}
+              {variant === 8 && (
+                <CornerDownRight
+                  className="mr-1 inline h-3.5 w-3.5 -translate-y-px opacity-70"
+                  aria-hidden
+                />
+              )}
               <McqMarkdown text={opt.explanation} linkify={false} />
             </span>
           );
