@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 2,
+  "id": "solar-system-sample",
+  "title": "Solar System Practice (sample)",
+  "description": "Demo learning pack — multiple-choice practice on the solar system.",
+  "homeSubtitle": "The demo pack. Build your own with the create-learning-pack skill.",
+  "themeColor": "#0f766e",
+  "categories": [
+    {
+      "key": "planets",
+      "label": "Planets & Moons",
+      "shortLabel": "Planets",
+      "icon": "🪐",
+      "weight": 0.6
+    },
+    {
+      "key": "space-exploration",
+      "label": "Space Exploration",
+      "shortLabel": "Exploration",
+      "icon": "🚀",
+      "weight": 0.4
+    }
+  ],
+  "levelsLabel": "Level",
+  "levels": [
+    {
+      "key": "basics",
+      "label": "Basics"
+    },
+    {
+      "key": "advanced",
+      "label": "Advanced"
+    }
+  ],
+  "papersLabel": "Papers",
+  "papers": [
+    {
+      "key": "starter-paper-1",
+      "label": "Paper 1",
+      "series": "Starter papers",
+      "categoryKey": "planets"
+    },
+    {
+      "key": "starter-paper-2",
+      "label": "Paper 2",
+      "series": "Starter papers",
+      "categoryKey": "space-exploration"
+    }
+  ],
+  "exam": {
+    "label": "Mock exam",
+    "passPct": 70,
+    "questionCount": 30,
+    "durationMinutes": 45
+  },
+  "modes": {
+    "drive": true,
+    "coach": true,
+    "paper": true
+  },
+  "games": {},
+  "progression": {},
+  "sources": [
+    {
+      "label": "Original",
+      "name": "Hand-authored",
+      "blurb": "Solar-system facts written for this demo pack."
+    },
+    {
+      "label": "NASA",
+      "name": "NASA Science",
+      "blurb": "Cross-checked against public NASA material.",
+      "url": "https://science.nasa.gov/"
+    }
+  ],
+  "upgrade": {
+    "title": "Get the full solar system pack",
+    "url": "https://example.com/solar-system",
+    "blurb": "All 30-question mock exams, every moon and mission.",
+    "packId": "solar-system-full"
+  }
+}

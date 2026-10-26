@@ -39,6 +39,7 @@ export function UpgradeCard({ placement }: { placement: UpgradePlacement }) {
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => recordEvent('upsell_clicked', { placement })}
+      id={`upgrade-card-${placement}`}
       data-testid={`upgrade-card-${placement}`}
       className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-4 shadow-xs transition hover:border-brand-500/50 hover:shadow-md"
     >

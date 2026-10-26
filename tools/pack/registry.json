@@ -30,10 +30,24 @@
       "url": "https://aws-genai.quizmill.dev"
     },
     {
+      "id": "aws-clf",
+      "title": "AWS Certified Cloud Practitioner",
+      "description": "Practice for the AWS Certified Cloud Practitioner (CLF-C02) exam: cloud concepts, security and compliance, core services, and billing and support.",
+      "repo": "quizmill/pack-aws-clf",
+      "url": "https://aws-clf.quizmill.dev"
+    },
+    {
       "id": "aws-saa",
       "title": "AWS Solutions Architect Associate",
       "description": "Unofficial practice for the AWS Certified Solutions Architect – Associate (SAA-C03) exam — secure, resilient, high-performing and cost-optimized architectures. 60 original scenario questions across the four exam domains, each grounded in the AWS documentation.",
       "repo": "quizmill/pack-aws-saa"
+    },
+    {
+      "id": "aws-clf",
+      "title": "AWS Cloud Practitioner",
+      "description": "Unofficial practice for the AWS Certified Cloud Practitioner (CLF-C02) exam — a 30-question sample across the four exam domains (cloud concepts, security and compliance, cloud technology and services, billing, pricing and support), every question original and grounded in the AWS documentation.",
+      "repo": "quizmill/pack-aws-clf",
+      "url": "https://aws-clf.quizmill.dev"
     },
     {
       "id": "music-theory",
