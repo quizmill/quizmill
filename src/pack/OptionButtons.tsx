@@ -113,12 +113,15 @@ export function OptionButtons({
           ) : feedback && isThis && !isAnswer ? (
             <X className="h-5 w-5 shrink-0 text-warn-500" />
           ) : null;
+        // Ink-900 on the surface colour clears 4.5:1 in every palette;
+        // white on success/warn-500 did not. The state colour moves to
+        // the chip's border so it still reads green/amber.
         const chip =
           variant === 5 && feedback && (isAnswer || isThis) ? (
             <span
               className={cn(
-                'mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide',
-                isAnswer ? 'bg-success-500 text-white' : 'bg-warn-500 text-white',
+                'mt-0.5 shrink-0 rounded-full border bg-surface px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-ink-900',
+                isAnswer ? 'border-success-500' : 'border-warn-500',
               )}
             >
               {isAnswer && isThis ? 'Your answer' : isAnswer ? 'Correct answer' : 'Your answer'}
@@ -145,7 +148,9 @@ export function OptionButtons({
         // Not linkified: the note lives inside the (disabled) <button>,
         // where a nested <a> is invalid and unreachable.
         let note: ReactNode = null;
-        if (feedback && opt.explanation && variant !== 3 && variant !== 4) {
+        // Variants 3/4 move it out of the button — except on image tiles
+        // (`attached` is false there), which keep the inline note.
+        if (feedback && opt.explanation && !attached) {
           note = (
             <span
               data-testid="option-explanation"
