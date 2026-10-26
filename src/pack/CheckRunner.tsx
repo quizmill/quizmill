@@ -53,6 +53,7 @@ import {
   checkPlanFor,
   checkResultFor,
   dealCheckSitting,
+  READINESS_DOMAINS,
 } from '@/pack/check';
 import { CheckResultView } from '@/pack/CheckResult';
 import { VERDICT_META } from '@/pack/ExamReadiness';
@@ -451,9 +452,10 @@ export function PackCheckRunner() {
     dealt,
     projected: projectedCheckLength({ ...pacing, dealt, planned: plan.count }),
   });
-  // Ending early is open once every domain has the plan's floor — the
-  // point the result can say something; before it, the gap in words.
+  // Ending early is open once the result would judge every domain at
+  // (at least) the plan's floor; before it, the gap in words.
   const gap = checkVerdictGap(
+    READINESS_DOMAINS,
     plan,
     state.questions.slice(0, answered).map((q) => q.categoryKey),
   );
