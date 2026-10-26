@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  missedQuestions,
   sessionMistakeIds,
   unresolvedMistakeIds,
+  weakSpots,
 } from '../src/lib/mistakes';
 import type { Attempt } from '../src/data/types';
 
@@ -202,5 +204,59 @@ describe('sessionMistakeIds (review scoped to one session)', () => {
 
   it('returns nothing for an unknown session', () => {
     expect(sessionMistakeIds([paper('p1', false, 1)], 'nope')).toEqual([]);
+  });
+});
+
+describe('weakSpots (cleared after N right answers in a row)', () => {
+  // Pack attempts carry the question id as topic.
+  const q = (id: string, ok: boolean, t: number) => att(id, ok, t, { topic: id });
+
+  it('keeps a missed question until it is answered right N times in a row', () => {
+    const log = [q('q1', false, 100), q('q1', true, 200)];
+    expect(weakSpots(log, 2)).toEqual([{ id: 'q1', streak: 1, wrongAt: 100 }]);
+    expect(weakSpots([...log, q('q1', true, 300)], 2)).toEqual([]);
+  });
+
+  it('a wrong answer resets the streak', () => {
+    const log = [
+      q('q1', false, 100),
+      q('q1', true, 200),
+      q('q1', false, 300),
+      q('q1', true, 400),
+    ];
+    expect(weakSpots(log, 2)).toEqual([{ id: 'q1', streak: 1, wrongAt: 300 }]);
+  });
+
+  it('N = 1 is the unresolved-mistake queue', () => {
+    const log = [
+      q('q1', false, 100),
+      q('q1', true, 200),
+      q('q2', false, 150),
+      q('q3', true, 50),
+    ];
+    expect(weakSpots(log, 1).map((m) => m.id)).toEqual(unresolvedMistakeIds(log));
+    expect(weakSpots(log, 1).map((m) => m.id)).toEqual(['q2']);
+  });
+
+  it('never lists a question that was never missed', () => {
+    expect(weakSpots([q('q1', true, 100), q('q1', true, 200)], 3)).toEqual([]);
+  });
+
+  it('a topic rescue by another question counts as the first right answer, never more', () => {
+    const log = [
+      att('m1', false, 100, { topic: 'fractions' }),
+      att('m2', true, 200, { topic: 'fractions' }),
+      att('m3', true, 300, { topic: 'fractions' }),
+    ];
+    expect(weakSpots(log, 1)).toEqual([]);
+    expect(weakSpots(log, 2)).toEqual([{ id: 'm1', streak: 1, wrongAt: 100 }]);
+  });
+
+  it('missedQuestions keeps cleared ones too, oldest mistake first', () => {
+    const log = [q('b', false, 200), q('a', false, 100), q('a', true, 300), q('a', true, 400)];
+    expect(missedQuestions(log)).toEqual([
+      { id: 'a', streak: 2, wrongAt: 100 },
+      { id: 'b', streak: 0, wrongAt: 200 },
+    ]);
   });
 });
