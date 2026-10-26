@@ -36,7 +36,9 @@ test.describe('readiness check', () => {
     await expect(page.locator(tid('check-budget-10'))).toHaveAttribute('aria-checked', 'true');
 
     await clickButtonByText(page, 'Start the check');
-    await waitForText(page, /Q\s*1\s*\/\s*6/);
+    // Time-boxed: the chip has no total, the projection is a hint.
+    await expect(page.locator(tid('question-position'))).toHaveText('Q1');
+    await expect(page.locator(tid('check-hint'))).toHaveText("about 6 at the exam's pace");
     await expect(page.locator(tid('check-clock'))).toHaveText(/^(9:5\d|10:00)$/);
 
     let answered = 0;

@@ -7,7 +7,9 @@ import {
   CHECK_MAX_MINUTES,
   canDealAnother,
   checkHistory,
+  checkPaceHint,
   checkResult,
+  checkVerdictGap,
   compareChecks,
   dealCheck,
   planCheck,
@@ -383,6 +385,101 @@ describe('projectedCheckLength', () => {
     expect(projectedCheckLength({ ...base, elapsedSeconds: 20, answered: 1, dealt: 2 })).toBe(18);
     // Slow: 250 s a question, 100 s left → 2, but 3 are already dealt.
     expect(projectedCheckLength({ ...base, elapsedSeconds: 500, answered: 2, dealt: 3 })).toBe(3);
+  });
+});
+
+describe('checkPaceHint', () => {
+  it('names the plan before an answer, then what is left at the learner\'s pace — never a bare total', () => {
+    expect(checkPaceHint({ answered: 0, dealt: 1, projected: 14 })).toBe("about 14 at the exam's pace");
+    expect(checkPaceHint({ answered: 12, dealt: 13, projected: 16 })).toBe('about 3 more at your pace');
+    expect(checkPaceHint({ answered: 13, dealt: 13, projected: 14 })).toBe('about 1 more at your pace');
+    expect(checkPaceHint({ answered: 13, dealt: 13, projected: 13 })).toBe('last one at your pace');
+  });
+});
+
+describe('checkVerdictGap', () => {
+  const plan: CheckPlan = {
+    count: 6,
+    floor: 3,
+    minutes: 10,
+    perDomain: [
+      { key: 'planets', count: 3, share: 0.6 },
+      { key: 'space', count: 3, share: 0.4 },
+    ],
+  };
+  const judgesAll = (domains: readonly ReadinessDomainInput[], attempts: Attempt[]): boolean =>
+    checkResult(GOAL, domains, attempts, 'check-1').report.domains.every((d) => d.judged);
+
+  it("counts the answers still short of the plan's floor in every domain", () => {
+    expect(checkVerdictGap(TWO, plan, [])).toBe(6);
+    expect(checkVerdictGap(TWO, plan, ['planets', 'space', 'planets'])).toBe(3);
+    // Extra answers in one domain don't make up for another's gap.
+    expect(checkVerdictGap(TWO, plan, ['planets', 'planets', 'planets', 'planets', 'space'])).toBe(2);
+    expect(checkVerdictGap(TWO, plan, ['planets', 'space', 'planets', 'space', 'planets', 'space'])).toBe(0);
+  });
+
+  it('wants a look at every domain with a bank, even one a floor-0 plan left out', () => {
+    // Four questions over ten equal domains: the plan deals four, but the
+    // result still reads all ten — four answers would be 40% coverage.
+    const four: CheckPlan = {
+      count: 4,
+      floor: 0,
+      minutes: 10,
+      perDomain: TEN.map((d, i) => ({ key: d.key, count: i < 4 ? 1 : 0, share: 0.1 })),
+    };
+    const dealt = ['d0', 'd1', 'd2', 'd3'];
+    expect(judgesAll(TEN, dealt.map((k) => attempt({ subject: k })))).toBe(false);
+    expect(checkVerdictGap(TEN, four, dealt)).toBe(6);
+    const all = TEN.map((d) => d.key);
+    expect(checkVerdictGap(TEN, four, all)).toBe(0);
+    expect(judgesAll(TEN, all.map((k) => attempt({ subject: k })))).toBe(true);
+  });
+
+  it("keeps up with the result's floor as an extension raises it", () => {
+    // A 3/1/1 plan at floor 1, extended to 4/1/1: six answers over three
+    // domains are judged at a floor of two, so b and c are still thin.
+    const three: ReadinessDomainInput[] = ['a', 'b', 'c'].map((key) => ({ key, label: key, weight: 0, available: 5 }));
+    const short: CheckPlan = {
+      count: 5,
+      floor: 1,
+      minutes: 10,
+      perDomain: [
+        { key: 'a', count: 3, share: 1 / 3 },
+        { key: 'b', count: 1, share: 1 / 3 },
+        { key: 'c', count: 1, share: 1 / 3 },
+      ],
+    };
+    const atFive = ['a', 'a', 'a', 'b', 'c'];
+    expect(checkVerdictGap(three, short, atFive)).toBe(0);
+    const extended = [...atFive, 'a'];
+    expect(judgesAll(three, [...answers('a', 4, 4), ...answers('b', 1, 1), ...answers('c', 1, 1)])).toBe(false);
+    // Two more (one each to b and c) bring eight answers, still floor two.
+    expect(checkVerdictGap(three, short, extended)).toBe(2);
+    expect(checkVerdictGap(three, short, [...extended, 'b', 'c'])).toBe(0);
+    expect(judgesAll(three, [...answers('a', 4, 4), ...answers('b', 2, 2), ...answers('c', 2, 2)])).toBe(true);
+  });
+
+  it('asks a small domain for no more than its bank', () => {
+    const tiny: ReadinessDomainInput[] = [
+      { key: 'big', label: 'Big', weight: 0, available: 10 },
+      { key: 'tiny', label: 'Tiny', weight: 0, available: 1 },
+    ];
+    const p: CheckPlan = {
+      count: 4,
+      floor: 3,
+      minutes: 10,
+      perDomain: [
+        { key: 'big', count: 3, share: 0.9 },
+        { key: 'tiny', count: 1, share: 0.1 },
+      ],
+    };
+    expect(checkVerdictGap(tiny, p, ['big', 'big', 'big', 'tiny'])).toBe(0);
+  });
+
+  it('closes once checkResult can judge every domain', () => {
+    const attempts = [...answers('planets', 3, 2), ...answers('space', 3, 1)];
+    expect(checkVerdictGap(TWO, plan, attempts.map((a) => a.subject))).toBe(0);
+    expect(judgesAll(TWO, attempts)).toBe(true);
   });
 });
 

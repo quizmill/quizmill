@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { webcrypto } from 'node:crypto';
 import { PackCheckRunner } from '@/pack/CheckRunner';
 import { CheckResultView } from '@/pack/CheckResult';
-import { CHECK_BANK, CHECK_PLAN, CHECK_RECOMMENDED_MINUTES } from '@/pack/check';
+import { CHECK_BANK, CHECK_PLAN, CHECK_RECOMMENDED_MINUTES, checkResultFor } from '@/pack/check';
 import type { Attempt } from '@/data/types';
 import { loadAttempts, loadSessions, loadAchievements } from '@/lib/storage';
 import { correctKeysOf, packQuestions } from '@/pack/data';
@@ -168,7 +168,8 @@ describe('PackCheckRunner', () => {
     expect(text()).toContain('The clock stops the check at 20 min, never later');
     await click(control('Start the check')!);
     expect(byId('check-clock')!.textContent).toBe('20:00');
-    expect(text()).toMatch(/Q\s*1\s*\/\s*12/);
+    expect(byId('question-position')!.textContent).toBe('Q1');
+    expect(byId('check-hint')!.textContent).toBe("about 12 at the exam's pace");
   });
 
   it('deals every domain its share, gives feedback per question, and ends on the result page', async () => {
@@ -177,7 +178,7 @@ describe('PackCheckRunner', () => {
     const session = loadSessions()[0];
     expect(session).toMatchObject({ mode: 'check', subject: 'check', endedAt: null });
     expect(text()).toContain('Readiness check');
-    expect(text()).toMatch(/Q\s*1\s*\/\s*6/);
+    expect(byId('question-position')!.textContent).toBe('Q1');
     expect(byId('check-clock')!.textContent).toBe('10:00');
 
     // Miss every Exploration question; feedback shows as in practice.
@@ -234,12 +235,13 @@ describe('PackCheckRunner', () => {
     await render();
     await click(control('Start the check')!);
     // Ten seconds a question: six leave nine minutes, so the sitting
-    // carries on past the advertised six — the chip's total grows with
-    // the projection — and only the in-scope bank (18) ends it.
+    // carries on past the advertised six — the hint counts what is left
+    // at that pace — and only the in-scope bank (18) ends it.
     const quick = { think: 5_000, read: 5_000 };
     for (let i = 0; i < 6; i++) await answer(new Set(), quick);
     expect(byId('check-result')).toBeNull();
-    expect(text()).toMatch(/Q\s*7\s*\/\s*18/);
+    expect(byId('question-position')!.textContent).toBe('Q7');
+    expect(byId('check-hint')!.textContent).toBe('about 11 more at your pace');
     let dealt = 6;
     while (!byId('check-result') && dealt < 40) {
       await answer(new Set(), quick);
@@ -299,6 +301,86 @@ describe('PackCheckRunner', () => {
     await click(control('Sit it again later')!);
     await click(control('See result')!);
     expect(byId('check-time-up')).toBeNull();
+  });
+
+  it('tracks the clock, not a question total, and words the projection as a hint', async () => {
+    await render();
+    await click(control('Start the check')!);
+    // Before the first answer: the plan's count at the exam's pace, the
+    // bar empty, and no "n / m" anywhere in the sitting.
+    expect(byId('question-position')!.textContent).toBe('Q1');
+    expect(byId('check-hint')!.textContent).toBe("about 6 at the exam's pace");
+    expect(byId('time-bar')!.getAttribute('aria-valuenow')).toBe('0');
+    expect(text()).not.toMatch(/\d+\s*\/\s*\d+/);
+
+    // Mid-sitting: 90 s a question, 450 s used after five → 150 s left,
+    // one more fits; the bar is three-quarters of the clock.
+    for (let i = 0; i < 4; i++) await answer(new Set());
+    expect(byId('question-position')!.textContent).toBe('Q5');
+    expect(byId('check-hint')!.textContent).toBe('about 1 more at your pace');
+    expect(byId('time-bar')!.getAttribute('aria-valuenow')).toBe('60');
+    expect(text()).not.toMatch(/\d+\s*\/\s*\d+/);
+
+    // The last one: the sixth fits, a seventh would not.
+    await answer(new Set());
+    expect(byId('question-position')!.textContent).toBe('Q6');
+    expect(byId('check-hint')!.textContent).toBe('last one at your pace');
+    expect(text()).not.toMatch(/\d+\s*\/\s*\d+/);
+  });
+
+  it('keeps End check disabled until every domain has the plan\'s floor, with the gap in words', async () => {
+    await render();
+    // Twenty minutes: twelve planned, floor three a domain — six answers
+    // (three each, the rounds alternate) carry a verdict.
+    await click(byId('check-budget-20')!);
+    await click(control('Start the check')!);
+    expect(control('End check')!.disabled).toBe(true);
+    expect(byId('check-end-gap')!.textContent).toBe('6 more for a verdict');
+    for (let i = 0; i < 3; i++) await answer(new Set());
+    expect(control('End check')!.disabled).toBe(true);
+    expect(byId('check-end-gap')!.textContent).toBe('3 more for a verdict');
+    // A click on the disabled action ends nothing.
+    await click(control('End check')!);
+    expect(byId('check-result')).toBeNull();
+    for (let i = 0; i < 2; i++) await answer(new Set());
+    expect(byId('check-end-gap')!.textContent).toBe('1 more for a verdict');
+
+    // Answering the sixth opens it while its feedback shows.
+    const q = currentQuestion();
+    for (const k of correctKeysOf(q)) await pickOption(k);
+    await elapse(THINK_MS);
+    await click(control('Check answer')!);
+    expect(control('End check')!.disabled).toBe(false);
+    expect(byId('check-end-gap')!.textContent).toBe('Enough answered for a verdict');
+  });
+
+  it('ends early over the questions answered, exactly as the bell would', async () => {
+    await render();
+    await click(byId('check-budget-20')!);
+    await click(control('Start the check')!);
+    for (let i = 0; i < 6; i++) await answer(new Set(['space-exploration']));
+    // On the seventh, unanswered: ending drops it, as time-up does.
+    expect(control('End check')!.disabled).toBe(false);
+    await click(control('End check')!);
+
+    expect(byId('check-result')).toBeTruthy();
+    expect(byId('check-time-up')).toBeNull();
+    expect(byId('check-ended-early')!.textContent).toContain('Ended early at 6 questions');
+    const session = loadSessions()[0];
+    expect(session.questionCount).toBe(6);
+    expect(session.correctCount).toBe(3);
+    expect(session.endedAt).not.toBeNull();
+    expect(loadAttempts()).toHaveLength(6);
+    // The same reading time-up gives over the same six answers: nothing
+    // relaxed, the band and verdict tiers as ever.
+    const result = checkResultFor(loadAttempts(), session.id)!;
+    expect(byId('check-score')!.textContent).toContain('3/6 correct');
+    expect(byId('check-verdict')!.getAttribute('data-verdict')).toBe(result.report.verdict);
+    expect(result.report.domains.every((d) => d.judged)).toBe(true);
+    // Reopened from the intro, the past result shows no note.
+    await click(control('Sit it again later')!);
+    await click(control('See result')!);
+    expect(byId('check-ended-early')).toBeNull();
   });
 
   it('shows the feedback panel with the explanation after Check answer', async () => {

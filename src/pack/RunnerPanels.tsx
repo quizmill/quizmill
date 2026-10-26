@@ -53,18 +53,39 @@ export function BackLink({ href = '/', label = 'Home' }: { href?: string; label?
 }
 
 export function ProgressBar({ current, total }: { current: number; total: number }) {
-  const pct = Math.round((current / total) * 100);
   return (
     <div className="flex w-32 items-center gap-2">
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-ink-100">
-        <div
-          className="h-full bg-brand-500 transition-all"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
+      <Bar fraction={current / total} />
       <span className="text-xs font-medium text-ink-500">
         {current}/{total}
       </span>
+    </div>
+  );
+}
+
+/** The header bar for a time-boxed sitting: the share of the clock used,
+ *  with no count beside it — the sitting has no fixed number to show. */
+export function TimeBar({ fraction }: { fraction: number }) {
+  return (
+    <div
+      className="flex w-32 items-center"
+      data-testid="time-bar"
+      role="progressbar"
+      aria-label="Time used"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(Math.min(1, Math.max(0, fraction)) * 100)}
+    >
+      <Bar fraction={fraction} />
+    </div>
+  );
+}
+
+function Bar({ fraction }: { fraction: number }) {
+  const pct = Math.round(Math.min(1, Math.max(0, fraction)) * 100);
+  return (
+    <div className="h-2 flex-1 overflow-hidden rounded-full bg-ink-100">
+      <div className="h-full bg-brand-500 transition-all" style={{ width: `${pct}%` }} />
     </div>
   );
 }
@@ -168,6 +189,7 @@ export function QuestionPanel({
   question,
   position,
   total,
+  progress = 0,
   selected,
   stage,
   onSelect,
@@ -178,7 +200,13 @@ export function QuestionPanel({
   question: PackQuestion;
   /** 1-based index of the question in the round. */
   position: number;
-  total: number;
+  /** Questions in the round; omitted for a time-boxed sitting (the
+   *  readiness check), whose chip reads "Q n" and whose bar follows
+   *  `progress` instead. */
+  total?: number;
+  /** Share of the sitting's clock used, 0–1 — the bar when there is no
+   *  `total`. */
+  progress?: number;
   selected: OptionKey[];
   stage: Stage;
   onSelect: (key: OptionKey) => void;
@@ -197,7 +225,11 @@ export function QuestionPanel({
     <>
       <header className="flex items-center justify-between">
         {back}
-        <ProgressBar current={position} total={total} />
+        {total !== undefined ? (
+          <ProgressBar current={position} total={total} />
+        ) : (
+          <TimeBar fraction={progress} />
+        )}
       </header>
 
       {banner}
@@ -210,8 +242,11 @@ export function QuestionPanel({
             {scenario.title}
           </span>
         ) : null}
-        <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-600">
-          Q {position} / {total}
+        <span
+          data-testid="question-position"
+          className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-600"
+        >
+          {total !== undefined ? `Q ${position} / ${total}` : `Q${position}`}
         </span>
       </div>
 
