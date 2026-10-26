@@ -37,6 +37,8 @@ import {
 } from '@/pack/data';
 import { paperSubject } from '@/pack/papers';
 import {
+  MIXED_LABEL,
+  MIXED_SUBJECT,
   advanceAfterAnswer,
   attemptHistory,
   bankForCategory,
@@ -57,35 +59,47 @@ import {
 } from './runner';
 
 /** What the runner deals from: one category (the level filter applies),
- *  or one named paper — sat whole, whatever the level filter says. */
+ *  every category at once (likewise), or one named paper — sat whole,
+ *  whatever the level filter says. */
 type Props =
   | {
       /** Pack category key from the manifest, e.g. 'planets'. */
       categoryKey: string;
       paperKey?: undefined;
+      mixed?: undefined;
     }
   | {
       /** Manifest `papers` key (#194). */
       paperKey: string;
       categoryKey?: undefined;
+      mixed?: undefined;
+    }
+  | {
+      /** A mixed round across every category (#232). */
+      mixed: true;
+      categoryKey?: undefined;
+      paperKey?: undefined;
     };
 
 /**
- * Practice runner: deals a round from one category (honouring the level
- * filter) or one named paper, records each answer, and celebrates
- * stickers, level-ups and the daily streak as they land.
+ * Practice runner: deals a round from one category or the whole pack
+ * (honouring the level filter) or one named paper, records each answer,
+ * and celebrates stickers, level-ups and the daily streak as they land.
  */
 export function PackPracticeRunner(props: Props) {
   // The scope's display label and the session's subject. A paper owned
   // by one category is that category's session; a cross-category paper
-  // carries the `paper` pseudo-subject (attempts keep real categories).
+  // carries the `paper` pseudo-subject and a mixed round the `mixed` one
+  // (attempts keep real categories).
   const paper = props.paperKey !== undefined ? PACK_PAPER_BY_KEY[props.paperKey] : undefined;
   const scopeLabel = paper
     ? paper.label
-    : (PACK_CATEGORY_LABEL[props.categoryKey ?? ''] ?? props.categoryKey ?? props.paperKey);
+    : props.mixed
+      ? MIXED_LABEL
+      : (PACK_CATEGORY_LABEL[props.categoryKey ?? ''] ?? props.categoryKey ?? props.paperKey);
   const sessionSubject = paper
     ? paperSubject(paper)
-    : (props.categoryKey ?? props.paperKey);
+    : (props.categoryKey ?? props.paperKey ?? MIXED_SUBJECT);
   const { attempts } = useStorageData();
   const recordAttempt = useRecordAttempt();
   const startSession = useStartSession();
@@ -127,7 +141,10 @@ export function PackPracticeRunner(props: Props) {
     () =>
       paperKey !== undefined
         ? bankForPaper(packQuestions, paperKey)
-        : filterByLevel(bankForCategory(packQuestions, categoryKey), levelFilter),
+        : filterByLevel(
+            categoryKey !== undefined ? bankForCategory(packQuestions, categoryKey) : packQuestions,
+            levelFilter,
+          ),
     [categoryKey, paperKey, levelFilter],
   );
 

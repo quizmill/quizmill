@@ -13,6 +13,7 @@ import {
   Printer,
   RefreshCw,
   Settings,
+  Shuffle,
   Timer,
   Trophy,
   TrendingDown,
@@ -52,6 +53,7 @@ import {
   PACK_PAPER_BY_QUESTION_ID,
 } from '@/pack/data';
 import { groupPapers, paperProgress } from '@/pack/papers';
+import { MIXED_LABEL, QUESTION_COUNT } from '@/pack/runner';
 import { EXAM_SITTING } from '@/pack/exam';
 import { CHECK_PLAN } from '@/pack/check';
 import { CHECK_BUDGETS_MINUTES, CHECK_MAX_MINUTES } from '@/lib/readinessCheck';
@@ -200,6 +202,11 @@ export default function PackHome() {
     slot.answered++;
     if (a.isCorrect) slot.correct++;
   }
+  // The mixed round's length: the usual ten, or the whole filtered bank
+  // when that is smaller.
+  let mixedAvailable = 0;
+  for (const s of statsByCategory.values()) mixedAvailable += s.available;
+  const mixedCount = Math.min(QUESTION_COUNT, mixedAvailable);
   // Per-paper progress — one cold look per question, like the categories,
   // but over the WHOLE paper: the level filter never narrows a paper.
   const paperLooks = new Map<string, { isCorrect: boolean }[]>();
@@ -362,6 +369,31 @@ export default function PackHome() {
           <h2 className="text-lg font-semibold text-ink-700">Pick a category</h2>
         </div>
         <div className="flex flex-col gap-2.5">
+          {/* A round from every category at once (#232): a category of
+              three or five questions can never fill a round of ten, and
+              a pack with many small categories otherwise has no full
+              round at all. Only offered when there is more than one. */}
+          {APP_CONFIG.categories.length > 1 && mixedCount > 0 ? (
+            <Link
+              href="/practice/?mixed=1"
+              data-testid="mixed-card"
+              className="tap-feedback group flex items-center justify-between gap-3 rounded-2xl border border-ink-400/25 bg-ink-50 p-4 shadow-xs transition hover:shadow-md"
+            >
+              <span
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ink-200 text-ink-700"
+                aria-hidden
+              >
+                <Shuffle className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <span className="text-base font-semibold text-ink-900">{MIXED_LABEL}</span>
+                <div className="mt-1 text-sm text-ink-500">
+                  {mixedCount} mixed {mixedCount === 1 ? 'question' : 'questions'}
+                </div>
+              </div>
+              <ArrowRight className="h-5 w-5 shrink-0 text-ink-400 transition group-hover:text-ink-600" />
+            </Link>
+          ) : null}
           {APP_CONFIG.categories.map((cat) => {
             const s = statsByCategory.get(cat.key);
             if (!s) return null;
