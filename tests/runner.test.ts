@@ -358,6 +358,13 @@ describe('shuffleOptions (re-asking a weak spot)', () => {
     'A or B, depending on the load',
     'Option B, but only on Mondays',
     'Neither of these',
+    'All preceding answers are correct',
+    'Both previous statements',
+    'None of the following',
+    'The first two options',
+    'The last answer only',
+    'The other choices are all wrong',
+    'Only the latter',
   ])('leaves a question in pack order when an option reads "%s"', (text) => {
     const question = withTexts('Mercury', 'Venus', 'Earth', text);
     expect(canShuffleOptions(question)).toBe(false);

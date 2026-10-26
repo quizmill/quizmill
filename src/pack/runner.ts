@@ -60,12 +60,13 @@ export function formatKeyList(keys: OptionKey[]): string {
 
 /**
  * Option text that only reads right in its place — "all of the above",
- * "both A and C", "Option B" — so its question keeps the pack's order.
- * Deliberately conservative: a false hit just leaves one question
- * unshuffled, a miss would put "none of the above" first.
+ * "all preceding answers", "the first two options", "both A and C",
+ * "Option B" — so its question keeps the pack's order. Deliberately
+ * conservative: a false hit just leaves one question unshuffled, a miss
+ * would put "none of the above" first.
  */
 const POSITIONAL_OPTION =
-  /\b(above|below)\b|\b(all|none|both|neither) of (these|those|them)\b|\b(options?|answers?|choices?) [A-F]\b|\b[A-F] (and|or|&) [A-F]\b/i;
+  /\b(above|below|preceding|previous|following|former|latter)\b|\b(all|none|both|neither) of (these|those|them)\b|\b(first|second|third|fourth|fifth|last|other|remaining)( (two|three|four))? (options?|answers?|choices?|statements?)\b|\b(options?|answers?|choices?) [A-F]\b|\b[A-F] (and|or|&) [A-F]\b/i;
 
 export function canShuffleOptions(question: PackQuestion): boolean {
   return !question.options.some((o) => POSITIONAL_OPTION.test(o.text));
