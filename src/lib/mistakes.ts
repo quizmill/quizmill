@@ -56,9 +56,17 @@ export function missedQuestions(attempts: readonly Attempt[]): MissedQuestion[] 
   for (const a of sorted) {
     const tk = topicKey(a.subject, a.topic);
     if (a.isCorrect) {
-      lastCorrectOnTopic.set(tk, a.answeredAt);
       const m = missed.get(a.questionId);
-      if (m) m.streak++;
+      if (m) {
+        // A topic rescue by another question since the miss is the first
+        // right answer; this one comes after it. Read before this attempt
+        // updates the topic, so it can't credit itself twice.
+        if (m.streak === 0 && (lastCorrectOnTopic.get(m.tk) ?? -Infinity) >= m.t) {
+          m.streak = 1;
+        }
+        m.streak++;
+      }
+      lastCorrectOnTopic.set(tk, a.answeredAt);
     } else {
       missed.set(a.questionId, { tk, t: a.answeredAt, streak: 0 });
     }

@@ -252,6 +252,19 @@ describe('weakSpots (cleared after N right answers in a row)', () => {
     expect(weakSpots(log, 2)).toEqual([{ id: 'm1', streak: 1, wrongAt: 100 }]);
   });
 
+  it('a right answer to the question itself after a topic rescue makes two', () => {
+    // Regression: the topic credit only showed on the returned row, so the
+    // question's own right answer left it at "1 of 2" a second time.
+    // Migrated attempts carry a free-text topic; this engine writes the id.
+    const log = [
+      att('m1', false, 100, { topic: 'fractions' }),
+      att('m2', true, 200, { topic: 'fractions' }),
+      att('m1', true, 300, { topic: 'm1' }),
+    ];
+    expect(missedQuestions(log)).toEqual([{ id: 'm1', streak: 2, wrongAt: 100 }]);
+    expect(weakSpots(log, 2)).toEqual([]);
+  });
+
   it('missedQuestions keeps cleared ones too, oldest mistake first', () => {
     const log = [q('b', false, 200), q('a', false, 100), q('a', true, 300), q('a', true, 400)];
     expect(missedQuestions(log)).toEqual([
