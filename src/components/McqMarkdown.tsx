@@ -32,7 +32,11 @@ export function McqMarkdown({ text, linkify = true }: { text: string; linkify?: 
 
 function InlineMarkdown({ text, linkify }: { text: string; linkify: boolean }): ReactNode {
   const tokens = useMemo(() => parseInline(text), [text]);
-  return <span className="whitespace-pre-line">{renderTokens(tokens, linkify)}</span>;
+  // `wrap-anywhere`: a bare URL or long code span has no break opportunity
+  // and would otherwise run past the card edge on a phone.
+  return (
+    <span className="whitespace-pre-line wrap-anywhere">{renderTokens(tokens, linkify)}</span>
+  );
 }
 
 function renderTokens(tokens: InlineToken[], linkify: boolean): ReactNode[] {
