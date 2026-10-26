@@ -155,6 +155,12 @@ export function PackPracticeRunner(props: Props) {
       setOutOfQuestions(true);
       return;
     }
+    // DESIGN ROUND (#225, not for merge): `?q=<question id>` deals that
+    // question first so a preview link lands on the same question in
+    // every `?optv=` variant.
+    const pinnedId = new URLSearchParams(window.location.search).get('q');
+    const pinned = bank.find((q) => q.id === pinnedId);
+    if (pinned) picked.splice(0, picked.length, pinned, ...picked.filter((q) => q.id !== pinned.id));
     setRepeatRound(isBankFullySeen(bank, history));
     const sessionId = crypto.randomUUID();
     const now = Date.now();
