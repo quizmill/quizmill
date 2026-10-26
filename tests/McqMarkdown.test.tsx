@@ -123,3 +123,17 @@ describe('McqMarkdown emphasis', () => {
     expect(elapsed, `took ${elapsed.toFixed(0)}ms`).toBeLessThan(1000);
   });
 });
+
+describe('McqMarkdown wrapping', () => {
+  // A bare URL or a long code span has no break opportunity, so on a phone
+  // it ran past the feedback card's edge (#231). `wrap-anywhere`
+  // (overflow-wrap: anywhere) lets it break mid-token instead.
+  it('lets long unbroken tokens wrap inside the card', async () => {
+    await render(
+      'Read more: https://docs.aws.amazon.com/bedrock/latest/userguide/security_iam_id-based-policy-examples.html and `averyveryveryverylongidentifier`',
+    );
+    const wrapped = (el: Element | null) => !!el?.closest('.wrap-anywhere');
+    expect(wrapped(container.querySelector('a'))).toBe(true);
+    expect(wrapped(container.querySelector('code'))).toBe(true);
+  });
+});
