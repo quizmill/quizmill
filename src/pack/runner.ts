@@ -12,6 +12,17 @@ import { correctKeysOf, type OptionKey, type PackQuestion } from '@/pack/data';
 export const QUESTION_COUNT = 10;
 
 /**
+ * Session pseudo-subject for a mixed round (#232): ten questions dealt
+ * from every category at once, for packs whose categories are too small
+ * to fill a round alone. Like 'exam' and 'paper', only the session
+ * carries it — every attempt keeps its question's real category key.
+ */
+export const MIXED_SUBJECT = 'mixed';
+
+/** How Home and the results screen name a mixed round. */
+export const MIXED_LABEL = 'All categories';
+
+/**
  * Grade a selection against a question. Both single- and multi-answer
  * questions grade by set-equality — every correct key must be chosen and
  * no incorrect one — so multi-answer is all-or-nothing (no partial

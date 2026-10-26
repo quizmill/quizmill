@@ -336,6 +336,47 @@ export function projectedCheckLength(args: {
   return Math.max(dealt, Math.min(deckSize, guess));
 }
 
+/**
+ * The projection worded as a hint, never as a total: the sitting is
+ * time-boxed, so "13/16" with a moving 16 reads as a bug. Before the
+ * first answer it is the plan's count at the exam's pace; after, what
+ * is left beyond the questions dealt at the learner's own pace.
+ */
+export function checkPaceHint(args: { answered: number; dealt: number; projected: number }): string {
+  const { answered, dealt, projected } = args;
+  if (answered === 0) return `about ${projected} at the exam's pace`;
+  const more = projected - dealt;
+  return more > 0 ? `about ${more} more at your pace` : 'last one at your pace';
+}
+
+/**
+ * Answers still needed before a sitting can end early with a verdict:
+ * every domain with a bank — dealt by the plan or not, since the result
+ * reads them all — must reach the stricter of the plan's floor and the
+ * floor `checkResult` would judge at (at least one look, never more than
+ * the domain holds). That result floor rises with the answer count, so
+ * the gap is the fewest further answers k after which the shortfall,
+ * summed per domain so a surplus in one never covers another, fits in
+ * k. 0 when ending now gets every domain judged.
+ */
+export function checkVerdictGap(
+  domains: readonly ReadinessDomainInput[],
+  plan: CheckPlan,
+  answeredKeys: readonly string[],
+): number {
+  const live = domains.filter((d) => d.available > 0);
+  const got = new Map<string, number>();
+  for (const k of answeredKeys) got.set(k, (got.get(k) ?? 0) + 1);
+  const answered = answeredKeys.length;
+  const shortfall = (n: number): number => {
+    const floor = Math.max(1, plan.floor, checkFloorFor(live, n));
+    return sum(live.map((d) => Math.max(0, Math.min(floor, d.available) - (got.get(d.key) ?? 0))));
+  };
+  const most = sum(live.map((d) => d.available)) - answered;
+  for (let k = 0; k < most; k++) if (shortfall(answered + k) <= k) return k;
+  return Math.max(0, most);
+}
+
 export interface CheckDomainResult extends DomainReadiness {
   /** Questions answered wrong in this check, in the order they came. */
   missedIds: string[];

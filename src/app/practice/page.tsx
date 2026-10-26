@@ -17,7 +17,8 @@ import { useSearchParams } from 'next/navigation';
  * engine-historical reasons; it carries the pack category key.)
  *
  * `?paper=<key>` instead practises one of the pack's named papers whole
- * (manifest `papers`, #194) — same route, same reasoning.
+ * (manifest `papers`, #194) — same route, same reasoning. `?mixed=1`
+ * deals one round from every category at once (#232).
  */
 export default function PracticePage() {
   return (
@@ -43,6 +44,7 @@ function PracticeForSubject() {
     }
     return <PackPracticeRunner paperKey={paper} />;
   }
+  if (params.has('mixed')) return <PackPracticeRunner mixed />;
   const subject = params.get('subject') ?? '';
   const valid = subject !== '' && APP_CONFIG.categories.some((c) => c.key === subject);
   if (!valid) {

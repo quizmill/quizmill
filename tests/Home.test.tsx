@@ -231,6 +231,29 @@ describe('PackHome category stats', () => {
   });
 });
 
+describe('PackHome mixed round (#232)', () => {
+  it('offers a round across every category, first in the category list', async () => {
+    // A category of five can never fill a round of ten; the mixed card
+    // deals ten from the whole pack (18 demo questions).
+    await render();
+    const card = container.querySelector('[data-testid="mixed-card"]');
+    expect(card).toBeTruthy();
+    expect(card!.getAttribute('href')).toBe('/practice?mixed=1');
+    expect(card!.textContent).toContain('All categories');
+    expect(card!.textContent).toContain('10 mixed questions');
+    const text = container.textContent ?? '';
+    expect(text.indexOf('All categories')).toBeGreaterThan(text.indexOf('Pick a category'));
+    expect(text.indexOf('All categories')).toBeLessThan(text.indexOf('Planets & Moons'));
+  });
+
+  it('sizes the round to the level filter when that leaves fewer than ten', async () => {
+    saveLevelFilter('basics');
+    await render();
+    const card = container.querySelector('[data-testid="mixed-card"]');
+    expect(card!.textContent).toContain('9 mixed questions');
+  });
+});
+
 describe('PackHome timed exam tile', () => {
   it('links to the sitting with its size and clock (the demo declares 15 min)', async () => {
     await render();
