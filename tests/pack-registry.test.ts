@@ -89,7 +89,7 @@ describe('builtinRegistry', () => {
 
   it('lists every published AWS cert pack', () => {
     const ids = builtinRegistry().map((p) => p.id);
-    expect(ids).toEqual(expect.arrayContaining(['aws-arch-pro', 'aws-genai', 'aws-saa']));
+    expect(ids).toEqual(expect.arrayContaining(['aws-arch-pro', 'aws-genai', 'aws-saa', 'aws-clf']));
   });
 });
 
