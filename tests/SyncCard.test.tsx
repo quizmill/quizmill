@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { SyncCard } from '@/components/SyncStatusLine';
+import { SyncCard, SyncStatusLine } from '@/components/SyncStatusLine';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -91,5 +91,22 @@ describe('SyncCard', () => {
     await render(<SyncCard connected loading={false} />);
     expect(byTestId('sync-card-status')).toBeNull();
     expect(byTestId('sync-card-error')).toBeNull();
+  });
+});
+
+describe('SyncStatusLine', () => {
+  // An inline-flex line let the button after it ("Turn off sync on this
+  // device", itself inline-flex) ride up beside "Up to date" (#243).
+  it.each(['offline', 'syncing', 'synced'])('renders %s as a block row of its own', async (state) => {
+    await render(<SyncStatusLine state={state} pending={2} />);
+    const line = byTestId('sync-status-line');
+    expect(line?.dataset.state).toBe(state);
+    expect(line?.classList.contains('flex')).toBe(true);
+    expect(line?.classList.contains('inline-flex')).toBe(false);
+  });
+
+  it('renders nothing while idle', async () => {
+    await render(<SyncStatusLine state="idle" pending={0} />);
+    expect(byTestId('sync-status-line')).toBeNull();
   });
 });
