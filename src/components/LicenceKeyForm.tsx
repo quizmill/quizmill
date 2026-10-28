@@ -16,33 +16,43 @@ import {
 /** Cap the validation errors shown for a bundle the endpoint sent broken. */
 const MAX_ERRORS_SHOWN = 4;
 
+type UnlockFailure = Extract<UnlockOutcome, { ok: false }>;
+type UnlockedEntry = Extract<UnlockOutcome, { ok: true }>['entry'];
+
+/** One licence-key unlock: its state, and the submit that drives it. */
+export interface LicenceUnlock {
+  busy: boolean;
+  failure: UnlockFailure | null;
+  /** The unlocked pack, once in — the full load to Home follows. */
+  done: UnlockedEntry | null;
+  submit: (candidate: string) => Promise<void>;
+}
+
 /**
- * Licence key entry — the ONE handler behind both the /unlock route (where
- * the key arrives in the URL fragment and is submitted for the learner)
- * and "Have a licence key?" on /packs (typed or pasted). The outcome is
- * shown right here, where the learner is: a failure stays in the form
- * with the endpoint's text and the file fallback; a success stashes the
- * confirmation for Home and navigates there, so the unlocked pack is the
- * first thing on screen with no Packs visit in between.
+ * The ONE handler behind every licence-key entry. A key that arrived by
+ * URL (`autoKey`) is submitted once on mount. A success loads Home, after
+ * `holdMs` when the caller shows the confirmation for a beat first.
+ * Unmounting (a newer key remounts the form on /unlock; leaving the page)
+ * abandons the request in flight: whatever the endpoint answers afterwards
+ * must not insert or activate anything.
  */
-export function LicenceKeyForm({
-  config,
-  autoKey,
-}: {
-  config: UnlockConfig;
-  /** A key that arrived by URL: submitted once on mount, kept in the field. */
-  autoKey?: string;
-}) {
-  const [key, setKey] = useState(autoKey ?? '');
+export function useLicenceUnlock(
+  config: UnlockConfig,
+  { autoKey, holdMs = 0 }: { autoKey?: string; holdMs?: number } = {},
+): LicenceUnlock {
   const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState<Extract<UnlockOutcome, { ok: false }> | null>(null);
-  const [done, setDone] = useState<string | null>(null);
+  const [failure, setFailure] = useState<UnlockFailure | null>(null);
+  const [done, setDone] = useState<UnlockedEntry | null>(null);
   const started = useRef(false);
-  // The request in flight, if any. Unmounting (a newer key remounts the
-  // form on /unlock; leaving the page) abandons it: whatever the endpoint
-  // answers afterwards must not insert or activate anything.
   const inflight = useRef<AbortController | null>(null);
-  useEffect(() => () => inflight.current?.abort(), []);
+  const leaving = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      inflight.current?.abort();
+      if (leaving.current) clearTimeout(leaving.current);
+    },
+    [],
+  );
 
   async function submit(candidate: string) {
     const trimmed = candidate.trim();
@@ -62,8 +72,12 @@ export function LicenceKeyForm({
         if (outcome.reason !== 'cancelled') setFailure(outcome);
         return;
       }
-      setDone(outcome.entry.title);
-      openUnlockedPack(outcome.entry);
+      setDone(outcome.entry);
+      if (holdMs > 0) {
+        leaving.current = setTimeout(() => openUnlockedPack(outcome.entry), holdMs);
+      } else {
+        openUnlockedPack(outcome.entry);
+      }
     } finally {
       if (inflight.current === controller) inflight.current = null;
       setBusy(false);
@@ -77,6 +91,27 @@ export function LicenceKeyForm({
     // Runs once for the key the URL carried — never again on re-render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoKey]);
+
+  return { busy, failure, done, submit };
+}
+
+/**
+ * Licence key entry — the field, its button and the outcome, shown right
+ * here, where the learner is: a failure stays in the form with the
+ * endpoint's text and the file fallback; a success says so on the way to
+ * Home, so the unlocked pack is the first thing on screen with no Packs
+ * visit in between.
+ */
+export function LicenceKeyEntry({
+  unlock,
+  initialKey,
+}: {
+  unlock: LicenceUnlock;
+  /** Kept in the field, e.g. the key from the URL. */
+  initialKey?: string;
+}) {
+  const [key, setKey] = useState(initialKey ?? '');
+  const { busy, failure, done, submit } = unlock;
 
   return (
     <div data-testid="licence-key-form">
@@ -113,7 +148,7 @@ export function LicenceKeyForm({
 
       {done ? (
         <p data-testid="licence-key-done" className="mt-3 text-sm text-brand-800">
-          Unlocked “{done}” — opening it…
+          Unlocked “{done.title}” — opening it…
         </p>
       ) : null}
 
@@ -145,4 +180,14 @@ export function LicenceKeyForm({
       ) : null}
     </div>
   );
+}
+
+/**
+ * The key form on its own — "Have a licence key?" on /packs (typed or
+ * pasted). /unlock drives the same hook and entry itself, so it can show
+ * a calm unlocking state in place of the form.
+ */
+export function LicenceKeyForm({ config, autoKey }: { config: UnlockConfig; autoKey?: string }) {
+  const unlock = useLicenceUnlock(config, { autoKey });
+  return <LicenceKeyEntry unlock={unlock} initialKey={autoKey} />;
 }

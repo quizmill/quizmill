@@ -123,6 +123,16 @@
   }
 }
 
+@utility animate-indeterminate {
+  /* A segment sweeping across its track — progress with no known end.
+     Under reduced motion it sits still, a plain bar. */
+  animation: indeterminate 1.4s ease-in-out infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
 @layer base {
   /* Theme palettes as RGB triplets (see the @theme block above). Light is the
      default; the `.dark` class on <html> (set pre-paint by the bootstrap
@@ -238,6 +248,14 @@
 /* Keyframes behind the `animate-celebration*` utilities above. The
    `-reduced` pair is what those utilities switch to under
    prefers-reduced-motion. */
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
 @keyframes celebration {
   0% {
     transform: scale(0.5) rotate(-6deg);
