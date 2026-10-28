@@ -226,6 +226,17 @@ Beyond the required fields, all optional:
   to the https `url` with `?ref=<packId>-home` / `-settings` appended
   so the destination can tell where the tap came from. The engine
   carries no shop or price of its own — the pack supplies the words.
+  Each tap also adds a fresh `&claim=<32 hex>`, so a purchase made in a
+  browser layer over an installed app (iOS keeps their storage apart)
+  can unlock the app itself. The `url` **may** answer the claim check:
+  `POST <url>` with `{"claim":"…"}` (JSON) → `{"status":"pending"}`
+  (also for a claim it hasn't seen yet), `{"status":"paid","key":"…"}`
+  (the app runs the licence unlock below with that key) or
+  `{"status":"revoked"}`. The app asks while a claim is pending — at
+  start and on becoming visible, every 3 s for a minute — and drops
+  claims after 48 h. Any other answer (non-JSON, non-2xx, a CORS
+  failure) and the app stops sending claims for that pack, so a plain
+  checkout page costs one failed request. Answer the POST with CORS `*`.
 - **licence unlock** — every build lets a learner who holds a licence
   key fetch the pack it opens in one tap: a link to `/unlock#key=<key>`
   (the key rides in the fragment, which never reaches a server) or the
