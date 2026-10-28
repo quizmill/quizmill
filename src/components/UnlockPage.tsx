@@ -52,6 +52,12 @@ export function resetUnlockPageForTests(): void {
  * learner starts practising; installed apps load Home after a short hold.
  * A refusal brings back the key panel and the prefilled form.
  *
+ * In a browser tab the key is also offered with a Copy button, quietly
+ * below Start practising: on iOS a link from outside always opens in
+ * Safari while an installed app keeps its own storage. The claim hand-off
+ * usually carries the unlock over by itself; the key is the manual bridge
+ * (Packs → Have a licence key?) when it doesn't.
+ *
  * The route exists and works in every build: the key alone says which
  * pack, so nothing about the active pack decides whether a learner can
  * unlock one here (see src/lib/unlock.ts for how the endpoint is chosen).
