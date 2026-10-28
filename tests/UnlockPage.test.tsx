@@ -326,6 +326,9 @@ describe('/unlock#key=…', () => {
     expect(byTestId('licence-key-error')).toBeNull();
     expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('team-handbook');
     expect(localStorage.getItem(licenceKeyStorageKey('team-handbook'))).toBe(OTHER);
+    // The link confirms first; Start practising goes Home.
+    expect(assign).not.toHaveBeenCalled();
+    await act(async () => { byTestId<HTMLButtonElement>('unlock-start')!.click(); });
     expect(assign).toHaveBeenCalledWith('/');
   });
 
