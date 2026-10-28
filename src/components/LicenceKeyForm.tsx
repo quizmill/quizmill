@@ -23,7 +23,7 @@ type UnlockedEntry = Extract<UnlockOutcome, { ok: true }>['entry'];
 export interface LicenceUnlock {
   busy: boolean;
   failure: UnlockFailure | null;
-  /** The unlocked pack, once in — the full load to Home follows. */
+  /** The unlocked pack, once in — ready for a full load to Home. */
   done: UnlockedEntry | null;
   submit: (candidate: string) => Promise<void>;
 }
@@ -32,6 +32,7 @@ export interface LicenceUnlock {
  * The ONE handler behind every licence-key entry. A key that arrived by
  * URL (`autoKey`) is submitted once on mount. A success loads Home, after
  * `holdMs` when the caller shows the confirmation for a beat first.
+ * `deferNavigation` lets a URL-key caller wait for an explicit action instead.
  * Unmounting (a newer key remounts the form on /unlock; leaving the page)
  * abandons the request in flight: whatever the endpoint answers afterwards
  * must not insert or activate anything. A success is terminal: no second
@@ -39,7 +40,11 @@ export interface LicenceUnlock {
  */
 export function useLicenceUnlock(
   config: UnlockConfig,
-  { autoKey, holdMs = 0 }: { autoKey?: string; holdMs?: number } = {},
+  { autoKey, holdMs = 0, deferNavigation = false }: {
+    autoKey?: string;
+    holdMs?: number;
+    deferNavigation?: boolean;
+  } = {},
 ): LicenceUnlock {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<UnlockFailure | null>(null);
@@ -86,6 +91,7 @@ export function useLicenceUnlock(
       }
       succeeded.current = true;
       setDone(outcome.entry);
+      if (deferNavigation) return;
       if (holdMs > 0) {
         const timer = setTimeout(() => {
           leaving.current = null;
