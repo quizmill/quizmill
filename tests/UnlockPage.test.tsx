@@ -476,6 +476,53 @@ describe('/unlock#key=… in the installed app: one calm state, not the form', (
     expect(assign).not.toHaveBeenCalled();
   });
 
+  it('leaving during the success hold still loads Home with the toast', async () => {
+    setStandalone(true);
+    const release = holdGood();
+    setLocation(`#key=${GOOD}`);
+    await render(<UnlockPage />);
+    release();
+    await settle();
+    expect(byTestId('unlock-unlocked')).toBeTruthy();
+    expect(assign).not.toHaveBeenCalled();
+
+    // A client-side tap away (e.g. Home) unmounts the page mid-hold.
+    await act(async () => {
+      root?.unmount();
+    });
+    root = undefined;
+    expect(assign).toHaveBeenCalledTimes(1);
+    expect(assign).toHaveBeenCalledWith('/');
+    expect(JSON.parse(sessionStorage.getItem(UNLOCKED_TOAST_KEY) ?? 'null')).toEqual({
+      title: 'Solar System — Full Course',
+      count: 3,
+    });
+    await settle(700);
+    expect(assign).toHaveBeenCalledTimes(1);
+  });
+
+  it('a successful retry is terminal: a second press during the hold sends nothing', async () => {
+    setStandalone(true);
+    setLocation(`#key=${BAD}`);
+    await render(<UnlockPage />);
+    expect(byTestId('licence-key-error')).toBeTruthy();
+
+    await typeKey(GOOD);
+    await pressUnlock();
+    expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('solar-system-full');
+    expect(byTestId<HTMLButtonElement>('licence-key-go')?.disabled).toBe(true);
+    // Enter in the field, still within the hold.
+    const input = byTestId<HTMLInputElement>('licence-key-input')!;
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+    await settle();
+    expect(fetched).toHaveLength(2);
+    expect(loadEvents().filter((e) => e.type === 'pack_unlocked')).toHaveLength(1);
+    await settle(700);
+    expect(assign).toHaveBeenCalledTimes(1);
+  });
+
   it('without a key: the form, as today', async () => {
     setStandalone(true);
     setLocation('');

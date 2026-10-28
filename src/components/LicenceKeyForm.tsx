@@ -34,7 +34,8 @@ export interface LicenceUnlock {
  * `holdMs` when the caller shows the confirmation for a beat first.
  * Unmounting (a newer key remounts the form on /unlock; leaving the page)
  * abandons the request in flight: whatever the endpoint answers afterwards
- * must not insert or activate anything.
+ * must not insert or activate anything. A success is terminal: no second
+ * submit, and unmounting during the hold loads Home at once.
  */
 export function useLicenceUnlock(
   config: UnlockConfig,
@@ -45,18 +46,29 @@ export function useLicenceUnlock(
   const [done, setDone] = useState<UnlockedEntry | null>(null);
   const started = useRef(false);
   const inflight = useRef<AbortController | null>(null);
-  const leaving = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const leaving = useRef<{ timer: ReturnType<typeof setTimeout>; entry: UnlockedEntry } | null>(
+    null,
+  );
+  // Set synchronously on success: the unlock is terminal from there on.
+  const succeeded = useRef(false);
   useEffect(
     () => () => {
       inflight.current?.abort();
-      if (leaving.current) clearTimeout(leaving.current);
+      // Leaving mid-hold (e.g. a tap on Home): the pack is already active,
+      // so finish the full load now rather than strand the old pack's content.
+      const pending = leaving.current;
+      if (pending) {
+        leaving.current = null;
+        clearTimeout(pending.timer);
+        openUnlockedPack(pending.entry);
+      }
     },
     [],
   );
 
   async function submit(candidate: string) {
     const trimmed = candidate.trim();
-    if (!trimmed || busy) return;
+    if (!trimmed || busy || succeeded.current) return;
     setBusy(true);
     setFailure(null);
     const controller = new AbortController();
@@ -72,9 +84,14 @@ export function useLicenceUnlock(
         if (outcome.reason !== 'cancelled') setFailure(outcome);
         return;
       }
+      succeeded.current = true;
       setDone(outcome.entry);
       if (holdMs > 0) {
-        leaving.current = setTimeout(() => openUnlockedPack(outcome.entry), holdMs);
+        const timer = setTimeout(() => {
+          leaving.current = null;
+          openUnlockedPack(outcome.entry);
+        }, holdMs);
+        leaving.current = { timer, entry: outcome.entry };
       } else {
         openUnlockedPack(outcome.entry);
       }
@@ -134,7 +151,7 @@ export function LicenceKeyEntry({
         <Button
           size="sm"
           onClick={() => void submit(key)}
-          disabled={busy || !key.trim()}
+          disabled={busy || !!done || !key.trim()}
           data-testid="licence-key-go"
         >
           {busy ? (
