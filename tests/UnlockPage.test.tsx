@@ -54,6 +54,7 @@ if (!globalThis.crypto?.randomUUID) {
 
 const GOOD = 'QM-GOOD-KEY';
 const BAD = 'QM-BAD-KEY';
+const OTHER = 'QM-OTHER-PACK-KEY';
 
 function bundle() {
   const question = (n: number) => ({
@@ -90,7 +91,18 @@ let assign: ReturnType<typeof vi.fn>;
 let replaceState: ReturnType<typeof vi.fn>;
 let fetched: string[];
 
-/** A stub endpoint: GOOD → the bundle, anything else → 403 with a reason. */
+/** A private pack the active pack's `upgrade` block knows nothing about. */
+function otherBundle() {
+  const b = bundle();
+  return {
+    manifest: { ...b.manifest, id: 'team-handbook', title: 'Team Handbook' },
+    questions: b.questions.map((q, i) => ({ ...q, id: `team-handbook-planets-00${i + 1}` })),
+  };
+}
+
+/** A stub endpoint: GOOD → the bundle, OTHER → another pack's bundle,
+ *  anything else → 403 with a reason. Like the worker, a `pack=` the key
+ *  does not open is a 404. */
 function stubEndpoint() {
   fetched = [];
   vi.stubGlobal(
@@ -98,9 +110,15 @@ function stubEndpoint() {
     vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       fetched.push(url);
-      const key = new URL(url).searchParams.get('key');
-      if (key === GOOD) {
-        return new Response(JSON.stringify(bundle()), {
+      const params = new URL(url).searchParams;
+      const key = params.get('key');
+      const opens = key === GOOD ? bundle() : key === OTHER ? otherBundle() : null;
+      if (opens) {
+        const pack = params.get('pack');
+        if (pack && pack !== opens.manifest.id) {
+          return new Response(JSON.stringify({ error: 'KEY_OTHER_PACK' }), { status: 404 });
+        }
+        return new Response(JSON.stringify(opens), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         });
@@ -195,10 +213,9 @@ describe('/unlock#key=…', () => {
 
     // The key left the URL before anything else happened.
     expect(replaceState).toHaveBeenCalledWith(null, '', '/unlock/');
-    // One request, to the contract's URL, with the key.
-    expect(fetched).toEqual([
-      `https://unlock.example.com/v1/unlock?key=${GOOD}&pack=solar-system-full`,
-    ]);
+    // One request, to the contract's URL, with the key alone: a link may
+    // be for any pack, so the active pack's upgrade hint is not sent.
+    expect(fetched).toEqual([`https://unlock.example.com/v1/unlock?key=${GOOD}`]);
     // Inserted and active, key under the unlocked pack.
     expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('solar-system-full');
     expect(localStorage.getItem(licenceKeyStorageKey('solar-system-full'))).toBe(GOOD);
@@ -236,13 +253,23 @@ describe('/unlock#key=…', () => {
     expect(localStorage.getItem(licenceKeyStorageKey('solar-system-full'))).toBeNull();
     expect(sessionStorage.getItem(UNLOCKED_TOAST_KEY)).toBeNull();
     expect(loadEvents().map((e) => [e.type, e.data])).toEqual([
-      ['unlock_failed', { pack: 'solar-system-full', reason: 'denied' }],
+      ['unlock_failed', { reason: 'denied' }],
     ]);
 
     // Correct the key in place: same handler, same outcome as the link.
     await typeKey(GOOD);
     await pressUnlock();
     expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('solar-system-full');
+    expect(assign).toHaveBeenCalledWith('/');
+  });
+
+  it('a link for ANOTHER pack: no pack= from the active pack’s upgrade block, that pack installed', async () => {
+    setLocation(`#key=${OTHER}`);
+    await render(<UnlockPage />);
+    expect(fetched).toEqual([`https://unlock.example.com/v1/unlock?key=${OTHER}`]);
+    expect(byTestId('licence-key-error')).toBeNull();
+    expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('team-handbook');
+    expect(localStorage.getItem(licenceKeyStorageKey('team-handbook'))).toBe(OTHER);
     expect(assign).toHaveBeenCalledWith('/');
   });
 
@@ -339,7 +366,7 @@ describe('/unlock#key=…', () => {
     expect(sessionStorage.getItem(UNLOCKED_TOAST_KEY)).toBeNull();
     expect(assign).not.toHaveBeenCalled();
     expect(loadEvents().map((e) => [e.type, e.data])).toEqual([
-      ['unlock_failed', { pack: 'solar-system-full', reason: 'denied' }],
+      ['unlock_failed', { reason: 'denied' }],
     ]);
   });
 });
@@ -553,11 +580,21 @@ describe('Packs → Have a licence key?', () => {
 
     await typeKey(` ${GOOD} `);
     await pressUnlock();
-    expect(fetched).toEqual([
-      `https://unlock.example.com/v1/unlock?key=${GOOD}&pack=solar-system-full`,
-    ]);
+    expect(fetched).toEqual([`https://unlock.example.com/v1/unlock?key=${GOOD}`]);
     expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('solar-system-full');
     expect(localStorage.getItem(licenceKeyStorageKey('solar-system-full'))).toBe(GOOD);
+    expect(assign).toHaveBeenCalledWith('/');
+  });
+
+  it('a key for ANOTHER pack: no pack= from the active pack’s upgrade block, that pack installed', async () => {
+    setLocation('', '/packs/');
+    await render(<PacksPage />);
+    await typeKey(OTHER);
+    await pressUnlock();
+    expect(fetched).toEqual([`https://unlock.example.com/v1/unlock?key=${OTHER}`]);
+    expect(byTestId('licence-key-error')).toBeNull();
+    expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('team-handbook');
+    expect(localStorage.getItem(licenceKeyStorageKey('team-handbook'))).toBe(OTHER);
     expect(assign).toHaveBeenCalledWith('/');
   });
 

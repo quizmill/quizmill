@@ -8,8 +8,8 @@ import { LicenceKeyEntry, useLicenceUnlock } from '@/components/LicenceKeyForm';
 import { isStandaloneDisplay } from '@/lib/install';
 import {
   readKeyFromHash,
+  anyPackUnlockConfig,
   stripKeyFromLocation,
-  unlockConfig,
   type UnlockConfig,
 } from '@/lib/unlock';
 import { useClientState, useMounted } from '@/lib/useMounted';
@@ -66,7 +66,9 @@ export function resetUnlockPageForTests(): void {
  */
 export function UnlockPage() {
   const mounted = useMounted();
-  const config = unlockConfig();
+  // No `pack=` hint: a link may carry a key to any pack, whatever the
+  // active pack's upgrade sells.
+  const config = anyPackUnlockConfig();
   // Read after mount: SSG has no location, and the prerender must not
   // differ from the first client paint.
   const [key, setKey] = useClientState(takeUrlKey, null);
