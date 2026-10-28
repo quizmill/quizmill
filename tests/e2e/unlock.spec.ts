@@ -210,8 +210,17 @@ test.describe('a sampler that hints at its full bank on its own endpoint', () =>
     await waitForText(page, 'This key has been used on too many devices.', 20_000);
     const body = await bodyText(page);
     expect(body).toContain('You can also insert the file under Packs.');
-    expect(body).toContain('Installed the app on your home screen?');
     await expect(page.locator('[data-testid="unlock-key-value"]')).toHaveText(BAD);
+    // A plain browser tab, not the installed app: the copy-your-key steps
+    // lead, before the unlock form.
+    await expect(page.locator('[data-testid="unlock-key-steps"] li')).toHaveCount(3);
+    expect(
+      await page.evaluate(() => {
+        const steps = document.querySelector('[data-testid="unlock-key"]');
+        const form = document.querySelector('[data-testid="licence-key-form"]');
+        return !!steps && !!form && !!(steps.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING);
+      }),
+    ).toBe(true);
     await expect(keyInput(page)).toHaveValue(BAD);
 
     // The fragment was wiped on load, and nothing was stored.
