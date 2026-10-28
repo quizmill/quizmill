@@ -5,6 +5,8 @@ import { ArrowUpRight, Sparkles } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
 import { recordEvent } from '@/lib/storage';
 import { upgradeHref, type UpgradePlacement } from '@/lib/upgrade';
+import { claimHref, startClaim } from '@/lib/upgradeClaim';
+import { watchUpgradeClaims } from '@/components/UpgradeClaimCheck';
 
 // upsell_seen once per page LOAD per placement — a re-render of Home is
 // not a second impression (and dev strict mode double-mounts).
@@ -23,6 +25,10 @@ const seen = new Set<UpgradePlacement>();
  *
  * Records `upsell_seen` / `upsell_clicked` app events ({ placement }) —
  * the two funnel steps after practising (src/lib/analytics.ts).
+ *
+ * Each tap also leaves with a fresh `claim=` so a purchase made in a
+ * browser layer over the installed app can unlock the app itself
+ * (src/lib/upgradeClaim.ts; UpgradeClaimCheck does the collecting).
  */
 export function UpgradeCard({ placement }: { placement: UpgradePlacement }) {
   const upgrade = APP_CONFIG.upgrade;
@@ -33,12 +39,22 @@ export function UpgradeCard({ placement }: { placement: UpgradePlacement }) {
     recordEvent('upsell_seen', { placement });
   }, [present, placement]);
   if (!upgrade) return null;
+  const href = upgradeHref(upgrade.url, APP_CONFIG.packId, placement);
   return (
     <a
-      href={upgradeHref(upgrade.url, APP_CONFIG.packId, placement)}
+      href={href}
       target="_blank"
       rel="noopener noreferrer"
-      onClick={() => recordEvent('upsell_clicked', { placement })}
+      onClick={(e) => {
+        recordEvent('upsell_clicked', { placement });
+        // A fresh claim per tap, minted here rather than on render; the
+        // browser follows the href as it stands after this handler. Built
+        // from the base link each time, so an earlier tap's claim never
+        // rides along once claims are off.
+        const claim = startClaim(APP_CONFIG.packId, upgrade);
+        e.currentTarget.href = claim ? claimHref(href, claim) : href;
+        if (claim) watchUpgradeClaims();
+      }}
       id={`upgrade-card-${placement}`}
       data-testid={`upgrade-card-${placement}`}
       className="tap-feedback flex items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-4 shadow-xs transition hover:border-brand-500/50 hover:shadow-md"

@@ -5,6 +5,7 @@ import { UpdateNotifier } from '@/components/UpdateNotifier';
 import { TabBar } from '@/components/TabBar';
 import { SyncBootstrap } from '@/components/SyncBootstrap';
 import { PackUpdateCheck } from '@/components/PackUpdateCheck';
+import { UpgradeClaimCheck } from '@/components/UpgradeClaimCheck';
 import { SyncIndicator } from '@/components/SyncIndicator';
 import { ThemeWatcher } from '@/components/ThemeWatcher';
 import { RuntimePackBoundary } from '@/components/RuntimePackBoundary';
@@ -176,6 +177,8 @@ export default function RootLayout({
         <SyncBootstrap />
         {/* Unlocked packs ask their endpoint for a newer bundle once a day. */}
         <PackUpdateCheck />
+        {/* A purchase started from the upgrade card unlocks right here. */}
+        <UpgradeClaimCheck />
         <SyncIndicator />
       </body>
     </html>

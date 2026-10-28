@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { webcrypto } from 'node:crypto';
 import PackHome from '@/pack/Home';
 import { SettingsPage } from '@/components/SettingsPage';
+import { readClaims } from '@/lib/upgradeClaim';
 
 // The demo pack deliberately carries no upgrade block, so a pack WITH one
 // is simulated by widening the build-time config. (The absent case — no
@@ -84,6 +85,58 @@ describe('UpgradeCard with a pack that declares an upgrade', () => {
     expect(
       lastCategory!.compareDocumentPosition(card!) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  it('each tap leaves with a fresh claim next to the ref; none is minted on render', async () => {
+    await render(<PackHome />);
+    expect(readClaims('solar-system-demo').claims).toEqual([]);
+    const card = container.querySelector<HTMLAnchorElement>('[data-testid="upgrade-card-home"]')!;
+    // Keep the test page where it is: stop the navigation, not React.
+    const stay = (e: Event) => e.preventDefault();
+    document.addEventListener('click', stay, true);
+    const hrefs: string[] = [];
+    try {
+      for (let i = 0; i < 2; i++) {
+        await act(async () => card.click());
+        hrefs.push(card.href);
+      }
+    } finally {
+      document.removeEventListener('click', stay, true);
+    }
+    const claims = hrefs.map((h) => new URL(h).searchParams.get('claim'));
+    expect(claims[0]).toMatch(/^[0-9a-f]{32}$/);
+    expect(claims[1]).toMatch(/^[0-9a-f]{32}$/);
+    expect(claims[0]).not.toBe(claims[1]);
+    for (const h of hrefs) {
+      const u = new URL(h);
+      expect(u.searchParams.get('ref')).toBe('solar-system-demo-home');
+      expect(u.searchParams.get('utm_source')).toBe('app');
+    }
+    expect(readClaims('solar-system-demo').claims.map((c) => c.claim)).toEqual(claims);
+    // The claim never rides in an event.
+    expect(localStorage.getItem('quizmill.solar-system-demo.events.v1') ?? '').not.toContain(
+      claims[0]!,
+    );
+  });
+
+  it('a tap after claims were turned off leaves claim-free, not with the old claim', async () => {
+    await render(<PackHome />);
+    const card = container.querySelector<HTMLAnchorElement>('[data-testid="upgrade-card-home"]')!;
+    const stay = (e: Event) => e.preventDefault();
+    document.addEventListener('click', stay, true);
+    try {
+      await act(async () => card.click());
+      expect(new URL(card.href).searchParams.get('claim')).toMatch(/^[0-9a-f]{32}$/);
+      // The link answered outside the protocol meanwhile: claims off.
+      localStorage.setItem(
+        'quizmill.solar-system-demo.upgradeClaims.v1',
+        JSON.stringify({ claims: [], off: true }),
+      );
+      await act(async () => card.click());
+    } finally {
+      document.removeEventListener('click', stay, true);
+    }
+    expect(card.href).toBe('https://example.com/course?utm_source=app&ref=solar-system-demo-home');
   });
 
   it('renders in Settings with ref=<packId>-settings', async () => {

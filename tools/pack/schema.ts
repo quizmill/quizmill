@@ -201,7 +201,11 @@ export const packUpgradeSchema = z.object({
   /** Card headline, e.g. "Get the full course". */
   title: z.string().min(3).max(80),
   /** Where the card links. Must be https — it opens in a new tab and the
-   *  ref param is appended, so a bare or non-web URL is an authoring slip. */
+   *  ref param is appended, so a bare or non-web URL is an authoring slip.
+   *  Each tap adds a fresh `claim=` too; the url MAY answer
+   *  `POST { claim }` with `{ status: pending | paid (+ key) | revoked }`
+   *  so a purchase unlocks the installed app that started it — see
+   *  src/lib/upgradeClaim.ts. GET stays the checkout either way. */
   url: z
     .string()
     .url()
