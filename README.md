@@ -236,7 +236,12 @@ Beyond the required fields, all optional:
   start and on becoming visible, every 3 s for a minute — and drops
   claims after 48 h. Any other answer (non-JSON, non-2xx, a CORS
   failure) and the app stops sending claims for that pack, so a plain
-  checkout page costs one failed request. Answer the POST with CORS `*`.
+  checkout page costs one failed request. The JSON body makes the
+  browser send a CORS preflight first: answer `OPTIONS <url>` with a
+  2xx, `access-control-allow-origin: *`,
+  `access-control-allow-methods: POST` and
+  `access-control-allow-headers: content-type`, and the POST itself
+  with `access-control-allow-origin: *`.
 - **licence unlock** — every build lets a learner who holds a licence
   key fetch the pack it opens in one tap: a link to `/unlock#key=<key>`
   (the key rides in the fragment, which never reaches a server) or the
