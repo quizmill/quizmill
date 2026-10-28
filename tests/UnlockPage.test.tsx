@@ -9,10 +9,14 @@ import { PacksPage } from '@/components/PacksPage';
 import { ACTIVE_PACK_ID_KEY } from '@/lib/packKeys';
 import { UNLOCKED_TOAST_KEY, licenceKeyStorageKey } from '@/lib/unlock';
 import { loadEvents } from '@/lib/storage';
+import { UpgradeClaimCheck } from '@/components/UpgradeClaimCheck';
+import { startClaim } from '@/lib/upgradeClaim';
+
+vi.mock('next/navigation', () => ({ usePathname: () => '/unlock/' }));
 
 /**
  * The licence-key unlock, end to end in the DOM: `/unlock#key=…` submits
- * the key for the learner and leaves for Home with the pack active, a
+ * the key for the learner and waits for Start practising with the pack active, a
  * refusal stays on the page with the endpoint's words and the key entry,
  * the same entry sits on /packs, and Home shows the confirmation once.
  * The endpoint is a stubbed fetch; nothing here touches the network.
@@ -207,7 +211,53 @@ async function pressUnlock() {
 }
 
 describe('/unlock#key=…', () => {
-  it('a good key: fragment wiped, pack fetched + inserted + active, key kept, off to Home', async () => {
+  it('Home loads the unlocked pack with its toast', async () => {
+    setStandalone(false);
+    setLocation(`#key=${GOOD}`);
+    await render(<UnlockPage />);
+    await act(async () => { container.querySelector<HTMLAnchorElement>('a[href="/"]')!.click(); });
+    expect(assign).toHaveBeenCalledWith('/');
+    expect(JSON.parse(sessionStorage.getItem(UNLOCKED_TOAST_KEY) ?? 'null')).toEqual({
+      title: 'Solar System — Full Course', count: 3,
+    });
+  });
+
+  it('a newer key after success does not navigate away', async () => {
+    setStandalone(false);
+    setLocation(`#key=${GOOD}`);
+    await render(<UnlockPage />);
+    window.location.hash = `#key=${BAD}`;
+    await act(async () => { window.dispatchEvent(new Event('hashchange')); });
+    expect(byTestId('licence-key-error')).toBeTruthy();
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it('a pending claim cannot bypass the browser confirmation', async () => {
+    setStandalone(false);
+    setLocation(`#key=${GOOD}`);
+    startClaim('solar-system-demo', { url: 'https://example.com/course', packId: 'solar-system-full' });
+    let release: (() => void) | undefined;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      fetched.push(url);
+      if (url === 'https://example.com/course') {
+        return new Response(JSON.stringify({ status: 'paid', key: GOOD }));
+      }
+      await new Promise<void>((resolve) => { release = resolve; });
+      return new Response(JSON.stringify(bundle()));
+    }));
+    // Layout consumer first: it must yield before the page scrubs the key.
+    await render(<><UpgradeClaimCheck /><UnlockPage /></>);
+    expect(fetched).toHaveLength(1);
+    release?.();
+    await act(async () => { await new Promise((r) => setTimeout(r, 700)); });
+    expect(byTestId('unlock-start')).toBeTruthy();
+    expect(assign).not.toHaveBeenCalled();
+    await act(async () => { byTestId<HTMLButtonElement>('unlock-start')!.click(); });
+    expect(assign).toHaveBeenCalledWith('/');
+  });
+
+  it('a good key: stays unlocked until Start practising loads Home', async () => {
     setLocation(`#key=${GOOD}`);
     await render(<UnlockPage />);
 
@@ -219,17 +269,23 @@ describe('/unlock#key=…', () => {
     // Inserted and active, key under the unlocked pack.
     expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('solar-system-full');
     expect(localStorage.getItem(licenceKeyStorageKey('solar-system-full'))).toBe(GOOD);
-    // The confirmation is waiting for Home, and we are on our way there.
+    expect(sessionStorage.getItem(UNLOCKED_TOAST_KEY)).toBeNull();
+    await act(async () => { await new Promise((r) => setTimeout(r, 700)); });
+    expect(assign).not.toHaveBeenCalled();
+    expect(byTestId('unlock-unlocked')?.textContent).toContain('Solar System — Full Course');
+    expect(byTestId('licence-key-form')).toBeNull();
+    // The key is on screen with its Copy button and the steps to the app.
+    expect(byTestId('unlock-key-value')?.textContent).toBe(GOOD);
+    expect(byTestId('unlock-key-copy')).toBeTruthy();
+    expect(text()).toContain('It picks this up by itself.');
+    expect(byTestId('unlock-key-steps')).toBeNull();
+    await act(async () => { byTestId<HTMLButtonElement>('unlock-start')!.click(); });
+    expect(assign).toHaveBeenCalledWith('/');
+    // Start practising leaves the confirmation for Home.
     expect(JSON.parse(sessionStorage.getItem(UNLOCKED_TOAST_KEY) ?? 'null')).toEqual({
       title: 'Solar System — Full Course',
       count: 3,
     });
-    expect(assign).toHaveBeenCalledWith('/');
-    expect(byTestId('licence-key-done')?.textContent).toContain('Solar System — Full Course');
-    // The key is on screen with its Copy button and the steps to the app.
-    expect(byTestId('unlock-key-value')?.textContent).toBe(GOOD);
-    expect(byTestId('unlock-key-copy')).toBeTruthy();
-    expect(text()).toContain('Packs → Have a licence key? → paste');
     // And in no event.
     expect(loadEvents().map((e) => [e.type, e.data])).toEqual([
       ['pack_unlocked', { pack: 'solar-system-full' }],
@@ -300,7 +356,8 @@ describe('/unlock#key=…', () => {
     expect(fetched).toHaveLength(1);
     expect(byTestId('unlock-key-value')?.textContent).toBe(GOOD);
     expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('solar-system-full');
-    expect(assign).toHaveBeenCalledWith('/');
+    expect(assign).not.toHaveBeenCalled();
+    expect(byTestId('unlock-start')).toBeTruthy();
   });
 
   it('a key in the QUERY string is not honoured — but is scrubbed from the address bar', async () => {
@@ -560,14 +617,14 @@ describe('/unlock#key=… in the installed app: one calm state, not the form', (
     expect(text()).toContain('Paste the licence key you were given.');
   });
 
-  it('in a browser tab the copy-your-key steps still show while it unlocks', async () => {
+  it('in a browser tab only the calm state shows while it unlocks', async () => {
     setStandalone(false);
     holdGood();
     setLocation(`#key=${GOOD}`);
     await render(<UnlockPage />);
-    expect(byTestId('unlock-unlocking')).toBeNull();
-    expect(byTestId('unlock-key-steps')).toBeTruthy();
-    expect(byTestId('licence-key-form')).toBeTruthy();
+    expect(byTestId('unlock-unlocking')).toBeTruthy();
+    expect(byTestId('unlock-key')).toBeNull();
+    expect(byTestId('licence-key-form')).toBeNull();
   });
 });
 

@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
+import { isStandaloneDisplay } from '@/lib/install';
 import { APP_CONFIG } from '@/config';
 import { insertedPackKey } from '@/lib/packKeys';
 import {
@@ -51,7 +53,11 @@ export function watchUpgradeClaims(): void {
  * Home, with the unlocked toast. Renders nothing; safe in the layout.
  */
 export function UpgradeClaimCheck() {
+  const pathname = usePathname();
   useEffect(() => {
+    // The explicit browser unlock route owns its navigation, including after
+    // it scrubs the URL key. Installed apps still collect claims as before.
+    if (pathname?.replace(/\/$/, '') === '/unlock' && !isStandaloneDisplay()) return;
     const upgrade = APP_CONFIG.upgrade;
     if (!upgrade) return;
     const packId = APP_CONFIG.packId;
@@ -145,6 +151,6 @@ export function UpgradeClaimCheck() {
       document.removeEventListener('visibilitychange', onVisibility);
       if (kick === onTap) kick = null;
     };
-  }, []);
+  }, [pathname]);
   return null;
 }
