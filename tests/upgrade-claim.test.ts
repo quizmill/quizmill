@@ -99,7 +99,7 @@ describe('coming back: checking the claims', () => {
   it('POSTs { claim } as JSON to the upgrade url', async () => {
     const claim = startClaim(PACK, UPGRADE, NOW)!;
     const fake = fakeFetch({ [claim]: () => answer(200, { status: 'pending' }) });
-    const result = await checkClaims(PACK, UPGRADE, deps({ fetchImpl: fake.impl }));
+    const result = await checkClaims(PACK, deps({ fetchImpl: fake.impl }));
     expect(result).toBe('pending');
     expect(fake.calls).toHaveLength(1);
     expect(fake.calls[0].url).toBe(UPGRADE.url);
@@ -116,20 +116,20 @@ describe('coming back: checking the claims', () => {
       [claim]: () =>
         answer(200, status === 'paid' ? { status, key: 'QM-PAID-KEY' } : { status }),
     });
-    const unlock = vi.fn(async () => 'ok' as const);
+    const unlock = vi.fn<ClaimDeps['unlock']>(async () => 'ok');
     const d = deps({ fetchImpl: fake.impl, unlock });
 
-    expect(await checkClaims(PACK, UPGRADE, d)).toBe('pending');
+    expect(await checkClaims(PACK, d)).toBe('pending');
     expect(unlock).not.toHaveBeenCalled();
 
     status = 'paid';
-    expect(await checkClaims(PACK, UPGRADE, d)).toBe('unlocked');
+    expect(await checkClaims(PACK, d)).toBe('unlocked');
     expect(unlock).toHaveBeenCalledTimes(1);
-    expect(unlock).toHaveBeenCalledWith('QM-PAID-KEY');
+    expect(unlock.mock.calls[0][0]).toBe('QM-PAID-KEY');
     expect(readClaims(PACK).claims).toEqual([]);
 
     // Nothing left to ask about.
-    expect(await checkClaims(PACK, UPGRADE, d)).toBe('none');
+    expect(await checkClaims(PACK, d)).toBe('none');
     expect(unlock).toHaveBeenCalledTimes(1);
     expect(fake.calls).toHaveLength(2);
   });
@@ -138,7 +138,7 @@ describe('coming back: checking the claims', () => {
     const claim = startClaim(PACK, UPGRADE, NOW)!;
     const fake = fakeFetch({ [claim]: () => answer(200, { status: 'paid', key: 'K' }) });
     const d = deps({ fetchImpl: fake.impl, unlock: vi.fn(async () => 'retry' as const) });
-    expect(await checkClaims(PACK, UPGRADE, d)).toBe('pending');
+    expect(await checkClaims(PACK, d)).toBe('pending');
     expect(readClaims(PACK).claims).toHaveLength(1);
   });
 
@@ -146,7 +146,7 @@ describe('coming back: checking the claims', () => {
     const claim = startClaim(PACK, UPGRADE, NOW)!;
     const fake = fakeFetch({ [claim]: () => answer(200, { status: 'paid', key: 'K' }) });
     const d = deps({ fetchImpl: fake.impl, unlock: vi.fn(async () => 'failed' as const) });
-    expect(await checkClaims(PACK, UPGRADE, d)).toBe('none');
+    expect(await checkClaims(PACK, d)).toBe('none');
     expect(readClaims(PACK).claims).toEqual([]);
   });
 
@@ -157,7 +157,7 @@ describe('coming back: checking the claims', () => {
       [gone]: () => answer(200, { status: 'revoked' }),
       [kept]: () => answer(200, { status: 'pending' }),
     });
-    expect(await checkClaims(PACK, UPGRADE, deps({ fetchImpl: fake.impl }))).toBe('pending');
+    expect(await checkClaims(PACK, deps({ fetchImpl: fake.impl }))).toBe('pending');
     expect(readClaims(PACK).claims.map((c) => c.claim)).toEqual([kept]);
   });
 
@@ -176,7 +176,7 @@ describe('coming back: checking the claims', () => {
       startClaim('other-pack', UPGRADE, NOW);
       const fake = fakeFetch({ [a]: respond });
       const unlock = vi.fn(async () => 'ok' as const);
-      expect(await checkClaims(PACK, UPGRADE, deps({ fetchImpl: fake.impl, unlock }))).toBe(
+      expect(await checkClaims(PACK, deps({ fetchImpl: fake.impl, unlock }))).toBe(
         'none',
       );
       // One failed request, nothing more: all claims gone, none asked again.
@@ -195,14 +195,14 @@ describe('coming back: checking the claims', () => {
     const old = startClaim(PACK, UPGRADE, NOW - CLAIM_TTL_MS - 1)!;
     const fresh = startClaim(PACK, UPGRADE, NOW - CLAIM_TTL_MS + 60_000)!;
     const fake = fakeFetch({ [fresh]: () => answer(200, { status: 'pending' }) });
-    expect(await checkClaims(PACK, UPGRADE, deps({ fetchImpl: fake.impl }))).toBe('pending');
+    expect(await checkClaims(PACK, deps({ fetchImpl: fake.impl }))).toBe('pending');
     expect(fake.calls.map((c) => c.claim)).toEqual([fresh]);
     expect(readClaims(PACK).claims.map((c) => c.claim)).toEqual([fresh]);
     expect(old).not.toBe(fresh);
 
     // All expired → nothing asked, nothing left.
     const later = deps({ fetchImpl: fake.impl, now: () => NOW + CLAIM_TTL_MS });
-    expect(await checkClaims(PACK, UPGRADE, later)).toBe('none');
+    expect(await checkClaims(PACK, later)).toBe('none');
     expect(fake.calls).toHaveLength(1);
     expect(readClaims(PACK).claims).toEqual([]);
   });
@@ -212,7 +212,7 @@ describe('coming back: checking the claims', () => {
     const fake = fakeFetch({});
     const unlock = vi.fn(async () => 'ok' as const);
     const d = deps({ fetchImpl: fake.impl, unlock, isUnlocked: () => true });
-    expect(await checkClaims(PACK, UPGRADE, d)).toBe('none');
+    expect(await checkClaims(PACK, d)).toBe('none');
     expect(fake.calls).toHaveLength(0);
     expect(unlock).not.toHaveBeenCalled();
     expect(readClaims(PACK)).toEqual({ claims: [] });
@@ -229,9 +229,75 @@ describe('coming back: checking the claims', () => {
     });
     const unlock = vi.fn(async () => 'ok' as const);
     const d = deps({ fetchImpl: fake.impl, unlock, isUnlocked: () => unlocked });
-    expect(await checkClaims(PACK, UPGRADE, d)).toBe('none');
+    expect(await checkClaims(PACK, d)).toBe('none');
     expect(unlock).not.toHaveBeenCalled();
     expect(readClaims(PACK).claims).toEqual([]);
+  });
+
+  it('each claim is asked about at the url it left on, not the current one', async () => {
+    const before = startClaim(PACK, { ...UPGRADE, url: 'https://old-shop.test/course' }, NOW)!;
+    const after = startClaim(PACK, UPGRADE, NOW + 1)!;
+    const fake = fakeFetch({
+      [before]: () => answer(200, { status: 'pending' }),
+      [after]: () => answer(200, { status: 'pending' }),
+    });
+    expect(await checkClaims(PACK, deps({ fetchImpl: fake.impl }))).toBe('pending');
+    expect(fake.calls.map((c) => [c.claim, c.url])).toEqual([
+      [before, 'https://old-shop.test/course'],
+      [after, UPGRADE.url],
+    ]);
+  });
+
+  it('a paid key the device already holds is left alone, with or without a pack hint', async () => {
+    const claim = startClaim(PACK, { url: UPGRADE.url }, NOW)!;
+    const fake = fakeFetch({ [claim]: () => answer(200, { status: 'paid', key: 'K' }) });
+    const unlock = vi.fn(async () => 'ok' as const);
+    // No upgrade.packId: the only thing to go on is the key itself.
+    const isUnlocked = vi.fn((key?: string) => key === 'K');
+    expect(await checkClaims(PACK, deps({ fetchImpl: fake.impl, unlock, isUnlocked }))).toBe(
+      'none',
+    );
+    expect(isUnlocked).toHaveBeenLastCalledWith('K');
+    expect(unlock).not.toHaveBeenCalled();
+    expect(readClaims(PACK).claims).toEqual([]);
+  });
+
+  it('a check cancelled mid-flight keeps every claim and leaves claims on', async () => {
+    const claim = startClaim(PACK, UPGRADE, NOW)!;
+    startClaim(PACK, UPGRADE, NOW + 1);
+    const ctrl = new AbortController();
+    const fake = fakeFetch({
+      [claim]: () => {
+        ctrl.abort(); // the app was hidden while this was out
+        return Promise.reject(new DOMException('Aborted', 'AbortError'));
+      },
+    });
+    const unlock = vi.fn(async () => 'ok' as const);
+    expect(await checkClaims(PACK, deps({ fetchImpl: fake.impl, unlock }), ctrl.signal)).toBe(
+      'pending',
+    );
+    expect(fake.calls).toHaveLength(1);
+    expect(fake.calls[0].init.signal).toBe(ctrl.signal);
+    expect(unlock).not.toHaveBeenCalled();
+    expect(readClaims(PACK).claims).toHaveLength(2);
+    expect(readClaims(PACK).off).toBeUndefined();
+  });
+
+  it('a paid answer that arrives after cancelling is not acted on', async () => {
+    const claim = startClaim(PACK, UPGRADE, NOW)!;
+    const ctrl = new AbortController();
+    const fake = fakeFetch({
+      [claim]: () => {
+        ctrl.abort();
+        return answer(200, { status: 'paid', key: 'K' });
+      },
+    });
+    const unlock = vi.fn(async () => 'ok' as const);
+    expect(await checkClaims(PACK, deps({ fetchImpl: fake.impl, unlock }), ctrl.signal)).toBe(
+      'pending',
+    );
+    expect(unlock).not.toHaveBeenCalled();
+    expect(readClaims(PACK).claims).toHaveLength(1);
   });
 
   it('a claim started while a check is out survives it', async () => {
@@ -243,7 +309,7 @@ describe('coming back: checking the claims', () => {
         return answer(200, { status: 'revoked' });
       },
     });
-    await checkClaims(PACK, UPGRADE, deps({ fetchImpl: fake.impl }));
+    await checkClaims(PACK, deps({ fetchImpl: fake.impl }));
     expect(readClaims(PACK).claims.map((c) => c.claim)).toEqual([second]);
   });
 });

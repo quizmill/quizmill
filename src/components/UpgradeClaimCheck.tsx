@@ -3,7 +3,12 @@
 import { useEffect } from 'react';
 import { APP_CONFIG } from '@/config';
 import { insertedPackKey } from '@/lib/packKeys';
-import { openUnlockedPack, unlockConfig, unlockPack } from '@/lib/unlock';
+import {
+  openUnlockedPack,
+  unlockConfig,
+  unlockPack,
+  type UnlockFailure,
+} from '@/lib/unlock';
 import {
   CLAIM_POLL_MS,
   CLAIM_WINDOW_MS,
@@ -15,6 +20,21 @@ import { buildTimeManifest } from '@/pack/source';
 
 // The mounted checker's "start a window now", for the upgrade card's tap.
 let kick: (() => void) | null = null;
+
+/** Unlock failures worth asking again about on the next check. */
+const RETRYABLE = new Set<UnlockFailure>(['offline', 'bad-response', 'cancelled']);
+
+/** Some pack on this device is kept under exactly this licence key. */
+function holdsLicenceKey(key: string): boolean {
+  const ls = window.localStorage;
+  for (let i = 0; i < ls.length; i++) {
+    const name = ls.key(i);
+    if (name?.startsWith('quizmill.') && name.endsWith('.licence') && ls.getItem(name) === key) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /** Start (or restart) a check window — the upgrade card calls this on tap,
  *  for a checkout layer that may never hide the app underneath. */
@@ -39,24 +59,29 @@ export function UpgradeClaimCheck() {
     const deps: ClaimDeps = {
       fetchImpl: (...args) => fetch(...args),
       now: () => Date.now(),
-      isUnlocked: () => {
-        if (!target) return false;
+      isUnlocked: (key) => {
         try {
-          return window.localStorage.getItem(insertedPackKey(target)) !== null;
+          if (target) return window.localStorage.getItem(insertedPackKey(target)) !== null;
+          // No hint which pack the purchase is for: a pack already kept
+          // under this very key is the one it would unlock.
+          return key !== undefined && holdsLicenceKey(key);
         } catch {
           return false;
         }
       },
-      unlock: async (key) => {
+      unlock: async (key, signal) => {
         const outcome = await unlockPack(key, {
           config: unlockConfig(),
           buildPackId: buildTimeManifest.id,
+          ...(signal ? { signal } : {}),
         });
         if (outcome.ok) {
           openUnlockedPack(outcome.entry);
           return 'ok';
         }
-        return outcome.reason === 'offline' ? 'retry' : 'failed';
+        // Unreachable, a 5xx/429 or an odd body: the service may be back
+        // on the next check. A refused key or a wrong pack won't be.
+        return RETRYABLE.has(outcome.reason) ? 'retry' : 'failed';
       },
     };
 
@@ -64,6 +89,8 @@ export function UpgradeClaimCheck() {
     let until = 0;
     let busy = false;
     let stopped = false;
+    // The sweep that is out, so hiding the app can call it off.
+    let sweep: AbortController | undefined;
 
     const stopTimer = () => {
       if (timer !== undefined) clearTimeout(timer);
@@ -75,15 +102,19 @@ export function UpgradeClaimCheck() {
       timer = undefined;
       if (stopped || busy || hidden()) return;
       busy = true;
+      const ctrl = new AbortController();
+      sweep = ctrl;
       let result: Awaited<ReturnType<typeof checkClaims>>;
       try {
-        result = await checkClaims(packId, upgrade, deps);
+        result = await checkClaims(packId, deps, ctrl.signal);
       } catch {
         result = 'none';
       } finally {
         busy = false;
+        if (sweep === ctrl) sweep = undefined;
       }
       if (stopped || result !== 'pending' || hidden()) return;
+      stopTimer(); // a tap during the sweep may have queued one already
       if (Date.now() + CLAIM_POLL_MS < until) timer = setTimeout(() => void tick(), CLAIM_POLL_MS);
     };
     const start = (delay = 0) => {
@@ -95,7 +126,10 @@ export function UpgradeClaimCheck() {
     };
     const onVisibility = () => {
       if (document.visibilityState === 'visible') start();
-      else stopTimer();
+      else {
+        stopTimer();
+        sweep?.abort();
+      }
     };
 
     // A tap's first check waits one interval: the checkout has only just
@@ -107,6 +141,7 @@ export function UpgradeClaimCheck() {
     return () => {
       stopped = true;
       stopTimer();
+      sweep?.abort();
       document.removeEventListener('visibilitychange', onVisibility);
       if (kick === onTap) kick = null;
     };

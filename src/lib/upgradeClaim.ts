@@ -144,24 +144,32 @@ export type ClaimUnlockResult = 'ok' | 'retry' | 'failed';
 export interface ClaimDeps {
   fetchImpl: typeof fetch;
   now: () => number;
-  /** The pack the purchase is for is already on this device. */
-  isUnlocked: () => boolean;
+  /** The pack the purchase is for is already on this device — by the
+   *  manifest's hint, or (given a paid key) because that key is kept. */
+  isUnlocked: (key?: string) => boolean;
   /** The ordinary licence-key unlock, run with a paid key. */
-  unlock: (key: string) => Promise<ClaimUnlockResult>;
+  unlock: (key: string, signal?: AbortSignal) => Promise<ClaimUnlockResult>;
 }
 
 type ClaimAnswer =
   | { status: 'pending' }
   | { status: 'revoked' }
   | { status: 'paid'; key: string }
+  | { status: 'cancelled' } // the caller gave up; says nothing about the url
   | null; // not the protocol
 
-async function askAbout(url: string, claim: string, fetchImpl: typeof fetch): Promise<ClaimAnswer> {
+async function askAbout(
+  url: string,
+  claim: string,
+  fetchImpl: typeof fetch,
+  signal?: AbortSignal,
+): Promise<ClaimAnswer> {
   try {
     const res = await fetchImpl(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ claim }),
+      ...(signal ? { signal } : {}),
     });
     if (!res.ok) return null;
     const body = (await res.json()) as { status?: unknown; key?: unknown } | null;
@@ -171,20 +179,22 @@ async function askAbout(url: string, claim: string, fetchImpl: typeof fetch): Pr
     }
     return null;
   } catch {
-    return null;
+    return signal?.aborted ? { status: 'cancelled' } : null;
   }
 }
 
 /**
- * Ask about every pending claim for the pack once, oldest first, and act
- * on the answers. `unlocked` once a paid key went in (the caller is then
- * navigating away); `pending` while some claim is still worth asking
- * about; `none` when nothing is left.
+ * Ask about every pending claim for the pack once, oldest first, each at
+ * the url it left on, and act on the answers. `unlocked` once a paid key
+ * went in (the caller is then navigating away); `pending` while some
+ * claim is still worth asking about; `none` when nothing is left. An
+ * aborted `signal` (the app was hidden) ends the sweep with every claim
+ * kept and nothing acted on.
  */
 export async function checkClaims(
   packId: string,
-  upgrade: Pick<PackUpgrade, 'url'>,
   deps: ClaimDeps,
+  signal?: AbortSignal,
 ): Promise<'unlocked' | 'pending' | 'none'> {
   const now = deps.now();
   const store = readClaims(packId);
@@ -203,8 +213,10 @@ export async function checkClaims(
   const drop = (claim: string) =>
     updateClaims(packId, (s) => ({ ...s, claims: s.claims.filter((c) => c.claim !== claim) }));
 
-  for (const { claim } of fresh) {
-    const answer = await askAbout(upgrade.url, claim, deps.fetchImpl);
+  for (const { claim, url } of fresh) {
+    if (signal?.aborted) return 'pending';
+    const answer = await askAbout(url, claim, deps.fetchImpl, signal);
+    if (signal?.aborted || answer?.status === 'cancelled') return 'pending';
     if (answer === null) {
       writeClaims(packId, { claims: [], off: true });
       return 'none';
@@ -212,11 +224,11 @@ export async function checkClaims(
     if (answer.status === 'revoked') drop(claim);
     if (answer.status !== 'paid') continue;
     // A key pasted by hand while we were asking wins: nothing to do.
-    if (deps.isUnlocked()) {
+    if (deps.isUnlocked(answer.key)) {
       updateClaims(packId, (s) => ({ ...s, claims: [] }));
       return 'none';
     }
-    const result = await deps.unlock(answer.key);
+    const result = await deps.unlock(answer.key, signal);
     if (result === 'retry') continue;
     drop(claim);
     if (result === 'ok') return 'unlocked';
