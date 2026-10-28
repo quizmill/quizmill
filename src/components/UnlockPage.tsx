@@ -160,8 +160,8 @@ export function UnlockPage() {
             </li>
           </ol>
           <p className="mt-4 text-xs text-ink-600">
-            Don’t use the home-screen app? Nothing to copy: the pack is already unlocked
-            here.
+            Don’t use the home-screen app? There’s no need to copy anything: the form
+            below unlocks the pack in this browser.
           </p>
         </section>
       ) : null}

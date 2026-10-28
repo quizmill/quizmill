@@ -372,7 +372,10 @@ describe('/unlock#key=… by display mode', () => {
     expect(items[2]).toContain('Packs → Have a licence key? → paste');
     // The Copy button sits in the first step.
     expect(steps!.querySelector('li')?.querySelector('[data-testid="unlock-key-copy"]')).toBeTruthy();
-    expect(text()).toContain('already unlocked here');
+    // Browser-only learners are told they needn't copy, without claiming an
+    // unlock that hasn't happened (BAD is refused).
+    expect(text()).toContain('no need to copy anything');
+    expect(text()).not.toContain('already unlocked');
     // The key block comes before the form.
     const form = byTestId('licence-key-input')!;
     expect(
