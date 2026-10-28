@@ -21,10 +21,12 @@
  * Where `unlockUrl` is the build's default endpoint (NEXT_PUBLIC_UNLOCK_URL,
  * falling back to the hosted service at sync.quizmill.dev) unless the
  * active pack's manifest overrides it with `upgrade.unlockUrl` (an author
- * hosting their own). `pack` is sent only when the manifest hints at the
- * pack a key is expected to open (`upgrade.packId`, the sampler → full
- * bank case); the server then refuses a key for any other pack, and the
- * app refuses a bundle for any other pack before it touches storage.
+ * hosting their own). `pack` is sent only by the upgrade claim hand-off,
+ * when the manifest hints at the pack its purchase opens (`upgrade.packId`,
+ * the sampler → full bank case); the server then refuses a key for any
+ * other pack, and the app refuses a bundle for any other pack before it
+ * touches storage. The generic key entries never send it
+ * (`anyPackUnlockConfig`): a key there may be for any pack at all.
  *
  * CORS `*`, no cookies. How keys are issued is none of the engine's
  * business, and the key itself goes exactly three places: the request
@@ -95,6 +97,17 @@ export function resolveUnlockConfig(
 /** The ACTIVE pack's unlock contract — never null (see resolveUnlockConfig). */
 export function unlockConfig(): UnlockConfig {
   return resolveUnlockConfig(APP_CONFIG.upgrade, process.env.NEXT_PUBLIC_UNLOCK_URL);
+}
+
+/**
+ * The same endpoint with no `pack=` hint — for the generic key entries
+ * (the /unlock link, Packs → Have a licence key?, the starter card),
+ * where a learner may hold a key to ANY pack. The active pack's
+ * `upgrade.packId` names the pack ITS upgrade sells; sending it there
+ * would make the server refuse every key for a different pack.
+ */
+export function anyPackUnlockConfig(): UnlockConfig {
+  return { unlockUrl: unlockConfig().unlockUrl };
 }
 
 /**

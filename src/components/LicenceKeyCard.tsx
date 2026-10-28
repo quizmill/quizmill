@@ -2,7 +2,7 @@
 
 import { KeyRound } from 'lucide-react';
 import { LicenceKeyForm } from '@/components/LicenceKeyForm';
-import { unlockConfig } from '@/lib/unlock';
+import { anyPackUnlockConfig } from '@/lib/unlock';
 
 /**
  * "Have a licence key?" on /packs — the typed-key twin of the /unlock
@@ -12,7 +12,7 @@ import { unlockConfig } from '@/lib/unlock';
  * a learner to unlock one here.
  */
 export function LicenceKeyCard() {
-  const config = unlockConfig();
+  const config = anyPackUnlockConfig();
   return (
     <section
       data-testid="licence-key-card"

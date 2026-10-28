@@ -8,10 +8,11 @@ import { bodyText, waitForText } from './helpers';
  * declares nothing — the route and the Packs entry exist anyway, the key
  * alone goes to the build's default endpoint and the bundle names the
  * pack; and a "sampler" whose manifest hints at its full bank
- * (`upgrade.packId`) on the author's own endpoint (`upgrade.unlockUrl`),
- * so `pack=` travels too. `/unlock#key=GOOD` must confirm the unlock and,
- * in a browser tab once Start practising is pressed (the installed app on
- * its own), land on Home with the unlocked pack active and counted — no
+ * (`upgrade.packId`) on the author's own endpoint (`upgrade.unlockUrl`):
+ * links and the Packs entry still send the key alone there, and only the
+ * upgrade claim adds `pack=`. `/unlock#key=GOOD` must confirm the unlock
+ * and, in a browser tab once Start practising is pressed (the installed app
+ * on its own), land on Home with the unlocked pack active and counted — no
  * Packs visit; `#key=BAD` stays put
  * with the refusal and the key entry; the entry under Packs ends the same
  * way as the link. And the key must never be in a URL after load, nor in
@@ -199,8 +200,9 @@ test.describe('a sampler that hints at its full bank on its own endpoint', () =>
     // Home (#191) shows the counts per category card; the full pack has one.
     expect(await bodyText(page)).toContain('7 questions available');
 
-    // One request, to the contract's URL — and no key anywhere after load.
-    expect(endpointHits).toEqual([`${UNLOCK_BASE}/v1/unlock?key=${GOOD}&pack=solar-system-full`]);
+    // One request, to the contract's URL with the key alone — a link names
+    // no pack, so the bundle says which it opens — and no key after load.
+    expect(endpointHits).toEqual([`${UNLOCK_BASE}/v1/unlock?key=${GOOD}`]);
     expect(page.url()).not.toContain('key=');
     expect(page.url().endsWith('/')).toBe(true);
     expect(consoleText.join('\n')).not.toContain(GOOD);
@@ -262,7 +264,7 @@ test.describe('a sampler that hints at its full bank on its own endpoint', () =>
     await expect(page.locator('h1')).toHaveText('Solar System Full Course', { timeout: 20_000 });
     await waitForText(page, 'Unlocked: 7 questions');
     expect(page.url().endsWith('/')).toBe(true);
-    expect(endpointHits).toEqual([`${UNLOCK_BASE}/v1/unlock?key=${GOOD}&pack=solar-system-full`]);
+    expect(endpointHits).toEqual([`${UNLOCK_BASE}/v1/unlock?key=${GOOD}`]);
     expect(page.url()).not.toContain('key=');
     // What /unlock painted on the way: both calm states, never the form.
     expect(

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ArrowRight, KeyRound, PackagePlus } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
 import { LicenceKeyForm } from '@/components/LicenceKeyForm';
-import { unlockConfig } from '@/lib/unlock';
+import { anyPackUnlockConfig } from '@/lib/unlock';
 import { isStarterPack } from '@/pack/starter';
 
 /**
@@ -56,7 +56,7 @@ export function StarterPackCard() {
           <KeyRound className="h-4 w-4 text-ink-500" aria-hidden />
           Have a licence key?
         </p>
-        <LicenceKeyForm config={unlockConfig()} />
+        <LicenceKeyForm config={anyPackUnlockConfig()} />
       </div>
     </section>
   );
