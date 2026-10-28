@@ -4,9 +4,14 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Check, Copy, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { LicenceKeyForm } from '@/components/LicenceKeyForm';
+import { LicenceKeyEntry, useLicenceUnlock } from '@/components/LicenceKeyForm';
 import { isStandaloneDisplay } from '@/lib/install';
-import { readKeyFromHash, stripKeyFromLocation, unlockConfig } from '@/lib/unlock';
+import {
+  readKeyFromHash,
+  stripKeyFromLocation,
+  unlockConfig,
+  type UnlockConfig,
+} from '@/lib/unlock';
 import { useClientState, useMounted } from '@/lib/useMounted';
 
 function StepNumber({ n }: { n: number }) {
@@ -51,7 +56,9 @@ export function resetUnlockPageForTests(): void {
  * storage — the key is the bridge: copy it, open the app, paste it under
  * Packs → Have a licence key? Outside the installed app those three steps
  * lead the page, since an unlock in the browser looks finished but never
- * reaches the app.
+ * reaches the app. Inside it, the link needs nothing from the learner, so
+ * the page shows only "Unlocking…" then "Unlocked: …" on the way to Home,
+ * never a form they didn't touch; a refusal brings the form back.
  *
  * The route exists and works in every build: the key alone says which
  * pack, so nothing about the active pack decides whether a learner can
@@ -63,7 +70,6 @@ export function UnlockPage() {
   // Read after mount: SSG has no location, and the prerender must not
   // differ from the first client paint.
   const [key, setKey] = useClientState(takeUrlKey, null);
-  const [copied, setCopied] = useState(false);
   // Outside the installed app the key has to be carried over by hand, so
   // the copy steps lead; inside it, the key is already where it's needed.
   const [standalone] = useClientState(isStandaloneDisplay, true);
@@ -84,6 +90,86 @@ export function UnlockPage() {
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, [setKey]);
+
+  return (
+    <main className="flex flex-col gap-5">
+      <header className="flex items-center justify-between">
+        <Link
+          href="/"
+          className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm font-medium text-ink-600 hover:bg-ink-100"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Home
+        </Link>
+      </header>
+
+      {/* Keyed on the URL key so a key arriving after mount starts a fresh
+          unlock that submits it once. Nothing below the header before mount:
+          the prerender can't know whether a key came, and must not paint the
+          form for a page that is about to say "Unlocking…". */}
+      {mounted ? (
+        <UnlockBody key={key ?? ''} urlKey={key} standalone={standalone} config={config} />
+      ) : null}
+    </main>
+  );
+}
+
+/** How long "Unlocked: …" stays up before Home loads. */
+const UNLOCKED_HOLD_MS = 600;
+
+function UnlockBody({
+  urlKey: key,
+  standalone,
+  config,
+}: {
+  urlKey: string | null;
+  standalone: boolean;
+  config: UnlockConfig;
+}) {
+  const [copied, setCopied] = useState(false);
+  // Inside the installed app a key from the link needs nothing from the
+  // learner, so its unlock shows one calm state in place of the form —
+  // until it fails, when the form comes back with the key in it, for good.
+  const calm = !!key && standalone;
+  const unlock = useLicenceUnlock(config, {
+    autoKey: key ?? undefined,
+    holdMs: calm ? UNLOCKED_HOLD_MS : 0,
+  });
+  const [fellBack, setFellBack] = useState(false);
+  if (calm && unlock.failure && !fellBack) setFellBack(true);
+
+  if (calm && !fellBack) {
+    const { done } = unlock;
+    return (
+      <section
+        data-testid="unlock-unlocking"
+        role="status"
+        aria-live="polite"
+        className="mt-6 flex flex-col items-center gap-4 rounded-2xl border border-ink-200 bg-surface px-5 py-10 text-center shadow-xs"
+      >
+        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-100">
+          <KeyRound className="h-8 w-8 text-brand-600" aria-hidden />
+        </span>
+        {done ? (
+          <p data-testid="unlock-unlocked" className="text-xl font-bold text-ink-900">
+            Unlocked: {done.title}, {done.questionCount} questions
+          </p>
+        ) : (
+          <>
+            <p className="text-xl font-bold text-ink-900">Unlocking your full bank…</p>
+            <div
+              data-testid="unlock-progress"
+              aria-hidden
+              className="h-1.5 w-40 overflow-hidden rounded-full bg-brand-100"
+            >
+              <div className="animate-indeterminate h-full w-1/3 rounded-full bg-brand-500" />
+            </div>
+            <p className="text-sm text-ink-500">This takes a few seconds.</p>
+          </>
+        )}
+      </section>
+    );
+  }
 
   async function copy() {
     if (!key) return;
@@ -112,17 +198,7 @@ export function UnlockPage() {
   );
 
   return (
-    <main className="flex flex-col gap-5">
-      <header className="flex items-center justify-between">
-        <Link
-          href="/"
-          className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm font-medium text-ink-600 hover:bg-ink-100"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Home
-        </Link>
-      </header>
-
+    <>
       <div>
         <h1 className="flex items-center gap-2 text-3xl font-bold text-ink-900">
           <KeyRound className="h-7 w-7 text-brand-600" />
@@ -133,7 +209,7 @@ export function UnlockPage() {
         </p>
       </div>
 
-      {mounted && key && !standalone ? (
+      {key && !standalone ? (
         <section
           data-testid="unlock-key"
           className="rounded-2xl border-2 border-brand-500 bg-surface p-5 shadow-xs"
@@ -166,7 +242,7 @@ export function UnlockPage() {
         </section>
       ) : null}
 
-      {mounted && key && standalone ? (
+      {key && standalone ? (
         <section
           data-testid="unlock-key"
           className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs"
@@ -190,13 +266,9 @@ export function UnlockPage() {
             : 'Paste the licence key you were given.'}
         </p>
         <div className="mt-4">
-          {/* Keyed on the URL key so a key arriving after mount starts a
-              fresh form that submits it once. */}
-          {mounted ? (
-            <LicenceKeyForm key={key ?? ''} config={config} autoKey={key ?? undefined} />
-          ) : null}
+          <LicenceKeyEntry unlock={unlock} initialKey={key ?? undefined} />
         </div>
       </section>
-    </main>
+    </>
   );
 }

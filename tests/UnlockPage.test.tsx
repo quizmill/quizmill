@@ -408,6 +408,142 @@ describe('/unlock#key=… by display mode', () => {
   });
 });
 
+describe('/unlock#key=… in the installed app: one calm state, not the form', () => {
+  /** GOOD answers only when released, so the in-flight state can be seen. */
+  function holdGood(): () => void {
+    let release: (() => void) | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        fetched.push(String(input));
+        await new Promise<void>((r) => {
+          release = r;
+        });
+        return new Response(JSON.stringify(bundle()), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }),
+    );
+    return () => release?.();
+  }
+
+  async function settle(ms = 0) {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, ms));
+    });
+    await act(async () => {});
+  }
+
+  it('with a key: unlocking, then unlocked with title and count, then Home', async () => {
+    setStandalone(true);
+    const release = holdGood();
+    setLocation(`#key=${GOOD}`);
+    await render(<UnlockPage />);
+
+    const unlocking = byTestId('unlock-unlocking');
+    expect(unlocking).toBeTruthy();
+    expect(unlocking?.getAttribute('role')).toBe('status');
+    expect(byTestId('unlock-progress')).toBeTruthy();
+    expect(byTestId('licence-key-form')).toBeNull();
+    expect(byTestId('unlock-key')).toBeNull();
+    expect(fetched).toHaveLength(1);
+
+    release();
+    await settle();
+    const unlocked = byTestId('unlock-unlocked');
+    expect(unlocked?.textContent).toContain('Solar System — Full Course');
+    expect(unlocked?.textContent).toContain('3 questions');
+    expect(byTestId('unlock-progress')).toBeNull();
+    expect(byTestId('licence-key-form')).toBeNull();
+    // The pack is in and active already; Home loads after a short beat.
+    expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('solar-system-full');
+    expect(assign).not.toHaveBeenCalled();
+    await settle(700);
+    expect(assign).toHaveBeenCalledWith('/');
+  });
+
+  it('a failure brings the form back with the key filled in and the error', async () => {
+    setStandalone(true);
+    setLocation(`#key=${BAD}`);
+    await render(<UnlockPage />);
+
+    expect(byTestId('unlock-unlocking')).toBeNull();
+    expect(byTestId('licence-key-form')).toBeTruthy();
+    expect(byTestId<HTMLInputElement>('licence-key-input')?.value).toBe(BAD);
+    expect(byTestId('licence-key-error')?.textContent).toContain('That key has been revoked.');
+    expect(byTestId('unlock-key-value')?.textContent).toBe(BAD);
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it('leaving during the success hold still loads Home with the toast', async () => {
+    setStandalone(true);
+    const release = holdGood();
+    setLocation(`#key=${GOOD}`);
+    await render(<UnlockPage />);
+    release();
+    await settle();
+    expect(byTestId('unlock-unlocked')).toBeTruthy();
+    expect(assign).not.toHaveBeenCalled();
+
+    // A client-side tap away (e.g. Home) unmounts the page mid-hold.
+    await act(async () => {
+      root?.unmount();
+    });
+    root = undefined;
+    expect(assign).toHaveBeenCalledTimes(1);
+    expect(assign).toHaveBeenCalledWith('/');
+    expect(JSON.parse(sessionStorage.getItem(UNLOCKED_TOAST_KEY) ?? 'null')).toEqual({
+      title: 'Solar System — Full Course',
+      count: 3,
+    });
+    await settle(700);
+    expect(assign).toHaveBeenCalledTimes(1);
+  });
+
+  it('a successful retry is terminal: a second press during the hold sends nothing', async () => {
+    setStandalone(true);
+    setLocation(`#key=${BAD}`);
+    await render(<UnlockPage />);
+    expect(byTestId('licence-key-error')).toBeTruthy();
+
+    await typeKey(GOOD);
+    await pressUnlock();
+    expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('solar-system-full');
+    expect(byTestId<HTMLButtonElement>('licence-key-go')?.disabled).toBe(true);
+    // Enter in the field, still within the hold.
+    const input = byTestId<HTMLInputElement>('licence-key-input')!;
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+    await settle();
+    expect(fetched).toHaveLength(2);
+    expect(loadEvents().filter((e) => e.type === 'pack_unlocked')).toHaveLength(1);
+    await settle(700);
+    expect(assign).toHaveBeenCalledTimes(1);
+  });
+
+  it('without a key: the form, as today', async () => {
+    setStandalone(true);
+    setLocation('');
+    await render(<UnlockPage />);
+    expect(byTestId('unlock-unlocking')).toBeNull();
+    expect(byTestId('licence-key-form')).toBeTruthy();
+    expect(text()).toContain('Unlock a pack');
+    expect(text()).toContain('Paste the licence key you were given.');
+  });
+
+  it('in a browser tab the copy-your-key steps still show while it unlocks', async () => {
+    setStandalone(false);
+    holdGood();
+    setLocation(`#key=${GOOD}`);
+    await render(<UnlockPage />);
+    expect(byTestId('unlock-unlocking')).toBeNull();
+    expect(byTestId('unlock-key-steps')).toBeTruthy();
+    expect(byTestId('licence-key-form')).toBeTruthy();
+  });
+});
+
 describe('Packs → Have a licence key?', () => {
   it('unlocks with the same handler: fetched, active, key kept, off to Home', async () => {
     setLocation('', '/packs/');
