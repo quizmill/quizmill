@@ -40,7 +40,8 @@
 import { APP_CONFIG } from '@/config';
 import type { PackUpgrade } from '@/pack/data';
 import { recordEvent } from './storage';
-import { activatePack, insertPack, type PackLibraryEntry } from './packLibrary';
+import { cachePackAssets } from './packAssets';
+import { activatePack, getInsertedPack, insertPack, type PackLibraryEntry } from './packLibrary';
 
 /** The route a licence-key link opens; the key rides in its fragment. */
 export const UNLOCK_PATH = '/unlock';
@@ -372,6 +373,22 @@ export function stashUnlockedToast(toast: UnlockedToast): void {
   } catch {
     // no sessionStorage — Home simply shows no toast
   }
+}
+
+/**
+ * The ending every successful unlock shares (the key form, the /unlock
+ * link, the upgrade claim): prefetch the bundle's images — fire-and-forget,
+ * as the file insert does; the pack is already in — leave the confirmation
+ * for Home, and load Home. A full load on purpose, not a client route: the
+ * active pack is resolved once at boot (the layout bootstrap), so only a
+ * fresh document renders the unlocked pack — same reason /packs reloads.
+ */
+export function openUnlockedPack(entry: PackLibraryEntry): void {
+  const stored = getInsertedPack(entry.id);
+  if (stored) void cachePackAssets(stored).catch(() => undefined);
+  stashUnlockedToast({ title: entry.title, count: entry.questionCount });
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- deliberate full load, see above
+  window.location.assign(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/`);
 }
 
 /** Read AND clear the stashed confirmation — it shows exactly once. */

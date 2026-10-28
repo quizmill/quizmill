@@ -5,17 +5,13 @@ import { useEffect, useRef, useState } from 'react';
 import { KeyRound, LoaderCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { buildTimeManifest } from '@/pack/source';
-import { cachePackAssets } from '@/lib/packAssets';
-import { getInsertedPack } from '@/lib/packLibrary';
 import {
   UNLOCK_FALLBACK,
-  stashUnlockedToast,
+  openUnlockedPack,
   unlockPack,
   type UnlockConfig,
   type UnlockOutcome,
 } from '@/lib/unlock';
-
-const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
 /** Cap the validation errors shown for a bundle the endpoint sent broken. */
 const MAX_ERRORS_SHOWN = 4;
@@ -66,17 +62,8 @@ export function LicenceKeyForm({
         if (outcome.reason !== 'cancelled') setFailure(outcome);
         return;
       }
-      // Prefetch any images the bundle points at — fire-and-forget, as the
-      // file insert does; the pack is already in.
-      const stored = getInsertedPack(outcome.entry.id);
-      if (stored) void cachePackAssets(stored).catch(() => undefined);
-      stashUnlockedToast({ title: outcome.entry.title, count: outcome.entry.questionCount });
       setDone(outcome.entry.title);
-      // A full load on purpose, not a client route: the active pack is
-      // resolved once at boot (the layout bootstrap), so only a fresh
-      // document renders the unlocked pack — same reason /packs reloads.
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- deliberate full load, see above
-      window.location.assign(`${BASE_PATH}/`);
+      openUnlockedPack(outcome.entry);
     } finally {
       if (inflight.current === controller) inflight.current = null;
       setBusy(false);
