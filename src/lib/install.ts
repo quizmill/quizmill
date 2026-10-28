@@ -23,6 +23,15 @@ export function describeInstallSurface(
   return 'browser';
 }
 
+/** Whether this page runs as the installed app — client only. */
+export function isStandaloneDisplay(): boolean {
+  return (
+    window.matchMedia?.('(display-mode: standalone)').matches === true ||
+    // iOS Safari's pre-standard flag.
+    (navigator as unknown as { standalone?: boolean }).standalone === true
+  );
+}
+
 /** The Chromium-only event — not in lib.dom, so declared minimally. */
 export interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;

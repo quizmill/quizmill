@@ -209,10 +209,10 @@ describe('/unlock#key=…', () => {
     });
     expect(assign).toHaveBeenCalledWith('/');
     expect(byTestId('licence-key-done')?.textContent).toContain('Solar System — Full Course');
-    // The key is on screen with its Copy button and the installed-app hint.
+    // The key is on screen with its Copy button and the steps to the app.
     expect(byTestId('unlock-key-value')?.textContent).toBe(GOOD);
     expect(byTestId('unlock-key-copy')).toBeTruthy();
-    expect(text()).toContain('Installed the app on your home screen?');
+    expect(text()).toContain('Packs → Have a licence key? → paste');
     // And in no event.
     expect(loadEvents().map((e) => [e.type, e.data])).toEqual([
       ['pack_unlocked', { pack: 'solar-system-full' }],
@@ -341,6 +341,70 @@ describe('/unlock#key=…', () => {
     expect(loadEvents().map((e) => [e.type, e.data])).toEqual([
       ['unlock_failed', { pack: 'solar-system-full', reason: 'denied' }],
     ]);
+  });
+});
+
+/** Stub the display mode: installed app (standalone) or a plain browser tab. */
+function setStandalone(standalone: boolean) {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((query: string) => ({
+      matches: standalone && query === '(display-mode: standalone)',
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
+}
+
+describe('/unlock#key=… by display mode', () => {
+  it('in a browser tab: the copy-your-key steps lead, above the unlock form', async () => {
+    setStandalone(false);
+    setLocation(`#key=${BAD}`);
+    await render(<UnlockPage />);
+
+    const steps = byTestId('unlock-key-steps');
+    expect(steps).toBeTruthy();
+    const items = [...steps!.querySelectorAll('li')].map((li) => li.textContent ?? '');
+    expect(items).toHaveLength(3);
+    expect(items[0]).toContain('Copy your key');
+    expect(items[1]).toContain('home screen');
+    expect(items[2]).toContain('Packs → Have a licence key? → paste');
+    // The Copy button sits in the first step.
+    expect(steps!.querySelector('li')?.querySelector('[data-testid="unlock-key-copy"]')).toBeTruthy();
+    // Browser-only learners are told they needn't copy, without claiming an
+    // unlock that hasn't happened (BAD is refused).
+    expect(text()).toContain('no need to copy anything');
+    expect(text()).not.toContain('already unlocked');
+    // The key block comes before the form.
+    const form = byTestId('licence-key-input')!;
+    expect(
+      byTestId('unlock-key')!.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // The browser still unlocks on its own.
+    expect(fetched).toHaveLength(1);
+  });
+
+  it('in the installed app: no steps, the key with its hint as before', async () => {
+    setStandalone(true);
+    setLocation(`#key=${BAD}`);
+    await render(<UnlockPage />);
+
+    expect(byTestId('unlock-key-steps')).toBeNull();
+    expect(byTestId('unlock-key-value')?.textContent).toBe(BAD);
+    expect(text()).toContain('Installed the app on your home screen?');
+    expect(text()).toContain('Packs → Have a licence key?');
+    expect(text()).not.toContain('Enter a licence key.');
+    expect(fetched).toHaveLength(1);
+  });
+
+  it('iOS’s navigator.standalone counts as the installed app too', async () => {
+    setStandalone(false);
+    vi.stubGlobal('navigator', Object.assign(Object.create(navigator), { standalone: true }));
+    setLocation(`#key=${BAD}`);
+    await render(<UnlockPage />);
+    expect(byTestId('unlock-key-steps')).toBeNull();
+    expect(byTestId('unlock-key-value')?.textContent).toBe(BAD);
   });
 });
 

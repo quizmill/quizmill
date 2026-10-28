@@ -5,6 +5,7 @@ import { PlusCircle, Share } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import {
   describeInstallSurface,
+  isStandaloneDisplay,
   type BeforeInstallPromptEvent,
   type InstallSurface,
 } from '@/lib/install';
@@ -12,13 +13,9 @@ import { useClientState } from '@/lib/useMounted';
 
 /** Which install surface this browser is — read on the client only. */
 function detectInstallSurface(): InstallSurface {
-  const standalone =
-    window.matchMedia('(display-mode: standalone)').matches ||
-    // iOS Safari's pre-standard flag.
-    (navigator as unknown as { standalone?: boolean }).standalone === true;
   return describeInstallSurface(
     navigator.userAgent,
-    standalone,
+    isStandaloneDisplay(),
     navigator.maxTouchPoints,
   );
 }

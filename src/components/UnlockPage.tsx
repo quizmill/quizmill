@@ -5,8 +5,20 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, Check, Copy, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { LicenceKeyForm } from '@/components/LicenceKeyForm';
+import { isStandaloneDisplay } from '@/lib/install';
 import { readKeyFromHash, stripKeyFromLocation, unlockConfig } from '@/lib/unlock';
 import { useClientState, useMounted } from '@/lib/useMounted';
+
+function StepNumber({ n }: { n: number }) {
+  return (
+    <span
+      aria-hidden
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white"
+    >
+      {n}
+    </span>
+  );
+}
 
 // The key the URL carried, read once per page load and remembered: the
 // read also wipes the fragment, and React re-invokes client reads in dev
@@ -37,7 +49,9 @@ export function resetUnlockPageForTests(): void {
  * The key is also shown with a Copy button, because on iOS a link from
  * outside always opens in Safari while an installed app keeps its own
  * storage — the key is the bridge: copy it, open the app, paste it under
- * Packs → Have a licence key?
+ * Packs → Have a licence key? Outside the installed app those three steps
+ * lead the page, since an unlock in the browser looks finished but never
+ * reaches the app.
  *
  * The route exists and works in every build: the key alone says which
  * pack, so nothing about the active pack decides whether a learner can
@@ -50,6 +64,9 @@ export function UnlockPage() {
   // differ from the first client paint.
   const [key, setKey] = useClientState(takeUrlKey, null);
   const [copied, setCopied] = useState(false);
+  // Outside the installed app the key has to be carried over by hand, so
+  // the copy steps lead; inside it, the key is already where it's needed.
+  const [standalone] = useClientState(isStandaloneDisplay, true);
 
   // A second link tapped while this page is open is a fragment-only
   // navigation (no load) — pick its key up the same way. The new key
@@ -79,6 +96,21 @@ export function UnlockPage() {
     }
   }
 
+  const keyRow = (
+    <div className="mt-2 flex items-center gap-2">
+      <code
+        data-testid="unlock-key-value"
+        className="min-w-0 flex-1 select-all break-all rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 text-sm text-ink-800"
+      >
+        {key}
+      </code>
+      <Button size="sm" variant="secondary" onClick={() => void copy()} data-testid="unlock-key-copy">
+        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+        {copied ? 'Copied' : 'Copy'}
+      </Button>
+    </div>
+  );
+
   return (
     <main className="flex flex-col gap-5">
       <header className="flex items-center justify-between">
@@ -101,7 +133,40 @@ export function UnlockPage() {
         </p>
       </div>
 
-      {mounted && key ? (
+      {mounted && key && !standalone ? (
+        <section
+          data-testid="unlock-key"
+          className="rounded-2xl border-2 border-brand-500 bg-surface p-5 shadow-xs"
+        >
+          <h2 className="text-lg font-semibold text-ink-900">Using the app on your home screen?</h2>
+          <p className="mt-1 text-sm text-ink-600">
+            This page opened in your browser, so the app hasn’t got your key yet.
+          </p>
+          <ol data-testid="unlock-key-steps" className="mt-4 flex flex-col gap-4">
+            <li className="flex gap-3">
+              <StepNumber n={1} />
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-ink-900">Copy your key</p>
+                {keyRow}
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <StepNumber n={2} />
+              <p className="font-medium text-ink-900">Go back to the app on your home screen</p>
+            </li>
+            <li className="flex gap-3">
+              <StepNumber n={3} />
+              <p className="font-medium text-ink-900">Packs → Have a licence key? → paste</p>
+            </li>
+          </ol>
+          <p className="mt-4 text-xs text-ink-600">
+            Don’t use the home-screen app? There’s no need to copy anything: the form
+            below unlocks the pack in this browser.
+          </p>
+        </section>
+      ) : null}
+
+      {mounted && key && standalone ? (
         <section
           data-testid="unlock-key"
           className="rounded-2xl border border-ink-200 bg-surface p-5 shadow-xs"
@@ -109,21 +174,10 @@ export function UnlockPage() {
           <p className="text-xs font-semibold uppercase tracking-wider text-ink-500">
             Your licence key
           </p>
-          <div className="mt-2 flex items-center gap-2">
-            <code
-              data-testid="unlock-key-value"
-              className="min-w-0 flex-1 select-all break-all rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 text-sm text-ink-800"
-            >
-              {key}
-            </code>
-            <Button size="sm" variant="secondary" onClick={() => void copy()} data-testid="unlock-key-copy">
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              {copied ? 'Copied' : 'Copy'}
-            </Button>
-          </div>
+          {keyRow}
           <p className="mt-3 text-xs text-ink-600">
             Installed the app on your home screen? Paste this key under Packs →
-            Enter a licence key.
+            Have a licence key?
           </p>
         </section>
       ) : null}
