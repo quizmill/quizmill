@@ -9,6 +9,10 @@ import { PacksPage } from '@/components/PacksPage';
 import { ACTIVE_PACK_ID_KEY } from '@/lib/packKeys';
 import { UNLOCKED_TOAST_KEY, licenceKeyStorageKey } from '@/lib/unlock';
 import { loadEvents } from '@/lib/storage';
+import { UpgradeClaimCheck } from '@/components/UpgradeClaimCheck';
+import { startClaim } from '@/lib/upgradeClaim';
+
+vi.mock('next/navigation', () => ({ usePathname: () => '/unlock/' }));
 
 /**
  * The licence-key unlock, end to end in the DOM: `/unlock#key=…` submits
@@ -189,6 +193,52 @@ async function pressUnlock() {
 }
 
 describe('/unlock#key=…', () => {
+  it('Home loads the unlocked pack with its toast', async () => {
+    setStandalone(false);
+    setLocation(`#key=${GOOD}`);
+    await render(<UnlockPage />);
+    await act(async () => { container.querySelector<HTMLAnchorElement>('a[href="/"]')!.click(); });
+    expect(assign).toHaveBeenCalledWith('/');
+    expect(JSON.parse(sessionStorage.getItem(UNLOCKED_TOAST_KEY) ?? 'null')).toEqual({
+      title: 'Solar System — Full Course', count: 3,
+    });
+  });
+
+  it('a newer key after success does not navigate away', async () => {
+    setStandalone(false);
+    setLocation(`#key=${GOOD}`);
+    await render(<UnlockPage />);
+    window.location.hash = `#key=${BAD}`;
+    await act(async () => { window.dispatchEvent(new Event('hashchange')); });
+    expect(byTestId('licence-key-error')).toBeTruthy();
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it('a pending claim cannot bypass the browser confirmation', async () => {
+    setStandalone(false);
+    setLocation(`#key=${GOOD}`);
+    startClaim('solar-system-demo', { url: 'https://example.com/course', packId: 'solar-system-full' });
+    let release: (() => void) | undefined;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      fetched.push(url);
+      if (url === 'https://example.com/course') {
+        return new Response(JSON.stringify({ status: 'paid', key: GOOD }));
+      }
+      await new Promise<void>((resolve) => { release = resolve; });
+      return new Response(JSON.stringify(bundle()));
+    }));
+    // Layout consumer first: it must yield before the page scrubs the key.
+    await render(<><UpgradeClaimCheck /><UnlockPage /></>);
+    expect(fetched).toHaveLength(1);
+    release?.();
+    await act(async () => { await new Promise((r) => setTimeout(r, 700)); });
+    expect(byTestId('unlock-start')).toBeTruthy();
+    expect(assign).not.toHaveBeenCalled();
+    await act(async () => { byTestId<HTMLButtonElement>('unlock-start')!.click(); });
+    expect(assign).toHaveBeenCalledWith('/');
+  });
+
   it('a good key: stays unlocked until Start practising loads Home', async () => {
     setLocation(`#key=${GOOD}`);
     await render(<UnlockPage />);

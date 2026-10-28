@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { ArrowLeft, Check, Copy, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { LicenceKeyEntry, useLicenceUnlock } from '@/components/LicenceKeyForm';
+import { LicenceKeyEntry, useLicenceUnlock, type LicenceUnlock } from '@/components/LicenceKeyForm';
 import { isStandaloneDisplay } from '@/lib/install';
 import {
   openUnlockedPack,
@@ -57,6 +57,7 @@ export function resetUnlockPageForTests(): void {
  * unlock one here (see src/lib/unlock.ts for how the endpoint is chosen).
  */
 export function UnlockPage() {
+  const homeEntryRef = useRef<LicenceUnlock['done']>(null);
   const mounted = useMounted();
   const config = unlockConfig();
   // Read after mount: SSG has no location, and the prerender must not
@@ -87,6 +88,11 @@ export function UnlockPage() {
       <header className="flex items-center justify-between">
         <Link
           href="/"
+          onClick={(event) => {
+            if (!homeEntryRef.current) return;
+            event.preventDefault();
+            openUnlockedPack(homeEntryRef.current);
+          }}
           className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm font-medium text-ink-600 hover:bg-ink-100"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -99,7 +105,7 @@ export function UnlockPage() {
           the prerender can't know whether a key came, and must not paint the
           form for a page that is about to say "Unlocking…". */}
       {mounted ? (
-        <UnlockBody key={key ?? ''} urlKey={key} standalone={standalone} config={config} />
+        <UnlockBody key={key ?? ''} urlKey={key} standalone={standalone} config={config} homeEntryRef={homeEntryRef} />
       ) : null}
     </main>
   );
@@ -112,10 +118,12 @@ function UnlockBody({
   urlKey: key,
   standalone,
   config,
+  homeEntryRef,
 }: {
   urlKey: string | null;
   standalone: boolean;
   config: UnlockConfig;
+  homeEntryRef: RefObject<LicenceUnlock['done']>;
 }) {
   const [copied, setCopied] = useState(false);
   // A key from the link shows one calm state in place of the form —
@@ -128,6 +136,12 @@ function UnlockBody({
     deferNavigation: !!key && !standalone && !fellBack,
   });
   if (calm && unlock.failure && !fellBack) setFellBack(true);
+
+  useEffect(() => {
+    homeEntryRef.current = unlock.done;
+    // A newer URL key replaces the body without leaving the route.
+    return () => { homeEntryRef.current = null; };
+  }, [homeEntryRef, unlock.done]);
 
   async function copy() {
     if (!key) return;
