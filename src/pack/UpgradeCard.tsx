@@ -39,19 +39,21 @@ export function UpgradeCard({ placement }: { placement: UpgradePlacement }) {
     recordEvent('upsell_seen', { placement });
   }, [present, placement]);
   if (!upgrade) return null;
+  const href = upgradeHref(upgrade.url, APP_CONFIG.packId, placement);
   return (
     <a
-      href={upgradeHref(upgrade.url, APP_CONFIG.packId, placement)}
+      href={href}
       target="_blank"
       rel="noopener noreferrer"
       onClick={(e) => {
         recordEvent('upsell_clicked', { placement });
         // A fresh claim per tap, minted here rather than on render; the
-        // browser follows the href as it stands after this handler.
+        // browser follows the href as it stands after this handler. Built
+        // from the base link each time, so an earlier tap's claim never
+        // rides along once claims are off.
         const claim = startClaim(APP_CONFIG.packId, upgrade);
-        if (!claim) return;
-        e.currentTarget.href = claimHref(e.currentTarget.href, claim);
-        watchUpgradeClaims();
+        e.currentTarget.href = claim ? claimHref(href, claim) : href;
+        if (claim) watchUpgradeClaims();
       }}
       id={`upgrade-card-${placement}`}
       data-testid={`upgrade-card-${placement}`}

@@ -119,6 +119,26 @@ describe('UpgradeCard with a pack that declares an upgrade', () => {
     );
   });
 
+  it('a tap after claims were turned off leaves claim-free, not with the old claim', async () => {
+    await render(<PackHome />);
+    const card = container.querySelector<HTMLAnchorElement>('[data-testid="upgrade-card-home"]')!;
+    const stay = (e: Event) => e.preventDefault();
+    document.addEventListener('click', stay, true);
+    try {
+      await act(async () => card.click());
+      expect(new URL(card.href).searchParams.get('claim')).toMatch(/^[0-9a-f]{32}$/);
+      // The link answered outside the protocol meanwhile: claims off.
+      localStorage.setItem(
+        'quizmill.solar-system-demo.upgradeClaims.v1',
+        JSON.stringify({ claims: [], off: true }),
+      );
+      await act(async () => card.click());
+    } finally {
+      document.removeEventListener('click', stay, true);
+    }
+    expect(card.href).toBe('https://example.com/course?utm_source=app&ref=solar-system-demo-home');
+  });
+
   it('renders in Settings with ref=<packId>-settings', async () => {
     await render(<SettingsPage />);
     const card = container.querySelector<HTMLAnchorElement>(
