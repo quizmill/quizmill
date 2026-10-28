@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { ArrowLeft, Check, Copy, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { LicenceKeyEntry, useLicenceUnlock } from '@/components/LicenceKeyForm';
+import { LicenceKeyEntry, useLicenceUnlock, type LicenceUnlock } from '@/components/LicenceKeyForm';
 import { isStandaloneDisplay } from '@/lib/install';
 import {
+  openUnlockedPack,
   readKeyFromHash,
   stripKeyFromLocation,
   unlockConfig,
@@ -47,31 +48,28 @@ export function resetUnlockPageForTests(): void {
  * the key is read from the FRAGMENT (never the query string: fragments
  * reach no server and no log; a `?key=` is scrubbed from the address bar
  * but not used), wiped from the address bar at once, and
- * submitted for them; a success lands on Home with the unlocked pack
- * active, a refusal stays here with the endpoint's words and the file
- * fallback.
+ * submitted for them. Browser links stay on the confirmation until the
+ * learner starts practising; installed apps load Home after a short hold.
+ * A refusal brings back the key panel and the prefilled form.
  *
- * The key is also shown with a Copy button, because on iOS a link from
- * outside always opens in Safari while an installed app keeps its own
- * storage — the key is the bridge: copy it, open the app, paste it under
- * Packs → Have a licence key? Outside the installed app those three steps
- * lead the page, since an unlock in the browser looks finished but never
- * reaches the app. Inside it, the link needs nothing from the learner, so
- * the page shows only "Unlocking…" then "Unlocked: …" on the way to Home,
- * never a form they didn't touch; a refusal brings the form back.
+ * In a browser tab the key is also offered with a Copy button, quietly
+ * below Start practising: on iOS a link from outside always opens in
+ * Safari while an installed app keeps its own storage. The claim hand-off
+ * usually carries the unlock over by itself; the key is the manual bridge
+ * (Packs → Have a licence key?) when it doesn't.
  *
  * The route exists and works in every build: the key alone says which
  * pack, so nothing about the active pack decides whether a learner can
  * unlock one here (see src/lib/unlock.ts for how the endpoint is chosen).
  */
 export function UnlockPage() {
+  const homeEntryRef = useRef<LicenceUnlock['done']>(null);
   const mounted = useMounted();
   const config = unlockConfig();
   // Read after mount: SSG has no location, and the prerender must not
   // differ from the first client paint.
   const [key, setKey] = useClientState(takeUrlKey, null);
-  // Outside the installed app the key has to be carried over by hand, so
-  // the copy steps lead; inside it, the key is already where it's needed.
+  // Installed apps keep their automatic full load after confirmation.
   const [standalone] = useClientState(isStandaloneDisplay, true);
 
   // A second link tapped while this page is open is a fragment-only
@@ -96,6 +94,11 @@ export function UnlockPage() {
       <header className="flex items-center justify-between">
         <Link
           href="/"
+          onClick={(event) => {
+            if (!homeEntryRef.current) return;
+            event.preventDefault();
+            openUnlockedPack(homeEntryRef.current);
+          }}
           className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm font-medium text-ink-600 hover:bg-ink-100"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -108,7 +111,7 @@ export function UnlockPage() {
           the prerender can't know whether a key came, and must not paint the
           form for a page that is about to say "Unlocking…". */}
       {mounted ? (
-        <UnlockBody key={key ?? ''} urlKey={key} standalone={standalone} config={config} />
+        <UnlockBody key={key ?? ''} urlKey={key} standalone={standalone} config={config} homeEntryRef={homeEntryRef} />
       ) : null}
     </main>
   );
@@ -121,22 +124,56 @@ function UnlockBody({
   urlKey: key,
   standalone,
   config,
+  homeEntryRef,
 }: {
   urlKey: string | null;
   standalone: boolean;
   config: UnlockConfig;
+  homeEntryRef: RefObject<LicenceUnlock['done']>;
 }) {
   const [copied, setCopied] = useState(false);
-  // Inside the installed app a key from the link needs nothing from the
-  // learner, so its unlock shows one calm state in place of the form —
+  // A key from the link shows one calm state in place of the form —
   // until it fails, when the form comes back with the key in it, for good.
-  const calm = !!key && standalone;
+  const calm = !!key;
+  const [fellBack, setFellBack] = useState(false);
   const unlock = useLicenceUnlock(config, {
     autoKey: key ?? undefined,
-    holdMs: calm ? UNLOCKED_HOLD_MS : 0,
+    holdMs: calm && standalone ? UNLOCKED_HOLD_MS : 0,
+    deferNavigation: !!key && !standalone && !fellBack,
   });
-  const [fellBack, setFellBack] = useState(false);
   if (calm && unlock.failure && !fellBack) setFellBack(true);
+
+  useEffect(() => {
+    homeEntryRef.current = unlock.done;
+    // A newer URL key replaces the body without leaving the route.
+    return () => { homeEntryRef.current = null; };
+  }, [homeEntryRef, unlock.done]);
+
+  async function copy() {
+    if (!key) return;
+    try {
+      await navigator.clipboard.writeText(key);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // no clipboard access — the key is still selectable on screen
+    }
+  }
+
+  const keyRow = (
+    <div className="mt-2 flex items-center gap-2">
+      <code
+        data-testid="unlock-key-value"
+        className="min-w-0 flex-1 select-all break-all rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 text-sm text-ink-800"
+      >
+        {key}
+      </code>
+      <Button size="sm" variant="secondary" onClick={() => void copy()} data-testid="unlock-key-copy">
+        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+        {copied ? 'Copied' : 'Copy'}
+      </Button>
+    </div>
+  );
 
   if (calm && !fellBack) {
     const { done } = unlock;
@@ -167,35 +204,23 @@ function UnlockBody({
             <p className="text-sm text-ink-500">This takes a few seconds.</p>
           </>
         )}
+        {done && !standalone ? (
+          <>
+            <Button data-testid="unlock-start" onClick={() => openUnlockedPack(done)}>
+              Start practising
+            </Button>
+            <div data-testid="unlock-key" className="mt-3 w-full text-left text-xs text-ink-500">
+              <p>
+                Using the app from your home screen? It picks this up by itself. If it doesn’t,
+                copy your key:
+              </p>
+              {keyRow}
+            </div>
+          </>
+        ) : null}
       </section>
     );
   }
-
-  async function copy() {
-    if (!key) return;
-    try {
-      await navigator.clipboard.writeText(key);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // no clipboard access — the key is still selectable on screen
-    }
-  }
-
-  const keyRow = (
-    <div className="mt-2 flex items-center gap-2">
-      <code
-        data-testid="unlock-key-value"
-        className="min-w-0 flex-1 select-all break-all rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 text-sm text-ink-800"
-      >
-        {key}
-      </code>
-      <Button size="sm" variant="secondary" onClick={() => void copy()} data-testid="unlock-key-copy">
-        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-        {copied ? 'Copied' : 'Copy'}
-      </Button>
-    </div>
-  );
 
   return (
     <>

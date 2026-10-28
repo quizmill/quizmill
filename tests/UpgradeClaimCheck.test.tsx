@@ -13,6 +13,9 @@ import { insertedPackKey } from '@/lib/packKeys';
 import { CLAIM_POLL_MS, CLAIM_WINDOW_MS, readClaims, startClaim } from '@/lib/upgradeClaim';
 import { openUnlockedPack, unlockPack } from '@/lib/unlock';
 
+let pathname = '/';
+vi.mock('next/navigation', () => ({ usePathname: () => pathname }));
+
 const UPGRADE = {
   title: 'Get the full course',
   url: 'https://shop.test/course',
@@ -75,6 +78,7 @@ async function advance(ms: number) {
 }
 
 beforeEach(() => {
+  pathname = '/';
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
   localStorage.clear();
   status = 'pending';
@@ -105,6 +109,36 @@ afterEach(async () => {
 });
 
 describe('UpgradeClaimCheck', () => {
+  it('still collects claims on the installed app unlock route', async () => {
+    pathname = '/unlock/';
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+    startClaim(PACK, UPGRADE);
+    status = 'paid';
+    await mount();
+    await advance(0);
+    expect(openUnlockedPack).toHaveBeenCalledWith(ENTRY);
+    expect(readClaims(PACK).claims).toEqual([]);
+  });
+
+  it('cancels an outstanding check when entering browser unlock and resumes on leaving', async () => {
+    startClaim(PACK, UPGRADE);
+    let release: ((response: Response) => void) | undefined;
+    fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => { release = resolve; }));
+    await mount();
+    pathname = '/unlock/';
+    await act(async () => { root!.render(<UpgradeClaimCheck />); });
+    await act(async () => {
+      release?.(new Response(JSON.stringify({ status: 'paid', key: 'QM-PAID-KEY' })));
+    });
+    expect(unlockPack).not.toHaveBeenCalled();
+    expect(readClaims(PACK).claims).toHaveLength(1);
+    pathname = '/';
+    status = 'paid';
+    await act(async () => { root!.render(<UpgradeClaimCheck />); });
+    await advance(0);
+    expect(openUnlockedPack).toHaveBeenCalledWith(ENTRY);
+  });
+
   it('asks nothing when no claim is pending', async () => {
     await mount();
     await advance(CLAIM_WINDOW_MS);

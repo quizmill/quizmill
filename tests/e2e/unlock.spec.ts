@@ -9,8 +9,10 @@ import { bodyText, waitForText } from './helpers';
  * alone goes to the build's default endpoint and the bundle names the
  * pack; and a "sampler" whose manifest hints at its full bank
  * (`upgrade.packId`) on the author's own endpoint (`upgrade.unlockUrl`),
- * so `pack=` travels too. `/unlock#key=GOOD` must land on Home with the
- * unlocked pack active and counted — no Packs visit; `#key=BAD` stays put
+ * so `pack=` travels too. `/unlock#key=GOOD` must confirm the unlock and,
+ * in a browser tab once Start practising is pressed (the installed app on
+ * its own), land on Home with the unlocked pack active and counted — no
+ * Packs visit; `#key=BAD` stays put
  * with the refusal and the key entry; the entry under Packs ends the same
  * way as the link. And the key must never be in a URL after load, nor in
  * the console.
@@ -127,6 +129,13 @@ test('the demo pack declares nothing: /unlock still works, the key alone names t
 }) => {
   await page.goto('/');
   await page.goto(`/unlock/#key=${GOOD}`, { waitUntil: 'networkidle' });
+  // A browser tab stays on the confirmation until Start practising.
+  await expect(page.locator('[data-testid="unlock-unlocked"]')).toHaveText(
+    'Unlocked: Solar System Full Course, 7 questions',
+    { timeout: 20_000 },
+  );
+  expect(new URL(page.url()).pathname).toBe('/unlock/');
+  await page.click('[data-testid="unlock-start"]');
   await expect(page.locator('h1')).toHaveText('Solar System Full Course', { timeout: 20_000 });
   await waitForText(page, 'Unlocked: 7 questions');
   // The key alone, to the default endpoint — no pack= without a hint.
@@ -169,11 +178,22 @@ test.describe('a sampler that hints at its full bank on its own endpoint', () =>
     }, SAMPLER);
   });
 
-  test('/unlock#key=GOOD lands on Home with the unlocked pack active — no Packs visit', async ({
+  test('/unlock#key=GOOD confirms, then Start practising lands on Home with the unlocked pack active — no Packs visit', async ({
     page,
   }) => {
     await page.goto(`/unlock/#key=${GOOD}`, { waitUntil: 'networkidle' });
-    // The unlock navigates to Home on its own.
+    // A browser tab holds the confirmation (with the key, quietly, as a
+    // fallback) until the learner presses Start practising.
+    const unlocked = page.locator('[data-testid="unlock-unlocked"]');
+    await expect(unlocked).toHaveText('Unlocked: Solar System Full Course, 7 questions', {
+      timeout: 20_000,
+    });
+    await expect(page.locator('[data-testid="unlock-key-value"]')).toHaveText(GOOD);
+    await expect(page.locator('[data-testid="unlock-key-steps"]')).toHaveCount(0);
+    await page.waitForTimeout(1_000);
+    await expect(unlocked).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/unlock/');
+    await page.click('[data-testid="unlock-start"]');
     await expect(page.locator('h1')).toHaveText('Solar System Full Course', { timeout: 20_000 });
     await waitForText(page, 'Unlocked: 7 questions');
     // Home (#191) shows the counts per category card; the full pack has one.
