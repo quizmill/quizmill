@@ -232,6 +232,67 @@ test.describe('a sampler that hints at its full bank on its own endpoint', () =>
     expect(endpointHits).toHaveLength(2);
   });
 
+  test('a purchase from the upgrade card unlocks the app that started it — no /unlock visit', async ({
+    page,
+  }) => {
+    // The upgrade url: GET is the checkout (a page in another tab), POST
+    // the claim check — pending at first, then paid with the key.
+    const claimsAsked: string[] = [];
+    let paid = false;
+    await page.context().route('https://example.com/course**', async (route) => {
+      const req = route.request();
+      const cors = {
+        'access-control-allow-origin': '*',
+        'access-control-allow-headers': 'content-type',
+        'access-control-allow-methods': 'POST',
+      };
+      if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+      if (req.method() === 'POST') {
+        claimsAsked.push(JSON.parse(req.postData() ?? '{}').claim);
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          headers: cors,
+          body: JSON.stringify(paid ? { status: 'paid', key: GOOD } : { status: 'pending' }),
+        });
+      }
+      return route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Checkout</h1>' });
+    });
+
+    await page.goto('/', { waitUntil: 'networkidle' });
+    await expect(page.locator('h1')).toHaveText('Solar System Sampler', { timeout: 20_000 });
+    const [checkout] = await Promise.all([
+      page.waitForEvent('popup'),
+      page.click('[data-testid="upgrade-card-home"]'),
+    ]);
+    const claim = new URL(checkout.url()).searchParams.get('claim');
+    expect(claim).toMatch(/^[0-9a-f]{32}$/);
+    expect(new URL(checkout.url()).searchParams.get('ref')).toBe('solar-sampler-home');
+
+    // Still pending: the app keeps the sampler and keeps asking.
+    await expect.poll(() => claimsAsked.length, { timeout: 10_000 }).toBeGreaterThan(0);
+    await expect(page.locator('h1')).toHaveText('Solar System Sampler');
+
+    // Paid in the checkout's layer → the app unlocks on its own.
+    paid = true;
+    await checkout.close();
+    await expect(page.locator('h1')).toHaveText('Solar System Full Course', { timeout: 20_000 });
+    await waitForText(page, 'Unlocked: 7 questions');
+    expect(new Set(claimsAsked)).toEqual(new Set([claim]));
+    expect(endpointHits).toEqual([`${UNLOCK_BASE}/v1/unlock?key=${GOOD}&pack=solar-system-full`]);
+    const state = await page.evaluate(() => ({
+      active: localStorage.getItem('quizmill.activePackId'),
+      licence: localStorage.getItem('quizmill.solar-system-full.licence'),
+      claims: localStorage.getItem('quizmill.solar-sampler.upgradeClaims.v1'),
+      events: localStorage.getItem('quizmill.solar-sampler.events.v1') ?? '',
+    }));
+    expect(state.active).toBe('solar-system-full');
+    expect(state.licence).toBe(GOOD);
+    expect(JSON.parse(state.claims ?? '{}').claims).toEqual([]);
+    expect(state.events).not.toContain(claim!);
+    expect(consoleText.join('\n')).not.toContain(claim!);
+  });
+
   test('Packs → Have a licence key? ends the same way', async ({ page }) => {
     await page.goto('/packs/', { waitUntil: 'networkidle' });
     await waitForText(page, 'Have a licence key?', 20_000);
