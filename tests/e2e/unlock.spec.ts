@@ -203,6 +203,57 @@ test.describe('a sampler that hints at its full bank on its own endpoint', () =>
     await expect(page.locator('[data-testid="unlocked-toast"]')).toHaveCount(0);
   });
 
+  test('in the installed app, /unlock#key=GOOD shows the unlocking state, never the form, then Home', async ({
+    page,
+  }) => {
+    // The installed app (iOS's flag), and a record of every state the page
+    // ever painted — so a form flashing past for one frame still counts.
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'standalone', { value: true, configurable: true });
+      if (!location.pathname.startsWith('/unlock')) return;
+      new MutationObserver(() => {
+        for (const id of ['unlock-unlocking', 'unlock-unlocked', 'licence-key-form']) {
+          if (document.querySelector(`[data-testid="${id}"]`)) {
+            sessionStorage.setItem(`e2e.seen.${id}`, '1');
+          }
+        }
+      }).observe(document, { childList: true, subtree: true });
+    });
+    // Answer the good key only after a beat, so the in-flight state is up.
+    let release: (() => void) | undefined;
+    const held = new Promise<void>((r) => {
+      release = r;
+    });
+    await page.route(`${UNLOCK_BASE}/v1/unlock**`, async (route) => {
+      await held;
+      await stubEndpoint(route);
+    });
+
+    await page.goto(`/unlock/#key=${GOOD}`);
+    const unlocking = page.locator('[data-testid="unlock-unlocking"]');
+    await expect(unlocking).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('[data-testid="unlock-progress"]')).toBeVisible();
+    await expect(page.locator('[data-testid="licence-key-form"]')).toHaveCount(0);
+
+    release?.();
+    await expect(page.locator('[data-testid="unlock-unlocked"]')).toContainText(
+      'Solar System Full Course',
+    );
+    await expect(page.locator('h1')).toHaveText('Solar System Full Course', { timeout: 20_000 });
+    await waitForText(page, 'Unlocked: 7 questions');
+    expect(page.url().endsWith('/')).toBe(true);
+    expect(endpointHits).toEqual([`${UNLOCK_BASE}/v1/unlock?key=${GOOD}&pack=solar-system-full`]);
+    expect(page.url()).not.toContain('key=');
+    // What /unlock painted on the way: both calm states, never the form.
+    expect(
+      await page.evaluate(() =>
+        ['unlock-unlocking', 'unlock-unlocked', 'licence-key-form'].map(
+          (id) => sessionStorage.getItem(`e2e.seen.${id}`) === '1',
+        ),
+      ),
+    ).toEqual([true, true, false]);
+  });
+
   test('/unlock#key=BAD stays put: the refusal, the file fallback, the key entry', async ({
     page,
   }) => {
