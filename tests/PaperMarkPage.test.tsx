@@ -190,6 +190,44 @@ describe('PaperMarkPage', () => {
     expect(loadSessions()).toHaveLength(1);
   });
 
+  it('celebrates the saved score in proportion to it', async () => {
+    const sheet = demoSheet();
+    savePaperSheet(sheet);
+    const picked = packQuestions.slice(0, 3);
+    const wrongOf = (qq: (typeof picked)[number]) =>
+      qq.options.map((o) => o.key).find((k) => !correctKeysOf(qq).includes(k))!;
+
+    // All three right: the big one, confetti and all.
+    window.location.hash = `#sheet=${sheet.id}`;
+    await render(<PaperMarkPage />);
+    for (const [i, qq] of picked.entries()) {
+      await click(q(`[aria-label="Question ${i + 1}: answer ${correctKeysOf(qq)[0]}"]`));
+    }
+    await click(q('[data-testid="save-marks"]'));
+    expect(q('[data-testid="score-card"]').dataset.tier).toBe('perfect');
+    expect(q('[data-testid="mark-saved"]').textContent).toContain('Perfect score');
+    expect(container.querySelector('[data-testid="confetti"]')).not.toBeNull();
+    expect(container.querySelector('.animate-celebration-stay')).not.toBeNull();
+
+    // All three wrong: an encouraging card, no confetti raining on it.
+    localStorage.clear();
+    savePaperSheet(sheet);
+    await act(async () => {
+      root?.unmount();
+    });
+    window.location.hash = `#sheet=${sheet.id}`;
+    await render(<PaperMarkPage />);
+    for (const [i, qq] of picked.entries()) {
+      await click(q(`[aria-label="Question ${i + 1}: answer ${wrongOf(qq)}"]`));
+    }
+    await click(q('[data-testid="save-marks"]'));
+    expect(q('[data-testid="score-card"]').dataset.tier).toBe('steady');
+    expect(container.querySelector('[data-testid="confetti"]')).toBeNull();
+    expect(container.querySelector('[data-testid="sparkles"]')).toBeNull();
+    // ...and the emoji doesn't pop in either.
+    expect(container.querySelector('.animate-celebration-stay')).toBeNull();
+  });
+
   it('marks a sheet in batches without moving the first batch to a later day', async () => {
     const sheet = demoSheet();
     savePaperSheet(sheet);

@@ -37,6 +37,7 @@ import {
 } from '@/pack/data';
 import { nextSelection } from '@/pack/runner';
 import { SaveDestination } from '@/pack/SaveDestination';
+import { ScoreCard } from '@/pack/ScoreCelebration';
 import {
   adoptPaperSheet,
   buildPaperResult,
@@ -613,49 +614,43 @@ function SavedView({ sheet, outcome }: { sheet: PaperSheet; outcome: SaveOutcome
   return (
     <main className="flex flex-col gap-5" data-testid="mark-saved">
       <Header />
-      <div className="flex flex-col items-center gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-6 text-center shadow-xs">
-        <CheckCircle2 className="h-10 w-10 text-brand-600" />
-        <div>
-          <div className="text-2xl font-bold text-ink-900">
-            {result.correctCount}/{result.answeredCount} correct
-          </div>
-          {kept === 0 && corrected === 0 ? (
-            <p className="mt-1 text-sm text-ink-600">
-              Sheet {sheet.code} is in the books — it counts like any practice
-              session.
-            </p>
-          ) : (
-            // A later batch (or a correction): spell out what this save
-            // wrote, and that the score above is the sheet, not the batch.
-            <p className="mt-1 text-sm text-ink-600" data-testid="saved-breakdown">
-              {wrote.join(', ')}
-              {kept > 0 ? (
-                <>
-                  {' '}
-                  — the {kept} answered previously{' '}
-                  {kept === 1 ? 'was left as it was' : 'were left as they were'},
-                  so nothing is counted twice
-                </>
-              ) : null}
-              . The score is for sheet {sheet.code} so far.
-            </p>
-          )}
-          {wrong > 0 ? (
-            <p className="mt-1 text-sm text-ink-600">
-              The {wrong === 1 ? 'question' : `${wrong} questions`} answered
-              wrong {wrong === 1 ? 'is' : 'are'} waiting in mistakes review.
-            </p>
+      <ScoreCard correct={result.correctCount} answered={result.answeredCount}>
+      {kept === 0 && corrected === 0 ? (
+        <p className="mt-1 text-sm text-ink-600">
+          Sheet {sheet.code} is in the books — it counts like any practice
+          session.
+        </p>
+      ) : (
+        // A later batch (or a correction): spell out what this save
+        // wrote, and that the score above is the sheet, not the batch.
+        <p className="mt-1 text-sm text-ink-600" data-testid="saved-breakdown">
+          {wrote.join(', ')}
+          {kept > 0 ? (
+            <>
+              {' '}
+              — the {kept} answered previously{' '}
+              {kept === 1 ? 'was left as it was' : 'were left as they were'},
+              so nothing is counted twice
+            </>
           ) : null}
-          {result.blankCount > 0 ? (
-            <p className="mt-1 text-sm text-ink-600">
-              {result.blankCount} {result.blankCount === 1 ? 'question' : 'questions'}{' '}
-              left blank — open this sheet again to add{' '}
-              {result.blankCount === 1 ? 'it' : 'them'} later; what you entered
-              stays filled in.
-            </p>
-          ) : null}
-        </div>
-      </div>
+          . The score is for sheet {sheet.code} so far.
+        </p>
+      )}
+      {wrong > 0 ? (
+        <p className="mt-1 text-sm text-ink-600">
+          The {wrong === 1 ? 'question' : `${wrong} questions`} answered
+          wrong {wrong === 1 ? 'is' : 'are'} waiting in mistakes review.
+        </p>
+      ) : null}
+      {result.blankCount > 0 ? (
+        <p className="mt-1 text-sm text-ink-600">
+          {result.blankCount} {result.blankCount === 1 ? 'question' : 'questions'}{' '}
+          left blank — open this sheet again to add{' '}
+          {result.blankCount === 1 ? 'it' : 'them'} later; what you entered
+          stays filled in.
+        </p>
+      ) : null}
+      </ScoreCard>
       <SaveDestination phase="after" />
       <div className="flex flex-col gap-2">
         {wrong > 0 ? (
