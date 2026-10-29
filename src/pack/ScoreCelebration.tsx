@@ -208,7 +208,9 @@ export function ScoreCard({
       {tier === 'good' ? <Sparkles /> : null}
       <div
         className={cn(
-          'animate-celebration-stay leading-none',
+          'leading-none',
+          // A low mark gets no effects at all, not even the pop-in.
+          tier !== 'steady' && 'animate-celebration-stay',
           tier === 'perfect' ? 'text-7xl' : tier === 'great' ? 'text-6xl' : 'text-5xl',
         )}
         aria-hidden

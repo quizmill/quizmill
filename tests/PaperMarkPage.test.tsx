@@ -207,6 +207,7 @@ describe('PaperMarkPage', () => {
     expect(q('[data-testid="score-card"]').dataset.tier).toBe('perfect');
     expect(q('[data-testid="mark-saved"]').textContent).toContain('Perfect score');
     expect(container.querySelector('[data-testid="confetti"]')).not.toBeNull();
+    expect(container.querySelector('.animate-celebration-stay')).not.toBeNull();
 
     // All three wrong: an encouraging card, no confetti raining on it.
     localStorage.clear();
@@ -223,6 +224,8 @@ describe('PaperMarkPage', () => {
     expect(q('[data-testid="score-card"]').dataset.tier).toBe('steady');
     expect(container.querySelector('[data-testid="confetti"]')).toBeNull();
     expect(container.querySelector('[data-testid="sparkles"]')).toBeNull();
+    // ...and the emoji doesn't pop in either.
+    expect(container.querySelector('.animate-celebration-stay')).toBeNull();
   });
 
   it('marks a sheet in batches without moving the first batch to a later day', async () => {
