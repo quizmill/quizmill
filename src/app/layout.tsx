@@ -11,6 +11,7 @@ import { ThemeWatcher } from '@/components/ThemeWatcher';
 import { RuntimePackBoundary } from '@/components/RuntimePackBoundary';
 import { LEGACY_THEME_KEY, THEME_KEY } from '@/lib/theme';
 import { LOOK_KEY } from '@/lib/look';
+import { RUNTIME_PACK_PENDING_ATTR } from '@/lib/runtimePackPending';
 import {
   ACTIVE_PACK_ID_KEY,
   HANDOFF_PACK_KEY,
@@ -30,7 +31,9 @@ const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 //   - the pack-library pointer (ACTIVE_PACK_ID_KEY → the inserted pack
 //     stored under insertedPackKey(id) — see src/lib/packLibrary.ts).
 // No stored pack → global stays unset → the build-time pack renders, exactly
-// as before.
+// as before. A stored pack also marks <html> pending, which keeps the
+// prerendered build-time page hidden until RuntimePackBoundary swaps the
+// runtime pack in (src/lib/runtimePackPending.ts).
 //
 // ORDERING IS LOAD-BEARING — this must be a real inline <script>
 // (dangerouslySetInnerHTML), NOT `next/script strategy="beforeInteractive"`.
@@ -42,7 +45,11 @@ const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 // deferred/module bundle (guarded by tests/e2e/runtime-pack-bootstrap).
 // insertedPackKey(id) = PACK_KEY_BEFORE_ID + id + PACK_KEY_AFTER_ID — split
 // around a placeholder so the inline script rebuilds the exact same key.
-const [PACK_KEY_BEFORE_ID, PACK_KEY_AFTER_ID] = insertedPackKey('').split('');
+// (Splitting on '' splits every character, which made the script look up
+// "q" + id + "u" and leave an inserted pack to the bundle — too late to keep
+// the build-time pack off screen.)
+const ID_PLACEHOLDER = '<id>';
+const [PACK_KEY_BEFORE_ID, PACK_KEY_AFTER_ID] = insertedPackKey(ID_PLACEHOLDER).split(ID_PLACEHOLDER);
 
 const PACK_BOOTSTRAP = `(function(){try{
 var r=null,m=location.hash.match(/[#&]pack=([^&]+)/);
@@ -52,7 +59,8 @@ r=localStorage.getItem(${JSON.stringify(HANDOFF_PACK_KEY)});
 if(!r){var i=localStorage.getItem(${JSON.stringify(ACTIVE_PACK_ID_KEY)});
 if(i){r=localStorage.getItem(${JSON.stringify(PACK_KEY_BEFORE_ID)}+i+${JSON.stringify(PACK_KEY_AFTER_ID)})}}
 }
-if(r){window.__QUIZMILL_PACK__=JSON.parse(r)}
+if(r){window.__QUIZMILL_PACK__=JSON.parse(r);
+document.documentElement.setAttribute(${JSON.stringify(RUNTIME_PACK_PENDING_ATTR)},'')}
 }catch(e){}})();`;
 
 // Apply the stored colour-scheme preference before first paint so a dark

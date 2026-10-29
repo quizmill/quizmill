@@ -488,3 +488,18 @@
   font-weight: 800;
   letter-spacing: -0.02em;
 }
+
+/* A runtime pack is on its way (src/lib/runtimePackPending.ts): the
+   prerendered page is the BUILD-TIME pack's, so keep it off screen until
+   RuntimePackBoundary swaps the live tree in and drops the attribute. The
+   delayed reveal is only a safety net for a bundle that never runs: the
+   page comes back rather than staying blank. */
+:root[data-runtime-pack-pending] #qm-app {
+  visibility: hidden;
+  animation: runtime-pack-reveal 0s 4s forwards;
+}
+@keyframes runtime-pack-reveal {
+  to {
+    visibility: visible;
+  }
+}
