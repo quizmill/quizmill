@@ -27,6 +27,15 @@ function setupNodeSteps(workflow: string): string[] {
   return workflow.match(/uses: actions\/setup-node@[^\n]*\n(?:[ \t]+[^\n]*\n)*/g) ?? [];
 }
 
+/** Whether a workflow's own `run:` steps call npm, npx or node (comments ignored). */
+function runsNode(workflow: string): boolean {
+  const live = workflow
+    .split('\n')
+    .filter((line) => !/^\s*#/.test(line))
+    .join('\n');
+  return /\b(?:npm|npx|node)\b/.test(live.replace(/actions\/setup-node/g, ''));
+}
+
 /**
  * What a setup-node step pins: `'.nvmrc'` when it reads the file, the
  * major when it names one literally, `undefined` when neither — a step
@@ -55,12 +64,15 @@ describe('Node version pin', () => {
     expect(enginesNode('cli/package.json')).toBe(`>=${nvmrc}`);
   });
 
-  it('every workflow sets up the same major', () => {
+  it('every workflow that runs Node sets up the same major', () => {
     const files = fs.readdirSync(WORKFLOWS).filter((f) => /\.ya?ml$/.test(f));
     expect(files.length).toBeGreaterThan(0);
     for (const file of files) {
-      const steps = setupNodeSteps(read(path.join('.github', 'workflows', file)));
-      expect(steps.length, `${file} has no setup-node step`).toBeGreaterThan(0);
+      const workflow = read(path.join('.github', 'workflows', file));
+      // A workflow made only of actions (stale.yml) runs no Node of ours, so it has nothing to pin.
+      if (!runsNode(workflow)) continue;
+      const steps = setupNodeSteps(workflow);
+      expect(steps.length, `${file} runs Node but has no setup-node step`).toBeGreaterThan(0);
       for (const step of steps) {
         // Either read the pin from the file (engine checkouts) or repeat
         // the same major literally (reusable workflows run against the
@@ -72,6 +84,20 @@ describe('Node version pin', () => {
         ).toBe(true);
       }
     }
+  });
+
+  describe('runsNode', () => {
+    it('is true for a run step calling npm, npx or node', () => {
+      expect(runsNode('    steps:\n      - run: npm ci\n')).toBe(true);
+      expect(runsNode('    steps:\n      - run: npx quizmill validate .\n')).toBe(true);
+      expect(runsNode('    steps:\n      - run: node scripts/x.mjs\n')).toBe(true);
+    });
+
+    it('is false for an actions-only workflow, a commented mention or setup-node alone', () => {
+      expect(runsNode('    steps:\n      - uses: actions/stale@v9\n')).toBe(false);
+      expect(runsNode('# runs npm nowhere\n    steps:\n      - uses: actions/stale@v9\n')).toBe(false);
+      expect(runsNode('    steps:\n      - uses: actions/setup-node@v4\n')).toBe(false);
+    });
   });
 
   describe('setupNodePin', () => {
