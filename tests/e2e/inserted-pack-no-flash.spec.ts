@@ -44,6 +44,10 @@ const INSERTED = {
 
 const BUILD_TIME_TITLE = 'Solar System Practice';
 
+// The precaching service worker would serve engine chunks straight from its
+// cache, past page.route() and the gate below; block it from the first load.
+test.use({ serviceWorkers: 'block' });
+
 /** Hold every engine chunk until the returned release() is called. */
 async function holdChunks(page: Page): Promise<() => void> {
   let release!: () => void;
