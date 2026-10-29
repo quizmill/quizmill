@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useState, type ReactNode } from 'react';
 import { isRuntimePack } from '@/pack/source';
+import { RUNTIME_PACK_PENDING_ATTR } from '@/lib/runtimePackPending';
 
 /**
  * Hydration guard for a pack swapped in at runtime.
@@ -20,8 +21,11 @@ import { isRuntimePack } from '@/pack/source';
  * `dangerouslySetInnerHTML` is taken as-is — React doesn't look inside it,
  * which is what lets any innerHTML hydrate at all — so server and client
  * agree by construction. A layout effect then swaps the live tree in before
- * the browser paints, so nothing visible changes from before: the
- * prerendered HTML was on screen until React ran either way. With no runtime
+ * the browser paints. The prerendered HTML is NOT on screen meanwhile: the
+ * bootstrap marks <html> with RUNTIME_PACK_PENDING_ATTR and globals.css hides
+ * this root until the hand-over clears it, so the build-time pack never
+ * flashes past before the runtime one (a sample bank before the full bank a
+ * licence key just unlocked, on a phone still loading the bundle). With no runtime
  * pack (every ordinary one-pack deploy) this is a transparent wrapper and the
  * prerendered pack hydrates in place exactly as it always has.
  */
@@ -43,6 +47,9 @@ export function RuntimePackBoundary({ children }: { children: ReactNode }) {
     // way to swap the tree after hydration and before paint.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the hand-over is the point, see above
     setAdopted(null);
+    // The bootstrap kept the prerendered (other pack's) page hidden until
+    // now; the live tree lands in this same frame, so un-hide it with it.
+    document.documentElement.removeAttribute(RUNTIME_PACK_PENDING_ATTR);
   }, []);
 
   // `display: contents` keeps the wrapper out of the layout. The keys force
