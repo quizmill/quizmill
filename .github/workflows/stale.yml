@@ -1,0 +1,31 @@
+name: Stale PRs
+
+# Pull requests with no activity for 30 days get a `stale` label and a note; 7 quiet days after that they close.
+# Any comment, push or review resets the clock. Issues are left alone. Label a PR `on-hold` to exempt it.
+on:
+  schedule:
+    - cron: '23 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          days-before-issue-stale: -1
+          days-before-issue-close: -1
+          days-before-pr-stale: 30
+          days-before-pr-close: 7
+          stale-pr-label: stale
+          exempt-pr-labels: on-hold
+          stale-pr-message: >-
+            No activity for 30 days, so this is marked stale. It closes in 7 days unless there's a comment,
+            a push or the `on-hold` label. The branch is kept either way.
+          close-pr-message: >-
+            Closed after 37 days without activity. The branch is kept: reopen and rebase if it's still wanted.
+          operations-per-run: 60
