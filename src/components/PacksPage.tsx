@@ -119,7 +119,7 @@ function LicenceKeyLine({ packId }: { packId: string }) {
         className={
           revealed
             ? 'min-w-0 flex-1 select-all break-all rounded-lg bg-ink-50 px-2 py-1 text-ink-800'
-            : 'min-w-0 flex-1 truncate rounded-lg bg-ink-50 px-2 py-1 text-ink-500'
+            : 'min-w-0 flex-1 whitespace-nowrap rounded-lg bg-ink-50 px-2 py-1 text-ink-500'
         }
       >
         {revealed ? key : maskLicenceKey(key)}
@@ -132,7 +132,7 @@ function LicenceKeyLine({ packId }: { packId: string }) {
         onClick={() => void copy()}
       >
         {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-        {copied ? 'Copied' : revealed ? 'Copy' : 'Reveal & copy'}
+        {copied ? 'Copied' : 'Copy'}
       </Button>
     </div>
   );
