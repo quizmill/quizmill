@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Boxes,
+  Check,
+  Copy,
   Download,
   FileJson,
   Link as LinkIcon,
@@ -33,6 +35,7 @@ import {
 import { cachePackAssets } from '@/lib/packAssets';
 import { fetchPackFromUrl, parsePackFiles, type ParseOutcome } from '@/lib/packInsert';
 import { recordEvent } from '@/lib/storage';
+import { maskLicenceKey, storedLicenceKey } from '@/lib/unlock';
 import { useClientState, useMounted } from '@/lib/useMounted';
 import {
   loadRegistry,
@@ -80,6 +83,58 @@ function ProgressLine({ packId }: { packId: string }) {
         <> · last practised {new Date(progress.lastPractisedAt).toLocaleDateString()}</>
       ) : null}
     </p>
+  );
+}
+
+/**
+ * The licence key a pack was unlocked with, handed back for a second
+ * device or the installed app (Packs → Have a licence key? there):
+ * masked until tapped, then shown and copied. Nothing for a pack held
+ * without a key.
+ */
+function LicenceKeyLine({ packId }: { packId: string }) {
+  // Read after mount: SSG renders with no localStorage.
+  const mounted = useMounted();
+  const key = useMemo(() => (mounted ? storedLicenceKey(packId) : null), [mounted, packId]);
+  const [revealed, setRevealed] = useState(false);
+  const [copied, setCopied] = useState(false);
+  if (!key) return null;
+
+  async function copy() {
+    if (!key) return;
+    setRevealed(true);
+    try {
+      await navigator.clipboard.writeText(key);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // no clipboard access — the revealed key is still selectable
+    }
+  }
+
+  return (
+    <div data-testid="pack-licence-key" className="mt-2 flex items-center gap-2 text-xs text-ink-500">
+      <span className="shrink-0">Licence key</span>
+      <code
+        className={
+          revealed
+            ? 'min-w-0 flex-1 select-all break-all rounded-lg bg-ink-50 px-2 py-1 text-ink-800'
+            : 'min-w-0 flex-1 whitespace-nowrap rounded-lg bg-ink-50 px-2 py-1 text-ink-500'
+        }
+      >
+        {revealed ? key : maskLicenceKey(key)}
+      </code>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="shrink-0"
+        data-testid="pack-licence-key-copy"
+        onClick={() => void copy()}
+      >
+        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+        {copied ? 'Copied' : 'Copy'}
+      </Button>
+    </div>
   );
 }
 
@@ -143,6 +198,7 @@ function PackCard({
         <p className="mt-1.5 line-clamp-2 text-sm text-ink-600">{description}</p>
       ) : null}
       <ProgressLine packId={id} />
+      <LicenceKeyLine packId={id} />
       {!active || onEject ? (
         <div className="mt-3 flex items-center gap-2">
           {!active && onActivate ? (

@@ -63,6 +63,23 @@ export function licenceKeyStorageKey(packId: string): string {
   return `quizmill.${packId}.licence`;
 }
 
+/** The licence key a pack was unlocked with on this device, or null. */
+export function storedLicenceKey(packId: string): string | null {
+  try {
+    return window.localStorage.getItem(licenceKeyStorageKey(packId))?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/** A key with everything but its first group hidden (`QL-····-····-····`),
+ *  so the shelf can say a pack holds one without showing it. */
+export function maskLicenceKey(key: string): string {
+  const groups = key.split('-');
+  if (groups.length < 2) return '····';
+  return [groups[0], ...groups.slice(1).map(() => '····')].join('-');
+}
+
 /** Where the daily update check keeps its record for a pack (when it last
  *  asked, and whether the key was refused) — see src/lib/packUpdates.ts.
  *  A fresh unlock resets it to "checked now", so a key entered again

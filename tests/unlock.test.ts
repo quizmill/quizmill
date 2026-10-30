@@ -10,6 +10,7 @@ import {
   UNLOCKED_TOAST_KEY,
   fetchUnlockBundle,
   licenceKeyStorageKey,
+  maskLicenceKey,
   readKeyFromHash,
   resolveUnlockConfig,
   stashUnlockedToast,
@@ -112,6 +113,16 @@ describe('readKeyFromHash', () => {
     expect(readKeyFromHash('#key=')).toBeNull();
     expect(readKeyFromHash('#pack=eyJ9')).toBeNull();
     expect(readKeyFromHash('?key=in-the-query-string')).toBeNull();
+  });
+});
+
+describe('maskLicenceKey', () => {
+  it('keeps the first group and hides the rest', () => {
+    expect(maskLicenceKey('QL-AB12-CD34-EF56')).toBe('QL-····-····-····');
+  });
+
+  it('hides a key with no groups entirely', () => {
+    expect(maskLicenceKey('secretkey')).toBe('····');
   });
 });
 
