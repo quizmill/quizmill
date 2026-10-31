@@ -116,5 +116,13 @@ export function storageErrorMessage(e: unknown): string {
   const err = e as { name?: unknown; message?: unknown } | null;
   const name = typeof err?.name === 'string' && err.name ? err.name : 'Error';
   const detail = typeof err?.message === 'string' && err.message ? `${name}: ${err.message}` : String(e);
-  return `couldn't save the pack on this device (${detail})`;
+  return `${SAVE_FAILED_PREFIX}${detail})`;
+}
+
+const SAVE_FAILED_PREFIX = "couldn't save the pack on this device (";
+
+/** Whether an insert error came from storing the pack (either message
+ *  above) rather than from validating it. */
+export function isStorageErrorMessage(message: string): boolean {
+  return message === STORAGE_FULL_MESSAGE || message.startsWith(SAVE_FAILED_PREFIX);
 }

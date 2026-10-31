@@ -321,12 +321,13 @@ export async function activatePack(id: string | null): Promise<ActivateResult> {
   const ls = window.localStorage;
   const previous = getActivePackPointer();
   // Only a copy IndexedDB also holds may go — otherwise it is the pack.
-  const prevRaw =
+  const prevKey =
     previous && previous !== id && (await readStoredPack(previous))
-      ? ls.getItem(insertedPackKey(previous))
+      ? insertedPackKey(previous)
       : null;
+  const prevRaw = prevKey === null ? null : ls.getItem(prevKey);
   try {
-    if (prevRaw !== null) ls.removeItem(insertedPackKey(previous!));
+    if (prevKey !== null) ls.removeItem(prevKey);
     if (id !== null) {
       ls.setItem(insertedPackKey(id), JSON.stringify(pack));
       ls.setItem(ACTIVE_PACK_ID_KEY, id);
@@ -335,7 +336,7 @@ export async function activatePack(id: string | null): Promise<ActivateResult> {
     }
   } catch (e) {
     try {
-      if (prevRaw !== null) ls.setItem(insertedPackKey(previous!), prevRaw);
+      if (prevKey !== null && prevRaw !== null) ls.setItem(prevKey, prevRaw);
     } catch {
       // it fitted a moment ago; nothing more to try
     }

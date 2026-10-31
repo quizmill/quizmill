@@ -277,7 +277,7 @@ describe('unlockPack', () => {
     expect(r.entry.questionCount).toBe(3);
     expect(r.entry.origin).toBe('licence key · unlock.example.com');
 
-    expect(getInsertedPack('solar-system-full')?.questions).toHaveLength(3);
+    expect((await getInsertedPack('solar-system-full'))?.questions).toHaveLength(3);
     expect(listInsertedPacks().map((e) => e.id)).toEqual(['solar-system-full']);
     expect(getActivePackPointer()).toBe('solar-system-full');
     expect(storage.getItem(licenceKeyStorageKey('solar-system-full'))).toBe(KEY);
@@ -286,6 +286,35 @@ describe('unlockPack', () => {
     expect(events.map((e) => [e.type, e.data])).toEqual([
       ['pack_unlocked', { pack: 'solar-system-full' }],
     ]);
+  });
+
+  it('a full device is a storage failure that says so; any other write error keeps its own words', async () => {
+    // Only the pack library's writes fail; the analytics row still lands.
+    const setItem = storage.setItem;
+    const refuse = (error: unknown) => {
+      storage.setItem = (k: string, v: string) => {
+        if (k.startsWith('quizmill.packLibrary.')) throw error;
+        setItem(k, v);
+      };
+    };
+    const unlock = () =>
+      unlockPack(KEY, { config: CONFIG, buildPackId: 'solar-system-demo', fetchImpl: respond(200, bundle()) });
+
+    refuse(new DOMException('full', 'QuotaExceededError'));
+    expect(await unlock()).toMatchObject({
+      ok: false,
+      reason: 'storage',
+      message: expect.stringContaining('not enough storage space'),
+    });
+
+    refuse(new DOMException('The operation is insecure.', 'SecurityError'));
+    const other = await unlock();
+    expect(other).toMatchObject({ ok: false, reason: 'storage' });
+    if (!other.ok) {
+      expect(other.message).toContain('SecurityError: The operation is insecure.');
+      expect(other.message).not.toContain('storage space');
+    }
+    expect(listInsertedPacks()).toEqual([]);
   });
 
   it('the key appears nowhere in storage but its own slot', async () => {

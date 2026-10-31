@@ -169,7 +169,7 @@ describe('bundle → /packs importer round trip', () => {
     });
   });
 
-  it('inserts the bundled demo pack unchanged, images included', () => {
+  it('inserts the bundled demo pack unchanged, images included', async () => {
     const built = buildPackBundle(DEMO);
     expect(built.ok).toBe(true);
     if (!built.ok) return;
@@ -178,14 +178,14 @@ describe('bundle → /packs importer round trip', () => {
     const parsed = parsePackFiles([{ name: `${built.bundle.id}.bundle.json`, text }]);
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
-    const inserted = insertPack(parsed.candidate, {
+    const inserted = await insertPack(parsed.candidate, {
       origin: 'unit-test',
       buildPackId: 'some-other-pack',
     });
     expect(inserted.ok).toBe(true);
 
     const demo = readPackDir(DEMO);
-    const stored = getInsertedPack(built.bundle.id);
+    const stored = await getInsertedPack(built.bundle.id);
     expect(stored).not.toBeNull();
     expect(stored?.manifest).toEqual(demo.manifest);
     expect(stored?.questions).toEqual(demo.questions);

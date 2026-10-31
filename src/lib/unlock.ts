@@ -44,6 +44,7 @@ import type { PackUpgrade } from '@/pack/data';
 import { recordEvent } from './storage';
 import { cachePackAssets } from './packAssets';
 import { activatePack, getInsertedPack, insertPack, type PackLibraryEntry } from './packLibrary';
+import { isStorageErrorMessage } from './packStore';
 
 /** The route a licence-key link opens; the key rides in its fragment. */
 export const UNLOCK_PATH = '/unlock';
@@ -357,24 +358,27 @@ export async function unlockPack(
   // The endpoint itself and the version it served ride in their own
   // fields — the daily update check asks the same place with that
   // version (src/lib/packUpdates.ts).
-  const inserted = insertPack(fetched.candidate, {
+  const inserted = await insertPack(fetched.candidate, {
     origin: `licence key · ${new URL(config.unlockUrl).host}`,
     buildPackId: opts.buildPackId,
     unlockUrl: config.unlockUrl,
     ...(fetched.version ? { packVersion: fetched.version } : {}),
   });
   if (!inserted.ok) {
-    const quota = inserted.errors.some((e) => e.includes('storage space'));
+    const storage = inserted.errors.some(isStorageErrorMessage);
     return fail(
-      quota ? 'storage' : 'invalid-pack',
-      quota ? inserted.errors[0] : 'The pack the service sent did not validate.',
+      storage ? 'storage' : 'invalid-pack',
+      storage ? inserted.errors[0] : 'The pack the service sent did not validate.',
       arriving ?? config.packId,
       inserted.errors,
     );
   }
 
   const { entry } = inserted;
-  activatePack(entry.id);
+  // The pack is on the shelf even when it can't be made active (no room
+  // left in localStorage for the copy the boot reads) — say why.
+  const activated = await activatePack(entry.id);
+  if (!activated.ok) return fail('storage', activated.error, entry.id, [activated.error]);
   try {
     window.localStorage.setItem(licenceKeyStorageKey(entry.id), key);
     // The bundle was fetched just now, so the daily update check counts
@@ -414,8 +418,9 @@ export function stashUnlockedToast(toast: UnlockedToast): void {
  * fresh document renders the unlocked pack — same reason /packs reloads.
  */
 export function openUnlockedPack(entry: PackLibraryEntry): void {
-  const stored = getInsertedPack(entry.id);
-  if (stored) void cachePackAssets(stored).catch(() => undefined);
+  void getInsertedPack(entry.id)
+    .then((stored) => stored && cachePackAssets(stored))
+    .catch(() => undefined);
   stashUnlockedToast({ title: entry.title, count: entry.questionCount });
   // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- deliberate full load, see above
   window.location.assign(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/`);

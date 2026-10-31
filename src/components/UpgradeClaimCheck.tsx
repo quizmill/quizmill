@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { isStandaloneDisplay } from '@/lib/install';
 import { APP_CONFIG } from '@/config';
-import { insertedPackKey } from '@/lib/packKeys';
+import { hasInsertedPack } from '@/lib/packLibrary';
 import {
   openUnlockedPack,
   unlockConfig,
@@ -67,7 +67,7 @@ export function UpgradeClaimCheck() {
       now: () => Date.now(),
       isUnlocked: (key) => {
         try {
-          if (target) return window.localStorage.getItem(insertedPackKey(target)) !== null;
+          if (target) return hasInsertedPack(target);
           // No hint which pack the purchase is for: a pack already kept
           // under this very key is the one it would unlock.
           return key !== undefined && holdsLicenceKey(key);
