@@ -145,7 +145,9 @@ function patchPrefs<K extends keyof PackPrefs>(key: K, value: PackPrefs[K] | nul
   writeJson(PREFS_KEY, prefs);
 }
 
-/** The active level-band filter, or null for "All". */
+/** The saved level-band filter, or null for "All". Raw: screens read it
+ *  through `loadPackLevelFilter` (`src/pack/runner.ts`), which drops a level
+ *  the active pack doesn't have. */
 export function loadLevelFilter(): string | null {
   return loadPrefs().level ?? null;
 }

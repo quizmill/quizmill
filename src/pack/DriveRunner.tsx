@@ -23,7 +23,7 @@ import {
   useEndSession,
   useStorageData,
 } from '@/lib/useStorage';
-import { loadAttempts, loadLevelFilter, loadSessions } from '@/lib/storage';
+import { loadAttempts, loadSessions } from '@/lib/storage';
 import { useClientState } from '@/lib/useMounted';
 import { recordNewAchievements } from '@/pack/useAchievementUnlock';
 import { recordLevelCrossings } from '@/pack/useLevelUp';
@@ -58,6 +58,7 @@ import {
   buildSessionStart,
   filterByLevel,
   isLastQuestion,
+  loadPackLevelFilter,
   moveToNext,
   pickSessionFromBank,
   scoreSummary,
@@ -139,7 +140,7 @@ export function DriveRunner() {
 
   function handleStart() {
     warmUpTts(); // unlock TTS inside the tap gesture (iOS)
-    const voiceBank = filterByLevel(bank, loadLevelFilter());
+    const voiceBank = filterByLevel(bank, loadPackLevelFilter());
     const picked = pickSessionFromBank(voiceBank, attemptHistory(attempts));
     if (picked === null) {
       setPhase('empty');

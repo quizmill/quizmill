@@ -20,7 +20,6 @@ import { Button, buttonStyles } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 import { useStorageData } from '@/lib/useStorage';
 import { useClientState, useMounted } from '@/lib/useMounted';
-import { loadLevelFilter } from '@/lib/storage';
 import {
   correctKeysOf,
   isMultiAnswer,
@@ -38,7 +37,13 @@ import {
   PACK_PAPER_BY_KEY,
 } from '@/pack/data';
 import { groupPapers, paperSubject } from '@/pack/papers';
-import { attemptHistory, bankForCategory, bankForPaper, filterByLevel } from '@/pack/runner';
+import {
+  attemptHistory,
+  bankForCategory,
+  bankForPaper,
+  filterByLevel,
+  loadPackLevelFilter,
+} from '@/pack/runner';
 import { PackImage } from '@/pack/PackImage';
 import { PaperWriteView } from '@/pack/PaperWriteView';
 import { deleteSheetInk, hasSheetInk, pruneSheetInk } from '@/pack/paperInk';
@@ -311,7 +316,7 @@ function ComposeCard({
   );
   // Default to the practice level filter so paper matches what the
   // learner is working on.
-  const [level, setLevel] = useClientState(loadLevelFilter, null);
+  const [level, setLevel] = useClientState(loadPackLevelFilter, null);
   const [chosenCount, setCount] = useState<PaperCount>(DEFAULT_PAPER_COUNT);
   // A named paper to print whole (manifest `papers`, #194), or null for
   // a mixed sheet from the category/level/count controls. Not remembered:

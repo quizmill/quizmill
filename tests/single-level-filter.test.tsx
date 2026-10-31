@@ -126,6 +126,36 @@ describe('Home level filter with a single-level pack (#201)', () => {
   });
 });
 
+describe('a saved level the pack no longer has (#260)', () => {
+  function available(): string[] {
+    return (container.textContent ?? '').match(/\d+ questions available/g) ?? [];
+  }
+
+  it('reads as "All" on Home, so the bank is not filtered to nothing', async () => {
+    // The pack dropped the learner's level; Home hides the row for a single
+    // level, so a stale pref would leave no way back to a non-empty bank.
+    await render(<PackHome />);
+    const all = available();
+    await act(async () => {
+      root?.unmount();
+    });
+    state.levels = [{ key: 'basics', label: 'Basics' }];
+    saveLevelFilter('exam');
+    root = undefined;
+    await render(<PackHome />);
+    expect(all.length).toBeGreaterThan(0);
+    expect(available()).toEqual(all);
+  });
+
+  it('selects "All" in a multi-level row', async () => {
+    saveLevelFilter('exam');
+    await render(<PackHome />);
+    const all = container.querySelector('[role="radiogroup"][aria-label="Filter by Tier"] [role="radio"]');
+    expect(all?.textContent).toBe('All');
+    expect(all?.getAttribute('aria-checked')).toBe('true');
+  });
+});
+
 describe('Paper level filter with a single-level pack (#201)', () => {
   it('still offers All plus every level when the pack has two', async () => {
     await render(<PaperPage />);

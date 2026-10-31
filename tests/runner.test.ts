@@ -9,6 +9,7 @@ import {
   formatKeyList,
   gradeSelection,
   isBankFullySeen,
+  knownLevel,
   moveToNext,
   nextSelection,
   type RunnerState,
@@ -67,6 +68,24 @@ describe('filterByLevel', () => {
 
   it('is empty when no question is in the level', () => {
     expect(filterByLevel(bank, 'exam')).toEqual([]);
+  });
+});
+
+describe('knownLevel', () => {
+  const bank = [q('a', 'core'), q('b', 'core')];
+
+  it('keeps a saved level the pack still has', () => {
+    expect(knownLevel('core', ['core'])).toBe('core');
+  });
+
+  it('reads a level the pack dropped as All, so the whole bank comes back (#260)', () => {
+    expect(knownLevel('exam', ['core'])).toBeNull();
+    expect(filterByLevel(bank, knownLevel('exam', ['core']))).toEqual(bank);
+  });
+
+  it('is All for no saved level, or a pack without levels', () => {
+    expect(knownLevel(null, ['core'])).toBeNull();
+    expect(knownLevel('core', [])).toBeNull();
   });
 });
 

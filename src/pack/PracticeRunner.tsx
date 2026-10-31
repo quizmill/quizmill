@@ -23,7 +23,7 @@ import {
   RunnerResults,
   type Stage,
 } from '@/pack/RunnerPanels';
-import { amendAttempt, loadAttempts, loadSessions, loadLevelFilter } from '@/lib/storage';
+import { amendAttempt, loadAttempts, loadSessions } from '@/lib/storage';
 import { streakProgress } from '@/lib/stats';
 import { totalXp } from '@/lib/xp';
 import { loadProgressionShown } from '@/lib/progressionPref';
@@ -50,6 +50,7 @@ import {
   filterByLevel,
   isBankFullySeen,
   isLastQuestion,
+  loadPackLevelFilter,
   moveToNext,
   nextSelection,
   pickSessionFromBank,
@@ -130,7 +131,7 @@ export function PackPracticeRunner(props: Props) {
   const [xpGained, setXpGained] = useState<number | null>(null);
   // The active level-band filter (a manifest level key) or null = All.
   // Read from localStorage after mount, so SSR/first paint stay stable.
-  const [levelFilter] = useClientState(loadLevelFilter, null);
+  const [levelFilter] = useClientState(loadPackLevelFilter, null);
   // First option tapped on the current question (first-instinct signal)
   // and the just-recorded attempt (to stamp feedbackSeconds on Next).
   const firstSelectedRef = useRef<OptionKey | null>(null);
