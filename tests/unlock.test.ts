@@ -453,6 +453,44 @@ describe('unlockPack', () => {
     expect(loadEvents()).toEqual([]);
   });
 
+  it('a request abandoned while the pack is being stored is not activated and does not report success', async () => {
+    const controller = new AbortController();
+    // The library announces the insert; the caller gives up right then.
+    vi.stubGlobal('window', {
+      localStorage: storage,
+      sessionStorage: fakeStorage(),
+      dispatchEvent: () => {
+        controller.abort();
+        return true;
+      },
+    });
+    const r = await unlockPack(KEY, {
+      config: CONFIG,
+      buildPackId: 'solar-system-demo',
+      fetchImpl: respond(200, bundle()),
+      signal: controller.signal,
+    });
+    expect(r).toEqual({ ok: false, reason: 'cancelled', message: '' });
+    expect(getActivePackPointer()).toBeNull();
+    expect(loadEvents()).toEqual([]);
+  });
+
+  it('keeps the key for a pack that went on the shelf even when it could not be opened', async () => {
+    const setItem = storage.setItem;
+    storage.setItem = (k: string, v: string) => {
+      if (k === 'quizmill.activePackId') throw new DOMException('full', 'QuotaExceededError');
+      setItem(k, v);
+    };
+    const r = await unlockPack(KEY, {
+      config: CONFIG,
+      buildPackId: 'solar-system-demo',
+      fetchImpl: respond(200, bundle()),
+    });
+    expect(r).toMatchObject({ ok: false, reason: 'storage' });
+    expect(listInsertedPacks().map((e) => e.id)).toEqual(['solar-system-full']);
+    expect(storage.getItem(licenceKeyStorageKey('solar-system-full'))).toBe(KEY);
+  });
+
   it('a fetch the signal aborted mid-flight is cancelled, not "offline"', async () => {
     const controller = new AbortController();
     controller.abort();

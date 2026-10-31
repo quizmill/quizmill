@@ -300,11 +300,13 @@ export async function fetchUnlockBundle(
 }
 
 /**
- * The whole unlock, start to finish: fetch → validate + insert → activate
- * → keep the key → record `pack_unlocked`. On any failure `unlock_failed`
- * is recorded with the reason (never the key) and nothing is stored; its
- * `pack` is the bundle's id once one has arrived, else the manifest's
- * hint, else nothing (a refused key names no pack).
+ * The whole unlock, start to finish: fetch → validate + insert → keep the
+ * key → activate → record `pack_unlocked`. On any failure `unlock_failed`
+ * is recorded with the reason (never the key; its `pack` is the bundle's
+ * id once one has arrived, else the manifest's hint, else nothing — a
+ * refused key names no pack) and nothing is stored, except when only the
+ * activation failed: the pack is on the shelf by then, and its key stays
+ * with it so updates still reach it.
  * The caller navigates to Home afterwards — a full load, so every module
  * rebinds to the new pack.
  *
@@ -363,7 +365,9 @@ export async function unlockPack(
     buildPackId: opts.buildPackId,
     unlockUrl: config.unlockUrl,
     ...(fetched.version ? { packVersion: fetched.version } : {}),
+    signal,
   });
+  if (signal?.aborted) return CANCELLED;
   if (!inserted.ok) {
     const storage = inserted.errors.some(isStorageErrorMessage);
     return fail(
@@ -375,10 +379,8 @@ export async function unlockPack(
   }
 
   const { entry } = inserted;
-  // The pack is on the shelf even when it can't be made active (no room
-  // left in localStorage for the copy the boot reads) — say why.
-  const activated = await activatePack(entry.id);
-  if (!activated.ok) return fail('storage', activated.error, entry.id, [activated.error]);
+  // The key is kept as soon as the pack is on the shelf, before it is
+  // opened: a pack that can't be made active still gets its updates.
   try {
     window.localStorage.setItem(licenceKeyStorageKey(entry.id), key);
     // The bundle was fetched just now, so the daily update check counts
@@ -391,6 +393,11 @@ export async function unlockPack(
   } catch {
     // the pack is in; a key that can't be kept just means typing it again
   }
+  // The pack is on the shelf even when it can't be made active (no room
+  // left in localStorage for the copy the boot reads) — say why.
+  const activated = await activatePack(entry.id, { signal });
+  if (signal?.aborted) return CANCELLED;
+  if (!activated.ok) return fail('storage', activated.error, entry.id, [activated.error]);
   recordEvent('pack_unlocked', { pack: entry.id });
   return { ok: true, entry };
 }

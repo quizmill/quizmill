@@ -206,7 +206,10 @@ export async function checkPackUpdate(
       : envelopeVersion(fetched.candidate)
         ? { packVersion: envelopeVersion(fetched.candidate) }
         : {}),
+    // Checked again where the write happens, after any eject queued first.
+    onlyIfOnShelf: true,
   });
+  if (!inserted.ok && inserted.reason === 'ejected') return 'ejected';
   saveUpdateCheck(entry.id, { checkedAt: now });
   if (!inserted.ok) return 'error';
 
