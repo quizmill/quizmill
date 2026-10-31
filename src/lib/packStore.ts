@@ -88,13 +88,11 @@ export async function writeStoredPack(id: string, pack: ActivePack): Promise<voi
   await run('readwrite', (s) => s.put(pack, id));
 }
 
-/** Drop a pack; a missing pack or store is not an error. */
+/** Drop a pack; a missing pack, or no IndexedDB at all, is not an error.
+ *  Rejects when IndexedDB is there but refuses — the record may remain. */
 export async function deleteStoredPack(id: string): Promise<void> {
-  try {
-    await run('readwrite', (s) => s.delete(id));
-  } catch {
-    // nothing stored, nothing to drop
-  }
+  if (!factory()) return;
+  await run('readwrite', (s) => s.delete(id));
 }
 
 /** A storage write failed because the origin is out of space — Chrome and

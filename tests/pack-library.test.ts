@@ -16,6 +16,7 @@ import {
   LIBRARY_INDEX_KEY,
   insertedPackKey,
 } from '@/lib/packKeys';
+import { readStoredPack } from '@/lib/packStore';
 
 // The library binds no state at module load, so a per-test window stub is
 // enough — no module resets needed.
@@ -480,6 +481,97 @@ describe('inserted packs live in IndexedDB', () => {
     expect(store.has(insertedPackKey('pack-b'))).toBe(false);
   });
 
+  it('a switch away from a handed-off pack frees the handoff copy before writing the new one', async () => {
+    await insertPack(bulkyPack('pack-a', 150), { buildPackId: BUILD_PACK_ID });
+    store.set(HANDOFF_PACK_KEY, JSON.stringify(bulkyPack('cloud-pack', 150)));
+    // Both copies (~300 KB each in UTF-16) don't fit the 600 KB cap side by side.
+    expect(await activatePack('pack-a')).toEqual({ ok: true });
+    expect(store.has(HANDOFF_PACK_KEY)).toBe(false);
+    expect(getActivePackPointer()).toBe('pack-a');
+  });
+
+  it('a refused switch away from a handed-off pack puts the handoff copy back', async () => {
+    await insertPack(bulkyPack('huge', 400), { buildPackId: BUILD_PACK_ID });
+    const handoff = JSON.stringify(bulkyPack('cloud-pack', 100));
+    store.set(HANDOFF_PACK_KEY, handoff);
+    store.set('quizmill.cloud-pack.attempts.v1', 'y'.repeat(150 * 1024));
+
+    expect((await activatePack('huge')).ok).toBe(false);
+    expect(store.get(HANDOFF_PACK_KEY)).toBe(handoff);
+    expect(store.has(insertedPackKey('huge'))).toBe(false);
+  });
+
+  it('a switch that cannot even read localStorage reports it instead of throwing', async () => {
+    await insertPack(validPack('pack-a'), { buildPackId: BUILD_PACK_ID });
+    vi.stubGlobal('window', {
+      get localStorage(): Storage {
+        throw new DOMException('The operation is insecure.', 'SecurityError');
+      },
+      dispatchEvent: () => true,
+    });
+    const result = await activatePack('pack-a');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('SecurityError');
+  });
+
+  it('eject leaves the pointer alone when another tab switched away while it ran', async () => {
+    await insertPack(validPack('pack-a'), { buildPackId: BUILD_PACK_ID });
+    await insertPack(validPack('pack-b'), { buildPackId: BUILD_PACK_ID });
+    await activatePack('pack-a');
+    const ls = cappedStorage(600);
+    let otherTabSwitches = true;
+    vi.stubGlobal('window', {
+      localStorage: {
+        ...ls,
+        getItem: (k: string) => {
+          const v = ls.getItem(k);
+          // Once the eject is under way (its first read of the shelf),
+          // another tab moves the pointer to pack-b.
+          if (k === LIBRARY_INDEX_KEY && otherTabSwitches) {
+            otherTabSwitches = false;
+            store.set(ACTIVE_PACK_ID_KEY, 'pack-b');
+          }
+          return v;
+        },
+      },
+      dispatchEvent: () => true,
+    });
+
+    expect(await ejectPack('pack-a')).toEqual({ wasActive: false });
+    expect(getActivePackPointer()).toBe('pack-b');
+  });
+
+  it('an eject IndexedDB refuses still leaves the shelf, and the record goes once it is back', async () => {
+    const idb = new IDBFactory();
+    vi.stubGlobal('indexedDB', idb);
+    await insertPack(validPack(), { buildPackId: BUILD_PACK_ID });
+
+    vi.stubGlobal('indexedDB', { open: () => { throw new DOMException('refused', 'UnknownError'); } });
+    await ejectPack('capitals-mini');
+    vi.stubGlobal('indexedDB', idb);
+
+    // Off the shelf: never served or reopened, whatever IndexedDB still holds.
+    expect(listInsertedPacks()).toEqual([]);
+    expect(await getInsertedPack('capitals-mini')).toBeNull();
+    expect((await activatePack('capitals-mini')).ok).toBe(false);
+    // The next migration deletes the leftover record.
+    await migrateInsertedPacks();
+    expect(await readStoredPack('capitals-mini')).toBeNull();
+  });
+
+  it('a pack re-inserted after an eject IndexedDB refused keeps its record', async () => {
+    const idb = new IDBFactory();
+    vi.stubGlobal('indexedDB', idb);
+    await insertPack(validPack(), { buildPackId: BUILD_PACK_ID });
+    vi.stubGlobal('indexedDB', { open: () => { throw new DOMException('refused', 'UnknownError'); } });
+    await ejectPack('capitals-mini');
+    vi.stubGlobal('indexedDB', idb);
+
+    await insertPack(validPack(), { buildPackId: BUILD_PACK_ID });
+    await migrateInsertedPacks();
+    expect((await getInsertedPack('capitals-mini'))?.manifest.id).toBe('capitals-mini');
+  });
+
   it('a switch abandoned before it commits changes nothing', async () => {
     await insertPack(validPack('pack-a'), { buildPackId: BUILD_PACK_ID });
     const controller = new AbortController();
@@ -521,6 +613,18 @@ describe('insertPack — reporting a failed write', () => {
     const result = await insertPack(validPack(), { buildPackId: BUILD_PACK_ID });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.errors[0]).toContain('not enough storage space');
+  });
+
+  it('reports localStorage that cannot even be opened instead of throwing', async () => {
+    vi.stubGlobal('window', {
+      get localStorage(): Storage {
+        throw new DOMException('The operation is insecure.', 'SecurityError');
+      },
+      dispatchEvent: () => true,
+    });
+    const result = await insertPack(validPack(), { buildPackId: BUILD_PACK_ID });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors[0]).toContain('SecurityError: The operation is insecure.');
   });
 
   it('reports any other failure with the real error, not as a full device', async () => {

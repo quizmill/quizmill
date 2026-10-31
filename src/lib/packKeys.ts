@@ -25,6 +25,10 @@ export const ACTIVE_PACK_ID_KEY = 'quizmill.activePackId';
 /** Index of inserted packs: JSON array of PackLibraryEntry metadata. */
 export const LIBRARY_INDEX_KEY = 'quizmill.packLibrary.index.v1';
 
+/** Ids of ejected packs whose IndexedDB record couldn't be deleted at the
+ *  time (JSON array); the next migration deletes them. */
+export const PENDING_DELETE_KEY = 'quizmill.packLibrary.pendingDelete.v1';
+
 const INSERTED_PACK_PREFIX = 'quizmill.packLibrary.pack.';
 
 /**

@@ -38,6 +38,7 @@ import {
   ACTIVE_PACK_ID_KEY,
   HANDOFF_PACK_KEY,
   LIBRARY_INDEX_KEY,
+  PENDING_DELETE_KEY,
   insertedPackKey,
 } from './packKeys';
 
@@ -118,6 +119,20 @@ function writeIndex(entries: PackLibraryEntry[]): void {
   window.localStorage.setItem(LIBRARY_INDEX_KEY, JSON.stringify(entries));
 }
 
+function readPendingDeletes(): string[] {
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(PENDING_DELETE_KEY) ?? '[]');
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePendingDeletes(ids: string[]): void {
+  if (ids.length > 0) window.localStorage.setItem(PENDING_DELETE_KEY, JSON.stringify(ids));
+  else window.localStorage.removeItem(PENDING_DELETE_KEY);
+}
+
 /** All inserted packs, newest first. */
 export function listInsertedPacks(): PackLibraryEntry[] {
   if (!browser()) return [];
@@ -142,10 +157,13 @@ function readLocalPack(id: string): ActivePack | null {
   }
 }
 
-/** The full content of one inserted pack, or null when absent/corrupt. */
+/** The full content of one inserted pack, or null when absent/corrupt or
+ *  off the shelf (an eject IndexedDB refused can leave a record behind). */
 export async function getInsertedPack(id: string): Promise<ActivePack | null> {
   if (!browser()) return null;
-  const newer = entryFor(id)?.localOnly ? readLocalPack(id) : null;
+  const entry = entryFor(id);
+  if (!entry) return null;
+  const newer = entry.localOnly ? readLocalPack(id) : null;
   return newer ?? (await readStoredPack(id)) ?? readLocalPack(id);
 }
 
@@ -177,6 +195,23 @@ async function migrate(): Promise<void> {
     } catch {
       // IndexedDB refused it — the localStorage copy stays, nothing lost
     }
+  }
+  // Records of ejected packs IndexedDB wouldn't delete at the time.
+  const pending = readPendingDeletes();
+  if (pending.length === 0) return;
+  const left: string[] = [];
+  for (const id of pending) {
+    if (hasInsertedPack(id)) continue; // inserted again since
+    try {
+      await deleteStoredPack(id);
+    } catch {
+      left.push(id);
+    }
+  }
+  try {
+    writePendingDeletes(left);
+  } catch {
+    // tried again next time
   }
 }
 
@@ -321,13 +356,15 @@ async function storePack(
   pack: ActivePack,
   opts: { onlyIfOnShelf?: boolean; signal?: AbortSignal },
 ): Promise<{ ok: true } | { ok: false; errors: string[]; reason?: 'ejected' | 'cancelled' }> {
-  const ls = window.localStorage;
   const key = insertedPackKey(entry.id);
+  let ls: Storage | null = null;
   let inStore = false;
   let prevStored: ActivePack | null = null;
   let wroteStore = false;
   let prevLocal: string | null | undefined; // undefined: not read, nothing written
   try {
+    // Merely touching localStorage throws where the browser blocks storage.
+    ls = window.localStorage;
     // Free localStorage of packs an older build kept there before adding one.
     await migrate();
     inStore = await packStoreAvailable();
@@ -350,6 +387,10 @@ async function storePack(
       ...readIndex().filter((e) => e.id !== entry.id),
       inStore ? entry : { ...entry, localOnly: true },
     ]);
+    // Back on the shelf: a deletion an earlier eject left pending must not
+    // take this record.
+    const pending = readPendingDeletes();
+    if (pending.includes(entry.id)) writePendingDeletes(pending.filter((p) => p !== entry.id));
     return { ok: true };
   } catch (e) {
     try {
@@ -361,8 +402,10 @@ async function storePack(
       // the old record can't be put back; reads then see the new one
     }
     try {
-      if (prevLocal === null) ls.removeItem(key);
-      else if (prevLocal !== undefined && ls.getItem(key) !== prevLocal) ls.setItem(key, prevLocal);
+      if (ls !== null) {
+        if (prevLocal === null) ls.removeItem(key);
+        else if (prevLocal !== undefined && ls.getItem(key) !== prevLocal) ls.setItem(key, prevLocal);
+      }
     } catch {
       // it fitted a moment ago; nothing more to try
     }
@@ -383,15 +426,26 @@ export async function ejectPack(id: string): Promise<{ wasActive: boolean }> {
 }
 
 async function removePack(id: string): Promise<{ wasActive: boolean }> {
-  const wasActive = getActivePackPointer() === id;
   // Capture the pack before removal so its offline-cached images can be
   // dropped too (fire-and-forget).
   const pack = await getInsertedPack(id);
   if (pack) void dropPackAssets(pack);
-  await deleteStoredPack(id);
-  window.localStorage.removeItem(insertedPackKey(id));
+  let dropped = true;
+  try {
+    await deleteStoredPack(id);
+  } catch {
+    dropped = false;
+  }
+  const ls = window.localStorage;
+  // IndexedDB refused: the pack still leaves the shelf (reads go through
+  // the index, so the record is never served) and the next migration
+  // deletes it.
+  if (!dropped) writePendingDeletes([...readPendingDeletes().filter((p) => p !== id), id]);
+  ls.removeItem(insertedPackKey(id));
   writeIndex(readIndex().filter((e) => e.id !== id));
-  if (wasActive) window.localStorage.removeItem(ACTIVE_PACK_ID_KEY);
+  // Read the pointer after the awaits: another tab may have switched away.
+  const wasActive = getActivePackPointer() === id;
+  if (wasActive) ls.removeItem(ACTIVE_PACK_ID_KEY);
   emit();
   return { wasActive };
 }
@@ -405,23 +459,29 @@ export type ActivateResult = { ok: true } | { ok: false; error: string; cancelle
  * two big packs never have to fit side by side, and comes back if the new
  * one doesn't fit. The caller reloads the page so every module rebinds to
  * the new pack. Clears any external handoff blob (`HANDOFF_PACK_KEY`),
- * which would otherwise outrank the pointer. `signal` abandons the switch
- * (`cancelled: true`) if it fires before anything is written.
+ * which would otherwise outrank the pointer — before the new copy, like
+ * the previous mirror, and back if the switch fails. `signal` abandons the
+ * switch (`cancelled: true`) if it fires before anything is written.
+ * Never rejects: a storage failure comes back as `{ ok: false, error }`.
  */
 export async function activatePack(
   id: string | null,
   opts: { signal?: AbortSignal } = {},
 ): Promise<ActivateResult> {
   if (!browser()) return { ok: false, error: 'not in a browser' };
-  return serial(() => pointAt(id, opts.signal));
+  return serial(() =>
+    pointAt(id, opts.signal).catch((e: unknown): ActivateResult => ({ ok: false, error: storageErrorMessage(e) })),
+  );
 }
 
 async function pointAt(id: string | null, signal: AbortSignal | undefined): Promise<ActivateResult> {
+  // First, so storage the browser blocks is reported as such, not as a
+  // missing pack.
+  const ls = window.localStorage;
   await migrate();
   const pack = id === null ? null : await getInsertedPack(id);
   if (id !== null && pack === null) return { ok: false, error: `"${id}" is not on this device` };
 
-  const ls = window.localStorage;
   const previous = getActivePackPointer();
   // Only a copy IndexedDB also holds (and holds current) may go —
   // otherwise it is the pack.
@@ -434,8 +494,10 @@ async function pointAt(id: string | null, signal: AbortSignal | undefined): Prom
   const prevRaw = prevKey === null ? null : ls.getItem(prevKey);
   const targetKey = id === null ? null : insertedPackKey(id);
   const targetRaw = targetKey === null ? null : ls.getItem(targetKey);
+  const handoffRaw = ls.getItem(HANDOFF_PACK_KEY);
   try {
     if (prevKey !== null) ls.removeItem(prevKey);
+    ls.removeItem(HANDOFF_PACK_KEY);
     if (id !== null && targetKey !== null) {
       ls.setItem(targetKey, JSON.stringify(pack));
       ls.setItem(ACTIVE_PACK_ID_KEY, id);
@@ -456,6 +518,7 @@ async function pointAt(id: string | null, signal: AbortSignal | undefined): Prom
     }
     try {
       if (prevKey !== null && prevRaw !== null) ls.setItem(prevKey, prevRaw);
+      if (handoffRaw !== null) ls.setItem(HANDOFF_PACK_KEY, handoffRaw);
     } catch {
       // it fitted a moment ago; nothing more to try
     }
@@ -468,7 +531,6 @@ async function pointAt(id: string | null, signal: AbortSignal | undefined): Prom
         : storageErrorMessage(e),
     };
   }
-  ls.removeItem(HANDOFF_PACK_KEY);
   emit();
   return { ok: true };
 }
