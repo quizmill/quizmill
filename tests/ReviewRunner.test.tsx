@@ -1,11 +1,13 @@
 // @vitest-environment happy-dom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { webcrypto } from 'node:crypto';
 import { PackReviewRunner } from '@/pack/ReviewRunner';
 import { ATTEMPTS_KEY } from '@/lib/storage';
 import { correctKeysOf, packQuestions } from '@/pack/data';
+import { canShuffleOptions } from '@/pack/runner';
+import { weakSpotClearAfterPref } from '@/lib/weakSpotPref';
 import type { Attempt } from '@/data/types';
 
 // React needs this flag to allow act() outside @testing-library.
@@ -87,6 +89,23 @@ async function finishRound() {
   throw new Error('round never reached the results screen');
 }
 
+/** The option buttons' key bubbles, in display order. */
+function optionKeys(): string[] {
+  return buttons()
+    .filter((b) => b.type === 'button')
+    .map((b) => b.querySelector('span')?.textContent ?? '')
+    .filter((k) => /^[A-F]$/.test(k));
+}
+
+/** Tap the option with this pack key, then Check answer. */
+async function answer(key: string) {
+  const option = buttons().find(
+    (b) => b.type === 'button' && (b.textContent ?? '').trim().startsWith(key),
+  );
+  await click(option!);
+  await click(control('Check answer')!);
+}
+
 function wrong(
   questionId: string,
   sessionId: string,
@@ -161,6 +180,73 @@ describe('PackReviewRunner', () => {
     expect(container.textContent).toContain('Q 1 / 3');
   });
 
+  it('keeps a question dealt until it is right N times in a row (default 2)', async () => {
+    const [q1] = packQuestions;
+    localStorage.setItem(ATTEMPTS_KEY, JSON.stringify([wrong(q1.id, 'old', 1000, 1)]));
+    await render();
+    expect(container.textContent).toContain('Q 1 / 1');
+    await answer(correctKeysOf(q1)[0]);
+    expect(container.textContent).toContain('Right — 1 of 2 to clear it.');
+    await click(control('See results')!);
+    await click(control('Review more')!);
+    // Still a weak spot: dealt again, and the second right answer clears it.
+    expect(container.textContent).toContain(q1.prompt);
+    await answer(correctKeysOf(q1)[0]);
+    expect(container.textContent).toContain('Rescued.');
+    await click(control('See results')!);
+    await click(control('Review more')!);
+    expect(container.textContent).toContain('Nothing to review');
+  });
+
+  it('one right answer clears it when the device is set to 1', async () => {
+    weakSpotClearAfterPref.save(1);
+    const [q1] = packQuestions;
+    localStorage.setItem(ATTEMPTS_KEY, JSON.stringify([wrong(q1.id, 'old', 1000, 1)]));
+    await render();
+    await answer(correctKeysOf(q1)[0]);
+    expect(container.textContent).toContain('Rescued.');
+  });
+
+  it('shuffles the options of a re-asked question but records the pack key', async () => {
+    const q = packQuestions.find((p) => canShuffleOptions(p) && p.options.length > 2)!;
+    localStorage.setItem(ATTEMPTS_KEY, JSON.stringify([wrong(q.id, 'old', 1000, 1)]));
+    // Fisher–Yates with random() = 0 rotates the bank order left by one.
+    const spy = vi.spyOn(Math, 'random').mockReturnValue(0);
+    await render();
+    spy.mockRestore();
+    const bankKeys = q.options.map((o) => o.key);
+    expect(optionKeys()).toEqual([...bankKeys.slice(1), bankKeys[0]]);
+    const key = correctKeysOf(q)[0];
+    await answer(key);
+    const attempts = JSON.parse(localStorage.getItem(ATTEMPTS_KEY)!) as Attempt[];
+    expect(attempts.at(-1)).toMatchObject({ questionId: q.id, selectedAnswer: key, isCorrect: true });
+  });
+
+  it("keeps a paper sheet's review in printed order", async () => {
+    const { onSheet } = seedOldMistakesAndASheet();
+    window.location.hash = '#session=sheet-1';
+    const spy = vi.spyOn(Math, 'random').mockReturnValue(0);
+    await render();
+    spy.mockRestore();
+    expect(optionKeys()).toEqual(onSheet.options.map((o) => o.key));
+  });
+
+  it("shuffles an exam's or check's scoped review — only paper keeps its order", async () => {
+    // Regression: any `#session=` scope kept pack order, so reviews opened
+    // from exam and check results kept the answer-position cue.
+    const q = packQuestions.find((p) => canShuffleOptions(p) && p.options.length > 2)!;
+    localStorage.setItem(
+      ATTEMPTS_KEY,
+      JSON.stringify([{ ...wrong(q.id, 'exam-1', 1000, 1), mode: 'exam' }]),
+    );
+    window.location.hash = '#session=exam-1';
+    const spy = vi.spyOn(Math, 'random').mockReturnValue(0);
+    await render();
+    spy.mockRestore();
+    const bankKeys = q.options.map((o) => o.key);
+    expect(optionKeys()).toEqual([...bankKeys.slice(1), bankKeys[0]]);
+  });
+
   it('"Review more" after a scoped session moves on to the rest of the queue', async () => {
     seedOldMistakesAndASheet();
     window.location.hash = '#session=sheet-1';
@@ -178,6 +264,8 @@ describe('PackReviewRunner', () => {
 describe('PackReviewRunner results screen', () => {
   it('renders the results card exactly as before (markup pin)', async () => {
     // finishRound answers everything wrongly → a deterministic 0/3 score.
+    // One right answer clearing a question is the behaviour this pins.
+    weakSpotClearAfterPref.save(1);
     seedOldMistakesAndASheet();
     await render();
     await finishRound();

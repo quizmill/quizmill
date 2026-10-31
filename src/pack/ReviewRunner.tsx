@@ -23,9 +23,10 @@ import {
   type Stage,
 } from '@/pack/RunnerPanels';
 import { amendAttempt, loadAttempts, loadSessions } from '@/lib/storage';
-import { sessionMistakeIds, unresolvedMistakeIds } from '@/lib/mistakes';
+import { missedQuestions, sessionMistakeIds, weakSpots } from '@/lib/mistakes';
 import { totalXp } from '@/lib/xp';
 import { loadProgressionShown } from '@/lib/progressionPref';
+import { weakSpotClearAfterPref } from '@/lib/weakSpotPref';
 import {
   isMultiAnswer,
   packQuestions,
@@ -43,6 +44,7 @@ import {
   moveToNext,
   nextSelection,
   scoreSummary,
+  shuffleOptions,
   type RunnerState,
 } from './runner';
 
@@ -62,10 +64,15 @@ function scopeFromHash(): string | null {
  * since rescued. Deals after mount so the localStorage history is in —
  * see the practice runner for the mount guard.
  *
- * Opened plain it works through the whole queue, oldest mistake first, a
- * batch at a time. Opened with `#session=<id>` (the paper marking page
- * does this) it re-asks only that session's mistakes, all of them, in
- * the order they were asked.
+ * Opened plain it works through the weak-spot list (src/lib/mistakes.ts),
+ * oldest mistake first, a batch at a time; a question leaves it after the
+ * device's "clear after N" right answers in a row. Opened with
+ * `#session=<id>` (the paper marking page does this) it re-asks only that
+ * session's mistakes, all of them, in the order they were asked.
+ *
+ * Options are shuffled once per deal so a re-asked question can't be
+ * answered from memory of its position (see `shuffleOptions`) — except
+ * in a paper sheet's review, which keeps the printed order.
  */
 export function PackReviewRunner() {
   const { attempts } = useStorageData();
@@ -90,6 +97,10 @@ export function PackReviewRunner() {
   const firstSelectedRef = useRef<OptionKey | null>(null);
   const lastAttemptRef = useRef<{ id: string; answeredAt: number } | null>(null);
   const [finished, setFinished] = useState(false);
+  // Right answers in a row that clear a weak spot — read at deal time.
+  const [clearAfter, setClearAfter] = useState(weakSpotClearAfterPref.fallback);
+  // The just-answered question's streak when it was right, for the verdict.
+  const [streak, setStreak] = useState(0);
 
   // Dealing the round records the session start (a storage write) as well
   // as setting state, so it stays an effect.
@@ -98,18 +109,29 @@ export function PackReviewRunner() {
     if (!mounted || state) return;
     const scope = scopeFromHash();
     setScoped(scope !== null);
+    const need = weakSpotClearAfterPref.load();
+    setClearAfter(need);
     const ids =
       scope !== null
         ? sessionMistakeIds(attempts, scope)
-        : unresolvedMistakeIds(attempts).slice(0, REVIEW_BATCH_SIZE);
+        : weakSpots(attempts, need)
+            .slice(0, REVIEW_BATCH_SIZE)
+            .map((m) => m.id);
     if (ids.length === 0) {
       setNothingToReview(true);
       return;
     }
     const byId = new Map(packQuestions.map((q) => [q.id, q]));
+    // A paper sheet's review follows a page the learner may hold in hand,
+    // so it keeps the printed order. Exam and check reviews (also scoped)
+    // were on screen, so they shuffle like the rest.
+    const paperSheet =
+      scope !== null &&
+      attempts.some((a) => a.sessionId === scope && a.mode === 'paper');
     const picked = ids
       .map((id) => byId.get(id))
-      .filter((q): q is PackQuestion => q !== undefined);
+      .filter((q): q is PackQuestion => q !== undefined)
+      .map((q) => (paperSheet ? q : shuffleOptions(q)));
     if (picked.length === 0) {
       setNothingToReview(true);
       return;
@@ -193,8 +215,12 @@ export function PackReviewRunner() {
       <RunnerResults
         eyebrow="Review complete"
         score={scoreSummary(state)}
-        pctLabel="rescued"
-        note="Questions you got right have been removed from your mistake queue."
+        pctLabel={clearAfter === 1 ? 'rescued' : 'correct'}
+        note={
+          clearAfter === 1
+            ? 'Questions you got right have been removed from your mistake queue.'
+            : `A question leaves your weak spots once you get it right ${clearAfter} times in a row.`
+        }
         celebrations={celebrations}
       >
         <Button size="lg" block onClick={handleReviewMore}>
@@ -243,6 +269,9 @@ export function PackReviewRunner() {
     // Same re-read rationale as the practice runner — see there.
     const freshAttempts = loadAttempts();
     if (showXp) setXpGained(totalXp(freshAttempts) - xpBefore);
+    setStreak(
+      missedQuestions(freshAttempts).find((m) => m.id === current.id)?.streak ?? 0,
+    );
     checkNow(loadSessions(), freshAttempts);
     checkLevelNow(freshAttempts);
     setState(advanceAfterAnswer(state, attempt.isCorrect));
@@ -294,7 +323,13 @@ export function PackReviewRunner() {
         question={current}
         selected={selected}
         stage={stage}
-        verdict={{ correct: 'Rescued.', wrong: "We'll bring this one back later." }}
+        verdict={{
+          correct:
+            streak >= clearAfter
+              ? 'Rescued.'
+              : `Right — ${streak} of ${clearAfter} to clear it.`,
+          wrong: "We'll bring this one back later.",
+        }}
         xpGained={xpGained}
         isLast={isLastQuestion(state)}
         onCheck={handleCheck}

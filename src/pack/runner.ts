@@ -58,6 +58,41 @@ export function formatKeyList(keys: OptionKey[]): string {
   return `${keys.slice(0, -1).join(', ')} and ${keys[keys.length - 1]}`;
 }
 
+/**
+ * Option text that only reads right in its place — "all of the above",
+ * "all preceding answers", "the first two options", "both A and C",
+ * "Option B" — so its question keeps the pack's order. Deliberately
+ * conservative: a false hit just leaves one question unshuffled, a miss
+ * would put "none of the above" first.
+ */
+const POSITIONAL_OPTION =
+  /\b(above|below|preceding|previous|following|former|latter)\b|\b(all|none|both|neither) of (these|those|them)\b|\b(first|second|third|fourth|fifth|last|other|remaining)( (two|three|four))? (options?|answers?|choices?|statements?)\b|\b(options?|answers?|choices?) [A-F]\b|\b[A-F] (and|or|&) [A-F]\b/i;
+
+export function canShuffleOptions(question: PackQuestion): boolean {
+  return !question.options.some((o) => POSITIONAL_OPTION.test(o.text));
+}
+
+/**
+ * The question with its options in a fresh display order (Fisher–Yates),
+ * for re-asking a weak spot without the learner recognising the position.
+ * Only the ORDER moves: each option keeps the pack's key, so the bubbles
+ * read e.g. C, A, D, B, every recorded `selectedAnswer`/`firstSelected`
+ * is a pack key, and an explanation saying "B is wrong because…" still
+ * points at the option labelled B. Positional options stay put.
+ */
+export function shuffleOptions(
+  question: PackQuestion,
+  random: () => number = Math.random,
+): PackQuestion {
+  if (!canShuffleOptions(question)) return question;
+  const options = [...question.options];
+  for (let i = options.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [options[i], options[j]] = [options[j], options[i]];
+  }
+  return { ...question, options };
+}
+
 export interface RunnerState {
   sessionId: string;
   questions: PackQuestion[];

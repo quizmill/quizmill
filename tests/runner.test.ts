@@ -4,6 +4,7 @@ import {
   buildAttempt,
   buildSessionEnd,
   buildSessionStart,
+  canShuffleOptions,
   feedbackSecondsSince,
   filterByLevel,
   formatKeyList,
@@ -11,6 +12,7 @@ import {
   isBankFullySeen,
   moveToNext,
   nextSelection,
+  shuffleOptions,
   type RunnerState,
 } from '@/pack/runner';
 import type { OptionKey, PackQuestion } from '@/pack/data';
@@ -326,5 +328,50 @@ describe('isBankFullySeen', () => {
 
   it('is false for an empty bank', () => {
     expect(isBankFullySeen([], new Map())).toBe(false);
+  });
+});
+
+describe('shuffleOptions (re-asking a weak spot)', () => {
+  /** A deterministic "random": always picks the first remaining slot. */
+  const first = () => 0;
+  const withTexts = (...texts: string[]): PackQuestion => ({
+    ...multiQ(),
+    options: texts.map((text, i) => ({ key: 'ABCD'[i] as OptionKey, text })),
+  });
+
+  it('reorders the options but keeps every pack key on its own text', () => {
+    const question = multiQ();
+    const shuffled = shuffleOptions(question, first);
+    expect(shuffled.options.map((o) => o.key)).toEqual(['B', 'C', 'D', 'A']);
+    for (const o of shuffled.options) {
+      expect(o.text).toBe(o.key.toLowerCase());
+    }
+    // The bank copy is untouched and grading still reads the pack keys.
+    expect(question.options.map((o) => o.key)).toEqual(['A', 'B', 'C', 'D']);
+    expect(gradeSelection(shuffled, ['C', 'A'])).toBe(true);
+  });
+
+  it.each([
+    'All of the above',
+    'None of the above',
+    'Both A and C',
+    'A or B, depending on the load',
+    'Option B, but only on Mondays',
+    'Neither of these',
+    'All preceding answers are correct',
+    'Both previous statements',
+    'None of the following',
+    'The first two options',
+    'The last answer only',
+    'The other choices are all wrong',
+    'Only the latter',
+  ])('leaves a question in pack order when an option reads "%s"', (text) => {
+    const question = withTexts('Mercury', 'Venus', 'Earth', text);
+    expect(canShuffleOptions(question)).toBe(false);
+    expect(shuffleOptions(question, first)).toBe(question);
+  });
+
+  it('shuffles ordinary options', () => {
+    expect(canShuffleOptions(withTexts('Mercury', 'Venus', 'Earth', 'Mars'))).toBe(true);
   });
 });

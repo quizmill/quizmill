@@ -16,51 +16,91 @@
  * Packs write the question id as the topic, so in practice rescue is
  * per-question and the review runner re-asks the very question that was
  * missed (see `buildAttempt` in src/pack/runner.ts).
+ *
+ * The weak-spot list generalises this: a missed question stays listed
+ * until it has been answered right N times in a row (N a device pref),
+ * counted per question id. The rule above is the case N = 1.
  */
 import type { Attempt } from '@/data/types';
 
 const topicKey = (subject: string, topic: string): string =>
   `${subject}:${topic}`;
 
+/** A question missed at least once, and how far it has come back since. */
+export interface MissedQuestion {
+  id: string;
+  /** Right answers in a row since the latest wrong one. A later correct
+   *  answer on the same topic by ANOTHER question counts as the first of
+   *  them (the topic rescue above), never as more. */
+  streak: number;
+  /** When the latest wrong answer was given. */
+  wrongAt: number;
+}
+
 /**
- * Return the IDs of all questions whose most recent wrong attempt has NOT
- * been rescued by a later correct attempt on the same topic. Sorted by the
- * timestamp of the wrong attempt, OLDEST first — so the review queue
+ * Every question with at least one wrong attempt, with its streak since
+ * the latest wrong one. Oldest latest-mistake first — so the review queue
  * (which takes the first N) resurfaces mistakes made longer ago before
- * recent ones, the spaced-repetition intuition: a stale mistake should not
- * stay buried under today's slip-ups.
+ * recent ones, the spaced-repetition intuition: a stale mistake should
+ * not stay buried under today's slip-ups.
  */
-export function unresolvedMistakeIds(attempts: readonly Attempt[]): string[] {
-  // Walk chronologically so we can read off the latest "correct on topic"
-  // time as we go.
+export function missedQuestions(attempts: readonly Attempt[]): MissedQuestion[] {
+  // Walk chronologically so the streak and the latest "correct on topic"
+  // time can be read off as we go.
   const sorted = [...attempts].sort((a, b) => a.answeredAt - b.answeredAt);
 
   const lastCorrectOnTopic = new Map<string, number>();
-  const lastCorrectOnQuestion = new Map<string, number>();
-  /** questionId → { topicKey, t } for the kid's latest wrong attempt at this question. */
-  const lastWrong = new Map<string, { tk: string; t: number }>();
+  /** questionId → the latest wrong attempt at it and the run since. */
+  const missed = new Map<string, { tk: string; t: number; streak: number }>();
 
   for (const a of sorted) {
     const tk = topicKey(a.subject, a.topic);
     if (a.isCorrect) {
+      const m = missed.get(a.questionId);
+      if (m) {
+        // A topic rescue by another question since the miss is the first
+        // right answer; this one comes after it. Read before this attempt
+        // updates the topic, so it can't credit itself twice.
+        if (m.streak === 0 && (lastCorrectOnTopic.get(m.tk) ?? -Infinity) >= m.t) {
+          m.streak = 1;
+        }
+        m.streak++;
+      }
       lastCorrectOnTopic.set(tk, a.answeredAt);
-      lastCorrectOnQuestion.set(a.questionId, a.answeredAt);
     } else {
-      lastWrong.set(a.questionId, { tk, t: a.answeredAt });
+      missed.set(a.questionId, { tk, t: a.answeredAt, streak: 0 });
     }
   }
 
-  const unresolved: { id: string; t: number }[] = [];
-  for (const [qid, { tk, t }] of lastWrong) {
-    const lastOk = Math.max(
-      lastCorrectOnTopic.get(tk) ?? -Infinity,
-      lastCorrectOnQuestion.get(qid) ?? -Infinity,
-    );
-    if (lastOk < t) unresolved.push({ id: qid, t });
+  const out: MissedQuestion[] = [];
+  for (const [id, { tk, t, streak }] of missed) {
+    const topicRescued = (lastCorrectOnTopic.get(tk) ?? -Infinity) >= t;
+    out.push({ id, streak: streak === 0 && topicRescued ? 1 : streak, wrongAt: t });
   }
+  return out.sort((a, b) => a.wrongAt - b.wrongAt);
+}
 
-  unresolved.sort((a, b) => a.t - b.t);
-  return unresolved.map((x) => x.id);
+/**
+ * The weak-spot list: missed questions not yet answered right
+ * `clearAfter` times in a row. Derived, never stored — changing
+ * `clearAfter` (a device pref, see src/lib/weakSpotPref.ts) only changes
+ * what the list shows.
+ */
+export function weakSpots(
+  attempts: readonly Attempt[],
+  clearAfter: number,
+): MissedQuestion[] {
+  return missedQuestions(attempts).filter((m) => m.streak < clearAfter);
+}
+
+/**
+ * Return the IDs of all questions whose most recent wrong attempt has NOT
+ * been rescued by a later correct attempt on the same topic (or at the
+ * same question) — the weak-spot list with a single right answer clearing
+ * a question. Oldest mistake first.
+ */
+export function unresolvedMistakeIds(attempts: readonly Attempt[]): string[] {
+  return weakSpots(attempts, 1).map((m) => m.id);
 }
 
 /**
@@ -85,8 +125,4 @@ export function sessionMistakeIds(
     )
     .map((a) => a.questionId)
     .filter((id) => unresolved.has(id) && !seen.has(id) && seen.add(id));
-}
-
-export function unresolvedMistakeCount(attempts: readonly Attempt[]): number {
-  return unresolvedMistakeIds(attempts).length;
 }
