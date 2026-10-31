@@ -27,6 +27,7 @@ import { validatePack } from '../../tools/pack/schema';
 import { dropPackAssets } from '@/lib/packAssets';
 import {
   deleteStoredPack,
+  isQuotaError,
   packStoreAvailable,
   readStoredPack,
   storageErrorMessage,
@@ -340,7 +341,14 @@ export async function activatePack(id: string | null): Promise<ActivateResult> {
     } catch {
       // it fitted a moment ago; nothing more to try
     }
-    return { ok: false, error: storageErrorMessage(e) };
+    // Ejecting other packs frees nothing here (they live in IndexedDB):
+    // the copy has to fit beside the saved progress.
+    return {
+      ok: false,
+      error: isQuotaError(e)
+        ? 'not enough storage space on this device to open this pack next to your saved progress'
+        : storageErrorMessage(e),
+    };
   }
   ls.removeItem(HANDOFF_PACK_KEY);
   emit();
