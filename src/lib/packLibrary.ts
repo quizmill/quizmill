@@ -64,11 +64,15 @@ export interface PackLibraryEntry {
   /** The unlock endpoint base a licence-key pack was fetched from, so the
    *  daily update check asks the same place. Absent for other inserts. */
   unlockUrl?: string;
+  /** Set when the pack was (re-)inserted while IndexedDB was out: the
+   *  localStorage copy is the newer one, whatever IndexedDB still holds,
+   *  until `migrateInsertedPacks` moves it over. */
+  localOnly?: true;
 }
 
 export type InsertResult =
   | { ok: true; entry: PackLibraryEntry }
-  | { ok: false; errors: string[] };
+  | { ok: false; errors: string[]; reason?: 'ejected' | 'cancelled' };
 
 function browser(): boolean {
   return typeof window !== 'undefined';
@@ -76,6 +80,21 @@ function browser(): boolean {
 
 function emit(): void {
   window.dispatchEvent(new Event(PACK_LIBRARY_EVENT));
+}
+
+// Library mutations run one at a time: each spans several awaits (IndexedDB)
+// and reads state another one changes — an update must not land after an
+// eject, a migration must not drop a mirror an activation just wrote.
+let queue: Promise<unknown> = Promise.resolve();
+
+function serial<T>(op: () => Promise<T>): Promise<T> {
+  const run = queue.then(op, op);
+  queue = run.catch(() => undefined);
+  return run;
+}
+
+function entryFor(id: string): PackLibraryEntry | undefined {
+  return readIndex().find((e) => e.id === id);
 }
 
 function readIndex(): PackLibraryEntry[] {
@@ -126,29 +145,44 @@ function readLocalPack(id: string): ActivePack | null {
 /** The full content of one inserted pack, or null when absent/corrupt. */
 export async function getInsertedPack(id: string): Promise<ActivePack | null> {
   if (!browser()) return null;
-  return (await readStoredPack(id)) ?? readLocalPack(id);
+  const newer = entryFor(id)?.localOnly ? readLocalPack(id) : null;
+  return newer ?? (await readStoredPack(id)) ?? readLocalPack(id);
 }
 
 /**
- * Move packs that live in localStorage (inserted by an older build) into
- * IndexedDB and free their localStorage copy — all but the active pack's,
- * which the synchronous boot reads. Idempotent and safe to call on every
- * load; does nothing where IndexedDB is unavailable. A pack is only ever
- * removed from localStorage once IndexedDB holds it.
+ * Move packs that live in localStorage (inserted by an older build, or
+ * while IndexedDB was out) into IndexedDB and free their localStorage
+ * copy — all but the active pack's, which the synchronous boot reads.
+ * Idempotent and safe to call on every load; does nothing where IndexedDB
+ * is unavailable. A pack is only ever removed from localStorage once
+ * IndexedDB holds it.
  */
-export async function migrateInsertedPacks(): Promise<void> {
+export function migrateInsertedPacks(): Promise<void> {
+  return serial(migrate);
+}
+
+async function migrate(): Promise<void> {
   if (!browser() || !(await packStoreAvailable())) return;
-  const active = getActivePackPointer();
-  for (const { id } of readIndex()) {
+  for (const { id, localOnly } of readIndex()) {
     const local = readLocalPack(id);
     if (!local) continue;
     try {
-      if (!(await readStoredPack(id))) await writeStoredPack(id, local);
-      if (id !== active) window.localStorage.removeItem(insertedPackKey(id));
+      if (localOnly || !(await readStoredPack(id))) await writeStoredPack(id, local);
+      if (localOnly) {
+        writeIndex(readIndex().map((e) => (e.id === id ? withoutLocalOnly(e) : e)));
+      }
+      // Read the pointer now, not before the awaits: another tab may have
+      // made this pack active meanwhile, and the boot needs its copy.
+      if (id !== getActivePackPointer()) window.localStorage.removeItem(insertedPackKey(id));
     } catch {
       // IndexedDB refused it — the localStorage copy stays, nothing lost
     }
   }
+}
+
+function withoutLocalOnly(entry: PackLibraryEntry): PackLibraryEntry {
+  const { localOnly: _, ...rest } = entry;
+  return rest;
 }
 
 /** The inserted-pack id the app is pointed at, or null (build-time pack). */
@@ -196,10 +230,21 @@ function embeddedAssets(raw: unknown): Record<string, string> | undefined {
  * `packVersion` overrides the version the bundle envelope carries (the
  * unlock path passes the endpoint's ETag); `unlockUrl` is kept only when
  * given, so a later file insert of the same pack simply forgets it.
+ * `onlyIfOnShelf` makes it an update that is dropped (`reason: 'ejected'`)
+ * when the pack has left the shelf by the time it would be written;
+ * `signal` abandons the insert (`reason: 'cancelled'`) if it fires before
+ * anything is written.
  */
 export async function insertPack(
   raw: unknown,
-  opts: { origin?: string; buildPackId: string; packVersion?: string; unlockUrl?: string },
+  opts: {
+    origin?: string;
+    buildPackId: string;
+    packVersion?: string;
+    unlockUrl?: string;
+    onlyIfOnShelf?: boolean;
+    signal?: AbortSignal;
+  },
 ): Promise<InsertResult> {
   if (!browser()) return { ok: false, errors: ['not in a browser'] };
   if (typeof raw !== 'object' || raw === null) {
@@ -257,20 +302,8 @@ export async function insertPack(
     ...(packVersion ? { packVersion } : {}),
     ...(opts.unlockUrl ? { unlockUrl: opts.unlockUrl } : {}),
   };
-  try {
-    // Free localStorage of packs an older build kept there before adding one.
-    await migrateInsertedPacks();
-    const inStore = await packStoreAvailable();
-    if (inStore) await writeStoredPack(entry.id, pack);
-    // The active pack's mirror follows its update; without IndexedDB,
-    // localStorage is the only home a pack has.
-    if (!inStore || getActivePackPointer() === entry.id) {
-      window.localStorage.setItem(insertedPackKey(entry.id), JSON.stringify(pack));
-    }
-    writeIndex([...readIndex().filter((e) => e.id !== entry.id), entry]);
-  } catch (e) {
-    return { ok: false, errors: [storageErrorMessage(e)] };
-  }
+  const stored = await serial(() => storePack(entry, pack, opts));
+  if (!stored.ok) return stored;
   // Ask the browser not to evict a pack unlocked with a licence key under
   // storage pressure — best effort, the answer doesn't change anything here.
   if (opts.unlockUrl && typeof navigator !== 'undefined') {
@@ -278,6 +311,63 @@ export async function insertPack(
   }
   emit();
   return { ok: true, entry };
+}
+
+/** The write half of `insertPack`, run under `serial`. All or nothing: a
+ *  write that fails puts every copy back as it was, so a failed update
+ *  leaves the previous content whole (and a retry compares against it). */
+async function storePack(
+  entry: PackLibraryEntry,
+  pack: ActivePack,
+  opts: { onlyIfOnShelf?: boolean; signal?: AbortSignal },
+): Promise<{ ok: true } | { ok: false; errors: string[]; reason?: 'ejected' | 'cancelled' }> {
+  const ls = window.localStorage;
+  const key = insertedPackKey(entry.id);
+  let inStore = false;
+  let prevStored: ActivePack | null = null;
+  let wroteStore = false;
+  let prevLocal: string | null | undefined; // undefined: not read, nothing written
+  try {
+    // Free localStorage of packs an older build kept there before adding one.
+    await migrate();
+    inStore = await packStoreAvailable();
+    prevStored = inStore ? await readStoredPack(entry.id) : null;
+    // Last checks before the first write — nothing awaits after them
+    // until IndexedDB has the pack.
+    if (opts.onlyIfOnShelf && !hasInsertedPack(entry.id)) {
+      return { ok: false, errors: [`"${entry.id}" is no longer on the shelf`], reason: 'ejected' };
+    }
+    if (opts.signal?.aborted) return { ok: false, errors: ['cancelled'], reason: 'cancelled' };
+    prevLocal = ls.getItem(key);
+    if (inStore) {
+      await writeStoredPack(entry.id, pack);
+      wroteStore = true;
+    }
+    // The active pack's mirror follows its update; without IndexedDB,
+    // localStorage is the only home a pack has.
+    if (!inStore || getActivePackPointer() === entry.id) ls.setItem(key, JSON.stringify(pack));
+    writeIndex([
+      ...readIndex().filter((e) => e.id !== entry.id),
+      inStore ? entry : { ...entry, localOnly: true },
+    ]);
+    return { ok: true };
+  } catch (e) {
+    try {
+      if (wroteStore) {
+        if (prevStored) await writeStoredPack(entry.id, prevStored);
+        else await deleteStoredPack(entry.id);
+      }
+    } catch {
+      // the old record can't be put back; reads then see the new one
+    }
+    try {
+      if (prevLocal === null) ls.removeItem(key);
+      else if (prevLocal !== undefined && ls.getItem(key) !== prevLocal) ls.setItem(key, prevLocal);
+    } catch {
+      // it fitted a moment ago; nothing more to try
+    }
+    return { ok: false, errors: [storageErrorMessage(e)] };
+  }
 }
 
 /**
@@ -289,6 +379,10 @@ export async function insertPack(
  */
 export async function ejectPack(id: string): Promise<{ wasActive: boolean }> {
   if (!browser()) return { wasActive: false };
+  return serial(() => removePack(id));
+}
+
+async function removePack(id: string): Promise<{ wasActive: boolean }> {
   const wasActive = getActivePackPointer() === id;
   // Capture the pack before removal so its offline-cached images can be
   // dropped too (fire-and-forget).
@@ -302,7 +396,7 @@ export async function ejectPack(id: string): Promise<{ wasActive: boolean }> {
   return { wasActive };
 }
 
-export type ActivateResult = { ok: true } | { ok: false; error: string };
+export type ActivateResult = { ok: true } | { ok: false; error: string; cancelled?: true };
 
 /**
  * Point the app at an inserted pack (or back at the build-time pack with
@@ -311,31 +405,55 @@ export type ActivateResult = { ok: true } | { ok: false; error: string };
  * two big packs never have to fit side by side, and comes back if the new
  * one doesn't fit. The caller reloads the page so every module rebinds to
  * the new pack. Clears any external handoff blob (`HANDOFF_PACK_KEY`),
- * which would otherwise outrank the pointer.
+ * which would otherwise outrank the pointer. `signal` abandons the switch
+ * (`cancelled: true`) if it fires before anything is written.
  */
-export async function activatePack(id: string | null): Promise<ActivateResult> {
+export async function activatePack(
+  id: string | null,
+  opts: { signal?: AbortSignal } = {},
+): Promise<ActivateResult> {
   if (!browser()) return { ok: false, error: 'not in a browser' };
-  await migrateInsertedPacks();
+  return serial(() => pointAt(id, opts.signal));
+}
+
+async function pointAt(id: string | null, signal: AbortSignal | undefined): Promise<ActivateResult> {
+  await migrate();
   const pack = id === null ? null : await getInsertedPack(id);
   if (id !== null && pack === null) return { ok: false, error: `"${id}" is not on this device` };
 
   const ls = window.localStorage;
   const previous = getActivePackPointer();
-  // Only a copy IndexedDB also holds may go — otherwise it is the pack.
+  // Only a copy IndexedDB also holds (and holds current) may go —
+  // otherwise it is the pack.
   const prevKey =
-    previous && previous !== id && (await readStoredPack(previous))
+    previous && previous !== id && !entryFor(previous)?.localOnly && (await readStoredPack(previous))
       ? insertedPackKey(previous)
       : null;
+  // The last await is behind us: from here to the end nothing yields.
+  if (signal?.aborted) return { ok: false, error: 'cancelled', cancelled: true };
   const prevRaw = prevKey === null ? null : ls.getItem(prevKey);
+  const targetKey = id === null ? null : insertedPackKey(id);
+  const targetRaw = targetKey === null ? null : ls.getItem(targetKey);
   try {
     if (prevKey !== null) ls.removeItem(prevKey);
-    if (id !== null) {
-      ls.setItem(insertedPackKey(id), JSON.stringify(pack));
+    if (id !== null && targetKey !== null) {
+      ls.setItem(targetKey, JSON.stringify(pack));
       ls.setItem(ACTIVE_PACK_ID_KEY, id);
     } else {
       ls.removeItem(ACTIVE_PACK_ID_KEY);
     }
   } catch (e) {
+    // Undo in reverse: the target's copy goes back to what it was (gone,
+    // unless it was already there), which frees the room the previous
+    // pack's copy needs to come back.
+    try {
+      if (targetKey !== null) {
+        if (targetRaw === null) ls.removeItem(targetKey);
+        else ls.setItem(targetKey, targetRaw);
+      }
+    } catch {
+      // it fitted a moment ago; nothing more to try
+    }
     try {
       if (prevKey !== null && prevRaw !== null) ls.setItem(prevKey, prevRaw);
     } catch {

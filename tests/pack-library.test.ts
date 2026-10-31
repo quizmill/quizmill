@@ -404,6 +404,90 @@ describe('inserted packs live in IndexedDB', () => {
     await migrateInsertedPacks();
     expect((await getInsertedPack('old-a'))?.manifest.id).toBe('old-a');
   });
+
+  it('a migration running while another pack is activated never drops the new mirror', async () => {
+    const entry = (id: string) => ({ id, title: id, description: '', themeColor: '#000', questionCount: 1, categoryCount: 1, insertedAt: 1 });
+    store.set(LIBRARY_INDEX_KEY, JSON.stringify([entry('old-a'), entry('old-b')]));
+    store.set(insertedPackKey('old-a'), JSON.stringify(validPack('old-a')));
+    store.set(insertedPackKey('old-b'), JSON.stringify(validPack('old-b')));
+    store.set(ACTIVE_PACK_ID_KEY, 'old-b');
+
+    await Promise.all([migrateInsertedPacks(), activatePack('old-a')]);
+
+    expect(getActivePackPointer()).toBe('old-a');
+    expect(JSON.parse(store.get(insertedPackKey('old-a'))!).manifest.id).toBe('old-a');
+  });
+
+  it('an update that only applies to a pack on the shelf does not bring back one ejected meanwhile', async () => {
+    await insertPack(validPack(), { buildPackId: BUILD_PACK_ID });
+    const [, updated] = await Promise.all([
+      ejectPack('capitals-mini'),
+      insertPack(validPack(), { buildPackId: BUILD_PACK_ID, onlyIfOnShelf: true }),
+    ]);
+    expect(updated).toMatchObject({ ok: false, reason: 'ejected' });
+    expect(listInsertedPacks()).toEqual([]);
+    expect(await getInsertedPack('capitals-mini')).toBeNull();
+  });
+
+  it('a re-insert made while IndexedDB was out wins over the older record once it is back', async () => {
+    const idb = new IDBFactory();
+    vi.stubGlobal('indexedDB', idb);
+    await insertPack(validPack(), { buildPackId: BUILD_PACK_ID });
+
+    vi.stubGlobal('indexedDB', undefined);
+    const updated = validPack();
+    updated.questions.push({ ...updated.questions[0], id: 'capitals-mini-europe-002' });
+    await insertPack(updated, { buildPackId: BUILD_PACK_ID });
+
+    vi.stubGlobal('indexedDB', idb);
+    expect((await getInsertedPack('capitals-mini'))?.questions).toHaveLength(2);
+    await migrateInsertedPacks();
+    expect(store.has(insertedPackKey('capitals-mini'))).toBe(false); // inactive: freed
+    expect((await getInsertedPack('capitals-mini'))?.questions).toHaveLength(2);
+  });
+
+  it('an update of the active pack whose mirror does not fit leaves every copy as it was', async () => {
+    await insertPack(bulkyPack('pack-a', 50), { buildPackId: BUILD_PACK_ID });
+    await activatePack('pack-a');
+    store.set('quizmill.pack-a.attempts.v1', 'y'.repeat(150 * 1024)); // progress fills the rest
+
+    const result = await insertPack(bulkyPack('pack-a', 200), { buildPackId: BUILD_PACK_ID });
+    expect(result.ok).toBe(false);
+    const stored = await getInsertedPack('pack-a');
+    expect(stored?.questions[0].explanation.length).toBeLessThan(100 * 1024);
+    expect(JSON.parse(store.get(insertedPackKey('pack-a'))!).questions[0].explanation.length).toBeLessThan(100 * 1024);
+  });
+
+  it('a switch whose pointer write fails takes the new mirror out and puts the old one back', async () => {
+    await insertPack(validPack('pack-a'), { buildPackId: BUILD_PACK_ID });
+    await insertPack(validPack('pack-b'), { buildPackId: BUILD_PACK_ID });
+    await activatePack('pack-a');
+    const ls = cappedStorage(600);
+    vi.stubGlobal('window', {
+      localStorage: {
+        ...ls,
+        setItem: (k: string, v: string) => {
+          if (k === ACTIVE_PACK_ID_KEY) throw new DOMException('full', 'QuotaExceededError');
+          ls.setItem(k, v);
+        },
+      },
+      dispatchEvent: () => true,
+    });
+
+    expect((await activatePack('pack-b')).ok).toBe(false);
+    expect(getActivePackPointer()).toBe('pack-a');
+    expect(store.has(insertedPackKey('pack-a'))).toBe(true);
+    expect(store.has(insertedPackKey('pack-b'))).toBe(false);
+  });
+
+  it('a switch abandoned before it commits changes nothing', async () => {
+    await insertPack(validPack('pack-a'), { buildPackId: BUILD_PACK_ID });
+    const controller = new AbortController();
+    const pending = activatePack('pack-a', { signal: controller.signal });
+    controller.abort();
+    expect(await pending).toMatchObject({ ok: false, cancelled: true });
+    expect(getActivePackPointer()).toBeNull();
+  });
 });
 
 describe('insertPack — reporting a failed write', () => {
