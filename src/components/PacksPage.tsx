@@ -292,13 +292,13 @@ export function PacksPage() {
     clearFeedback();
   }
 
-  function finishInsert(outcome: ParseOutcome, origin: string) {
+  async function finishInsert(outcome: ParseOutcome, origin: string) {
     setFeedbackSeq((n) => n + 1);
     if (!outcome.ok) {
       setErrors(outcome.errors);
       return;
     }
-    const result = insertPack(outcome.candidate, { origin, buildPackId: buildId });
+    const result = await insertPack(outcome.candidate, { origin, buildPackId: buildId });
     if (!result.ok) {
       setErrors(result.errors);
       return;
@@ -312,7 +312,7 @@ export function PacksPage() {
     refresh();
     // Prefetch the pack's images for offline practice — in the background,
     // the insert itself is already done.
-    const stored = getInsertedPack(result.entry.id);
+    const stored = await getInsertedPack(result.entry.id);
     if (stored) {
       void cachePackAssets(stored).then(({ total, cached }) => {
         if (total > 0 && cached > 0) {
@@ -336,7 +336,7 @@ export function PacksPage() {
       const files = await Promise.all(
         Array.from(list).map(async (f) => ({ name: f.name, text: await f.text() })),
       );
-      finishInsert(parsePackFiles(files), files.map((f) => f.name).join(', '));
+      await finishInsert(parsePackFiles(files), files.map((f) => f.name).join(', '));
     } finally {
       setBusy(null);
       if (fileInput.current) fileInput.current.value = '';
@@ -349,7 +349,7 @@ export function PacksPage() {
     if (busy !== null || !url.trim()) return;
     beginInsert('url');
     try {
-      finishInsert(await fetchPackFromUrl(url), url.trim());
+      await finishInsert(await fetchPackFromUrl(url), url.trim());
       setUrl('');
     } finally {
       setBusy(null);
@@ -361,28 +361,32 @@ export function PacksPage() {
     setBusyRepo(listing.repo);
     clearFeedback();
     try {
-      finishInsert(await fetchPackFromUrl(registryRepoUrl(listing)), registryRepoUrl(listing));
+      await finishInsert(await fetchPackFromUrl(registryRepoUrl(listing)), registryRepoUrl(listing));
     } finally {
       setBusyRepo(null);
     }
   }
 
-  function switchTo(id: string | null, title: string) {
-    if (!activatePack(id)) return;
+  async function switchTo(id: string | null, title: string) {
+    const activated = await activatePack(id);
+    if (!activated.ok) {
+      setMessage(`Couldn't switch to “${title}”: ${activated.error}.`);
+      return;
+    }
     setMessage(id === activeId ? `Reloading “${title}”…` : `Switching to “${title}”…`);
     // Any #pack= hash would outrank the pointer on reload — drop it first.
     window.history.replaceState(null, '', window.location.pathname + window.location.search);
     window.location.reload();
   }
 
-  function handleEject(entry: PackLibraryEntry) {
+  async function handleEject(entry: PackLibraryEntry) {
     const ok = window.confirm(
       `Eject “${entry.title}”?\n\nThe pack is removed from this device, but your progress for it is kept — insert the pack again and you'll pick up where you left off.${
         entry.id === activeId ? '\n\nIt is the active pack, so the app will switch back to the built-in pack.' : ''
       }`,
     );
     if (!ok) return;
-    const { wasActive } = ejectPack(entry.id);
+    const { wasActive } = await ejectPack(entry.id);
     if (wasActive) {
       window.location.reload();
       return;

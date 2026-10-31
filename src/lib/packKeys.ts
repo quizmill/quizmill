@@ -25,9 +25,20 @@ export const ACTIVE_PACK_ID_KEY = 'quizmill.activePackId';
 /** Index of inserted packs: JSON array of PackLibraryEntry metadata. */
 export const LIBRARY_INDEX_KEY = 'quizmill.packLibrary.index.v1';
 
+/** Ids of ejected packs whose IndexedDB record couldn't be deleted at the
+ *  time (JSON array); the next migration deletes them. */
+export const PENDING_DELETE_KEY = 'quizmill.packLibrary.pendingDelete.v1';
+
 const INSERTED_PACK_PREFIX = 'quizmill.packLibrary.pack.';
 
-/** Where an inserted pack's full ActivePack JSON is stored. */
+/**
+ * Where the ACTIVE inserted pack's full ActivePack JSON is mirrored for the
+ * synchronous boot. Every inserted pack lives in IndexedDB
+ * (src/lib/packStore.ts); only the one the pointer names is copied here,
+ * because localStorage is small (~5 MB per origin, counted in UTF-16, so a
+ * pack costs about twice its JSON size) and shared with all progress.
+ * Without IndexedDB every inserted pack falls back to living here.
+ */
 export function insertedPackKey(id: string): string {
   return `${INSERTED_PACK_PREFIX}${id}.v1`;
 }

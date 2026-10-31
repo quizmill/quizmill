@@ -2,12 +2,18 @@
  * The pack library — insert, eject, and swap learning packs at runtime,
  * so one installed app can play many packs (one active at a time).
  *
- * Inserted packs live wholesale in localStorage (`insertedPackKey(id)`)
- * with a small metadata index (`LIBRARY_INDEX_KEY`) so listing doesn't
- * parse every question bank. Activation writes only a POINTER
- * (`ACTIVE_PACK_ID_KEY`); the inline bootstrap in layout.tsx and
- * `src/pack/runtime.ts` resolve it to the stored pack before the engine
- * bundle evaluates, and a reload rebinds the whole app to it.
+ * Inserted packs live in IndexedDB (src/lib/packStore.ts) with a small
+ * metadata index in localStorage (`LIBRARY_INDEX_KEY`) so listing stays
+ * synchronous and doesn't parse every question bank. Activation writes a
+ * POINTER (`ACTIVE_PACK_ID_KEY`) and mirrors that one pack into
+ * localStorage (`insertedPackKey(id)`): the inline bootstrap in layout.tsx
+ * and `src/pack/runtime.ts` resolve the pointer to the mirror synchronously
+ * before the engine bundle evaluates, and a reload rebinds the whole app
+ * to it. Only the active pack is mirrored — localStorage is ~5 MB per
+ * origin, shared with all progress, and two or three packs filled it.
+ * Without IndexedDB (some private modes) packs fall back to living in
+ * localStorage, as they all did before; `migrateInsertedPacks` moves
+ * those over once it is there.
  *
  * Progress is untouched by all of this: every store is already namespaced
  * `quizmill.<packId>.*`, so each pack's sessions/attempts/stickers wait
@@ -19,11 +25,20 @@
  */
 import { validatePack } from '../../tools/pack/schema';
 import { dropPackAssets } from '@/lib/packAssets';
+import {
+  deleteStoredPack,
+  isQuotaError,
+  packStoreAvailable,
+  readStoredPack,
+  storageErrorMessage,
+  writeStoredPack,
+} from '@/lib/packStore';
 import type { ActivePack } from '@/pack/runtime';
 import {
   ACTIVE_PACK_ID_KEY,
   HANDOFF_PACK_KEY,
   LIBRARY_INDEX_KEY,
+  PENDING_DELETE_KEY,
   insertedPackKey,
 } from './packKeys';
 
@@ -50,11 +65,15 @@ export interface PackLibraryEntry {
   /** The unlock endpoint base a licence-key pack was fetched from, so the
    *  daily update check asks the same place. Absent for other inserts. */
   unlockUrl?: string;
+  /** Set when the pack was (re-)inserted while IndexedDB was out: the
+   *  localStorage copy is the newer one, whatever IndexedDB still holds,
+   *  until `migrateInsertedPacks` moves it over. */
+  localOnly?: true;
 }
 
 export type InsertResult =
   | { ok: true; entry: PackLibraryEntry }
-  | { ok: false; errors: string[] };
+  | { ok: false; errors: string[]; reason?: 'ejected' | 'cancelled' };
 
 function browser(): boolean {
   return typeof window !== 'undefined';
@@ -62,6 +81,21 @@ function browser(): boolean {
 
 function emit(): void {
   window.dispatchEvent(new Event(PACK_LIBRARY_EVENT));
+}
+
+// Library mutations run one at a time: each spans several awaits (IndexedDB)
+// and reads state another one changes — an update must not land after an
+// eject, a migration must not drop a mirror an activation just wrote.
+let queue: Promise<unknown> = Promise.resolve();
+
+function serial<T>(op: () => Promise<T>): Promise<T> {
+  const run = queue.then(op, op);
+  queue = run.catch(() => undefined);
+  return run;
+}
+
+function entryFor(id: string): PackLibraryEntry | undefined {
+  return readIndex().find((e) => e.id === id);
 }
 
 function readIndex(): PackLibraryEntry[] {
@@ -85,15 +119,34 @@ function writeIndex(entries: PackLibraryEntry[]): void {
   window.localStorage.setItem(LIBRARY_INDEX_KEY, JSON.stringify(entries));
 }
 
+function readPendingDeletes(): string[] {
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(PENDING_DELETE_KEY) ?? '[]');
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePendingDeletes(ids: string[]): void {
+  if (ids.length > 0) window.localStorage.setItem(PENDING_DELETE_KEY, JSON.stringify(ids));
+  else window.localStorage.removeItem(PENDING_DELETE_KEY);
+}
+
 /** All inserted packs, newest first. */
 export function listInsertedPacks(): PackLibraryEntry[] {
   if (!browser()) return [];
   return readIndex().sort((a, b) => b.insertedAt - a.insertedAt);
 }
 
-/** The full content of one inserted pack, or null when absent/corrupt. */
-export function getInsertedPack(id: string): ActivePack | null {
-  if (!browser()) return null;
+/** Whether a pack is on the shelf — the index, read synchronously. */
+export function hasInsertedPack(id: string): boolean {
+  return browser() && readIndex().some((e) => e.id === id);
+}
+
+/** The localStorage copy of a pack (the active mirror, or a pack kept
+ *  there by an older build or a device without IndexedDB). */
+function readLocalPack(id: string): ActivePack | null {
   try {
     const raw = window.localStorage.getItem(insertedPackKey(id));
     if (!raw) return null;
@@ -102,6 +155,69 @@ export function getInsertedPack(id: string): ActivePack | null {
   } catch {
     return null;
   }
+}
+
+/** The full content of one inserted pack, or null when absent/corrupt or
+ *  off the shelf (an eject IndexedDB refused can leave a record behind). */
+export async function getInsertedPack(id: string): Promise<ActivePack | null> {
+  if (!browser()) return null;
+  const entry = entryFor(id);
+  if (!entry) return null;
+  const newer = entry.localOnly ? readLocalPack(id) : null;
+  return newer ?? (await readStoredPack(id)) ?? readLocalPack(id);
+}
+
+/**
+ * Move packs that live in localStorage (inserted by an older build, or
+ * while IndexedDB was out) into IndexedDB and free their localStorage
+ * copy — all but the active pack's, which the synchronous boot reads.
+ * Idempotent and safe to call on every load; does nothing where IndexedDB
+ * is unavailable. A pack is only ever removed from localStorage once
+ * IndexedDB holds it.
+ */
+export function migrateInsertedPacks(): Promise<void> {
+  return serial(migrate);
+}
+
+async function migrate(): Promise<void> {
+  if (!browser() || !(await packStoreAvailable())) return;
+  for (const { id, localOnly } of readIndex()) {
+    const local = readLocalPack(id);
+    if (!local) continue;
+    try {
+      if (localOnly || !(await readStoredPack(id))) await writeStoredPack(id, local);
+      if (localOnly) {
+        writeIndex(readIndex().map((e) => (e.id === id ? withoutLocalOnly(e) : e)));
+      }
+      // Read the pointer now, not before the awaits: another tab may have
+      // made this pack active meanwhile, and the boot needs its copy.
+      if (id !== getActivePackPointer()) window.localStorage.removeItem(insertedPackKey(id));
+    } catch {
+      // IndexedDB refused it — the localStorage copy stays, nothing lost
+    }
+  }
+  // Records of ejected packs IndexedDB wouldn't delete at the time.
+  const pending = readPendingDeletes();
+  if (pending.length === 0) return;
+  const left: string[] = [];
+  for (const id of pending) {
+    if (hasInsertedPack(id)) continue; // inserted again since
+    try {
+      await deleteStoredPack(id);
+    } catch {
+      left.push(id);
+    }
+  }
+  try {
+    writePendingDeletes(left);
+  } catch {
+    // tried again next time
+  }
+}
+
+function withoutLocalOnly(entry: PackLibraryEntry): PackLibraryEntry {
+  const { localOnly: _, ...rest } = entry;
+  return rest;
 }
 
 /** The inserted-pack id the app is pointed at, or null (build-time pack). */
@@ -149,11 +265,22 @@ function embeddedAssets(raw: unknown): Record<string, string> | undefined {
  * `packVersion` overrides the version the bundle envelope carries (the
  * unlock path passes the endpoint's ETag); `unlockUrl` is kept only when
  * given, so a later file insert of the same pack simply forgets it.
+ * `onlyIfOnShelf` makes it an update that is dropped (`reason: 'ejected'`)
+ * when the pack has left the shelf by the time it would be written;
+ * `signal` abandons the insert (`reason: 'cancelled'`) if it fires before
+ * anything is written.
  */
-export function insertPack(
+export async function insertPack(
   raw: unknown,
-  opts: { origin?: string; buildPackId: string; packVersion?: string; unlockUrl?: string },
-): InsertResult {
+  opts: {
+    origin?: string;
+    buildPackId: string;
+    packVersion?: string;
+    unlockUrl?: string;
+    onlyIfOnShelf?: boolean;
+    signal?: AbortSignal;
+  },
+): Promise<InsertResult> {
   if (!browser()) return { ok: false, errors: ['not in a browser'] };
   if (typeof raw !== 'object' || raw === null) {
     return { ok: false, errors: ['not a pack: expected a JSON object with "manifest" and "questions"'] };
@@ -210,18 +337,80 @@ export function insertPack(
     ...(packVersion ? { packVersion } : {}),
     ...(opts.unlockUrl ? { unlockUrl: opts.unlockUrl } : {}),
   };
-  try {
-    window.localStorage.setItem(insertedPackKey(entry.id), JSON.stringify(pack));
-    writeIndex([...readIndex().filter((e) => e.id !== entry.id), entry]);
-  } catch {
-    // Almost certainly QuotaExceededError — the pack didn't fit.
-    return {
-      ok: false,
-      errors: ['not enough storage space on this device — eject a pack you no longer use and try again'],
-    };
+  const stored = await serial(() => storePack(entry, pack, opts));
+  if (!stored.ok) return stored;
+  // Ask the browser not to evict a pack unlocked with a licence key under
+  // storage pressure — best effort, the answer doesn't change anything here.
+  if (opts.unlockUrl && typeof navigator !== 'undefined') {
+    void navigator.storage?.persist?.().catch(() => false);
   }
   emit();
   return { ok: true, entry };
+}
+
+/** The write half of `insertPack`, run under `serial`. All or nothing: a
+ *  write that fails puts every copy back as it was, so a failed update
+ *  leaves the previous content whole (and a retry compares against it). */
+async function storePack(
+  entry: PackLibraryEntry,
+  pack: ActivePack,
+  opts: { onlyIfOnShelf?: boolean; signal?: AbortSignal },
+): Promise<{ ok: true } | { ok: false; errors: string[]; reason?: 'ejected' | 'cancelled' }> {
+  const key = insertedPackKey(entry.id);
+  let ls: Storage | null = null;
+  let inStore = false;
+  let prevStored: ActivePack | null = null;
+  let wroteStore = false;
+  let prevLocal: string | null | undefined; // undefined: not read, nothing written
+  try {
+    // Merely touching localStorage throws where the browser blocks storage.
+    ls = window.localStorage;
+    // Free localStorage of packs an older build kept there before adding one.
+    await migrate();
+    inStore = await packStoreAvailable();
+    prevStored = inStore ? await readStoredPack(entry.id) : null;
+    // Last checks before the first write — nothing awaits after them
+    // until IndexedDB has the pack.
+    if (opts.onlyIfOnShelf && !hasInsertedPack(entry.id)) {
+      return { ok: false, errors: [`"${entry.id}" is no longer on the shelf`], reason: 'ejected' };
+    }
+    if (opts.signal?.aborted) return { ok: false, errors: ['cancelled'], reason: 'cancelled' };
+    prevLocal = ls.getItem(key);
+    if (inStore) {
+      await writeStoredPack(entry.id, pack);
+      wroteStore = true;
+    }
+    // The active pack's mirror follows its update; without IndexedDB,
+    // localStorage is the only home a pack has.
+    if (!inStore || getActivePackPointer() === entry.id) ls.setItem(key, JSON.stringify(pack));
+    writeIndex([
+      ...readIndex().filter((e) => e.id !== entry.id),
+      inStore ? entry : { ...entry, localOnly: true },
+    ]);
+    // Back on the shelf: a deletion an earlier eject left pending must not
+    // take this record.
+    const pending = readPendingDeletes();
+    if (pending.includes(entry.id)) writePendingDeletes(pending.filter((p) => p !== entry.id));
+    return { ok: true };
+  } catch (e) {
+    try {
+      if (wroteStore) {
+        if (prevStored) await writeStoredPack(entry.id, prevStored);
+        else await deleteStoredPack(entry.id);
+      }
+    } catch {
+      // the old record can't be put back; reads then see the new one
+    }
+    try {
+      if (ls !== null) {
+        if (prevLocal === null) ls.removeItem(key);
+        else if (prevLocal !== undefined && ls.getItem(key) !== prevLocal) ls.setItem(key, prevLocal);
+      }
+    } catch {
+      // it fitted a moment ago; nothing more to try
+    }
+    return { ok: false, errors: [storageErrorMessage(e)] };
+  }
 }
 
 /**
@@ -231,34 +420,119 @@ export function insertPack(
  * Ejecting the ACTIVE pack clears the pointer — the app falls back to the
  * build-time pack on next load. Returns whether a reload is needed.
  */
-export function ejectPack(id: string): { wasActive: boolean } {
+export async function ejectPack(id: string): Promise<{ wasActive: boolean }> {
   if (!browser()) return { wasActive: false };
-  const wasActive = getActivePackPointer() === id;
+  return serial(() => removePack(id));
+}
+
+async function removePack(id: string): Promise<{ wasActive: boolean }> {
   // Capture the pack before removal so its offline-cached images can be
-  // dropped too (fire-and-forget — eject stays synchronous).
-  const pack = getInsertedPack(id);
+  // dropped too (fire-and-forget).
+  const pack = await getInsertedPack(id);
   if (pack) void dropPackAssets(pack);
-  window.localStorage.removeItem(insertedPackKey(id));
+  let dropped = true;
+  try {
+    await deleteStoredPack(id);
+  } catch {
+    dropped = false;
+  }
+  const ls = window.localStorage;
+  // IndexedDB refused: the pack still leaves the shelf (reads go through
+  // the index, so the record is never served) and the next migration
+  // deletes it.
+  if (!dropped) writePendingDeletes([...readPendingDeletes().filter((p) => p !== id), id]);
+  ls.removeItem(insertedPackKey(id));
   writeIndex(readIndex().filter((e) => e.id !== id));
-  if (wasActive) window.localStorage.removeItem(ACTIVE_PACK_ID_KEY);
+  // Read the pointer after the awaits: another tab may have switched away.
+  const wasActive = getActivePackPointer() === id;
+  if (wasActive) ls.removeItem(ACTIVE_PACK_ID_KEY);
   emit();
   return { wasActive };
 }
 
+export type ActivateResult = { ok: true } | { ok: false; error: string; cancelled?: true };
+
 /**
  * Point the app at an inserted pack (or back at the build-time pack with
- * `null`). Only writes the pointer — the caller reloads the page so every
- * module rebinds to the new pack. Clears any external handoff blob
- * (`HANDOFF_PACK_KEY`), which would otherwise outrank the pointer.
+ * `null`): writes the pointer and moves the localStorage mirror the boot
+ * reads from the previous pack to this one — the old copy goes FIRST, so
+ * two big packs never have to fit side by side, and comes back if the new
+ * one doesn't fit. The caller reloads the page so every module rebinds to
+ * the new pack. Clears any external handoff blob (`HANDOFF_PACK_KEY`),
+ * which would otherwise outrank the pointer — before the new copy, like
+ * the previous mirror, and back if the switch fails. `signal` abandons the
+ * switch (`cancelled: true`) if it fires before anything is written.
+ * Never rejects: a storage failure comes back as `{ ok: false, error }`.
  */
-export function activatePack(id: string | null): boolean {
-  if (!browser()) return false;
-  if (id !== null && getInsertedPack(id) === null) return false;
-  if (id === null) window.localStorage.removeItem(ACTIVE_PACK_ID_KEY);
-  else window.localStorage.setItem(ACTIVE_PACK_ID_KEY, id);
-  window.localStorage.removeItem(HANDOFF_PACK_KEY);
+export async function activatePack(
+  id: string | null,
+  opts: { signal?: AbortSignal } = {},
+): Promise<ActivateResult> {
+  if (!browser()) return { ok: false, error: 'not in a browser' };
+  return serial(() =>
+    pointAt(id, opts.signal).catch((e: unknown): ActivateResult => ({ ok: false, error: storageErrorMessage(e) })),
+  );
+}
+
+async function pointAt(id: string | null, signal: AbortSignal | undefined): Promise<ActivateResult> {
+  // First, so storage the browser blocks is reported as such, not as a
+  // missing pack.
+  const ls = window.localStorage;
+  await migrate();
+  const pack = id === null ? null : await getInsertedPack(id);
+  if (id !== null && pack === null) return { ok: false, error: `"${id}" is not on this device` };
+
+  const previous = getActivePackPointer();
+  // Only a copy IndexedDB also holds (and holds current) may go —
+  // otherwise it is the pack.
+  const prevKey =
+    previous && previous !== id && !entryFor(previous)?.localOnly && (await readStoredPack(previous))
+      ? insertedPackKey(previous)
+      : null;
+  // The last await is behind us: from here to the end nothing yields.
+  if (signal?.aborted) return { ok: false, error: 'cancelled', cancelled: true };
+  const prevRaw = prevKey === null ? null : ls.getItem(prevKey);
+  const targetKey = id === null ? null : insertedPackKey(id);
+  const targetRaw = targetKey === null ? null : ls.getItem(targetKey);
+  const handoffRaw = ls.getItem(HANDOFF_PACK_KEY);
+  try {
+    if (prevKey !== null) ls.removeItem(prevKey);
+    ls.removeItem(HANDOFF_PACK_KEY);
+    if (id !== null && targetKey !== null) {
+      ls.setItem(targetKey, JSON.stringify(pack));
+      ls.setItem(ACTIVE_PACK_ID_KEY, id);
+    } else {
+      ls.removeItem(ACTIVE_PACK_ID_KEY);
+    }
+  } catch (e) {
+    // Undo in reverse: the target's copy goes back to what it was (gone,
+    // unless it was already there), which frees the room the previous
+    // pack's copy needs to come back.
+    try {
+      if (targetKey !== null) {
+        if (targetRaw === null) ls.removeItem(targetKey);
+        else ls.setItem(targetKey, targetRaw);
+      }
+    } catch {
+      // it fitted a moment ago; nothing more to try
+    }
+    try {
+      if (prevKey !== null && prevRaw !== null) ls.setItem(prevKey, prevRaw);
+      if (handoffRaw !== null) ls.setItem(HANDOFF_PACK_KEY, handoffRaw);
+    } catch {
+      // it fitted a moment ago; nothing more to try
+    }
+    // Ejecting other packs frees nothing here (they live in IndexedDB):
+    // the copy has to fit beside the saved progress.
+    return {
+      ok: false,
+      error: isQuotaError(e)
+        ? 'not enough storage space on this device to open this pack next to your saved progress'
+        : storageErrorMessage(e),
+    };
+  }
   emit();
-  return true;
+  return { ok: true };
 }
 
 /** Saved-progress summary for any pack id, active or not — read straight

@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { UpgradeClaimCheck, watchUpgradeClaims } from '@/components/UpgradeClaimCheck';
-import { insertedPackKey } from '@/lib/packKeys';
+import { LIBRARY_INDEX_KEY } from '@/lib/packKeys';
 import { CLAIM_POLL_MS, CLAIM_WINDOW_MS, readClaims, startClaim } from '@/lib/upgradeClaim';
 import { openUnlockedPack, unlockPack } from '@/lib/unlock';
 
@@ -273,7 +273,8 @@ describe('UpgradeClaimCheck', () => {
 
   it('leaves a pack that is already unlocked alone', async () => {
     startClaim(PACK, UPGRADE);
-    localStorage.setItem(insertedPackKey('solar-system-full'), '{}');
+    // On the shelf = in the library index (the content itself is in IndexedDB).
+    localStorage.setItem(LIBRARY_INDEX_KEY, JSON.stringify([{ id: 'solar-system-full', title: 'Full' }]));
     await mount();
     await advance(CLAIM_POLL_MS);
     expect(fetchMock).not.toHaveBeenCalled();
