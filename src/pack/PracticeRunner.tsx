@@ -160,14 +160,15 @@ export function PackPracticeRunner(props: Props) {
     if (!mounted || state) return;
     // A paper may span categories, so its history is not narrowed by one.
     const history = attemptHistory(attempts, categoryKey);
-    // A paper is sat WHOLE — every question, however many — where a
-    // category round is the usual ten.
-    const picked = pickSessionFromBank(
-      bank,
-      history,
-      undefined,
-      paperKey !== undefined ? bank.length : QUESTION_COUNT,
-    );
+    // A paper is sat WHOLE and in bank order — its own order, as printed
+    // and numbered, with scenario questions together (#261) — where a
+    // category round is the usual ten, history-weighted and shuffled.
+    const picked =
+      paperKey !== undefined
+        ? bank.length > 0
+          ? bank
+          : null
+        : pickSessionFromBank(bank, history, undefined, QUESTION_COUNT);
     if (picked === null) {
       setOutOfQuestions(true);
       return;
