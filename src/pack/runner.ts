@@ -7,7 +7,8 @@
 import { APP_BUILD } from '@/config';
 import type { Attempt, Session, SessionMode } from '@/data/types';
 import { pickSessionQuestions, type AttemptSummary } from '@/lib/selection';
-import { correctKeysOf, type OptionKey, type PackQuestion } from '@/pack/data';
+import { loadLevelFilter } from '@/lib/storage';
+import { correctKeysOf, packLevelKeys, type OptionKey, type PackQuestion } from '@/pack/data';
 
 export const QUESTION_COUNT = 10;
 
@@ -92,6 +93,23 @@ export function filterByLevel(
 ): PackQuestion[] {
   if (!level) return bank;
   return bank.filter((q) => q.level === level);
+}
+
+/** A saved level filter, or null ("All") when the pack doesn't have that
+ *  level (any more): a pack that drops a level must not leave a learner who
+ *  picked it filtering the bank down to nothing — with one level left, Home
+ *  hides the row they'd need to clear it (#260). */
+export function knownLevel(
+  level: string | null | undefined,
+  levelKeys: readonly string[],
+): string | null {
+  return level && levelKeys.includes(level) ? level : null;
+}
+
+/** The learner's level filter, checked against the active pack's levels.
+ *  Every screen that filters by level reads it through here. */
+export function loadPackLevelFilter(): string | null {
+  return knownLevel(loadLevelFilter(), packLevelKeys);
 }
 
 /**
