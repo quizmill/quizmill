@@ -312,8 +312,9 @@ export async function fetchUnlockBundle(
  *
  * `signal` lets the caller abandon a request it no longer wants (a newer
  * key arrived while this one was still being answered): once aborted,
- * nothing is inserted, activated, kept or recorded, whatever the
- * endpoint eventually says.
+ * nothing is inserted, activated or recorded, whatever the endpoint
+ * eventually says — except that an insert already landing when the signal
+ * fired keeps its key, like any pack on the shelf.
  */
 export async function unlockPack(
   key: string,
@@ -367,6 +368,10 @@ export async function unlockPack(
     ...(fetched.version ? { packVersion: fetched.version } : {}),
     signal,
   });
+  // The key is kept as soon as the pack is on the shelf — before it is
+  // opened, and even when the caller gave up while the insert was landing:
+  // a pack that is in (opened or not) still gets its updates.
+  if (inserted.ok) keepKey(inserted.entry.id, key);
   if (signal?.aborted) return CANCELLED;
   if (!inserted.ok) {
     const storage = inserted.errors.some(isStorageErrorMessage);
@@ -379,20 +384,6 @@ export async function unlockPack(
   }
 
   const { entry } = inserted;
-  // The key is kept as soon as the pack is on the shelf, before it is
-  // opened: a pack that can't be made active still gets its updates.
-  try {
-    window.localStorage.setItem(licenceKeyStorageKey(entry.id), key);
-    // The bundle was fetched just now, so the daily update check counts
-    // this as today's look — and a key entered again lifts a refusal the
-    // check may have hit (src/lib/packUpdates.ts).
-    window.localStorage.setItem(
-      updateCheckStorageKey(entry.id),
-      JSON.stringify({ checkedAt: Date.now() }),
-    );
-  } catch {
-    // the pack is in; a key that can't be kept just means typing it again
-  }
   // The pack is on the shelf even when it can't be made active (no room
   // left in localStorage for the copy the boot reads) — say why.
   const activated = await activatePack(entry.id, { signal });
@@ -400,6 +391,21 @@ export async function unlockPack(
   if (!activated.ok) return fail('storage', activated.error, entry.id, [activated.error]);
   recordEvent('pack_unlocked', { pack: entry.id });
   return { ok: true, entry };
+}
+
+function keepKey(packId: string, key: string): void {
+  try {
+    window.localStorage.setItem(licenceKeyStorageKey(packId), key);
+    // The bundle was fetched just now, so the daily update check counts
+    // this as today's look — and a key entered again lifts a refusal the
+    // check may have hit (src/lib/packUpdates.ts).
+    window.localStorage.setItem(
+      updateCheckStorageKey(packId),
+      JSON.stringify({ checkedAt: Date.now() }),
+    );
+  } catch {
+    // the pack is in; a key that can't be kept just means typing it again
+  }
 }
 
 export interface UnlockedToast {

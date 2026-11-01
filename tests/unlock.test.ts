@@ -473,6 +473,10 @@ describe('unlockPack', () => {
     expect(r).toEqual({ ok: false, reason: 'cancelled', message: '' });
     expect(getActivePackPointer()).toBeNull();
     expect(loadEvents()).toEqual([]);
+    // The insert had already landed: the pack is on the shelf, and its key
+    // stays with it so updates still reach it.
+    expect(listInsertedPacks().map((e) => e.id)).toEqual(['solar-system-full']);
+    expect(storage.getItem(licenceKeyStorageKey('solar-system-full'))).toBe(KEY);
   });
 
   it('keeps the key for a pack that went on the shelf even when it could not be opened', async () => {

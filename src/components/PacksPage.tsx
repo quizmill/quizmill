@@ -292,13 +292,16 @@ export function PacksPage() {
     clearFeedback();
   }
 
+  // Bumped with the feedback itself, never ahead of it: a slow (IndexedDB)
+  // insert would otherwise scroll while no panel is there to scroll to.
   async function finishInsert(outcome: ParseOutcome, origin: string) {
-    setFeedbackSeq((n) => n + 1);
     if (!outcome.ok) {
+      setFeedbackSeq((n) => n + 1);
       setErrors(outcome.errors);
       return;
     }
     const result = await insertPack(outcome.candidate, { origin, buildPackId: buildId });
+    setFeedbackSeq((n) => n + 1);
     if (!result.ok) {
       setErrors(result.errors);
       return;
