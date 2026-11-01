@@ -29,6 +29,10 @@ export const LIBRARY_INDEX_KEY = 'quizmill.packLibrary.index.v1';
  *  time (JSON array); the next migration deletes them. */
 export const PENDING_DELETE_KEY = 'quizmill.packLibrary.pendingDelete.v1';
 
+/** Web Locks name every library mutation holds, so two tabs of the app
+ *  never interleave their reads and writes of the shared stores. */
+export const PACK_LIBRARY_LOCK = 'quizmill.packLibrary';
+
 const INSERTED_PACK_PREFIX = 'quizmill.packLibrary.pack.';
 
 /**

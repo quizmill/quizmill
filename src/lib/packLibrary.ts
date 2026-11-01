@@ -38,6 +38,7 @@ import {
   ACTIVE_PACK_ID_KEY,
   HANDOFF_PACK_KEY,
   LIBRARY_INDEX_KEY,
+  PACK_LIBRARY_LOCK,
   PENDING_DELETE_KEY,
   insertedPackKey,
 } from './packKeys';
@@ -85,11 +86,17 @@ function emit(): void {
 
 // Library mutations run one at a time: each spans several awaits (IndexedDB)
 // and reads state another one changes — an update must not land after an
-// eject, a migration must not drop a mirror an activation just wrote.
+// eject, a migration must not drop a mirror an activation just wrote. Both
+// stores are shared by every tab of the app, so each mutation also holds an
+// origin-wide Web Lock; where the browser has none (pre-15.4 Safari) only
+// this tab's mutations are ordered, and the re-reads after each await below
+// (the pointer, shelf membership) are what's left between tabs.
 let queue: Promise<unknown> = Promise.resolve();
 
 function serial<T>(op: () => Promise<T>): Promise<T> {
-  const run = queue.then(op, op);
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+  const locked = locks ? () => locks.request(PACK_LIBRARY_LOCK, op) : op;
+  const run = queue.then(locked, locked);
   queue = run.catch(() => undefined);
   return run;
 }
@@ -388,9 +395,14 @@ async function storePack(
       inStore ? entry : { ...entry, localOnly: true },
     ]);
     // Back on the shelf: a deletion an earlier eject left pending must not
-    // take this record.
-    const pending = readPendingDeletes();
-    if (pending.includes(entry.id)) writePendingDeletes(pending.filter((p) => p !== entry.id));
+    // take this record. Best effort — the pack is in, and the migration
+    // skips a pending id that is on the shelf anyway.
+    try {
+      const pending = readPendingDeletes();
+      if (pending.includes(entry.id)) writePendingDeletes(pending.filter((p) => p !== entry.id));
+    } catch {
+      // left for the migration to skip
+    }
     return { ok: true };
   } catch (e) {
     try {
@@ -437,15 +449,22 @@ async function removePack(id: string): Promise<{ wasActive: boolean }> {
     dropped = false;
   }
   const ls = window.localStorage;
-  // IndexedDB refused: the pack still leaves the shelf (reads go through
-  // the index, so the record is never served) and the next migration
-  // deletes it.
-  if (!dropped) writePendingDeletes([...readPendingDeletes().filter((p) => p !== id), id]);
   ls.removeItem(insertedPackKey(id));
   writeIndex(readIndex().filter((e) => e.id !== id));
   // Read the pointer after the awaits: another tab may have switched away.
   const wasActive = getActivePackPointer() === id;
   if (wasActive) ls.removeItem(ACTIVE_PACK_ID_KEY);
+  // IndexedDB refused: the pack has still left the shelf (reads go through
+  // the index, so the record is never served) and the next migration
+  // deletes it — if there is room to note it; that note is the last thing,
+  // so a full localStorage can't stop the eject itself.
+  if (!dropped) {
+    try {
+      writePendingDeletes([...readPendingDeletes().filter((p) => p !== id), id]);
+    } catch {
+      // the record lingers unserved until the pack is inserted again
+    }
+  }
   emit();
   return { wasActive };
 }

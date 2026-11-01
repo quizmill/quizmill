@@ -14,6 +14,8 @@ import {
   ACTIVE_PACK_ID_KEY,
   HANDOFF_PACK_KEY,
   LIBRARY_INDEX_KEY,
+  PACK_LIBRARY_LOCK,
+  PENDING_DELETE_KEY,
   insertedPackKey,
 } from '@/lib/packKeys';
 import { readStoredPack } from '@/lib/packStore';
@@ -570,6 +572,89 @@ describe('inserted packs live in IndexedDB', () => {
     await insertPack(validPack(), { buildPackId: BUILD_PACK_ID });
     await migrateInsertedPacks();
     expect((await getInsertedPack('capitals-mini'))?.manifest.id).toBe('capitals-mini');
+  });
+
+  it('a re-insert whose pending-delete cleanup fails is still a successful insert', async () => {
+    const idb = new IDBFactory();
+    vi.stubGlobal('indexedDB', idb);
+    await insertPack(validPack(), { buildPackId: BUILD_PACK_ID });
+    vi.stubGlobal('indexedDB', { open: () => { throw new DOMException('refused', 'UnknownError'); } });
+    await ejectPack('capitals-mini');
+    vi.stubGlobal('indexedDB', idb);
+    expect(store.get(PENDING_DELETE_KEY)).toContain('capitals-mini');
+    // A fake-indexeddb migration would clear the pending list first; the
+    // bookkeeping write that follows the insert is what fails here.
+    const ls = cappedStorage(600);
+    const refuse = () => { throw new DOMException('refused', 'UnknownError'); };
+    vi.stubGlobal('window', {
+      localStorage: {
+        ...ls,
+        setItem: (k: string, v: string) => (k === PENDING_DELETE_KEY ? refuse() : ls.setItem(k, v)),
+        removeItem: (k: string) => (k === PENDING_DELETE_KEY ? refuse() : ls.removeItem(k)),
+      },
+      dispatchEvent: () => true,
+    });
+    vi.stubGlobal('indexedDB', { open: () => { throw new DOMException('refused', 'UnknownError'); } });
+
+    const updated = validPack();
+    updated.questions.push({ ...updated.questions[0], id: 'capitals-mini-europe-002' });
+    expect(await insertPack(updated, { buildPackId: BUILD_PACK_ID })).toMatchObject({ ok: true });
+    expect(listInsertedPacks().map((e) => e.id)).toEqual(['capitals-mini']);
+    expect((await getInsertedPack('capitals-mini'))?.questions).toHaveLength(2);
+  });
+
+  it('an eject still leaves the shelf when localStorage has no room for the retry note', async () => {
+    await insertPack(validPack(), { buildPackId: BUILD_PACK_ID });
+    await activatePack('capitals-mini');
+    vi.stubGlobal('indexedDB', { open: () => { throw new DOMException('refused', 'UnknownError'); } });
+    const ls = cappedStorage(600);
+    vi.stubGlobal('window', {
+      localStorage: {
+        ...ls,
+        setItem: (k: string, v: string) => {
+          if (k === PENDING_DELETE_KEY) throw new DOMException('full', 'QuotaExceededError');
+          ls.setItem(k, v);
+        },
+      },
+      dispatchEvent: () => true,
+    });
+
+    expect(await ejectPack('capitals-mini')).toEqual({ wasActive: true });
+    expect(listInsertedPacks()).toEqual([]);
+    expect(store.has(insertedPackKey('capitals-mini'))).toBe(false);
+    expect(getActivePackPointer()).toBeNull();
+  });
+
+  it('waits for a library change another tab is making before making its own', async () => {
+    // A minimal origin-wide lock manager: one holder per name at a time.
+    const tails = new Map<string, Promise<unknown>>();
+    const requested: string[] = [];
+    vi.stubGlobal('navigator', {
+      locks: {
+        request: <T>(name: string, cb: () => Promise<T>): Promise<T> => {
+          requested.push(name);
+          const run = (tails.get(name) ?? Promise.resolve()).then(cb);
+          tails.set(name, run.catch(() => undefined));
+          return run;
+        },
+      },
+    });
+    // The other tab holds the lock until released.
+    let release!: () => void;
+    void (navigator as unknown as { locks: { request: (n: string, cb: () => Promise<void>) => Promise<void> } })
+      .locks.request(PACK_LIBRARY_LOCK, () => new Promise<void>((r) => { release = r; }));
+
+    const pending = insertPack(validPack(), { buildPackId: BUILD_PACK_ID });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(listInsertedPacks()).toEqual([]); // still waiting its turn
+
+    release();
+    expect(await pending).toMatchObject({ ok: true });
+    await ejectPack('capitals-mini');
+    await activatePack(null);
+    await migrateInsertedPacks();
+    expect(new Set(requested)).toEqual(new Set([PACK_LIBRARY_LOCK]));
+    expect(requested.length).toBe(5);
   });
 
   it('a switch abandoned before it commits changes nothing', async () => {
