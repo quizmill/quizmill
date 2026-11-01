@@ -50,6 +50,13 @@
       "url": "https://aws-clf.quizmill.dev"
     },
     {
+      "id": "aws-aif",
+      "title": "AWS AI Practitioner",
+      "description": "Unofficial practice for the AWS Certified AI Practitioner (AIF-C01) exam — AI and ML fundamentals, generative AI, applications of foundation models, responsible AI, and security and governance for AI on AWS. 200 original questions across the five exam domains in the blueprint's 20/24/28/14/14 mix, each grounded in the AWS documentation.",
+      "repo": "quizmill/pack-aws-aif",
+      "url": "https://aws-aif.quizmill.dev"
+    },
+    {
       "id": "music-theory",
       "title": "Music Theory Practice",
       "description": "Visual music-theory practice — read staves, key signatures, intervals and chords. 102 questions across five categories and three levels (Beginner → Advanced); 84 carry generated staff and keyboard diagrams, and four answer with images.",
