@@ -190,6 +190,35 @@ describe('PaperMarkPage', () => {
     expect(loadSessions()).toHaveLength(1);
   });
 
+  it('clears a matching row when its active chip is tapped again, keeping the other rows', async () => {
+    const m = packQuestions.find((x) => x.rows)!;
+    const sheet: PaperSheet = {
+      id: 'sheet-matching',
+      code: 'P-MATCH',
+      createdAt: Date.now() - 3_600_000,
+      categoryKey: m.categoryKey,
+      questionIds: [m.id],
+    };
+    savePaperSheet(sheet);
+    window.location.hash = `#sheet=${sheet.id}`;
+    await render(<PaperMarkPage />);
+
+    const [c1, c2] = m.choices!;
+    const chip = (row: number, text: string) =>
+      q(`[aria-label="Question 1, row ${row}: ${text}"]`);
+    await click(chip(1, c1.text));
+    await click(chip(2, c2.text));
+    expect(chip(1, c1.text).getAttribute('aria-pressed')).toBe('true');
+
+    await click(chip(1, c1.text));
+    expect(chip(1, c1.text).getAttribute('aria-pressed')).toBe('false');
+    expect(chip(2, c2.text).getAttribute('aria-pressed')).toBe('true');
+
+    // Clearing the last pick leaves the question blank again.
+    await click(chip(2, c2.text));
+    expect(q('[data-testid="mark-row-1"]').getAttribute('data-status')).toBe('blank');
+  });
+
   it('celebrates the saved score in proportion to it', async () => {
     const sheet = demoSheet();
     savePaperSheet(sheet);

@@ -553,7 +553,14 @@ function MarkRow({
                       type="button"
                       aria-pressed={active}
                       aria-label={`Question ${index + 1}, row ${ri + 1}: ${c.text}`}
-                      onClick={() => onSelect(nextSelection(keys, matchPick(r.key, c.key), false))}
+                      onClick={() => {
+                        // Tapping the active chip clears that row only.
+                        const pick = matchPick(r.key, c.key);
+                        const next = active
+                          ? keys.filter((k) => k !== pick)
+                          : nextSelection(keys, pick, false);
+                        onSelect(next.length > 0 ? next : null);
+                      }}
                       className={cn(
                         'tap-feedback rounded-lg border px-2.5 py-1.5 text-sm font-semibold',
                         active
