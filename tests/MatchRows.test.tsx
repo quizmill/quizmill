@@ -76,4 +76,51 @@ describe('MatchRows', () => {
     expect(radios(second)[1].getAttribute('data-answer')).toBe('true');
     expect(radios(second).every((b) => b.disabled)).toBe(true);
   });
+
+  it('names the right choice for assistive tech in feedback, not by colour alone', async () => {
+    await render(['1=yes', '2=yes'], 'feedback');
+    const second = groups()[1];
+    expect(radios(second)[1].getAttribute('aria-label')).toBe('No (correct answer)');
+    expect(radios(second)[0].getAttribute('aria-label')).toBe('Yes');
+  });
+
+  it('gives each instance its own row ids, so two questions on one page never collide', async () => {
+    await act(async () => {
+      root = createRoot(container);
+      root.render(
+        <>
+          <MatchRows question={Q} selected={[]} stage="choosing" onSelect={() => {}} />
+          <MatchRows question={Q} selected={[]} stage="choosing" onSelect={() => {}} />
+        </>,
+      );
+    });
+    const ids = groups().map((g) => g.getAttribute('aria-labelledby')!);
+    expect(new Set(ids).size).toBe(4);
+    for (const [i, id] of ids.entries()) {
+      const label = container.querySelector(`[id="${id}"]`);
+      expect(label?.closest('[role="radiogroup"]')).toBe(groups()[i]);
+    }
+  });
+
+  it('is one tab stop per row, and arrow keys move the pick within the row', async () => {
+    const picks: AnswerKey[] = [];
+    await render(['2=no'], 'choosing', (k) => picks.push(k));
+    const [first, second] = groups();
+    // Nothing picked: the first choice is the tab stop. Picked: that choice.
+    expect(radios(first).map((b) => b.tabIndex)).toEqual([0, -1]);
+    expect(radios(second).map((b) => b.tabIndex)).toEqual([-1, 0]);
+
+    const key = (el: HTMLElement, k: string) =>
+      act(async () => {
+        el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
+      });
+    await key(radios(first)[0], 'ArrowRight');
+    expect(picks).toEqual(['1=no']);
+    expect(document.activeElement).toBe(radios(first)[1]);
+    // Wraps around at either end.
+    await key(radios(second)[1], 'ArrowDown');
+    expect(picks.at(-1)).toBe('2=yes');
+    await key(radios(second)[0], 'ArrowLeft');
+    expect(picks.at(-1)).toBe('2=no');
+  });
 });

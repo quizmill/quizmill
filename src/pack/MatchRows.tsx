@@ -1,3 +1,4 @@
+import { useId, type KeyboardEvent } from 'react';
 import { Check, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { McqMarkdown } from '@/components/McqMarkdown';
@@ -33,10 +34,29 @@ export function MatchRows({
   stage: 'choosing' | 'feedback';
   onSelect: (key: AnswerKey) => void;
 }) {
+  // Per instance: Coach shows several matching questions on one page, and
+  // row keys ("1", "2", …) repeat across them.
+  const idBase = useId();
   const rows = question.rows ?? [];
   const choices = question.choices ?? [];
   const picks = matchPicksOf(selected);
   const feedback = stage === 'feedback';
+
+  /** Radio-group keys: arrows move (and pick) within the row, wrapping. */
+  function onKeyDown(e: KeyboardEvent<HTMLButtonElement>, row: string, ci: number) {
+    const step =
+      e.key === 'ArrowRight' || e.key === 'ArrowDown'
+        ? 1
+        : e.key === 'ArrowLeft' || e.key === 'ArrowUp'
+          ? -1
+          : 0;
+    if (step === 0 || choices.length === 0) return;
+    e.preventDefault();
+    const ni = (ci + step + choices.length) % choices.length;
+    onSelect(matchPick(row, choices[ni].key));
+    const group = e.currentTarget.closest('[role="radiogroup"]');
+    group?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[ni]?.focus();
+  }
 
   return (
     <div className="flex flex-col gap-2.5" data-testid="match-rows">
@@ -44,11 +64,14 @@ export function MatchRows({
         const picked = picks[row.key];
         const answer = question.correctMatch?.[row.key];
         const rowCorrect = picked !== undefined && picked === answer;
+        const labelId = `${idBase}-row-${i}`;
+        // One tab stop per row: the picked choice, else the first.
+        const tabStop = choices.some((c) => c.key === picked) ? picked : choices[0]?.key;
         return (
           <div
             key={row.key}
             role="radiogroup"
-            aria-labelledby={`match-row-${row.key}`}
+            aria-labelledby={labelId}
             data-row-correct={feedback ? String(rowCorrect) : undefined}
             className={cn(
               'flex flex-col gap-2.5 rounded-xl border-2 bg-surface px-4 py-3 shadow-xs',
@@ -64,7 +87,7 @@ export function MatchRows({
                 {i + 1}
               </span>
               <div
-                id={`match-row-${row.key}`}
+                id={labelId}
                 className="flex-1 text-[15px] font-medium leading-relaxed text-ink-900"
               >
                 <McqMarkdown text={row.text} />
@@ -78,7 +101,7 @@ export function MatchRows({
               ) : null}
             </div>
             <div className={cn('grid gap-2', GRID[choices.length] ?? 'grid-cols-2')}>
-              {choices.map((c) => {
+              {choices.map((c, ci) => {
                 const isThis = picked === c.key;
                 const isAnswer = answer === c.key;
                 let visual = 'border-ink-200 bg-surface text-ink-700 hover:bg-ink-50 dark:hover:bg-ink-100';
@@ -95,9 +118,14 @@ export function MatchRows({
                     type="button"
                     role="radio"
                     aria-checked={isThis}
+                    // In feedback the right choice is otherwise shown by
+                    // colour alone; name it for screen readers too.
+                    aria-label={feedback ? (isAnswer ? `${c.text} (correct answer)` : c.text) : undefined}
                     data-answer={feedback ? String(isAnswer) : undefined}
                     disabled={feedback}
+                    tabIndex={c.key === tabStop ? 0 : -1}
                     onClick={() => onSelect(matchPick(row.key, c.key))}
+                    onKeyDown={(e) => onKeyDown(e, row.key, ci)}
                     className={cn(
                       'tap-feedback min-h-11 rounded-lg border-2 px-2 py-2 text-center text-sm font-semibold leading-snug transition focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-default',
                       visual,
