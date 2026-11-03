@@ -206,7 +206,7 @@ describe('PackHome category stats', () => {
 
     await render();
 
-    expect(categoryStatLine('Planets & Moons')).toContain('2/13 answered');
+    expect(categoryStatLine('Planets & Moons')).toContain('2/14 answered');
   });
 
   it('counts a re-answered question once, not per attempt (regression: "8/4")', async () => {
@@ -224,7 +224,7 @@ describe('PackHome category stats', () => {
 
     const line = categoryStatLine('Planets & Moons');
     // One distinct question answered, not two attempts.
-    expect(line).toContain('1/13 answered');
+    expect(line).toContain('1/14 answered');
     // Accuracy reflects the latest cold look (rescued → correct), and can
     // never read above 100%.
     expect(line).toContain('100% accuracy');
@@ -262,7 +262,7 @@ describe('PackHome timed exam tile', () => {
     expect(card!.getAttribute('href')).toBe('/practice/exam');
     expect(card!.textContent).toContain('Mock exam');
     // The demo declares exactly its 9 Advanced questions in 15 minutes.
-    expect(card!.textContent).toContain('9 Qs · 15:00');
+    expect(card!.textContent).toContain('10 Qs · 15:00');
   });
 
   it('shares the rail with only the readiness check when no device mode is on', async () => {

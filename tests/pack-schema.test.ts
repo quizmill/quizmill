@@ -552,7 +552,7 @@ describe('validatePack', () => {
   it("rejects a question in a paper whose categoryKey differs from the paper's", () => {
     const input = loadDemo();
     setPapers(input, [{ key: 'p1', label: 'Paper 1', categoryKey: 'planets' }]);
-    setPaper(input, 11, 'p1'); // demo-explore-001 is space-exploration
+    setPaper(input, 12, 'p1'); // demo-explore-001 is space-exploration
     const result = validatePack(input);
     expect(result.ok).toBe(false);
     expect(

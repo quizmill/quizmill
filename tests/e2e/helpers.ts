@@ -228,6 +228,14 @@ export async function clickButtonByText(page: Page, text: string): Promise<void>
 
 /** Pick option A in a question runner. */
 export async function pickOptionA(page: Page): Promise<void> {
+  // A matching question has no lettered options: give every row its first
+  // choice instead (one pick per row is what enables Check / Next).
+  const rows = page.locator('[data-testid="match-rows"] [role="radiogroup"]');
+  const n = await rows.count();
+  if (n > 0) {
+    for (let i = 0; i < n; i++) await rows.nth(i).getByRole('radio').first().click();
+    return;
+  }
   await page.locator('button', { hasText: /^\s*A/ }).first().click();
 }
 

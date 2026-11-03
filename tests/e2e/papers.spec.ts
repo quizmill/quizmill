@@ -22,7 +22,7 @@ test('lists the papers under their series and practises one whole', async ({ pag
   await expect(list).toContainText('Papers');
   await expect(list).toContainText('Starter papers');
   // The one series is open by default; both rows are reachable.
-  await expect(page.locator(tid('paper-row-starter-paper-1'))).toContainText('6 questions');
+  await expect(page.locator(tid('paper-row-starter-paper-1'))).toContainText('7 questions');
   await expect(page.locator(tid('paper-row-starter-paper-2'))).toContainText('5 questions');
 
   // Paper 2 is the five exploration questions — one round sits it whole.
@@ -56,12 +56,12 @@ test('prints a whole paper from Paper practice, headed by the paper', async ({ p
   await page.selectOption(tid('paper-pick'), 'starter-paper-1');
   // A paper is the unit — the mixed-sheet controls step aside.
   await expect(page.locator('[role="radiogroup"][aria-label="Question count"]')).toHaveCount(0);
-  await expect(page.locator(tid('create-sheet'))).toContainText('all 6, in order');
+  await expect(page.locator(tid('create-sheet'))).toContainText('all 7, in order');
   await page.click(tid('create-sheet'));
   const sheet = page.locator(tid('paper-sheet'));
   await expect(sheet).toBeVisible();
   await expect(sheet).toContainText('Starter papers · Paper 1');
-  await expect(sheet).toContainText('6 questions');
+  await expect(sheet).toContainText('7 questions');
   await expect(page.locator(`${tid('paper-sheet')} [data-testid^="sheet-question-"]`)).toHaveCount(6);
   // The QR still renders for a whole paper.
   await page.locator(`${tid('paper-sheet')} svg path`).first().waitFor();

@@ -58,7 +58,7 @@ describe('Timed exam device switch', () => {
     await render(<SettingsPage />);
     const card = container.querySelector('[data-testid="exam-setting"]');
     expect(card).toBeTruthy();
-    expect(card!.textContent).toContain('Mock exam: 9 questions in 15 minutes, set by this pack');
+    expect(card!.textContent).toContain('Mock exam: 10 questions in 15 minutes, set by this pack');
     const toggle = card!.querySelector<HTMLButtonElement>('[data-testid="exam-toggle"]')!;
     expect(toggle.getAttribute('aria-checked')).toBe('true');
     await act(async () => {

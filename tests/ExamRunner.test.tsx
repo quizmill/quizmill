@@ -7,6 +7,7 @@ import { PackExamRunner } from '@/pack/ExamRunner';
 import { EXAM_SITTING } from '@/pack/exam';
 import { loadAttempts, loadSessions, loadAchievements } from '@/lib/storage';
 import { correctKeysOf, packQuestions } from '@/pack/data';
+import { answerMatching } from './helpers/answer-matching';
 
 // React needs this flag to allow act() outside @testing-library.
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -94,10 +95,12 @@ async function pickOption(key: string) {
 async function answer(correctly: boolean) {
   const q = currentQuestion();
   const right = correctKeysOf(q);
-  if (correctly) {
+  if (q.rows) {
+    await answerMatching(container, q, correctly, click);
+  } else if (correctly) {
     for (const k of right) await pickOption(k);
   } else {
-    const wrong = q.options.find((o) => !right.includes(o.key))!;
+    const wrong = q.options!.find((o) => !right.includes(o.key))!;
     await pickOption(wrong.key);
   }
   await click((control('Next question') ?? control('Finish exam'))!);
@@ -191,7 +194,8 @@ describe('PackExamRunner', () => {
     await render();
     await click(control('Start exam')!);
     const q = currentQuestion();
-    await pickOption(correctKeysOf(q)[0]);
+    if (q.rows) await answerMatching(container, q, true, click);
+    else await pickOption(correctKeysOf(q)[0]);
     // Jump the wall clock past the deadline WITHOUT firing the interval —
     // the window between the bell and the next one-second tick.
     vi.setSystemTime(Date.now() + sitting.durationSeconds * 1000 + 100);

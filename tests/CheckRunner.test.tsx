@@ -9,6 +9,7 @@ import { CHECK_BANK, CHECK_PLAN, CHECK_RECOMMENDED_MINUTES, checkResultFor } fro
 import type { Attempt } from '@/data/types';
 import { loadAttempts, loadSessions, loadAchievements } from '@/lib/storage';
 import { correctKeysOf, packQuestions } from '@/pack/data';
+import { answerMatching } from './helpers/answer-matching';
 
 // React needs this flag to allow act() outside @testing-library.
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -107,8 +108,10 @@ async function answer(
 ): Promise<string> {
   const q = currentQuestion();
   const right = correctKeysOf(q);
-  if (wrongFor.has(q.categoryKey)) {
-    const wrong = q.options.find((o) => !right.includes(o.key))!;
+  if (q.rows) {
+    await answerMatching(container, q, !wrongFor.has(q.categoryKey), click);
+  } else if (wrongFor.has(q.categoryKey)) {
+    const wrong = q.options!.find((o) => !right.includes(o.key))!;
     await pickOption(wrong.key);
   } else {
     for (const k of right) await pickOption(k);
@@ -151,7 +154,7 @@ describe('PackCheckRunner', () => {
     // Ten, twenty or thirty minutes, each with what it buys; ten is
     // picked for the demo. There is no longer option.
     const budgets = Array.from(container.querySelectorAll('[data-testid^="check-budget-"]'));
-    expect(budgets.map((b) => b.textContent)).toEqual(['10 min~6 Qs', '20 min~12 Qs', '30 min~18 Qs']);
+    expect(budgets.map((b) => b.textContent)).toEqual(['10 min~6 Qs', '20 min~13 Qs', '30 min~19 Qs']);
     expect(budgets.map((b) => b.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false']);
     expect(byId('check-count')!.textContent).toBe('~6');
     expect(control('Start the check')).toBeTruthy();
@@ -163,13 +166,13 @@ describe('PackCheckRunner', () => {
     await render();
     await click(byId('check-budget-20')!);
     expect(byId('check-budget-20')!.getAttribute('aria-checked')).toBe('true');
-    expect(byId('check-count')!.textContent).toBe('~12');
-    expect(text()).toContain('about 12 questions at the real exam');
+    expect(byId('check-count')!.textContent).toBe('~13');
+    expect(text()).toContain('about 13 questions at the real exam');
     expect(text()).toContain('The clock stops the check at 20 min, never later');
     await click(control('Start the check')!);
     expect(byId('check-clock')!.textContent).toBe('20:00');
     expect(byId('question-position')!.textContent).toBe('Q1');
-    expect(byId('check-hint')!.textContent).toBe("about 12 at the exam's pace");
+    expect(byId('check-hint')!.textContent).toBe("about 13 at the exam's pace");
   });
 
   it('deals every domain its share, gives feedback per question, and ends on the result page', async () => {
@@ -236,12 +239,12 @@ describe('PackCheckRunner', () => {
     await click(control('Start the check')!);
     // Ten seconds a question: six leave nine minutes, so the sitting
     // carries on past the advertised six — the hint counts what is left
-    // at that pace — and only the in-scope bank (18) ends it.
+    // at that pace — and only the in-scope bank (19) ends it.
     const quick = { think: 5_000, read: 5_000 };
     for (let i = 0; i < 6; i++) await answer(new Set(), quick);
     expect(byId('check-result')).toBeNull();
     expect(byId('question-position')!.textContent).toBe('Q7');
-    expect(byId('check-hint')!.textContent).toBe('about 11 more at your pace');
+    expect(byId('check-hint')!.textContent).toBe('about 12 more at your pace');
     let dealt = 6;
     while (!byId('check-result') && dealt < 40) {
       await answer(new Set(), quick);
@@ -250,10 +253,10 @@ describe('PackCheckRunner', () => {
     expect(byId('check-result')).toBeTruthy();
     expect(byId('check-time-up')).toBeNull();
     expect(loadAttempts()).toHaveLength(CHECK_BANK.length);
-    expect(loadAttempts()).toHaveLength(18);
-    expect(new Set(loadAttempts().map((a) => a.questionId)).size).toBe(18);
-    expect(loadSessions()[0].questionCount).toBe(18);
-    expect(byId('check-score')!.textContent).toContain('18/18 correct');
+    expect(loadAttempts()).toHaveLength(19);
+    expect(new Set(loadAttempts().map((a) => a.questionId)).size).toBe(19);
+    expect(loadSessions()[0].questionCount).toBe(19);
+    expect(byId('check-score')!.textContent).toContain('19/19 correct');
   });
 
   it('stops dealing when the next question would not fit the time left', async () => {
@@ -388,8 +391,12 @@ describe('PackCheckRunner', () => {
     await click(control('Start the check')!);
     const q = currentQuestion();
     const right = correctKeysOf(q);
-    const wrong = q.options.find((o) => !right.includes(o.key))!;
-    await pickOption(wrong.key);
+    if (q.rows) {
+      await answerMatching(container, q, false, click);
+    } else {
+      const wrong = q.options!.find((o) => !right.includes(o.key))!;
+      await pickOption(wrong.key);
+    }
     await click(control('Check answer')!);
     expect(text()).toContain('Not quite.');
     // The explanation is markdown; compare its opening words flattened.
