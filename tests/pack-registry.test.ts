@@ -91,6 +91,13 @@ describe('builtinRegistry', () => {
     const ids = builtinRegistry().map((p) => p.id);
     expect(ids).toEqual(expect.arrayContaining(['aws-arch-pro', 'aws-genai', 'aws-saa', 'aws-clf', 'aws-aif']));
   });
+
+  it('lists each pack once — ids and repos are unique', () => {
+    const packs = builtinRegistry();
+    const dupes = (keys: string[]) => keys.filter((k, i) => keys.indexOf(k) !== i);
+    expect(dupes(packs.map((p) => p.id))).toEqual([]);
+    expect(dupes(packs.map((p) => p.repo))).toEqual([]);
+  });
 });
 
 describe('registryRepoUrl', () => {
