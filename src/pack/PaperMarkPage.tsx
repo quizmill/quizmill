@@ -497,7 +497,7 @@ function MarkRow({
           </span>
           <span className="flex-1" />
           <span
-            className="rounded-lg border border-ink-200 bg-surface px-2 py-0.5 font-mono text-sm font-bold text-ink-700"
+            className="min-w-0 truncate rounded-lg border border-ink-200 bg-surface px-2 py-0.5 font-mono text-sm font-bold text-ink-700"
             aria-label={`Saved answer: ${answerText(saved.keys)}`}
           >
             {answerText(saved.keys)}
@@ -617,7 +617,9 @@ function MarkRow({
             className="tap-feedback inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-ink-600 hover:bg-ink-100"
           >
             <Undo2 className="h-3.5 w-3.5" />
-            Keep {answerText(saved.keys)}
+            {/* A matching answer spells out every row; too wide for a
+                button that doesn't shrink. */}
+            {matching ? 'Keep saved answer' : `Keep ${answerText(saved.keys)}`}
           </button>
         ) : keys.length > 0 ? (
           <button

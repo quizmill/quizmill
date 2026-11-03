@@ -219,6 +219,40 @@ describe('PaperMarkPage', () => {
     expect(q('[data-testid="mark-row-1"]').getAttribute('data-status')).toBe('blank');
   });
 
+  it('keeps a reopened matching answer\'s controls short, however long its choices', async () => {
+    const m = packQuestions.find((x) => x.rows)!;
+    const sheet: PaperSheet = {
+      id: 'sheet-matching-keep',
+      code: 'P-KEEP',
+      createdAt: Date.now() - 3_600_000,
+      categoryKey: m.categoryKey,
+      questionIds: [m.id],
+    };
+    savePaperSheet(sheet);
+    window.location.hash = `#sheet=${sheet.id}`;
+    await render(<PaperMarkPage />);
+    for (let ri = 1; ri <= m.rows!.length; ri++) {
+      await click(q(`[aria-label="Question 1, row ${ri}: ${m.choices![0].text}"]`));
+    }
+    await click(q('[data-testid="save-marks"]'));
+
+    await act(async () => {
+      root?.unmount();
+    });
+    window.location.hash = `#sheet=${sheet.id}`;
+    await render(<PaperMarkPage />);
+    // Settled: the saved summary may be long, so it truncates instead of
+    // pushing the Change button off a phone screen.
+    const summary = q('[aria-label^="Saved answer:"]');
+    expect(summary.classList.contains('truncate')).toBe(true);
+
+    await click(q('[aria-label="Question 1: change answer"]'));
+    // The non-shrinking undo button doesn't spell out every row's choice.
+    expect(q('[aria-label="Question 1: keep the saved answer"]').textContent).toBe(
+      'Keep saved answer',
+    );
+  });
+
   it('celebrates the saved score in proportion to it', async () => {
     const sheet = demoSheet();
     savePaperSheet(sheet);
