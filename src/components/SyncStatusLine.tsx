@@ -21,30 +21,44 @@ export function SyncBackendFooter() {
  *  count of work held locally), actively syncing, or fully caught up.
  *  Shared by every sync-settings card. */
 export function SyncStatusLine({ state, pending }: { state: string; pending: number }) {
+  // A block-level row (flex, not inline-flex): an inline line let the
+  // button that follows it sit on the same line, flush against the text.
+  const line = (tone: string, children: ReactNode) => (
+    <p
+      className={`mt-2 flex items-center gap-1.5 text-sm ${tone}`}
+      data-testid="sync-status-line"
+      data-state={state}
+    >
+      {children}
+    </p>
+  );
   if (state === 'offline') {
-    return (
-      <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-ink-500">
-        <CloudOff className="h-4 w-4" />
+    return line(
+      'text-ink-500',
+      <>
+        <CloudOff className="h-4 w-4 shrink-0" />
         {pending > 0
           ? `Offline — ${pending} ${pending === 1 ? 'change' : 'changes'} saved here, will sync when you're back online.`
           : 'Offline — changes are saved here and will sync when you reconnect.'}
-      </p>
+      </>,
     );
   }
   if (state === 'syncing') {
-    return (
-      <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-brand-700">
+    return line(
+      'text-brand-700',
+      <>
         <RefreshCw className="h-4 w-4 animate-spin" />
         {pending > 0 ? `Syncing ${pending}…` : 'Syncing…'}
-      </p>
+      </>,
     );
   }
   if (state === 'synced') {
-    return (
-      <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-brand-700">
+    return line(
+      'text-brand-700',
+      <>
         <Check className="h-4 w-4" />
         Up to date
-      </p>
+      </>,
     );
   }
   return null;

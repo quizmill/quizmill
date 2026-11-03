@@ -33,7 +33,9 @@ import { z } from 'zod';
  * Questions carry 2–6 options keyed A–F in order — true/false, 5-option
  * exam papers, etc. Multi-answer questions ("select all that apply") are
  * additive: a question carries either `correctKey` (one answer) or
- * `correctKeys` (two or more), never both.
+ * `correctKeys` (two or more), never both. Matching questions are additive
+ * too: `rows` × a shared set of `choices`, keyed by `correctMatch` (one
+ * choice per row), in place of `options` — never alongside them.
  *
  * Packs are PRIVATE by default: the active pack lives at gitignored
  * `content/pack/`, authored packs under gitignored `packs/`. Only the
@@ -201,7 +203,11 @@ export const packUpgradeSchema = z.object({
   /** Card headline, e.g. "Get the full course". */
   title: z.string().min(3).max(80),
   /** Where the card links. Must be https — it opens in a new tab and the
-   *  ref param is appended, so a bare or non-web URL is an authoring slip. */
+   *  ref param is appended, so a bare or non-web URL is an authoring slip.
+   *  Each tap adds a fresh `claim=` too; the url MAY answer
+   *  `POST { claim }` with `{ status: pending | paid (+ key) | revoked }`
+   *  so a purchase unlocks the installed app that started it — see
+   *  src/lib/upgradeClaim.ts. GET stays the checkout either way. */
   url: z
     .string()
     .url()
@@ -353,6 +359,32 @@ export const packOptionSchema = z.object({
   explanation: z.string().min(1).max(300).optional(),
 });
 
+/** A row or choice key in a matching question: a short slug ("1", "yes",
+ *  "model-stage"). Never `=` or `,` — an attempt stores the picks as
+ *  "row=choice,row=choice". */
+const matchKeySchema = z
+  .string()
+  .regex(/^[a-z0-9][a-z0-9-]*$/, 'must be a lowercase slug (letters, digits, dashes)')
+  .max(24);
+
+/** One row of a matching question — the statement or item the learner
+ *  assigns a choice to. */
+export const packMatchRowSchema = z.object({
+  key: matchKeySchema,
+  text: z.string().min(1).max(400),
+  /** Optional one- or two-sentence reason for THIS row's answer, shown
+   *  under the row once checked — the matching analogue of an option's
+   *  `explanation`. */
+  explanation: z.string().min(1).max(300).optional(),
+});
+
+/** One of the shared choices every row of a matching question picks from
+ *  ("Yes" / "No", or the categories of a classify item). */
+export const packMatchChoiceSchema = z.object({
+  key: matchKeySchema,
+  text: z.string().min(1).max(60),
+});
+
 export const packScenarioSchema = z.object({
   id: z.string().regex(slug),
   title: z.string().min(5).max(120),
@@ -411,8 +443,20 @@ export const packQuestionSchema = z
     /** Optional prompt image, shown above the options — e.g. an NVR
      *  figure or a diagram the question refers to. */
     image: packImagePathSchema.optional(),
-    /** 2–6 options keyed A–F in order. True/false → 2; GL papers → 5. */
-    options: z.array(packOptionSchema).min(2).max(6),
+    /** 2–6 options keyed A–F in order. True/false → 2; GL papers → 5.
+     *  Absent on a matching question, which carries `rows` instead. */
+    options: z.array(packOptionSchema).min(2).max(6).optional(),
+    /** Matching question (additive): 2–10 rows, each answered with one
+     *  of the shared `choices` — a Yes/No review of several statements,
+     *  or a classify-each-row item. Carries `rows` + `choices` +
+     *  `correctMatch` INSTEAD of `options` + `correctKey(s)`. Graded
+     *  all-or-nothing like `correctKeys`: right only when every row is. */
+    rows: z.array(packMatchRowSchema).min(2).max(10).optional(),
+    /** The 2–6 choices every row of a matching question picks from. */
+    choices: z.array(packMatchChoiceSchema).min(2).max(6).optional(),
+    /** Matching key: row key → its correct choice key, one entry per row.
+     *  A choice may be the answer for any number of rows. */
+    correctMatch: z.record(z.string(), z.string()).optional(),
     /** Single-answer key. Exactly one of `correctKey` / `correctKeys` must
      *  be present — see superRefine. */
     correctKey: packOptionKeySchema.optional(),
@@ -443,10 +487,26 @@ export const packQuestionSchema = z
       .optional(),
   })
   .superRefine((q, ctx) => {
-    const keys = q.options.map((o) => o.key);
+    const hasOptions = q.options !== undefined;
+    const isMatching =
+      q.rows !== undefined || q.choices !== undefined || q.correctMatch !== undefined;
+    if (hasOptions === isMatching) {
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          'a question needs either options (+ correctKey/correctKeys) or rows (+ choices + correctMatch), not both',
+      });
+      return;
+    }
+    if (isMatching) {
+      refineMatching(q, ctx);
+      return;
+    }
+    const options = q.options ?? [];
+    const keys = options.map((o) => o.key);
     // Keys must be exactly the contiguous prefix A,B,C… for the option
     // count — one each, no gaps or dupes (order in the array is free).
-    const expected = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, q.options.length);
+    const expected = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, options.length);
     const keySet = new Set<string>(keys);
     if (keySet.size !== keys.length || !expected.every((k) => keySet.has(k))) {
       ctx.addIssue({
@@ -483,14 +543,81 @@ export const packQuestionSchema = z
     }
     // Image options are all-or-nothing: a mix of image and text answers
     // renders inconsistently, and usually signals an authoring slip.
-    const withImage = q.options.filter((o) => o.image).length;
-    if (withImage > 0 && withImage !== q.options.length) {
+    const withImage = options.filter((o) => o.image).length;
+    if (withImage > 0 && withImage !== options.length) {
       ctx.addIssue({
         code: 'custom',
         message: 'image options must be all-or-nothing (every option needs an image, or none)',
       });
     }
   });
+
+/** The cross-field checks of a matching question: all three blocks
+ *  present, unique keys, and a `correctMatch` that answers every row —
+ *  and only the rows — with a declared choice. */
+function refineMatching(
+  q: {
+    rows?: { key: string }[];
+    choices?: { key: string }[];
+    correctMatch?: Record<string, string>;
+    correctKey?: string;
+    correctKeys?: string[];
+  },
+  ctx: z.RefinementCtx,
+): void {
+  if (q.correctKey !== undefined || q.correctKeys !== undefined) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'a matching question is keyed by correctMatch — drop correctKey/correctKeys',
+    });
+  }
+  for (const field of ['rows', 'choices', 'correctMatch'] as const) {
+    if (q[field] === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [field],
+        message: 'a matching question needs rows, choices and correctMatch',
+      });
+    }
+  }
+  const rows = q.rows ?? [];
+  const choices = q.choices ?? [];
+  const rowKeys = rows.map((r) => r.key);
+  const choiceKeys = new Set(choices.map((c) => c.key));
+  if (new Set(rowKeys).size !== rowKeys.length) {
+    ctx.addIssue({ code: 'custom', path: ['rows'], message: 'row keys must be unique' });
+  }
+  if (choiceKeys.size !== choices.length) {
+    ctx.addIssue({ code: 'custom', path: ['choices'], message: 'choice keys must be unique' });
+  }
+  const key = q.correctMatch;
+  if (!key) return;
+  for (const row of new Set(rowKeys)) {
+    const choice = key[row];
+    if (choice === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['correctMatch'],
+        message: `row "${row}" has no answer in correctMatch`,
+      });
+    } else if (choices.length > 0 && !choiceKeys.has(choice)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['correctMatch'],
+        message: `correctMatch row "${row}": choice "${choice}" is not one of the choices`,
+      });
+    }
+  }
+  for (const row of Object.keys(key)) {
+    if (!rowKeys.includes(row)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['correctMatch'],
+        message: `correctMatch names row "${row}", which is not one of the rows`,
+      });
+    }
+  }
+}
 
 export type PackCategory = z.infer<typeof packCategorySchema>;
 export type PackExam = z.infer<typeof packExamSchema>;
@@ -520,6 +647,20 @@ export interface PackFiles {
   questions: unknown;
   scenarios?: unknown;
   concepts?: unknown;
+}
+
+/** Lowercase letters and digits only, so `very-hard`, `Very hard` and
+ *  `VERY_HARD` all compare equal. */
+const normaliseTag = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/**
+ * Whether a tag just names this level (by key or label, normalised). The
+ * level already has its own chip, so such a tag shows the tier twice: the
+ * question header drops it and the validator warns about it (#238).
+ */
+export function tagNamesLevel(tag: string, level: Pick<PackLevel, 'key' | 'label'>): boolean {
+  const t = normaliseTag(tag);
+  return t !== '' && (t === normaliseTag(level.key) || t === normaliseTag(level.label));
 }
 
 /**
@@ -656,6 +797,21 @@ export function validatePack(input: PackFiles): PackValidationResult {
           `questions.json[${q.id}]: level "${q.level}" not declared in pack.json levels`,
         );
       }
+    }
+    // A tag that repeats the question's own level is redundant with the
+    // level chip. The app hides it, so this is a warning, one line per pack.
+    const levelByKey = new Map((manifest.data.levels ?? []).map((l) => [l.key, l]));
+    const repeatsLevel = questions.filter((q) => {
+      const level = q.level ? levelByKey.get(q.level) : undefined;
+      return level !== undefined && (q.tags ?? []).some((t) => tagNamesLevel(t, level));
+    });
+    if (repeatsLevel.length > 0) {
+      const ids = repeatsLevel.slice(0, 3).map((q) => q.id).join(', ');
+      const more = repeatsLevel.length > 3 ? ', …' : '';
+      const n = repeatsLevel.length;
+      warnings.push(
+        `questions.json: ${n} ${n === 1 ? 'question has tags' : 'questions have tags'} that repeat their level (${ids}${more}) — \`level\` is the tier; drop it from \`tags\``,
+      );
     }
 
     const papers = manifest.data.papers ?? [];

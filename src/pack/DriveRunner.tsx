@@ -23,7 +23,7 @@ import {
   useEndSession,
   useStorageData,
 } from '@/lib/useStorage';
-import { loadAttempts, loadLevelFilter, loadSessions } from '@/lib/storage';
+import { loadAttempts, loadSessions } from '@/lib/storage';
 import { useClientState } from '@/lib/useMounted';
 import { recordNewAchievements } from '@/pack/useAchievementUnlock';
 import { recordLevelCrossings } from '@/pack/useLevelUp';
@@ -58,6 +58,7 @@ import {
   buildSessionStart,
   filterByLevel,
   isLastQuestion,
+  loadPackLevelFilter,
   moveToNext,
   pickSessionFromBank,
   scoreSummary,
@@ -115,11 +116,16 @@ export function DriveRunner() {
 
   // Only questions that work with no screen: text prompt, text options,
   // and a single spoken answer. Multi-answer ("select all that apply")
-  // can't be voiced hands-free — excluded like image questions are.
+  // can't be voiced hands-free — excluded like image questions are, and
+  // so are matching questions (no options at all: one answer per row).
   const bank = useMemo(
     () =>
       packQuestions.filter(
-        (q) => !q.image && q.options.every((o) => !o.image) && !isMultiAnswer(q),
+        (q) =>
+          !q.image &&
+          q.options !== undefined &&
+          q.options.every((o) => !o.image) &&
+          !isMultiAnswer(q),
       ),
     [],
   );
@@ -139,7 +145,7 @@ export function DriveRunner() {
 
   function handleStart() {
     warmUpTts(); // unlock TTS inside the tap gesture (iOS)
-    const voiceBank = filterByLevel(bank, loadLevelFilter());
+    const voiceBank = filterByLevel(bank, loadPackLevelFilter());
     const picked = pickSessionFromBank(voiceBank, attemptHistory(attempts));
     if (picked === null) {
       setPhase('empty');
@@ -271,7 +277,7 @@ export function DriveRunner() {
           return;
         }
         const key = transcripts
-          .map((t) => matchAnswer(t, q.options))
+          .map((t) => matchAnswer(t, q.options ?? []))
           .find((k) => k !== null);
         if (key) {
           onAnswer(key);
@@ -291,7 +297,7 @@ export function DriveRunner() {
         silentRounds = 0;
         if (reprompts < MAX_REPROMPTS) {
           reprompts++;
-          await speak(repromptForOptions(q.options));
+          await speak(repromptForOptions(q.options ?? []));
           if (cancelled) return;
         }
       }
@@ -510,7 +516,7 @@ export function DriveRunner() {
         </div>
 
         <div className="flex flex-col gap-2" data-testid="drive-options">
-          {current.options.map((opt) => {
+          {(current.options ?? []).map((opt) => {
             const isThis = selected === opt.key;
             const isAnswer = opt.key === current.correctKey;
             return (

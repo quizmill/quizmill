@@ -23,7 +23,7 @@ import {
   RunnerResults,
   type Stage,
 } from '@/pack/RunnerPanels';
-import { amendAttempt, loadAttempts, loadSessions, loadLevelFilter } from '@/lib/storage';
+import { amendAttempt, loadAttempts, loadSessions } from '@/lib/storage';
 import { streakProgress } from '@/lib/stats';
 import { totalXp } from '@/lib/xp';
 import { loadProgressionShown } from '@/lib/progressionPref';
@@ -33,7 +33,7 @@ import {
   progressionEnabled,
   PACK_CATEGORY_LABEL,
   PACK_PAPER_BY_KEY,
-  type OptionKey,
+  type AnswerKey,
 } from '@/pack/data';
 import { paperSubject } from '@/pack/papers';
 import {
@@ -50,7 +50,9 @@ import {
   filterByLevel,
   isBankFullySeen,
   isLastQuestion,
+  loadPackLevelFilter,
   moveToNext,
+  isAnswerReady,
   nextSelection,
   pickSessionFromBank,
   scoreSummary,
@@ -117,7 +119,7 @@ export function PackPracticeRunner(props: Props) {
   const [stage, setStage] = useState<Stage>('choosing');
   // The chosen option key(s). Single-answer questions hold one entry;
   // multi-answer ("select all") questions accumulate several.
-  const [selected, setSelected] = useState<OptionKey[]>([]);
+  const [selected, setSelected] = useState<AnswerKey[]>([]);
   const [finished, setFinished] = useState(false);
   // When today's practice goal is reached, the streak length to celebrate
   // (null when there's nothing to show). Distinct from sticker unlocks so a
@@ -130,10 +132,10 @@ export function PackPracticeRunner(props: Props) {
   const [xpGained, setXpGained] = useState<number | null>(null);
   // The active level-band filter (a manifest level key) or null = All.
   // Read from localStorage after mount, so SSR/first paint stay stable.
-  const [levelFilter] = useClientState(loadLevelFilter, null);
+  const [levelFilter] = useClientState(loadPackLevelFilter, null);
   // First option tapped on the current question (first-instinct signal)
   // and the just-recorded attempt (to stamp feedbackSeconds on Next).
-  const firstSelectedRef = useRef<OptionKey | null>(null);
+  const firstSelectedRef = useRef<AnswerKey | null>(null);
   const lastAttemptRef = useRef<{ id: string; answeredAt: number } | null>(null);
 
   const { categoryKey, paperKey } = props;
@@ -160,14 +162,15 @@ export function PackPracticeRunner(props: Props) {
     if (!mounted || state) return;
     // A paper may span categories, so its history is not narrowed by one.
     const history = attemptHistory(attempts, categoryKey);
-    // A paper is sat WHOLE — every question, however many — where a
-    // category round is the usual ten.
-    const picked = pickSessionFromBank(
-      bank,
-      history,
-      undefined,
-      paperKey !== undefined ? bank.length : QUESTION_COUNT,
-    );
+    // A paper is sat WHOLE and in bank order — its own order, as printed
+    // and numbered, with scenario questions together (#261) — where a
+    // category round is the usual ten, history-weighted and shuffled.
+    const picked =
+      paperKey !== undefined
+        ? bank.length > 0
+          ? bank
+          : null
+        : pickSessionFromBank(bank, history, undefined, QUESTION_COUNT);
     if (picked === null) {
       setOutOfQuestions(true);
       return;
@@ -271,14 +274,14 @@ export function PackPracticeRunner(props: Props) {
   const current = state.questions[state.currentIndex];
   const multi = isMultiAnswer(current);
 
-  function handleSelect(key: OptionKey) {
+  function handleSelect(key: AnswerKey) {
     if (stage !== 'choosing') return;
     firstSelectedRef.current ??= key;
     setSelected((prev) => nextSelection(prev, key, multi));
   }
 
   function handleCheck() {
-    if (!state || selected.length === 0) return;
+    if (!state || !isAnswerReady(current, selected)) return;
     // Snapshot XP before the write so the chip can show exactly what
     // this answer earned (first-correct/rescue bonuses included).
     const showXp = progressionEnabled && loadProgressionShown();

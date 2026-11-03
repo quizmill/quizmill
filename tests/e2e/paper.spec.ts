@@ -98,8 +98,11 @@ test('prints an answer key for the coach under its own PDF name', async ({ page 
   await expect(page.locator(tid('paper-answer-key'))).toBeVisible();
   await expect(page.locator(tid('paper-sheet'))).toHaveCount(0);
   await expect(page).toHaveTitle(/ - answer key$/);
+  // One answer box per lettered question; a matching question (if the
+  // sheet dealt one) ticks its answers in its table instead.
   const answers = page.locator(tid('key-answer'));
-  await expect(answers).toHaveCount(10);
+  const tables = await page.locator(`${tid('paper-answer-key')} ${tid('paper-match-table')}`).count();
+  await expect(answers).toHaveCount(10 - tables);
   for (const a of await answers.allTextContents()) {
     expect(a.trim()).toMatch(/^[A-F](,[A-F])*$/);
   }
@@ -110,8 +113,11 @@ test('marks a sheet back in and records a paper session', async ({ page }) => {
   await page.click(tid('mark-sheet'));
   await expect(page.locator(tid('mark-rows'))).toBeVisible();
 
-  await page.click('[aria-label="Question 1: answer A"]');
-  await page.click('[aria-label="Question 2: answer B"]');
+  // The first two lettered questions (a matching question on the sheet
+  // has choice chips per row instead of letters).
+  const letterA = page.locator('[aria-label$=": answer A"]');
+  await letterA.nth(0).click();
+  await letterA.nth(1).click();
   await page.click(tid('save-marks'));
   await expect(page.locator(tid('mark-saved'))).toBeVisible();
   await waitForText(page, /[0-2]\/2 correct/);
@@ -134,10 +140,11 @@ test('writes on a sheet on screen: ink lands where the pen went and survives a r
   await page.click(tid('write-sheet'));
   await expect(page.locator(tid('ink-surface'))).toBeVisible();
 
-  const rectOf = async (sel: string) => (await page.locator(sel).boundingBox())!;
+  const rectOf = async (sel: string) => (await page.locator(sel).first().boundingBox())!;
 
-  // A tick inside the first answer box, with a real pointer.
-  const box = await rectOf(tid('answer-box-1'));
+  // A tick inside the first answer box (a matching question has a tick
+  // table instead), with a real pointer.
+  const box = await rectOf('[data-testid^="answer-box-"]');
   await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.5);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.45, box.y + box.height * 0.75, { steps: 6 });
@@ -148,7 +155,7 @@ test('writes on a sheet on screen: ink lands where the pen went and survives a r
   // fixed-width layout, so this is the coordinate mapping end to end.
   const inside = async () => {
     const ink = await rectOf(tid('ink-stroke'));
-    const b = await rectOf(tid('answer-box-1'));
+    const b = await rectOf('[data-testid^="answer-box-"]');
     return (
       ink.x >= b.x &&
       ink.y >= b.y &&
@@ -186,16 +193,25 @@ test("reviews the sheet's own mistakes, not the older ones in the queue", async 
   // wrong and Q2 right whatever the sheet dealt.
   await page.click(tid('view-key'));
   await expect(page.locator(tid('key-answer')).first()).toBeVisible();
-  const key = (await page.locator(tid('key-answer')).allTextContents()).map((t) => t.trim());
+  // Per sheet position: the lettered answer, or null for a matching
+  // question (its answers are ticks in a table) — mark the first two
+  // lettered ones.
+  const byPosition = await page
+    .locator(`${tid('paper-answer-key')} ol > li`)
+    .evaluateAll((lis) =>
+      lis.map((li) => li.querySelector('[data-testid="key-answer"]')?.textContent?.trim() ?? null),
+    );
+  const [p1, p2] = byPosition.flatMap((k, i) => (k ? [i + 1] : []));
+  const key = [byPosition[p1 - 1]!, byPosition[p2 - 1]!];
   await page.click(tid('view-sheet'));
   await page.click(tid('mark-sheet'));
   await expect(page.locator(tid('mark-rows'))).toBeVisible();
 
   // One letter that isn't the whole answer is wrong for single- and
   // multi-answer questions alike.
-  await page.click(`[aria-label="Question 1: answer ${key[0] === 'A' ? 'B' : 'A'}"]`);
+  await page.click(`[aria-label="Question ${p1}: answer ${key[0] === 'A' ? 'B' : 'A'}"]`);
   for (const letter of key[1].split(',')) {
-    await page.click(`[aria-label="Question 2: answer ${letter}"]`);
+    await page.click(`[aria-label="Question ${p2}: answer ${letter}"]`);
   }
   await page.click(tid('save-marks'));
   await expect(page.locator(tid('mark-saved'))).toBeVisible();
@@ -212,7 +228,7 @@ test("reviews the sheet's own mistakes, not the older ones in the queue", async 
     page,
     ATTEMPTS_KEY,
   ))!;
-  const sheetQ1 = attempts.find((a) => a.mode === 'paper' && a.id.endsWith(':a1'));
+  const sheetQ1 = attempts.find((a) => a.mode === 'paper' && a.id.endsWith(`:a${p1}`));
   const reviewed = attempts.filter((a) => a.mode === 'review');
   expect(reviewed).toHaveLength(1);
   expect(reviewed[0].questionId).toBe(sheetQ1?.questionId);

@@ -20,9 +20,9 @@ import { Button, buttonStyles } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 import { useStorageData } from '@/lib/useStorage';
 import { useClientState, useMounted } from '@/lib/useMounted';
-import { loadLevelFilter } from '@/lib/storage';
 import {
   correctKeysOf,
+  isMatching,
   isMultiAnswer,
   packLevels,
   packManifest,
@@ -38,8 +38,15 @@ import {
   PACK_PAPER_BY_KEY,
 } from '@/pack/data';
 import { groupPapers, paperSubject } from '@/pack/papers';
-import { attemptHistory, bankForCategory, bankForPaper, filterByLevel } from '@/pack/runner';
+import {
+  attemptHistory,
+  bankForCategory,
+  bankForPaper,
+  filterByLevel,
+  loadPackLevelFilter,
+} from '@/pack/runner';
 import { PackImage } from '@/pack/PackImage';
+import { PaperMatchTable } from '@/pack/PaperMatchTable';
 import { PaperWriteView } from '@/pack/PaperWriteView';
 import { deleteSheetInk, hasSheetInk, pruneSheetInk } from '@/pack/paperInk';
 import {
@@ -311,7 +318,7 @@ function ComposeCard({
   );
   // Default to the practice level filter so paper matches what the
   // learner is working on.
-  const [level, setLevel] = useClientState(loadLevelFilter, null);
+  const [level, setLevel] = useClientState(loadPackLevelFilter, null);
   const [chosenCount, setCount] = useState<PaperCount>(DEFAULT_PAPER_COUNT);
   // A named paper to print whole (manifest `papers`, #194), or null for
   // a mixed sheet from the category/level/count controls. Not remembered:
@@ -832,8 +839,9 @@ function PrintableSheet({
                   {q.image ? (
                     <PackImage src={q.image} className="mt-2 max-h-44 rounded-lg" />
                   ) : null}
+                  {isMatching(q) ? <PaperMatchTable question={q} /> : null}
                   <ul className="mt-2 flex flex-col gap-1">
-                    {q.options.map((opt) => (
+                    {(q.options ?? []).map((opt) => (
                       <li key={opt.key} className="flex items-start gap-2">
                         <span className="font-bold">{opt.key}.</span>
                         <span className="min-w-0">
@@ -854,7 +862,7 @@ function PrintableSheet({
                   (This question is no longer in the pack.)
                 </div>
               )}
-              {q ? (
+              {q && !isMatching(q) ? (
                 <div
                   className={cn(
                     'flex shrink-0 flex-col items-center gap-1',
@@ -926,7 +934,7 @@ function PrintableAnswerKey({ sheet }: { sheet: PaperSheet }) {
           // is just their own letter (image-only options, non-verbal
           // banks), which add nothing next to the key.
           const answerLines = keys.flatMap((k) => {
-            const text = q?.options.find((o) => o.key === k)?.text.trim();
+            const text = q?.options?.find((o) => o.key === k)?.text.trim();
             return text && text !== k ? [{ key: k, text }] : [];
           });
           const concept = q?.conceptId ? PACK_CONCEPT_BY_ID[q.conceptId] : undefined;
@@ -940,6 +948,7 @@ function PrintableAnswerKey({ sheet }: { sheet: PaperSheet }) {
                   <div className="font-medium text-neutral-700">
                     <McqMarkdown text={q.prompt} />
                   </div>
+                  {isMatching(q) ? <PaperMatchTable question={q} showAnswers /> : null}
                   {answerLines.length > 0 ? (
                     <div className="mt-1.5 flex flex-col gap-0.5">
                       {answerLines.map((line) => (
@@ -972,7 +981,7 @@ function PrintableAnswerKey({ sheet }: { sheet: PaperSheet }) {
                   (This question is no longer in the pack.)
                 </div>
               )}
-              {q ? (
+              {q && !isMatching(q) ? (
                 <div className="flex w-16 shrink-0 flex-col items-center gap-1">
                   <span
                     className="flex h-12 w-14 items-center justify-center rounded-lg border-2 border-neutral-900 font-mono text-lg font-bold"

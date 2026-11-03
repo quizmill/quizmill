@@ -10,6 +10,7 @@ import {
   formatKeyList,
   gradeSelection,
   isBankFullySeen,
+  knownLevel,
   moveToNext,
   nextSelection,
   shuffleOptions,
@@ -69,6 +70,24 @@ describe('filterByLevel', () => {
 
   it('is empty when no question is in the level', () => {
     expect(filterByLevel(bank, 'exam')).toEqual([]);
+  });
+});
+
+describe('knownLevel', () => {
+  const bank = [q('a', 'core'), q('b', 'core')];
+
+  it('keeps a saved level the pack still has', () => {
+    expect(knownLevel('core', ['core'])).toBe('core');
+  });
+
+  it('reads a level the pack dropped as All, so the whole bank comes back (#260)', () => {
+    expect(knownLevel('exam', ['core'])).toBeNull();
+    expect(filterByLevel(bank, knownLevel('exam', ['core']))).toEqual(bank);
+  });
+
+  it('is All for no saved level, or a pack without levels', () => {
+    expect(knownLevel(null, ['core'])).toBeNull();
+    expect(knownLevel('core', [])).toBeNull();
   });
 });
 
@@ -342,12 +361,12 @@ describe('shuffleOptions (re-asking a weak spot)', () => {
   it('reorders the options but keeps every pack key on its own text', () => {
     const question = multiQ();
     const shuffled = shuffleOptions(question, first);
-    expect(shuffled.options.map((o) => o.key)).toEqual(['B', 'C', 'D', 'A']);
-    for (const o of shuffled.options) {
+    expect(shuffled.options!.map((o) => o.key)).toEqual(['B', 'C', 'D', 'A']);
+    for (const o of shuffled.options!) {
       expect(o.text).toBe(o.key.toLowerCase());
     }
     // The bank copy is untouched and grading still reads the pack keys.
-    expect(question.options.map((o) => o.key)).toEqual(['A', 'B', 'C', 'D']);
+    expect(question.options!.map((o) => o.key)).toEqual(['A', 'B', 'C', 'D']);
     expect(gradeSelection(shuffled, ['C', 'A'])).toBe(true);
   });
 
@@ -373,5 +392,23 @@ describe('shuffleOptions (re-asking a weak spot)', () => {
 
   it('shuffles ordinary options', () => {
     expect(canShuffleOptions(withTexts('Mercury', 'Venus', 'Earth', 'Mars'))).toBe(true);
+  });
+
+  it('leaves a matching question (rows, no options) as it is', () => {
+    const { options: _omit, ...rest } = multiQ();
+    void _omit;
+    const question: PackQuestion = {
+      ...rest,
+      rows: [
+        { key: 'r1', text: 'Mercury' },
+        { key: 'r2', text: 'Mars' },
+      ],
+      choices: [
+        { key: 'yes', text: 'Yes' },
+        { key: 'no', text: 'No' },
+      ],
+    } as PackQuestion;
+    expect(canShuffleOptions(question)).toBe(false);
+    expect(shuffleOptions(question, first)).toBe(question);
   });
 });

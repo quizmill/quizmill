@@ -48,3 +48,22 @@ describe('QuestionMeta paper chip (#194)', () => {
     expect(container.querySelector('[data-testid="paper-chip"]')).toBeNull();
   });
 });
+
+describe('QuestionMeta level chip (#238)', () => {
+  it('drops a tag that repeats the question’s level, keeping the rest', async () => {
+    // Demo levels: basics → "Basics", advanced → "Advanced".
+    const base = packQuestions.find((q) => q.level === 'advanced')!;
+    await render(
+      <QuestionMeta
+        question={{ ...base, tags: ['Advanced', 'ad-vanced', 'basics', 'domain-3'] }}
+      />,
+    );
+    const chips = [...container.querySelectorAll('span')].map((s) => s.textContent);
+    const tierChips = chips.filter(
+      (c) => c?.toLowerCase().replace(/[^a-z0-9]/g, '') === 'advanced',
+    );
+    expect(tierChips).toEqual(['Advanced']);
+    expect(chips).toContain('basics');
+    expect(chips).toContain('domain-3');
+  });
+});

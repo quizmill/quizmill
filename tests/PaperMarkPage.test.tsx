@@ -104,7 +104,7 @@ describe('PaperMarkPage', () => {
     // Q1: the correct letter; Q2: a wrong one; Q3 left blank (skipped).
     const [q1, q2] = packQuestions.slice(0, 2);
     const correct1 = correctKeysOf(q1)[0];
-    const wrong2 = q2.options
+    const wrong2 = q2.options!
       .map((o) => o.key)
       .find((k) => !correctKeysOf(q2).includes(k))!;
     await click(q(`[aria-label="Question 1: answer ${correct1}"]`));
@@ -158,7 +158,7 @@ describe('PaperMarkPage', () => {
 
     const [q1] = packQuestions;
     const correct1 = correctKeysOf(q1)[0];
-    const wrong1 = q1.options
+    const wrong1 = q1.options!
       .map((o) => o.key)
       .find((k) => !correctKeysOf(q1).includes(k))!;
 
@@ -188,6 +188,107 @@ describe('PaperMarkPage', () => {
     expect(attempts[0].isCorrect).toBe(true);
     expect(attempts[0].selectedAnswer).toBe(correct1);
     expect(loadSessions()).toHaveLength(1);
+  });
+
+  it('clears a matching row when its active chip is tapped again, keeping the other rows', async () => {
+    const m = packQuestions.find((x) => x.rows)!;
+    const sheet: PaperSheet = {
+      id: 'sheet-matching',
+      code: 'P-MATCH',
+      createdAt: Date.now() - 3_600_000,
+      categoryKey: m.categoryKey,
+      questionIds: [m.id],
+    };
+    savePaperSheet(sheet);
+    window.location.hash = `#sheet=${sheet.id}`;
+    await render(<PaperMarkPage />);
+
+    const [c1, c2] = m.choices!;
+    const chip = (row: number, text: string) =>
+      q(`[aria-label="Question 1, row ${row}: ${text}"]`);
+    await click(chip(1, c1.text));
+    await click(chip(2, c2.text));
+    expect(chip(1, c1.text).getAttribute('aria-pressed')).toBe('true');
+
+    await click(chip(1, c1.text));
+    expect(chip(1, c1.text).getAttribute('aria-pressed')).toBe('false');
+    expect(chip(2, c2.text).getAttribute('aria-pressed')).toBe('true');
+
+    // Clearing the last pick leaves the question blank again.
+    await click(chip(2, c2.text));
+    expect(q('[data-testid="mark-row-1"]').getAttribute('data-status')).toBe('blank');
+  });
+
+  it('keeps a reopened matching answer\'s controls short, however long its choices', async () => {
+    const m = packQuestions.find((x) => x.rows)!;
+    const sheet: PaperSheet = {
+      id: 'sheet-matching-keep',
+      code: 'P-KEEP',
+      createdAt: Date.now() - 3_600_000,
+      categoryKey: m.categoryKey,
+      questionIds: [m.id],
+    };
+    savePaperSheet(sheet);
+    window.location.hash = `#sheet=${sheet.id}`;
+    await render(<PaperMarkPage />);
+    for (let ri = 1; ri <= m.rows!.length; ri++) {
+      await click(q(`[aria-label="Question 1, row ${ri}: ${m.choices![0].text}"]`));
+    }
+    await click(q('[data-testid="save-marks"]'));
+
+    await act(async () => {
+      root?.unmount();
+    });
+    window.location.hash = `#sheet=${sheet.id}`;
+    await render(<PaperMarkPage />);
+    // Settled: the saved summary may be long, so it truncates instead of
+    // pushing the Change button off a phone screen.
+    const summary = q('[aria-label^="Saved answer:"]');
+    expect(summary.classList.contains('truncate')).toBe(true);
+
+    await click(q('[aria-label="Question 1: change answer"]'));
+    // The non-shrinking undo button doesn't spell out every row's choice.
+    expect(q('[aria-label="Question 1: keep the saved answer"]').textContent).toBe(
+      'Keep saved answer',
+    );
+  });
+
+  it('celebrates the saved score in proportion to it', async () => {
+    const sheet = demoSheet();
+    savePaperSheet(sheet);
+    const picked = packQuestions.slice(0, 3);
+    const wrongOf = (qq: (typeof picked)[number]) =>
+      qq.options!.map((o) => o.key).find((k) => !correctKeysOf(qq).includes(k))!;
+
+    // All three right: the big one, confetti and all.
+    window.location.hash = `#sheet=${sheet.id}`;
+    await render(<PaperMarkPage />);
+    for (const [i, qq] of picked.entries()) {
+      await click(q(`[aria-label="Question ${i + 1}: answer ${correctKeysOf(qq)[0]}"]`));
+    }
+    await click(q('[data-testid="save-marks"]'));
+    expect(q('[data-testid="score-card"]').dataset.tier).toBe('perfect');
+    expect(q('[data-testid="mark-saved"]').textContent).toContain('Perfect score');
+    expect(container.querySelector('[data-testid="confetti"]')).not.toBeNull();
+    expect(container.querySelector('.animate-celebration-stay')).not.toBeNull();
+
+    // All three wrong: an encouraging card, no confetti raining on it.
+    localStorage.clear();
+    savePaperSheet(sheet);
+    await act(async () => {
+      root?.unmount();
+    });
+    window.location.hash = `#sheet=${sheet.id}`;
+    await render(<PaperMarkPage />);
+    for (const [i, qq] of picked.entries()) {
+      await click(q(`[aria-label="Question ${i + 1}: answer ${wrongOf(qq)}"]`));
+    }
+    await click(q('[data-testid="save-marks"]'));
+    expect(q('[data-testid="score-card"]').dataset.tier).toBe('steady');
+    expect(container.querySelector('[data-testid="confetti"]')).toBeNull();
+    expect(container.querySelector('[data-testid="sparkles"]')).toBeNull();
+    // ...and the emoji doesn't pop in either.
+    expect(container.querySelector('.animate-celebration-stay')).toBeNull();
   });
 
   it('marks a sheet in batches without moving the first batch to a later day', async () => {
@@ -300,7 +401,7 @@ describe('PaperMarkPage — batches', () => {
     await markFirstBatch(sheet);
     const before = loadAttempts()[0];
     const [q1] = packQuestions;
-    const wrong1 = q1.options
+    const wrong1 = q1.options!
       .map((o) => o.key)
       .find((k) => !correctKeysOf(q1).includes(k))!;
 
@@ -479,8 +580,13 @@ describe('PaperPage', () => {
     const answers = Array.from(
       container.querySelectorAll('[data-testid="key-answer"]'),
     ).map((el) => el.textContent?.trim());
-    expect(answers).toHaveLength(10);
-    expect(answers[0]).toBe(correctKeysOf(first).join(','));
+    // One answer box per option question; a matching question's ticks sit
+    // in its table instead.
+    const optionQs = sheets[0].questionIds
+      .map((id: string) => packQuestions.find((x) => x.id === id)!)
+      .filter((x: { rows?: unknown }) => !x.rows);
+    expect(answers).toHaveLength(optionQs.length);
+    expect(answers[0]).toBe(correctKeysOf(optionQs[0]).join(','));
     expect(
       container.querySelectorAll('[data-testid="key-explanation"]')[0].textContent,
     ).toContain(first.explanation.slice(0, 20));

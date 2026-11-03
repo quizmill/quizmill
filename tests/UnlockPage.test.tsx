@@ -9,10 +9,14 @@ import { PacksPage } from '@/components/PacksPage';
 import { ACTIVE_PACK_ID_KEY } from '@/lib/packKeys';
 import { UNLOCKED_TOAST_KEY, licenceKeyStorageKey } from '@/lib/unlock';
 import { loadEvents } from '@/lib/storage';
+import { UpgradeClaimCheck } from '@/components/UpgradeClaimCheck';
+import { startClaim } from '@/lib/upgradeClaim';
+
+vi.mock('next/navigation', () => ({ usePathname: () => '/unlock/' }));
 
 /**
  * The licence-key unlock, end to end in the DOM: `/unlock#key=…` submits
- * the key for the learner and leaves for Home with the pack active, a
+ * the key for the learner and waits for Start practising with the pack active, a
  * refusal stays on the page with the endpoint's words and the key entry,
  * the same entry sits on /packs, and Home shows the confirmation once.
  * The endpoint is a stubbed fetch; nothing here touches the network.
@@ -54,6 +58,7 @@ if (!globalThis.crypto?.randomUUID) {
 
 const GOOD = 'QM-GOOD-KEY';
 const BAD = 'QM-BAD-KEY';
+const OTHER = 'QM-OTHER-PACK-KEY';
 
 function bundle() {
   const question = (n: number) => ({
@@ -90,7 +95,18 @@ let assign: ReturnType<typeof vi.fn>;
 let replaceState: ReturnType<typeof vi.fn>;
 let fetched: string[];
 
-/** A stub endpoint: GOOD → the bundle, anything else → 403 with a reason. */
+/** A private pack the active pack's `upgrade` block knows nothing about. */
+function otherBundle() {
+  const b = bundle();
+  return {
+    manifest: { ...b.manifest, id: 'team-handbook', title: 'Team Handbook' },
+    questions: b.questions.map((q, i) => ({ ...q, id: `team-handbook-planets-00${i + 1}` })),
+  };
+}
+
+/** A stub endpoint: GOOD → the bundle, OTHER → another pack's bundle,
+ *  anything else → 403 with a reason. Like the worker, a `pack=` the key
+ *  does not open is a 404. */
 function stubEndpoint() {
   fetched = [];
   vi.stubGlobal(
@@ -98,9 +114,15 @@ function stubEndpoint() {
     vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       fetched.push(url);
-      const key = new URL(url).searchParams.get('key');
-      if (key === GOOD) {
-        return new Response(JSON.stringify(bundle()), {
+      const params = new URL(url).searchParams;
+      const key = params.get('key');
+      const opens = key === GOOD ? bundle() : key === OTHER ? otherBundle() : null;
+      if (opens) {
+        const pack = params.get('pack');
+        if (pack && pack !== opens.manifest.id) {
+          return new Response(JSON.stringify({ error: 'KEY_OTHER_PACK' }), { status: 404 });
+        }
+        return new Response(JSON.stringify(opens), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         });
@@ -189,30 +211,81 @@ async function pressUnlock() {
 }
 
 describe('/unlock#key=…', () => {
-  it('a good key: fragment wiped, pack fetched + inserted + active, key kept, off to Home', async () => {
+  it('Home loads the unlocked pack with its toast', async () => {
+    setStandalone(false);
+    setLocation(`#key=${GOOD}`);
+    await render(<UnlockPage />);
+    await act(async () => { container.querySelector<HTMLAnchorElement>('a[href="/"]')!.click(); });
+    expect(assign).toHaveBeenCalledWith('/');
+    expect(JSON.parse(sessionStorage.getItem(UNLOCKED_TOAST_KEY) ?? 'null')).toEqual({
+      title: 'Solar System — Full Course', count: 3,
+    });
+  });
+
+  it('a newer key after success does not navigate away', async () => {
+    setStandalone(false);
+    setLocation(`#key=${GOOD}`);
+    await render(<UnlockPage />);
+    window.location.hash = `#key=${BAD}`;
+    await act(async () => { window.dispatchEvent(new Event('hashchange')); });
+    expect(byTestId('licence-key-error')).toBeTruthy();
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it('a pending claim cannot bypass the browser confirmation', async () => {
+    setStandalone(false);
+    setLocation(`#key=${GOOD}`);
+    startClaim('solar-system-demo', { url: 'https://example.com/course', packId: 'solar-system-full' });
+    let release: (() => void) | undefined;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      fetched.push(url);
+      if (url === 'https://example.com/course') {
+        return new Response(JSON.stringify({ status: 'paid', key: GOOD }));
+      }
+      await new Promise<void>((resolve) => { release = resolve; });
+      return new Response(JSON.stringify(bundle()));
+    }));
+    // Layout consumer first: it must yield before the page scrubs the key.
+    await render(<><UpgradeClaimCheck /><UnlockPage /></>);
+    expect(fetched).toHaveLength(1);
+    release?.();
+    await act(async () => { await new Promise((r) => setTimeout(r, 700)); });
+    expect(byTestId('unlock-start')).toBeTruthy();
+    expect(assign).not.toHaveBeenCalled();
+    await act(async () => { byTestId<HTMLButtonElement>('unlock-start')!.click(); });
+    expect(assign).toHaveBeenCalledWith('/');
+  });
+
+  it('a good key: stays unlocked until Start practising loads Home', async () => {
     setLocation(`#key=${GOOD}`);
     await render(<UnlockPage />);
 
     // The key left the URL before anything else happened.
     expect(replaceState).toHaveBeenCalledWith(null, '', '/unlock/');
-    // One request, to the contract's URL, with the key.
-    expect(fetched).toEqual([
-      `https://unlock.example.com/v1/unlock?key=${GOOD}&pack=solar-system-full`,
-    ]);
+    // One request, to the contract's URL, with the key alone: a link may
+    // be for any pack, so the active pack's upgrade hint is not sent.
+    expect(fetched).toEqual([`https://unlock.example.com/v1/unlock?key=${GOOD}`]);
     // Inserted and active, key under the unlocked pack.
     expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('solar-system-full');
     expect(localStorage.getItem(licenceKeyStorageKey('solar-system-full'))).toBe(GOOD);
-    // The confirmation is waiting for Home, and we are on our way there.
+    expect(sessionStorage.getItem(UNLOCKED_TOAST_KEY)).toBeNull();
+    await act(async () => { await new Promise((r) => setTimeout(r, 700)); });
+    expect(assign).not.toHaveBeenCalled();
+    expect(byTestId('unlock-unlocked')?.textContent).toContain('Solar System — Full Course');
+    expect(byTestId('licence-key-form')).toBeNull();
+    // The key is on screen with its Copy button and the steps to the app.
+    expect(byTestId('unlock-key-value')?.textContent).toBe(GOOD);
+    expect(byTestId('unlock-key-copy')).toBeTruthy();
+    expect(text()).toContain('It picks this up by itself.');
+    expect(byTestId('unlock-key-steps')).toBeNull();
+    await act(async () => { byTestId<HTMLButtonElement>('unlock-start')!.click(); });
+    expect(assign).toHaveBeenCalledWith('/');
+    // Start practising leaves the confirmation for Home.
     expect(JSON.parse(sessionStorage.getItem(UNLOCKED_TOAST_KEY) ?? 'null')).toEqual({
       title: 'Solar System — Full Course',
       count: 3,
     });
-    expect(assign).toHaveBeenCalledWith('/');
-    expect(byTestId('licence-key-done')?.textContent).toContain('Solar System — Full Course');
-    // The key is on screen with its Copy button and the installed-app hint.
-    expect(byTestId('unlock-key-value')?.textContent).toBe(GOOD);
-    expect(byTestId('unlock-key-copy')).toBeTruthy();
-    expect(text()).toContain('Installed the app on your home screen?');
     // And in no event.
     expect(loadEvents().map((e) => [e.type, e.data])).toEqual([
       ['pack_unlocked', { pack: 'solar-system-full' }],
@@ -236,13 +309,26 @@ describe('/unlock#key=…', () => {
     expect(localStorage.getItem(licenceKeyStorageKey('solar-system-full'))).toBeNull();
     expect(sessionStorage.getItem(UNLOCKED_TOAST_KEY)).toBeNull();
     expect(loadEvents().map((e) => [e.type, e.data])).toEqual([
-      ['unlock_failed', { pack: 'solar-system-full', reason: 'denied' }],
+      ['unlock_failed', { reason: 'denied' }],
     ]);
 
     // Correct the key in place: same handler, same outcome as the link.
     await typeKey(GOOD);
     await pressUnlock();
     expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('solar-system-full');
+    expect(assign).toHaveBeenCalledWith('/');
+  });
+
+  it('a link for ANOTHER pack: no pack= from the active pack’s upgrade block, that pack installed', async () => {
+    setLocation(`#key=${OTHER}`);
+    await render(<UnlockPage />);
+    expect(fetched).toEqual([`https://unlock.example.com/v1/unlock?key=${OTHER}`]);
+    expect(byTestId('licence-key-error')).toBeNull();
+    expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('team-handbook');
+    expect(localStorage.getItem(licenceKeyStorageKey('team-handbook'))).toBe(OTHER);
+    // The link confirms first; Start practising goes Home.
+    expect(assign).not.toHaveBeenCalled();
+    await act(async () => { byTestId<HTMLButtonElement>('unlock-start')!.click(); });
     expect(assign).toHaveBeenCalledWith('/');
   });
 
@@ -273,7 +359,8 @@ describe('/unlock#key=…', () => {
     expect(fetched).toHaveLength(1);
     expect(byTestId('unlock-key-value')?.textContent).toBe(GOOD);
     expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('solar-system-full');
-    expect(assign).toHaveBeenCalledWith('/');
+    expect(assign).not.toHaveBeenCalled();
+    expect(byTestId('unlock-start')).toBeTruthy();
   });
 
   it('a key in the QUERY string is not honoured — but is scrubbed from the address bar', async () => {
@@ -339,8 +426,208 @@ describe('/unlock#key=…', () => {
     expect(sessionStorage.getItem(UNLOCKED_TOAST_KEY)).toBeNull();
     expect(assign).not.toHaveBeenCalled();
     expect(loadEvents().map((e) => [e.type, e.data])).toEqual([
-      ['unlock_failed', { pack: 'solar-system-full', reason: 'denied' }],
+      ['unlock_failed', { reason: 'denied' }],
     ]);
+  });
+});
+
+/** Stub the display mode: installed app (standalone) or a plain browser tab. */
+function setStandalone(standalone: boolean) {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((query: string) => ({
+      matches: standalone && query === '(display-mode: standalone)',
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
+}
+
+describe('/unlock#key=… by display mode', () => {
+  it('in a browser tab: the copy-your-key steps lead, above the unlock form', async () => {
+    setStandalone(false);
+    setLocation(`#key=${BAD}`);
+    await render(<UnlockPage />);
+
+    const steps = byTestId('unlock-key-steps');
+    expect(steps).toBeTruthy();
+    const items = [...steps!.querySelectorAll('li')].map((li) => li.textContent ?? '');
+    expect(items).toHaveLength(3);
+    expect(items[0]).toContain('Copy your key');
+    expect(items[1]).toContain('home screen');
+    expect(items[2]).toContain('Packs → Have a licence key? → paste');
+    // The Copy button sits in the first step.
+    expect(steps!.querySelector('li')?.querySelector('[data-testid="unlock-key-copy"]')).toBeTruthy();
+    // Browser-only learners are told they needn't copy, without claiming an
+    // unlock that hasn't happened (BAD is refused).
+    expect(text()).toContain('no need to copy anything');
+    expect(text()).not.toContain('already unlocked');
+    // The key block comes before the form.
+    const form = byTestId('licence-key-input')!;
+    expect(
+      byTestId('unlock-key')!.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // The browser still unlocks on its own.
+    expect(fetched).toHaveLength(1);
+  });
+
+  it('in the installed app: no steps, the key with its hint as before', async () => {
+    setStandalone(true);
+    setLocation(`#key=${BAD}`);
+    await render(<UnlockPage />);
+
+    expect(byTestId('unlock-key-steps')).toBeNull();
+    expect(byTestId('unlock-key-value')?.textContent).toBe(BAD);
+    expect(text()).toContain('Installed the app on your home screen?');
+    expect(text()).toContain('Packs → Have a licence key?');
+    expect(text()).not.toContain('Enter a licence key.');
+    expect(fetched).toHaveLength(1);
+  });
+
+  it('iOS’s navigator.standalone counts as the installed app too', async () => {
+    setStandalone(false);
+    vi.stubGlobal('navigator', Object.assign(Object.create(navigator), { standalone: true }));
+    setLocation(`#key=${BAD}`);
+    await render(<UnlockPage />);
+    expect(byTestId('unlock-key-steps')).toBeNull();
+    expect(byTestId('unlock-key-value')?.textContent).toBe(BAD);
+  });
+});
+
+describe('/unlock#key=… in the installed app: one calm state, not the form', () => {
+  /** GOOD answers only when released, so the in-flight state can be seen. */
+  function holdGood(): () => void {
+    let release: (() => void) | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        fetched.push(String(input));
+        await new Promise<void>((r) => {
+          release = r;
+        });
+        return new Response(JSON.stringify(bundle()), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }),
+    );
+    return () => release?.();
+  }
+
+  async function settle(ms = 0) {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, ms));
+    });
+    await act(async () => {});
+  }
+
+  it('with a key: unlocking, then unlocked with title and count, then Home', async () => {
+    setStandalone(true);
+    const release = holdGood();
+    setLocation(`#key=${GOOD}`);
+    await render(<UnlockPage />);
+
+    const unlocking = byTestId('unlock-unlocking');
+    expect(unlocking).toBeTruthy();
+    expect(unlocking?.getAttribute('role')).toBe('status');
+    expect(byTestId('unlock-progress')).toBeTruthy();
+    expect(byTestId('licence-key-form')).toBeNull();
+    expect(byTestId('unlock-key')).toBeNull();
+    expect(fetched).toHaveLength(1);
+
+    release();
+    await settle();
+    const unlocked = byTestId('unlock-unlocked');
+    expect(unlocked?.textContent).toContain('Solar System — Full Course');
+    expect(unlocked?.textContent).toContain('3 questions');
+    expect(byTestId('unlock-progress')).toBeNull();
+    expect(byTestId('licence-key-form')).toBeNull();
+    // The pack is in and active already; Home loads after a short beat.
+    expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('solar-system-full');
+    expect(assign).not.toHaveBeenCalled();
+    await settle(700);
+    expect(assign).toHaveBeenCalledWith('/');
+  });
+
+  it('a failure brings the form back with the key filled in and the error', async () => {
+    setStandalone(true);
+    setLocation(`#key=${BAD}`);
+    await render(<UnlockPage />);
+
+    expect(byTestId('unlock-unlocking')).toBeNull();
+    expect(byTestId('licence-key-form')).toBeTruthy();
+    expect(byTestId<HTMLInputElement>('licence-key-input')?.value).toBe(BAD);
+    expect(byTestId('licence-key-error')?.textContent).toContain('That key has been revoked.');
+    expect(byTestId('unlock-key-value')?.textContent).toBe(BAD);
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it('leaving during the success hold still loads Home with the toast', async () => {
+    setStandalone(true);
+    const release = holdGood();
+    setLocation(`#key=${GOOD}`);
+    await render(<UnlockPage />);
+    release();
+    await settle();
+    expect(byTestId('unlock-unlocked')).toBeTruthy();
+    expect(assign).not.toHaveBeenCalled();
+
+    // A client-side tap away (e.g. Home) unmounts the page mid-hold.
+    await act(async () => {
+      root?.unmount();
+    });
+    root = undefined;
+    expect(assign).toHaveBeenCalledTimes(1);
+    expect(assign).toHaveBeenCalledWith('/');
+    expect(JSON.parse(sessionStorage.getItem(UNLOCKED_TOAST_KEY) ?? 'null')).toEqual({
+      title: 'Solar System — Full Course',
+      count: 3,
+    });
+    await settle(700);
+    expect(assign).toHaveBeenCalledTimes(1);
+  });
+
+  it('a successful retry is terminal: a second press during the hold sends nothing', async () => {
+    setStandalone(true);
+    setLocation(`#key=${BAD}`);
+    await render(<UnlockPage />);
+    expect(byTestId('licence-key-error')).toBeTruthy();
+
+    await typeKey(GOOD);
+    await pressUnlock();
+    expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('solar-system-full');
+    expect(byTestId<HTMLButtonElement>('licence-key-go')?.disabled).toBe(true);
+    // Enter in the field, still within the hold.
+    const input = byTestId<HTMLInputElement>('licence-key-input')!;
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+    await settle();
+    expect(fetched).toHaveLength(2);
+    expect(loadEvents().filter((e) => e.type === 'pack_unlocked')).toHaveLength(1);
+    await settle(700);
+    expect(assign).toHaveBeenCalledTimes(1);
+  });
+
+  it('without a key: the form, as today', async () => {
+    setStandalone(true);
+    setLocation('');
+    await render(<UnlockPage />);
+    expect(byTestId('unlock-unlocking')).toBeNull();
+    expect(byTestId('licence-key-form')).toBeTruthy();
+    expect(text()).toContain('Unlock a pack');
+    expect(text()).toContain('Paste the licence key you were given.');
+  });
+
+  it('in a browser tab only the calm state shows while it unlocks', async () => {
+    setStandalone(false);
+    holdGood();
+    setLocation(`#key=${GOOD}`);
+    await render(<UnlockPage />);
+    expect(byTestId('unlock-unlocking')).toBeTruthy();
+    expect(byTestId('unlock-key')).toBeNull();
+    expect(byTestId('licence-key-form')).toBeNull();
   });
 });
 
@@ -353,11 +640,21 @@ describe('Packs → Have a licence key?', () => {
 
     await typeKey(` ${GOOD} `);
     await pressUnlock();
-    expect(fetched).toEqual([
-      `https://unlock.example.com/v1/unlock?key=${GOOD}&pack=solar-system-full`,
-    ]);
+    expect(fetched).toEqual([`https://unlock.example.com/v1/unlock?key=${GOOD}`]);
     expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('solar-system-full');
     expect(localStorage.getItem(licenceKeyStorageKey('solar-system-full'))).toBe(GOOD);
+    expect(assign).toHaveBeenCalledWith('/');
+  });
+
+  it('a key for ANOTHER pack: no pack= from the active pack’s upgrade block, that pack installed', async () => {
+    setLocation('', '/packs/');
+    await render(<PacksPage />);
+    await typeKey(OTHER);
+    await pressUnlock();
+    expect(fetched).toEqual([`https://unlock.example.com/v1/unlock?key=${OTHER}`]);
+    expect(byTestId('licence-key-error')).toBeNull();
+    expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBe('team-handbook');
+    expect(localStorage.getItem(licenceKeyStorageKey('team-handbook'))).toBe(OTHER);
     expect(assign).toHaveBeenCalledWith('/');
   });
 

@@ -29,7 +29,6 @@ import { weakSpots } from '@/lib/mistakes';
 import { useDevicePref } from '@/lib/useDevicePref';
 import { weakSpotClearAfterPref } from '@/lib/weakSpotPref';
 import {
-  loadLevelFilter,
   saveLevelFilter,
   loadDismissedNudge,
   saveDismissedNudge,
@@ -55,7 +54,7 @@ import {
   PACK_PAPER_BY_QUESTION_ID,
 } from '@/pack/data';
 import { groupPapers, paperProgress } from '@/pack/papers';
-import { MIXED_LABEL, QUESTION_COUNT } from '@/pack/runner';
+import { MIXED_LABEL, QUESTION_COUNT, loadPackLevelFilter } from '@/pack/runner';
 import { EXAM_SITTING, EXAM_WITHHELD } from '@/pack/exam';
 import { CHECK_PLAN } from '@/pack/check';
 import { CHECK_BUDGETS_MINUTES, CHECK_MAX_MINUTES } from '@/lib/readinessCheck';
@@ -124,7 +123,7 @@ export default function PackHome() {
   const { attempts, sessions } = useStorageData();
   // Active level-band filter (a manifest level key) or null = All. Read
   // from localStorage after mount so SSR/first paint stay stable.
-  const [level, setLevelState] = useClientState(loadLevelFilter, null);
+  const [level, setLevelState] = useClientState(loadPackLevelFilter, null);
   const [dismissedNudge, setDismissedNudge] = useClientState(loadDismissedNudge, null);
   // Drive Mode is opt-in (Settings toggle, or the pack's `modes` default)
   // — the tile only shows once it's on. Read after mount like the other prefs.

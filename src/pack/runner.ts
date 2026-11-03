@@ -7,7 +7,17 @@
 import { APP_BUILD } from '@/config';
 import type { Attempt, Session, SessionMode } from '@/data/types';
 import { pickSessionQuestions, type AttemptSummary } from '@/lib/selection';
-import { correctKeysOf, type OptionKey, type PackQuestion } from '@/pack/data';
+import { loadLevelFilter } from '@/lib/storage';
+import {
+  answerKeysOf,
+  isMatching,
+  matchPick,
+  matchPicksOf,
+  packLevelKeys,
+  type AnswerKey,
+  type OptionKey,
+  type PackQuestion,
+} from '@/pack/data';
 
 export const QUESTION_COUNT = 10;
 
@@ -29,26 +39,65 @@ export const MIXED_LABEL = 'All categories';
  * credit). An empty selection is never correct.
  */
 export function gradeSelection(
-  question: Pick<PackQuestion, 'correctKey' | 'correctKeys'>,
-  selected: OptionKey[],
+  question: Pick<PackQuestion, 'correctKey' | 'correctKeys' | 'rows' | 'correctMatch'>,
+  selected: AnswerKey[],
 ): boolean {
-  const correct = correctKeysOf(question);
-  if (selected.length !== correct.length) return false;
+  const correct = answerKeysOf(question);
+  if (correct.length === 0 || selected.length !== correct.length) return false;
   const chosen = new Set(selected);
   return correct.every((k) => chosen.has(k));
 }
 
 /**
  * Compute the next selection when an option is tapped. Single-answer mode
- * replaces the selection; multi-answer mode toggles the key in/out.
+ * replaces the selection; multi-answer mode toggles the key in/out. A
+ * matching pick ("row=choice") replaces that row's earlier pick, whatever
+ * `multi` says — one choice per row.
  */
-export function nextSelection(
-  prev: OptionKey[],
-  key: OptionKey,
-  multi: boolean,
-): OptionKey[] {
+export function nextSelection<K extends AnswerKey>(prev: K[], key: K, multi: boolean): K[] {
+  const at = key.indexOf('=');
+  if (at > 0) {
+    const row = key.slice(0, at + 1);
+    return [...prev.filter((k) => !k.startsWith(row)), key];
+  }
   if (!multi) return [key];
   return prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
+}
+
+/** Whether the learner has answered enough to check: one pick per row
+ *  for a matching question, at least one option otherwise. */
+export function isAnswerReady(
+  question: Pick<PackQuestion, 'rows'>,
+  selected: readonly AnswerKey[],
+): boolean {
+  if (!isMatching(question)) return selected.length > 0;
+  const picks = matchPicksOf(selected);
+  return (question.rows ?? []).every((r) => picks[r.key] !== undefined);
+}
+
+/** How many rows of a matching question a selection got right — the
+ *  "4 of 6 rows right" line under a wrong answer. */
+export function matchRowsRight(
+  question: Pick<PackQuestion, 'rows' | 'correctMatch'>,
+  selected: readonly AnswerKey[],
+): { right: number; total: number } {
+  const rows = question.rows ?? [];
+  const picks = matchPicksOf(selected);
+  const right = rows.filter((r) => picks[r.key] === question.correctMatch?.[r.key]).length;
+  return { right, total: rows.length };
+}
+
+/** A selection as stored on an attempt: comma-joined, option keys sorted
+ *  ("A,C"), matching picks in row order ("1=yes,2=no"). Empty → "". */
+export function encodeSelection(
+  question: Pick<PackQuestion, 'rows'>,
+  selected: readonly AnswerKey[],
+): string {
+  if (!isMatching(question)) return [...selected].sort().join(',');
+  const picks = matchPicksOf(selected);
+  return (question.rows ?? [])
+    .flatMap((r) => (picks[r.key] !== undefined ? [matchPick(r.key, picks[r.key])] : []))
+    .join(',');
 }
 
 /** Render option keys as a natural list: "A", "A and B", "A, B and C". */
@@ -56,6 +105,20 @@ export function formatKeyList(keys: OptionKey[]): string {
   if (keys.length <= 1) return keys.join('');
   if (keys.length === 2) return `${keys[0]} and ${keys[1]}`;
   return `${keys.slice(0, -1).join(', ')} and ${keys[keys.length - 1]}`;
+}
+
+/** An answer in words for a one-line summary: the option letters ("A and
+ *  C"), or a matching question's picked choice per row, in row order
+ *  ("Yes · No · —", a dash for an unanswered row). */
+export function formatAnswer(
+  question: Pick<PackQuestion, 'rows' | 'choices'>,
+  keys: readonly string[],
+): string {
+  if (!isMatching(question)) return formatKeyList(keys as OptionKey[]);
+  const picks = matchPicksOf(keys);
+  const label = (k: string | undefined) =>
+    question.choices?.find((c) => c.key === k)?.text ?? '—';
+  return (question.rows ?? []).map((r) => label(picks[r.key])).join(' · ');
 }
 
 /**
@@ -68,7 +131,10 @@ export function formatKeyList(keys: OptionKey[]): string {
 const POSITIONAL_OPTION =
   /\b(above|below|preceding|previous|following|former|latter)\b|\b(all|none|both|neither) of (these|those|them)\b|\b(first|second|third|fourth|fifth|last|other|remaining)( (two|three|four))? (options?|answers?|choices?|statements?)\b|\b(options?|answers?|choices?) [A-F]\b|\b[A-F] (and|or|&) [A-F]\b/i;
 
+/** A matching question (rows, no options) is never shuffled: its rows
+ *  and choices are a different shape and keep the pack's order. */
 export function canShuffleOptions(question: PackQuestion): boolean {
+  if (isMatching(question) || !question.options) return false;
   return !question.options.some((o) => POSITIONAL_OPTION.test(o.text));
 }
 
@@ -84,7 +150,7 @@ export function shuffleOptions(
   question: PackQuestion,
   random: () => number = Math.random,
 ): PackQuestion {
-  if (!canShuffleOptions(question)) return question;
+  if (!canShuffleOptions(question) || !question.options) return question;
   const options = [...question.options];
   for (let i = options.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
@@ -127,6 +193,23 @@ export function filterByLevel(
 ): PackQuestion[] {
   if (!level) return bank;
   return bank.filter((q) => q.level === level);
+}
+
+/** A saved level filter, or null ("All") when the pack doesn't have that
+ *  level (any more): a pack that drops a level must not leave a learner who
+ *  picked it filtering the bank down to nothing — with one level left, Home
+ *  hides the row they'd need to clear it (#260). */
+export function knownLevel(
+  level: string | null | undefined,
+  levelKeys: readonly string[],
+): string | null {
+  return level && levelKeys.includes(level) ? level : null;
+}
+
+/** The learner's level filter, checked against the active pack's levels.
+ *  Every screen that filters by level reads it through here. */
+export function loadPackLevelFilter(): string | null {
+  return knownLevel(loadLevelFilter(), packLevelKeys);
 }
 
 /**
@@ -189,15 +272,17 @@ export function pickSessionFromBank(
 export interface BuildAttemptArgs {
   state: RunnerState;
   question: PackQuestion;
-  /** The chosen option key(s) — length 1 for single-answer questions. */
-  selected: OptionKey[];
+  /** The chosen option key(s) — length 1 for single-answer questions — or
+   *  one "row=choice" pick per row of a matching question. */
+  selected: AnswerKey[];
   categoryKey: string;
   now: number;
   attemptId: string;
   /** How the session runs — denormalised onto the attempt. */
   mode?: SessionMode;
-  /** The first option tapped before any revision, when the UI tracked it. */
-  firstSelected?: OptionKey;
+  /** The first option tapped before any revision, when the UI tracked it
+   *  (a matching question's first pick, "row=choice"). */
+  firstSelected?: AnswerKey;
   /** Override the measured time (Drive Mode times its own speech loop). */
   timeTakenSeconds?: number;
 }
@@ -217,9 +302,9 @@ export function buildAttempt(args: BuildAttemptArgs): Attempt {
     sessionId: state.sessionId,
     questionId: question.id,
     answeredAt: now,
-    // Persist as a sorted, comma-joined string ("A" or "A,C") — stays a
-    // plain string so storage/sync/stats read it unchanged.
-    selectedAnswer: [...selected].sort().join(','),
+    // Persist as a comma-joined string ("A", "A,C" or "1=yes,2=no") —
+    // stays a plain string so storage/sync/stats read it unchanged.
+    selectedAnswer: encodeSelection(question, selected),
     isCorrect: gradeSelection(question, selected),
     timeTakenSeconds: args.timeTakenSeconds ?? measured,
     // Subject is the engine type — packs store the category key here.

@@ -326,3 +326,51 @@ describe('PacksPage insert feedback', () => {
     expect(button('Fetching…').disabled).toBe(true);
   });
 });
+
+/**
+ * A pack unlocked with a licence key keeps the key for its update check;
+ * the shelf hands it back (masked, then revealed and copied) so the same
+ * pack can be unlocked on a second device without hunting for the link.
+ */
+describe('PacksPage licence key line', () => {
+  async function insertFixture(id: string) {
+    await pickFile(async () => bundleJson(id, id), `${id}.json`);
+    await act(async () => {});
+  }
+
+  function card(id: string): HTMLElement {
+    const el = container.querySelector<HTMLElement>(`[data-testid="pack-card-${id}"]`);
+    if (!el) throw new Error(`no pack card ${id}`);
+    return el;
+  }
+
+  it('shows the stored key masked, and reveals and copies it on tap', async () => {
+    localStorage.setItem('quizmill.keyed-pack.licence', 'QL-AB12-CD34-EF56');
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    await render();
+    await insertFixture('keyed-pack');
+
+    const line = card('keyed-pack').querySelector<HTMLElement>('[data-testid="pack-licence-key"]');
+    expect(line, 'licence key line').toBeTruthy();
+    expect(line!.textContent).toContain('Licence key');
+    expect(line!.textContent).toContain('QL-····-····-····');
+    expect(line!.textContent).not.toContain('AB12');
+
+    const reveal = line!.querySelector<HTMLButtonElement>('[data-testid="pack-licence-key-copy"]');
+    expect(reveal).toBeTruthy();
+    await act(async () => {
+      reveal!.click();
+    });
+    expect(line!.textContent).toContain('QL-AB12-CD34-EF56');
+    expect(writeText).toHaveBeenCalledWith('QL-AB12-CD34-EF56');
+    expect(line!.textContent).toContain('Copied');
+  });
+
+  it('shows no key line for a pack held without a key', async () => {
+    await render();
+    await insertFixture('plain-pack');
+    expect(card('plain-pack').querySelector('[data-testid="pack-licence-key"]')).toBeNull();
+    expect(container.querySelector('[data-testid="pack-licence-key"]')).toBeNull();
+  });
+});

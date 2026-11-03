@@ -4,8 +4,15 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { webcrypto } from 'node:crypto';
 import { PackPracticeRunner } from '@/pack/PracticeRunner';
-import { loadAttempts, loadSessions, saveLevelFilter } from '@/lib/storage';
+import {
+  loadAttempts,
+  loadSessions,
+  saveAttempt,
+  saveLevelFilter,
+  saveSession,
+} from '@/lib/storage';
 import { packQuestions } from '@/pack/data';
+import { bankForPaper } from '@/pack/runner';
 
 // Practising a named paper (#194): the runner deals from that paper's
 // questions — the whole paper, whatever the level filter says — records
@@ -102,6 +109,45 @@ describe('PackPracticeRunner for a named paper', () => {
     expect(sessions).toHaveLength(1);
     expect(sessions[0].subject).toBe('space-exploration');
     expect(sessions[0].mode).toBe('practice');
+  });
+
+  it('deals the paper in bank order, even when some questions have history', async () => {
+    // A paper's order is part of the paper (#261): numbering matches the
+    // printed sheet and scenario questions stay together. History on the
+    // first two questions would push them to the back of a selector round.
+    const before = Date.now() - 60_000;
+    PAPER_2.slice(0, 2).forEach((q, i) => {
+      const answeredAt = before + i;
+      saveSession({
+        id: `old-${i}`,
+        subject: q.categoryKey,
+        startedAt: answeredAt,
+        endedAt: answeredAt + 1000,
+        questionCount: 1,
+        correctCount: 0,
+      });
+      saveAttempt({
+        id: `old-a-${i}`,
+        sessionId: `old-${i}`,
+        questionId: q.id,
+        answeredAt,
+        selectedAnswer: 'A',
+        isCorrect: false,
+        timeTakenSeconds: 3,
+        subject: q.categoryKey,
+        topic: q.id,
+        difficulty: 1,
+      });
+    });
+
+    await render('starter-paper-2');
+    await finishRound();
+
+    const dealt = loadAttempts()
+      .filter((a) => !a.id.startsWith('old-'))
+      .sort((a, b) => a.answeredAt - b.answeredAt)
+      .map((a) => a.questionId);
+    expect(dealt).toEqual(bankForPaper(packQuestions, 'starter-paper-2').map((q) => q.id));
   });
 
   it('names the paper on the results screen', async () => {

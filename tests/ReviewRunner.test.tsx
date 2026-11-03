@@ -72,7 +72,7 @@ async function finishRound() {
     const current = packQuestions.find((p) =>
       container.textContent?.includes(p.prompt),
     )!;
-    const wrongKey = current.options
+    const wrongKey = current.options!
       .map((o) => o.key)
       .find((k) => !correctKeysOf(current).includes(k))!;
     const option = buttons().find(
@@ -208,13 +208,13 @@ describe('PackReviewRunner', () => {
   });
 
   it('shuffles the options of a re-asked question but records the pack key', async () => {
-    const q = packQuestions.find((p) => canShuffleOptions(p) && p.options.length > 2)!;
+    const q = packQuestions.find((p) => canShuffleOptions(p) && (p.options?.length ?? 0) > 2)!;
     localStorage.setItem(ATTEMPTS_KEY, JSON.stringify([wrong(q.id, 'old', 1000, 1)]));
     // Fisher–Yates with random() = 0 rotates the bank order left by one.
     const spy = vi.spyOn(Math, 'random').mockReturnValue(0);
     await render();
     spy.mockRestore();
-    const bankKeys = q.options.map((o) => o.key);
+    const bankKeys = q.options!.map((o) => o.key);
     expect(optionKeys()).toEqual([...bankKeys.slice(1), bankKeys[0]]);
     const key = correctKeysOf(q)[0];
     await answer(key);
@@ -228,13 +228,13 @@ describe('PackReviewRunner', () => {
     const spy = vi.spyOn(Math, 'random').mockReturnValue(0);
     await render();
     spy.mockRestore();
-    expect(optionKeys()).toEqual(onSheet.options.map((o) => o.key));
+    expect(optionKeys()).toEqual(onSheet.options!.map((o) => o.key));
   });
 
   it("shuffles an exam's or check's scoped review — only paper keeps its order", async () => {
     // Regression: any `#session=` scope kept pack order, so reviews opened
     // from exam and check results kept the answer-position cue.
-    const q = packQuestions.find((p) => canShuffleOptions(p) && p.options.length > 2)!;
+    const q = packQuestions.find((p) => canShuffleOptions(p) && (p.options?.length ?? 0) > 2)!;
     localStorage.setItem(
       ATTEMPTS_KEY,
       JSON.stringify([{ ...wrong(q.id, 'exam-1', 1000, 1), mode: 'exam' }]),
@@ -243,7 +243,7 @@ describe('PackReviewRunner', () => {
     const spy = vi.spyOn(Math, 'random').mockReturnValue(0);
     await render();
     spy.mockRestore();
-    const bankKeys = q.options.map((o) => o.key);
+    const bankKeys = q.options!.map((o) => o.key);
     expect(optionKeys()).toEqual([...bankKeys.slice(1), bankKeys[0]]);
   });
 

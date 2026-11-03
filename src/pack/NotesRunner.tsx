@@ -29,7 +29,7 @@ import {
   isMultiAnswer,
   packQuestions,
   progressionEnabled,
-  type OptionKey,
+  type AnswerKey,
 } from '@/pack/data';
 import {
   advanceAfterAnswer,
@@ -39,6 +39,7 @@ import {
   feedbackSecondsSince,
   isLastQuestion,
   moveToNext,
+  isAnswerReady,
   nextSelection,
   scoreSummary,
   type RunnerState,
@@ -66,12 +67,12 @@ export function PackNotesRunner() {
   const [nothingToPractice, setNothingToPractice] = useState(false);
   const mounted = useMounted();
   const [stage, setStage] = useState<Stage>('choosing');
-  const [selected, setSelected] = useState<OptionKey[]>([]);
+  const [selected, setSelected] = useState<AnswerKey[]>([]);
   // XP earned by the just-checked answer — see the practice runner.
   const [xpGained, setXpGained] = useState<number | null>(null);
   // First option tapped on the current question (first-instinct signal)
   // and the just-recorded attempt (to stamp feedbackSeconds on Next).
-  const firstSelectedRef = useRef<OptionKey | null>(null);
+  const firstSelectedRef = useRef<AnswerKey | null>(null);
   const lastAttemptRef = useRef<{ id: string; answeredAt: number } | null>(null);
   const [finished, setFinished] = useState(false);
 
@@ -168,14 +169,14 @@ export function PackNotesRunner() {
   const current = state.questions[state.currentIndex];
   const multi = isMultiAnswer(current);
 
-  function handleSelect(key: OptionKey) {
+  function handleSelect(key: AnswerKey) {
     if (stage !== 'choosing') return;
     firstSelectedRef.current ??= key;
     setSelected((prev) => nextSelection(prev, key, multi));
   }
 
   function handleCheck() {
-    if (!state || selected.length === 0) return;
+    if (!state || !isAnswerReady(current, selected)) return;
     // Snapshot XP before the write so the chip shows what this answer
     // earned (first-correct/rescue bonuses included).
     const showXp = progressionEnabled && loadProgressionShown();

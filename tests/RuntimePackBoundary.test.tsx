@@ -4,6 +4,7 @@ import { act } from 'react';
 import { renderToString } from 'react-dom/server';
 import { hydrateRoot, type Root } from 'react-dom/client';
 import type { ActivePack } from '@/pack/runtime';
+import { RUNTIME_PACK_PENDING_ATTR } from '@/lib/runtimePackPending';
 
 // React needs this flag to allow act() outside @testing-library.
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -82,6 +83,7 @@ afterEach(async () => {
   container.remove();
   errorSpy.mockRestore();
   globalThis.__QUIZMILL_PACK__ = undefined;
+  document.documentElement.removeAttribute(RUNTIME_PACK_PENDING_ATTR);
   vi.resetModules();
 });
 
@@ -144,6 +146,17 @@ describe('RuntimePackBoundary', () => {
     expect(container.querySelector('h1')?.textContent).toBe('Injected Pack');
     expect(container.querySelectorAll('a')).toHaveLength(1);
     expect(container.textContent).not.toContain('Solar System');
+  });
+
+  it('reveals the page once the runtime pack is live', async () => {
+    // The bootstrap hides the prerendered (build-time) page while a runtime
+    // pack is on its way, so it never flashes; the hand-over un-hides it.
+    await prerender(<BuildTimePage />);
+    document.documentElement.setAttribute(RUNTIME_PACK_PENDING_ATTR, '');
+    await hydrate(<RuntimePage />, INJECTED);
+
+    expect(container.querySelector('h1')?.textContent).toBe('Injected Pack');
+    expect(document.documentElement.hasAttribute(RUNTIME_PACK_PENDING_ATTR)).toBe(false);
   });
 
   it('renders the runtime pack on a client-only mount too (nothing prerendered)', async () => {

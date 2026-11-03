@@ -21,10 +21,12 @@
  * Where `unlockUrl` is the build's default endpoint (NEXT_PUBLIC_UNLOCK_URL,
  * falling back to the hosted service at sync.quizmill.dev) unless the
  * active pack's manifest overrides it with `upgrade.unlockUrl` (an author
- * hosting their own). `pack` is sent only when the manifest hints at the
- * pack a key is expected to open (`upgrade.packId`, the sampler → full
- * bank case); the server then refuses a key for any other pack, and the
- * app refuses a bundle for any other pack before it touches storage.
+ * hosting their own). `pack` is sent only by the upgrade claim hand-off,
+ * when the manifest hints at the pack its purchase opens (`upgrade.packId`,
+ * the sampler → full bank case); the server then refuses a key for any
+ * other pack, and the app refuses a bundle for any other pack before it
+ * touches storage. The generic key entries never send it
+ * (`anyPackUnlockConfig`): a key there may be for any pack at all.
  *
  * CORS `*`, no cookies. How keys are issued is none of the engine's
  * business, and the key itself goes exactly three places: the request
@@ -40,7 +42,8 @@
 import { APP_CONFIG } from '@/config';
 import type { PackUpgrade } from '@/pack/data';
 import { recordEvent } from './storage';
-import { activatePack, insertPack, type PackLibraryEntry } from './packLibrary';
+import { cachePackAssets } from './packAssets';
+import { activatePack, getInsertedPack, insertPack, type PackLibraryEntry } from './packLibrary';
 
 /** The route a licence-key link opens; the key rides in its fragment. */
 export const UNLOCK_PATH = '/unlock';
@@ -58,6 +61,23 @@ export const UNLOCKED_TOAST_KEY = 'quizmill.unlocked.v1';
 /** Where a pack's licence key is kept — per pack, like its progress. */
 export function licenceKeyStorageKey(packId: string): string {
   return `quizmill.${packId}.licence`;
+}
+
+/** The licence key a pack was unlocked with on this device, or null. */
+export function storedLicenceKey(packId: string): string | null {
+  try {
+    return window.localStorage.getItem(licenceKeyStorageKey(packId))?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/** A key with everything but its first group hidden (`QL-····-····-····`),
+ *  so the shelf can say a pack holds one without showing it. */
+export function maskLicenceKey(key: string): string {
+  const groups = key.split('-');
+  if (groups.length < 2) return '····';
+  return [groups[0], ...groups.slice(1).map(() => '····')].join('-');
 }
 
 /** Where the daily update check keeps its record for a pack (when it last
@@ -94,6 +114,17 @@ export function resolveUnlockConfig(
 /** The ACTIVE pack's unlock contract — never null (see resolveUnlockConfig). */
 export function unlockConfig(): UnlockConfig {
   return resolveUnlockConfig(APP_CONFIG.upgrade, process.env.NEXT_PUBLIC_UNLOCK_URL);
+}
+
+/**
+ * The same endpoint with no `pack=` hint — for the generic key entries
+ * (the /unlock link, Packs → Have a licence key?, the starter card),
+ * where a learner may hold a key to ANY pack. The active pack's
+ * `upgrade.packId` names the pack ITS upgrade sells; sending it there
+ * would make the server refuse every key for a different pack.
+ */
+export function anyPackUnlockConfig(): UnlockConfig {
+  return { unlockUrl: unlockConfig().unlockUrl };
 }
 
 /**
@@ -372,6 +403,22 @@ export function stashUnlockedToast(toast: UnlockedToast): void {
   } catch {
     // no sessionStorage — Home simply shows no toast
   }
+}
+
+/**
+ * The ending every successful unlock shares (the key form, the /unlock
+ * link, the upgrade claim): prefetch the bundle's images — fire-and-forget,
+ * as the file insert does; the pack is already in — leave the confirmation
+ * for Home, and load Home. A full load on purpose, not a client route: the
+ * active pack is resolved once at boot (the layout bootstrap), so only a
+ * fresh document renders the unlocked pack — same reason /packs reloads.
+ */
+export function openUnlockedPack(entry: PackLibraryEntry): void {
+  const stored = getInsertedPack(entry.id);
+  if (stored) void cachePackAssets(stored).catch(() => undefined);
+  stashUnlockedToast({ title: entry.title, count: entry.questionCount });
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- deliberate full load, see above
+  window.location.assign(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/`);
 }
 
 /** Read AND clear the stashed confirmation — it shows exactly once. */
