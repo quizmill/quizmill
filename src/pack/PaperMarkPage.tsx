@@ -475,6 +475,14 @@ function MarkRow({
   // Answered in an earlier batch and not being corrected: shown settled,
   // with no letters to tap — it can't be mistaken for input still owed.
   if (saved && !reopened) {
+    const savedAnswer = (
+      <span
+        className="min-w-0 truncate rounded-lg border border-ink-200 bg-surface px-2 py-0.5 font-mono text-sm font-bold text-ink-700"
+        aria-label={`Saved answer: ${answerText(saved.keys)}`}
+      >
+        {answerText(saved.keys)}
+      </span>
+    );
     return (
       <li
         className="flex flex-col gap-2 rounded-2xl border border-ink-200 bg-ink-50 px-4 py-3"
@@ -496,12 +504,7 @@ function MarkRow({
             {whenLabel(saved.answeredAt)}
           </span>
           <span className="flex-1" />
-          <span
-            className="min-w-0 truncate rounded-lg border border-ink-200 bg-surface px-2 py-0.5 font-mono text-sm font-bold text-ink-700"
-            aria-label={`Saved answer: ${answerText(saved.keys)}`}
-          >
-            {answerText(saved.keys)}
-          </span>
+          {isMatching(q) ? null : savedAnswer}
           <button
             type="button"
             aria-label={`Question ${index + 1}: change answer`}
@@ -512,6 +515,9 @@ function MarkRow({
             Change
           </button>
         </div>
+        {/* A matching answer spells out every row, so it gets a line of
+            its own instead of crowding the badge and the Change button. */}
+        {isMatching(q) ? <div className="flex min-w-0">{savedAnswer}</div> : null}
       </li>
     );
   }
