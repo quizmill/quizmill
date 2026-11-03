@@ -128,7 +128,13 @@ describe('PaperPage paper picker', () => {
     const item = q(`[data-testid="sheet-question-${position}"]`);
     const table = item.querySelector('[data-testid="paper-match-table"]')!;
     expect(table.querySelectorAll('tbody tr')).toHaveLength(6);
-    expect(table.querySelectorAll('thead th[scope="col"]')).toHaveLength(3);
+    // The corner header keeps its column (only its text is hidden), so the
+    // three choice headings sit over their boxes; each statement is a row header.
+    const headers = [...table.querySelectorAll('thead th[scope="col"]')];
+    expect(headers).toHaveLength(4);
+    expect(headers[0].classList.contains('sr-only')).toBe(false);
+    expect(table.querySelectorAll('tbody th[scope="row"]')).toHaveLength(6);
+    expect(table.querySelectorAll('tbody tr:first-child td')).toHaveLength(3);
     expect(table.textContent).toContain('Ice giant');
     expect(item.querySelector(`[data-testid="answer-box-${position}"]`)).toBeNull();
     expect(table.querySelector('[data-testid="key-tick"]')).toBeNull();
@@ -141,8 +147,8 @@ describe('PaperPage paper picker', () => {
     const ticks = [...keyTable.querySelectorAll('tbody tr')].map((tr) =>
       [...tr.querySelectorAll('td')].findIndex((td) => td.querySelector('[data-testid="key-tick"]')),
     );
-    // Columns: row text, then Rocky / Gas giant / Ice giant.
-    expect(ticks).toEqual([1, 2, 3, 1, 3, 2]);
+    // Answer cells: Rocky / Gas giant / Ice giant (the row text is its header).
+    expect(ticks).toEqual([0, 1, 2, 0, 2, 1]);
     expect(keyTable.textContent).toContain('an ice giant, not a gas giant');
   });
 

@@ -21,7 +21,11 @@ export function PaperMatchTable({
     <table className="mt-2 w-full border-collapse text-left" data-testid="paper-match-table">
       <thead>
         <tr>
-          <th className="sr-only">Row</th>
+          {/* The cell keeps its column; only its text is hidden, or the
+              choice headings would slide left off their boxes. */}
+          <th scope="col">
+            <span className="sr-only">Statement</span>
+          </th>
           {choices.map((c) => (
             <th
               key={c.key}
@@ -38,7 +42,7 @@ export function PaperMatchTable({
           const answer = question.correctMatch?.[r.key];
           return (
             <tr key={r.key} className="border-t border-neutral-300">
-              <td className="py-1.5 pr-2 align-top">
+              <th scope="row" className="py-1.5 pr-2 text-left align-top font-normal">
                 <span className="mr-1 font-bold">{i + 1}.</span>
                 <McqMarkdown text={r.text} />
                 {showAnswers && r.explanation ? (
@@ -46,7 +50,7 @@ export function PaperMatchTable({
                     <McqMarkdown text={r.explanation} />
                   </div>
                 ) : null}
-              </td>
+              </th>
               {choices.map((c) => (
                 <td key={c.key} className="px-1 py-1.5 text-center align-top">
                   <span
