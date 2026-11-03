@@ -30,6 +30,20 @@ vi.mock('@/lib/packInsert', async (importOriginal) => {
   return { ...mod, fetchPackFromUrl };
 });
 
+// The insert can be held open (`insertGate.hold`) to stand in for a slow
+// IndexedDB write; otherwise it is the real one.
+const insertGate = vi.hoisted(() => ({ hold: null as Promise<void> | null }));
+vi.mock('@/lib/packLibrary', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@/lib/packLibrary')>();
+  return {
+    ...mod,
+    insertPack: async (...args: Parameters<typeof mod.insertPack>) => {
+      if (insertGate.hold) await insertGate.hold;
+      return mod.insertPack(...args);
+    },
+  };
+});
+
 // React needs this flag to allow act() outside @testing-library.
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
@@ -209,6 +223,27 @@ describe('PacksPage insert feedback', () => {
     expect(insertCard().querySelector('[data-testid="insert-result"]')).toBeNull();
     expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBeNull();
     expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('scrolls the result into view even when the insert takes a while to store', async () => {
+    await render();
+    let release!: () => void;
+    insertGate.hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    try {
+      await pickFile(async () => bundleJson());
+      await act(async () => {});
+      await act(async () => {
+        release();
+      });
+      await act(async () => {});
+    } finally {
+      insertGate.hold = null;
+    }
+    const result = insertCard().querySelector<HTMLElement>('[data-testid="insert-result"]');
+    expect(result).toBeTruthy();
+    expect(scrollIntoView.mock.instances).toContain(result);
   });
 
   it('puts a failed insert in the same place, scrolled into view', async () => {
