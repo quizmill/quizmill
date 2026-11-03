@@ -87,6 +87,13 @@ async function pickOption(key: string) {
   await click(option!);
 }
 
+/** Answer the question on screen correctly, whatever its shape — the
+ *  check may deal the matching item at any position. */
+async function pickRight(q: (typeof packQuestions)[number]) {
+  if (q.rows) await answerMatching(container, q, true, click);
+  else for (const k of correctKeysOf(q)) await pickOption(k);
+}
+
 /** Let the (fake) clock run: the sitting's interval ticks and re-renders. */
 async function elapse(ms: number) {
   await act(async () => {
@@ -114,7 +121,7 @@ async function answer(
     const wrong = q.options!.find((o) => !right.includes(o.key))!;
     await pickOption(wrong.key);
   } else {
-    for (const k of right) await pickOption(k);
+    await pickRight(q);
   }
   await elapse(pace.think);
   await click(control('Check answer')!);
@@ -269,8 +276,7 @@ describe('PackCheckRunner', () => {
     // Six minutes left after the first: a second is dealt.
     expect(control('Check answer')).toBeTruthy();
     expect(byId('check-result')).toBeNull();
-    const q = currentQuestion();
-    for (const k of correctKeysOf(q)) await pickOption(k);
+    await pickRight(currentQuestion());
     await elapse(slow.think);
     await click(control('Check answer')!);
     await elapse(slow.read);
@@ -349,8 +355,7 @@ describe('PackCheckRunner', () => {
     expect(byId('check-end-gap')!.textContent).toBe('1 more for a verdict');
 
     // Answering the sixth opens it while its feedback shows.
-    const q = currentQuestion();
-    for (const k of correctKeysOf(q)) await pickOption(k);
+    await pickRight(currentQuestion());
     await elapse(THINK_MS);
     await click(control('Check answer')!);
     expect(control('End check')!.disabled).toBe(false);
