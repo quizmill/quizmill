@@ -62,7 +62,7 @@ test('prints a whole paper from Paper practice, headed by the paper', async ({ p
   await expect(sheet).toBeVisible();
   await expect(sheet).toContainText('Starter papers · Paper 1');
   await expect(sheet).toContainText('7 questions');
-  await expect(page.locator(`${tid('paper-sheet')} [data-testid^="sheet-question-"]`)).toHaveCount(6);
+  await expect(page.locator(`${tid('paper-sheet')} [data-testid^="sheet-question-"]`)).toHaveCount(7);
   // The QR still renders for a whole paper.
   await page.locator(`${tid('paper-sheet')} svg path`).first().waitFor();
 });
