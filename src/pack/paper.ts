@@ -21,8 +21,13 @@ import { APP_BUILD } from '@/config';
 import type { Attempt, Session } from '@/data/types';
 import { KEY_PREFIX } from '@/lib/storage';
 import type { AttemptSummary } from '@/lib/selection';
-import { isMultiAnswer, type OptionKey, type PackQuestion } from '@/pack/data';
-import { deviceContext, gradeSelection, pickSessionFromBank } from '@/pack/runner';
+import { isMatching, isMultiAnswer, type AnswerKey, type PackQuestion } from '@/pack/data';
+import {
+  deviceContext,
+  encodeSelection,
+  gradeSelection,
+  pickSessionFromBank,
+} from '@/pack/runner';
 
 // ── Sheet records ────────────────────────────────────────────────────────
 
@@ -360,7 +365,7 @@ export async function decodePaperPayload(encoded: string): Promise<PaperPayload 
 export interface PaperMark {
   questionId: string;
   question: PackQuestion | null;
-  selected: OptionKey[] | null;
+  selected: AnswerKey[] | null;
 }
 
 /** Join a sheet's question ids back to the active bank. Ids the pack no
@@ -433,7 +438,7 @@ export function buildPaperResult(
       sessionId: sheet.id,
       questionId: mark.question.id,
       answeredAt: priorAnsweredAt?.get(id) ?? now + i,
-      selectedAnswer: [...mark.selected].sort().join(','),
+      selectedAnswer: encodeSelection(mark.question, mark.selected),
       isCorrect,
       timeTakenSeconds: 1, // unmeasured — the sheet keeps no clock
       subject: mark.question.categoryKey,
@@ -472,7 +477,7 @@ export function buildPaperResult(
 /** An answer this sheet already has in storage — entered in an earlier
  *  batch here, or on another device and pulled down by sync. */
 export interface SavedMark {
-  keys: OptionKey[];
+  keys: AnswerKey[];
   answeredAt: number;
 }
 
@@ -488,7 +493,7 @@ export function savedMarksForSheet(
   return sheet.questionIds.map((qid) => {
     const a = byQuestion.get(qid);
     if (!a) return null;
-    const keys = a.selectedAnswer.split(',').filter(Boolean) as OptionKey[];
+    const keys = a.selectedAnswer.split(',').filter(Boolean) as AnswerKey[];
     return keys.length > 0 ? { keys, answeredAt: a.answeredAt } : null;
   });
 }
@@ -508,7 +513,7 @@ export type MarkStatus = 'blank' | 'new' | 'saved' | 'changed';
 
 export function markStatus(
   saved: SavedMark | null,
-  selected: OptionKey[] | null,
+  selected: AnswerKey[] | null,
 ): MarkStatus {
   const picked = selected && selected.length > 0 ? [...selected].sort().join(',') : '';
   if (!saved) return picked ? 'new' : 'blank';
@@ -520,5 +525,6 @@ export function markStatus(
 export function answerBoxLabel(question: PackQuestion): string {
   // Deliberately no count for multi-answer — the screen runner doesn't
   // reveal how many are correct either.
+  if (isMatching(question)) return 'Tick one box in each row';
   return isMultiAnswer(question) ? 'Write ALL the correct letters' : 'Write the letter';
 }

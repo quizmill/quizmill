@@ -201,6 +201,75 @@
     "reviewStatus": "approved"
   },
   {
+    "id": "demo-planets-014",
+    "categoryKey": "planets",
+    "level": "advanced",
+    "paperId": "starter-paper-1",
+    "tags": [
+      "planet-types",
+      "matching"
+    ],
+    "difficulty": 3,
+    "prompt": "Classify each planet by what it is mostly made of. Choose one type for each row.",
+    "rows": [
+      {
+        "key": "1",
+        "text": "Mercury",
+        "explanation": "A small world of rock around a large iron core."
+      },
+      {
+        "key": "2",
+        "text": "Jupiter",
+        "explanation": "Mostly hydrogen and helium, with no solid surface."
+      },
+      {
+        "key": "3",
+        "text": "Neptune",
+        "explanation": "Rich in water, ammonia and methane \"ices\" under a thinner hydrogen envelope."
+      },
+      {
+        "key": "4",
+        "text": "Mars",
+        "explanation": "Rocky, with a thin carbon-dioxide atmosphere."
+      },
+      {
+        "key": "5",
+        "text": "Uranus",
+        "explanation": "Neptune's near twin: an ice giant, not a gas giant."
+      },
+      {
+        "key": "6",
+        "text": "Saturn",
+        "explanation": "Like Jupiter, overwhelmingly hydrogen and helium."
+      }
+    ],
+    "choices": [
+      {
+        "key": "rocky",
+        "text": "Rocky"
+      },
+      {
+        "key": "gas-giant",
+        "text": "Gas giant"
+      },
+      {
+        "key": "ice-giant",
+        "text": "Ice giant"
+      }
+    ],
+    "correctMatch": {
+      "1": "rocky",
+      "2": "gas-giant",
+      "3": "ice-giant",
+      "4": "rocky",
+      "5": "ice-giant",
+      "6": "gas-giant"
+    },
+    "explanation": "The four inner planets (Mercury, Venus, Earth, Mars) are rocky. Jupiter and Saturn are gas giants, made almost entirely of hydrogen and helium. Uranus and Neptune are giants too, but with far more water, ammonia and methane, which is why they are classed separately as ice giants.",
+    "source": "original",
+    "reviewStatus": "approved"
+  },
+  {
     "id": "demo-planets-007",
     "categoryKey": "planets",
     "level": "basics",

@@ -45,7 +45,7 @@ describe('the starter pack', () => {
     expect(manifest.look).toBeUndefined();
     for (const q of questions) {
       expect(q.image, q.id).toBeUndefined();
-      for (const o of q.options) expect(o.image, `${q.id} ${o.key}`).toBeUndefined();
+      for (const o of q.options!) expect(o.image, `${q.id} ${o.key}`).toBeUndefined();
     }
   });
 

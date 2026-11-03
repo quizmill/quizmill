@@ -150,7 +150,7 @@ export function speechForQuestion(
   const parts = [`Question ${index + 1} of ${total}.`];
   if (scenarioStem) parts.push(stripForSpeech(scenarioStem));
   parts.push(stripForSpeech(question.prompt));
-  for (const opt of question.options) {
+  for (const opt of question.options ?? []) {
     parts.push(`${opt.key}. ${stripForSpeech(opt.text)}.`);
   }
   return parts.join(' ');
@@ -166,7 +166,7 @@ export function speechForFeedback(
   if (selected === question.correctKey) {
     return `Correct! ${explanation}`;
   }
-  const right = question.options.find((o) => o.key === question.correctKey);
+  const right = question.options?.find((o) => o.key === question.correctKey);
   const rightText = right ? ` ${stripForSpeech(right.text)}.` : '';
   return `Not quite. The answer is ${question.correctKey}.${rightText} ${explanation}`;
 }

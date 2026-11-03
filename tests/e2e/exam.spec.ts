@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test';
 import { bodyText, clickButtonByText, pickOptionA, readStorage, waitForText } from './helpers';
 
 /**
- * The timed exam against the demo pack: its manifest declares a 9-question,
- * 15-minute mock exam and holds 9 Advanced questions, so one sitting is 9
+ * The timed exam against the demo pack: its manifest declares a 10-question,
+ * 15-minute mock exam and holds 10 Advanced questions, so one sitting is 10
  * questions in 15:00.
  */
 const SESSIONS_KEY = 'quizmill.solar-system-demo.sessions.v1';
@@ -22,7 +22,7 @@ test.describe('timed exam', () => {
 
     await waitForText(page, 'Start exam');
     const intro = await bodyText(page);
-    expect(intro).toContain('9');
+    expect(intro).toContain('10');
     expect(intro).toContain('15:00');
     expect(intro).toContain('70%');
 
@@ -35,15 +35,15 @@ test.describe('timed exam', () => {
     await clickButtonByText(page, 'Resume');
     await expect(page.locator(tid('exam-paused'))).toHaveCount(0);
 
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 10; i++) {
       await pickOptionA(page);
       // No feedback between questions: the next question appears directly.
-      await clickButtonByText(page, i === 8 ? 'Finish exam' : 'Next question');
+      await clickButtonByText(page, i === 9 ? 'Finish exam' : 'Next question');
     }
 
     await waitForText(page, 'Exam complete');
     await expect(page.locator(tid('exam-verdict'))).toHaveText(/Passed|Not passed/);
-    expect(await bodyText(page)).toMatch(/\d\/9/);
+    expect(await bodyText(page)).toMatch(/\d\/10/);
 
     const sessions = await readStorage<{ mode?: string; endedAt: number | null }[]>(
       page,
@@ -52,7 +52,7 @@ test.describe('timed exam', () => {
     expect(sessions?.[0]).toMatchObject({ mode: 'exam' });
     expect(sessions?.[0].endedAt).not.toBeNull();
     const attempts = await readStorage<{ mode?: string }[]>(page, ATTEMPTS_KEY);
-    expect(attempts).toHaveLength(9);
+    expect(attempts).toHaveLength(10);
     expect(attempts?.every((a) => a.mode === 'exam')).toBe(true);
   });
 });

@@ -34,20 +34,28 @@ import {
   type ReplayStep,
 } from '@/lib/coachSessions';
 import {
+  answerKeysOf,
   correctKeysOf,
+  isMatching,
   isMultiAnswer,
   packQuestions,
   packScenarios,
   PACK_CATEGORY_LABEL,
   PACK_CONCEPT_BY_ID,
-  type OptionKey,
+  type AnswerKey,
   type PackQuestion,
 } from '@/pack/data';
 import { ConceptCard } from '@/pack/ConceptCard';
+import { MatchRows } from '@/pack/MatchRows';
 import { OptionButtons } from '@/pack/OptionButtons';
 import { PackImage } from '@/pack/PackImage';
 import { QuestionMeta } from '@/pack/QuestionMeta';
-import { gradeSelection, nextSelection, formatKeyList } from '@/pack/runner';
+import {
+  formatAnswer,
+  gradeSelection,
+  isAnswerReady,
+  nextSelection,
+} from '@/pack/runner';
 import { useClientState, useMounted } from '@/lib/useMounted';
 
 /** What the URL hash points at: one session, or a whole day. */
@@ -505,15 +513,16 @@ function ReplayCard({
 }) {
   const { attempt, question } = step;
   const multi = isMultiAnswer(question);
-  const answerKeys = correctKeysOf(question);
-  const learnerKeys = selectedKeys(attempt) as OptionKey[];
+  const matching = isMatching(question);
+  const answerKeys = answerKeysOf(question);
+  const learnerKeys = selectedKeys(attempt) as AnswerKey[];
   // The parent's own (ephemeral) pick while the answer is hidden.
-  const [pick, setPick] = useState<OptionKey[]>([]);
+  const [pick, setPick] = useState<AnswerKey[]>([]);
   const scenario = question.scenarioId
     ? packScenarios.find((s) => s.id === question.scenarioId)
     : undefined;
   const concept = question.conceptId ? PACK_CONCEPT_BY_ID[question.conceptId] : undefined;
-  const pickGraded = pick.length > 0 ? gradeSelection(question, pick) : null;
+  const pickGraded = isAnswerReady(question, pick) ? gradeSelection(question, pick) : null;
   const priorWrong = prior.filter((a) => !a.isCorrect).length;
 
   return (
@@ -584,22 +593,34 @@ function ReplayCard({
           </div>
         ) : null}
 
-        <OptionButtons
-          options={question.options}
-          selected={revealed ? learnerKeys : pick}
-          stage={revealed ? 'feedback' : 'choosing'}
-          correctKeys={answerKeys}
-          multi={multi}
-          onSelect={(key) => {
-            if (revealed) return;
-            setPick((prev) => nextSelection(prev, key, multi));
-          }}
-        />
+        {matching ? (
+          <MatchRows
+            question={question}
+            selected={revealed ? learnerKeys : pick}
+            stage={revealed ? 'feedback' : 'choosing'}
+            onSelect={(key) => {
+              if (revealed) return;
+              setPick((prev) => nextSelection(prev, key, multi));
+            }}
+          />
+        ) : (
+          <OptionButtons
+            options={question.options ?? []}
+            selected={revealed ? learnerKeys : pick}
+            stage={revealed ? 'feedback' : 'choosing'}
+            correctKeys={correctKeysOf(question)}
+            multi={multi}
+            onSelect={(key) => {
+              if (revealed) return;
+              setPick((prev) => nextSelection(prev, key, multi));
+            }}
+          />
+        )}
 
         <div className="flex items-center justify-between gap-3">
           {!revealed && pickGraded !== null ? (
             <span className="text-sm text-ink-500">
-              Picked {formatKeyList(pick)} — reveal to check.
+              Picked {formatAnswer(question, pick)} — reveal to check.
             </span>
           ) : (
             <span />
@@ -635,8 +656,8 @@ function ReplayCard({
               {attempt.isCorrect ? 'Got it right' : 'Got it wrong'}
               <span className="font-medium text-ink-700">
                 {' '}
-                — answered {formatKeyList(learnerKeys)}
-                {attempt.isCorrect ? '' : `, the answer is ${formatKeyList(answerKeys)}`}
+                — answered {formatAnswer(question, learnerKeys)}
+                {attempt.isCorrect ? '' : `, the answer is ${formatAnswer(question, answerKeys)}`}
                 {attempt.firstSelected && attempt.firstSelected !== attempt.selectedAnswer
                   ? `, first tapped ${attempt.firstSelected}`
                   : ''}
@@ -662,7 +683,7 @@ function ReplayCard({
                       />
                       <span className="text-ink-500">{SHORT_DAY_FORMAT.format(new Date(a.answeredAt))}</span>
                       <span>
-                        {a.isCorrect ? 'right' : `wrong — picked ${formatKeyList(selectedKeys(a) as OptionKey[])}`}
+                        {a.isCorrect ? 'right' : `wrong — picked ${formatAnswer(question, selectedKeys(a))}`}
                       </span>
                     </li>
                   ))}
@@ -671,7 +692,7 @@ function ReplayCard({
             ) : null}
             {pickGraded !== null ? (
               <div className="text-sm text-ink-700">
-                Just now you picked {formatKeyList(pick)} —{' '}
+                Just now you picked {formatAnswer(question, pick)} —{' '}
                 {pickGraded ? 'correct.' : 'not right.'}
               </div>
             ) : null}
