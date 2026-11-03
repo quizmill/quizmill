@@ -232,9 +232,10 @@ export function matchPick(row: string, choice: string): MatchPick {
 
 /** Row key → picked choice key, read from a selection (or a stored
  *  attempt's split `selectedAnswer`). Entries that aren't picks — option
- *  keys — are ignored; a later pick for a row wins. */
+ *  keys — are ignored; a later pick for a row wins. Null-prototype, so a
+ *  row keyed `constructor` (a valid slug) reads unanswered until picked. */
 export function matchPicksOf(selected: readonly string[]): Record<string, string> {
-  const picks: Record<string, string> = {};
+  const picks: Record<string, string> = Object.create(null);
   for (const s of selected) {
     const at = s.indexOf('=');
     if (at > 0) picks[s.slice(0, at)] = s.slice(at + 1);

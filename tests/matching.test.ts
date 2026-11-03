@@ -68,6 +68,13 @@ describe('matching question helpers', () => {
     expect(s).toEqual(['2=yes', '1=no']);
   });
 
+  it('treats a row key that names an Object.prototype member as unanswered', () => {
+    const proto = { rows: [{ key: 'constructor', text: 'c' }, { key: 'other', text: 'o' }] };
+    expect(matchPicksOf(['other=yes']).constructor).toBeUndefined();
+    expect(isAnswerReady(proto, ['other=yes'])).toBe(false);
+    expect(isAnswerReady(proto, ['other=yes', 'constructor=no'])).toBe(true);
+  });
+
   it('is ready only when every row has a pick', () => {
     expect(isAnswerReady(yesNo, ['1=yes', '2=no'])).toBe(false);
     expect(isAnswerReady(yesNo, all)).toBe(true);
