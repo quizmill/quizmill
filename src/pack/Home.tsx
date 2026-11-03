@@ -25,7 +25,9 @@ import { UnlockedToast } from '@/components/UnlockedToast';
 import { PackUpdatedNotice } from '@/components/PackUpdatedNotice';
 import { useStorageData } from '@/lib/useStorage';
 import { useClientState, useMounted } from '@/lib/useMounted';
-import { unresolvedMistakeCount } from '@/lib/mistakes';
+import { weakSpots } from '@/lib/mistakes';
+import { useDevicePref } from '@/lib/useDevicePref';
+import { weakSpotClearAfterPref } from '@/lib/weakSpotPref';
 import {
   saveLevelFilter,
   loadDismissedNudge,
@@ -138,6 +140,8 @@ export default function PackHome() {
   // unless this device has hidden timed exams.
   const examLocked =
     examShown && APP_CONFIG.upgrade?.packId ? EXAM_WITHHELD : null;
+  // Right answers in a row that take a question off the weak-spot list.
+  const [clearAfter] = useDevicePref(weakSpotClearAfterPref);
   // In runtime-pack mode, hold the first paint until mount (see RUNTIME_PACK_MODE).
   const mounted = useMounted() || !RUNTIME_PACK_MODE;
   useEffect(() => {
@@ -179,7 +183,12 @@ export default function PackHome() {
     setLevel(nudge.to);
   };
 
-  const mistakeCount = unresolvedMistakeCount(attempts);
+  // The weak-spot list's length — only questions still in the pack, the
+  // same ones the list page shows and the review runner deals.
+  const packIds = new Set(packQuestions.map((q) => q.id));
+  const mistakeCount = weakSpots(attempts, clearAfter).filter((m) =>
+    packIds.has(m.id),
+  ).length;
 
   const statsByCategory = new Map<
     string,
@@ -271,7 +280,8 @@ export default function PackHome() {
 
       {mistakeCount > 0 ? (
         <HomeCard
-          href="/practice/review/"
+          href="/weak-spots/"
+          testid="weak-spots-card"
           tone="warn"
           icon={RefreshCw}
           title={
