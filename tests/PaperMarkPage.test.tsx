@@ -104,7 +104,7 @@ describe('PaperMarkPage', () => {
     // Q1: the correct letter; Q2: a wrong one; Q3 left blank (skipped).
     const [q1, q2] = packQuestions.slice(0, 2);
     const correct1 = correctKeysOf(q1)[0];
-    const wrong2 = q2.options
+    const wrong2 = q2.options!
       .map((o) => o.key)
       .find((k) => !correctKeysOf(q2).includes(k))!;
     await click(q(`[aria-label="Question 1: answer ${correct1}"]`));
@@ -158,7 +158,7 @@ describe('PaperMarkPage', () => {
 
     const [q1] = packQuestions;
     const correct1 = correctKeysOf(q1)[0];
-    const wrong1 = q1.options
+    const wrong1 = q1.options!
       .map((o) => o.key)
       .find((k) => !correctKeysOf(q1).includes(k))!;
 
@@ -195,7 +195,7 @@ describe('PaperMarkPage', () => {
     savePaperSheet(sheet);
     const picked = packQuestions.slice(0, 3);
     const wrongOf = (qq: (typeof picked)[number]) =>
-      qq.options.map((o) => o.key).find((k) => !correctKeysOf(qq).includes(k))!;
+      qq.options!.map((o) => o.key).find((k) => !correctKeysOf(qq).includes(k))!;
 
     // All three right: the big one, confetti and all.
     window.location.hash = `#sheet=${sheet.id}`;
@@ -338,7 +338,7 @@ describe('PaperMarkPage — batches', () => {
     await markFirstBatch(sheet);
     const before = loadAttempts()[0];
     const [q1] = packQuestions;
-    const wrong1 = q1.options
+    const wrong1 = q1.options!
       .map((o) => o.key)
       .find((k) => !correctKeysOf(q1).includes(k))!;
 
@@ -517,8 +517,13 @@ describe('PaperPage', () => {
     const answers = Array.from(
       container.querySelectorAll('[data-testid="key-answer"]'),
     ).map((el) => el.textContent?.trim());
-    expect(answers).toHaveLength(10);
-    expect(answers[0]).toBe(correctKeysOf(first).join(','));
+    // One answer box per option question; a matching question's ticks sit
+    // in its table instead.
+    const optionQs = sheets[0].questionIds
+      .map((id: string) => packQuestions.find((x) => x.id === id)!)
+      .filter((x: { rows?: unknown }) => !x.rows);
+    expect(answers).toHaveLength(optionQs.length);
+    expect(answers[0]).toBe(correctKeysOf(optionQs[0]).join(','));
     expect(
       container.querySelectorAll('[data-testid="key-explanation"]')[0].textContent,
     ).toContain(first.explanation.slice(0, 20));

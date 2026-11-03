@@ -30,12 +30,15 @@ import {
 } from '@/lib/storage';
 import { newlyEarnedAchievements } from '@/pack/achievements-engine';
 import {
+  isMatching,
   isMultiAnswer,
+  matchPick,
+  matchPicksOf,
   packQuestions,
   sheetScopeLabel,
-  type OptionKey,
+  type AnswerKey,
 } from '@/pack/data';
-import { nextSelection } from '@/pack/runner';
+import { formatAnswer, nextSelection } from '@/pack/runner';
 import { SaveDestination } from '@/pack/SaveDestination';
 import { ScoreCard } from '@/pack/ScoreCelebration';
 import {
@@ -136,7 +139,7 @@ export function PaperMarkPage() {
   const [source, setSource] = useState<Source>({ kind: 'none' });
   // Letters picked in THIS visit, by sheet position. A row absent here
   // shows what storage holds for it (or nothing).
-  const [edits, setEdits] = useState<Record<number, OptionKey[] | null>>({});
+  const [edits, setEdits] = useState<Record<number, AnswerKey[] | null>>({});
   // Previously answered rows the marker has opened up to correct.
   const [reopened, setReopened] = useState<ReadonlySet<number>>(new Set());
   const [storageVersion, setStorageVersion] = useState(0);
@@ -221,7 +224,7 @@ export function PaperMarkPage() {
   const selectionAt = (
     i: number,
     stored: (SavedMark | null)[],
-  ): OptionKey[] | null => {
+  ): AnswerKey[] | null => {
     const draft = edits[i];
     if (draft && draft.length > 0) return draft;
     return stored[i]?.keys ?? null;
@@ -445,12 +448,12 @@ function MarkRow({
   mark: PaperMark;
   /** What storage already holds for this row (an earlier batch). */
   saved: SavedMark | null;
-  selected: OptionKey[] | null;
+  selected: AnswerKey[] | null;
   status: MarkStatus;
   /** A previously answered row opened up for correcting. */
   reopened: boolean;
   onReopen: (open: boolean) => void;
-  onSelect: (next: OptionKey[] | null) => void;
+  onSelect: (next: AnswerKey[] | null) => void;
 }) {
   const q = mark.question;
   if (!q) {
@@ -460,6 +463,9 @@ function MarkRow({
       </li>
     );
   }
+  // A matching question's answer reads as its picked choices, row by
+  // row; option letters stay letters.
+  const answerText = (k: AnswerKey[]) => (isMatching(q) ? formatAnswer(q, k) : k.join(' '));
   const number = (
     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink-100 text-xs font-bold text-ink-700">
       {index + 1}
@@ -492,9 +498,9 @@ function MarkRow({
           <span className="flex-1" />
           <span
             className="rounded-lg border border-ink-200 bg-surface px-2 py-0.5 font-mono text-sm font-bold text-ink-700"
-            aria-label={`Saved answer: ${saved.keys.join(', ')}`}
+            aria-label={`Saved answer: ${answerText(saved.keys)}`}
           >
-            {saved.keys.join(' ')}
+            {answerText(saved.keys)}
           </span>
           <button
             type="button"
@@ -511,6 +517,8 @@ function MarkRow({
   }
 
   const multi = isMultiAnswer(q);
+  const matching = isMatching(q);
+  const picks = matchPicksOf(selected ?? []);
   const keys = selected ?? [];
   return (
     <li
@@ -527,8 +535,43 @@ function MarkRow({
           <McqMarkdown text={q.prompt} />
         </span>
       </div>
+      {matching ? (
+        // One row of choice chips per matching row — the ticks the
+        // learner made in the sheet's table.
+        <div className="flex flex-col gap-2.5" data-testid={`mark-match-${index + 1}`}>
+          {(q.rows ?? []).map((r, ri) => (
+            <div key={r.key} className="flex flex-col gap-1">
+              <div className="text-xs leading-snug text-ink-600">
+                <span className="font-bold">{ri + 1}.</span> <McqMarkdown text={r.text} />
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {(q.choices ?? []).map((c) => {
+                  const active = picks[r.key] === c.key;
+                  return (
+                    <button
+                      key={c.key}
+                      type="button"
+                      aria-pressed={active}
+                      aria-label={`Question ${index + 1}, row ${ri + 1}: ${c.text}`}
+                      onClick={() => onSelect(nextSelection(keys, matchPick(r.key, c.key), false))}
+                      className={cn(
+                        'tap-feedback rounded-lg border px-2.5 py-1.5 text-sm font-semibold',
+                        active
+                          ? 'border-brand-600 bg-brand-600 text-white shadow-xs'
+                          : 'border-ink-200 bg-surface text-ink-700 hover:border-ink-300',
+                      )}
+                    >
+                      {c.text}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div className="flex items-center gap-1.5">
-        {q.options.map((opt) => {
+        {(q.options ?? []).map((opt) => {
           const active = keys.includes(opt.key);
           return (
             <button
@@ -567,7 +610,7 @@ function MarkRow({
             className="tap-feedback inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-ink-600 hover:bg-ink-100"
           >
             <Undo2 className="h-3.5 w-3.5" />
-            Keep {saved.keys.join(' ')}
+            Keep {answerText(saved.keys)}
           </button>
         ) : keys.length > 0 ? (
           <button
@@ -589,7 +632,7 @@ function MarkRow({
         >
           {status === 'changed' ? (
             <>
-              Changing the saved answer ({saved.keys.join(' ')}) — this
+              Changing the saved answer ({answerText(saved.keys)}) — this
               corrects it, it doesn&apos;t add a second one.
             </>
           ) : (

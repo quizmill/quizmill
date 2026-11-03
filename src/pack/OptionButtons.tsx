@@ -2,13 +2,13 @@ import { Check, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { McqMarkdown } from '@/components/McqMarkdown';
 import { PackImage } from '@/pack/PackImage';
-import type { OptionKey, PackOption } from '@/pack/data';
+import type { AnswerKey, OptionKey, PackOption } from '@/pack/data';
 
 interface OptionButtonsProps {
   options: PackOption[];
   /** The chosen option key(s). One entry for single-answer questions;
    *  several while a multi-answer ("select all") question is in progress. */
-  selected: OptionKey[];
+  selected: AnswerKey[];
   stage: 'choosing' | 'feedback';
   /** Every correct key — one for single-answer, two+ for multi-answer. */
   correctKeys: OptionKey[];

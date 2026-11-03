@@ -8,7 +8,16 @@ import { APP_BUILD } from '@/config';
 import type { Attempt, Session, SessionMode } from '@/data/types';
 import { pickSessionQuestions, type AttemptSummary } from '@/lib/selection';
 import { loadLevelFilter } from '@/lib/storage';
-import { correctKeysOf, packLevelKeys, type OptionKey, type PackQuestion } from '@/pack/data';
+import {
+  answerKeysOf,
+  isMatching,
+  matchPick,
+  matchPicksOf,
+  packLevelKeys,
+  type AnswerKey,
+  type OptionKey,
+  type PackQuestion,
+} from '@/pack/data';
 
 export const QUESTION_COUNT = 10;
 
@@ -30,26 +39,65 @@ export const MIXED_LABEL = 'All categories';
  * credit). An empty selection is never correct.
  */
 export function gradeSelection(
-  question: Pick<PackQuestion, 'correctKey' | 'correctKeys'>,
-  selected: OptionKey[],
+  question: Pick<PackQuestion, 'correctKey' | 'correctKeys' | 'rows' | 'correctMatch'>,
+  selected: AnswerKey[],
 ): boolean {
-  const correct = correctKeysOf(question);
-  if (selected.length !== correct.length) return false;
+  const correct = answerKeysOf(question);
+  if (correct.length === 0 || selected.length !== correct.length) return false;
   const chosen = new Set(selected);
   return correct.every((k) => chosen.has(k));
 }
 
 /**
  * Compute the next selection when an option is tapped. Single-answer mode
- * replaces the selection; multi-answer mode toggles the key in/out.
+ * replaces the selection; multi-answer mode toggles the key in/out. A
+ * matching pick ("row=choice") replaces that row's earlier pick, whatever
+ * `multi` says — one choice per row.
  */
-export function nextSelection(
-  prev: OptionKey[],
-  key: OptionKey,
-  multi: boolean,
-): OptionKey[] {
+export function nextSelection<K extends AnswerKey>(prev: K[], key: K, multi: boolean): K[] {
+  const at = key.indexOf('=');
+  if (at > 0) {
+    const row = key.slice(0, at + 1);
+    return [...prev.filter((k) => !k.startsWith(row)), key];
+  }
   if (!multi) return [key];
   return prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
+}
+
+/** Whether the learner has answered enough to check: one pick per row
+ *  for a matching question, at least one option otherwise. */
+export function isAnswerReady(
+  question: Pick<PackQuestion, 'rows'>,
+  selected: readonly AnswerKey[],
+): boolean {
+  if (!isMatching(question)) return selected.length > 0;
+  const picks = matchPicksOf(selected);
+  return (question.rows ?? []).every((r) => picks[r.key] !== undefined);
+}
+
+/** How many rows of a matching question a selection got right — the
+ *  "4 of 6 rows right" line under a wrong answer. */
+export function matchRowsRight(
+  question: Pick<PackQuestion, 'rows' | 'correctMatch'>,
+  selected: readonly AnswerKey[],
+): { right: number; total: number } {
+  const rows = question.rows ?? [];
+  const picks = matchPicksOf(selected);
+  const right = rows.filter((r) => picks[r.key] === question.correctMatch?.[r.key]).length;
+  return { right, total: rows.length };
+}
+
+/** A selection as stored on an attempt: comma-joined, option keys sorted
+ *  ("A,C"), matching picks in row order ("1=yes,2=no"). Empty → "". */
+export function encodeSelection(
+  question: Pick<PackQuestion, 'rows'>,
+  selected: readonly AnswerKey[],
+): string {
+  if (!isMatching(question)) return [...selected].sort().join(',');
+  const picks = matchPicksOf(selected);
+  return (question.rows ?? [])
+    .flatMap((r) => (picks[r.key] !== undefined ? [matchPick(r.key, picks[r.key])] : []))
+    .join(',');
 }
 
 /** Render option keys as a natural list: "A", "A and B", "A, B and C". */
@@ -57,6 +105,20 @@ export function formatKeyList(keys: OptionKey[]): string {
   if (keys.length <= 1) return keys.join('');
   if (keys.length === 2) return `${keys[0]} and ${keys[1]}`;
   return `${keys.slice(0, -1).join(', ')} and ${keys[keys.length - 1]}`;
+}
+
+/** An answer in words for a one-line summary: the option letters ("A and
+ *  C"), or a matching question's picked choice per row, in row order
+ *  ("Yes · No · —", a dash for an unanswered row). */
+export function formatAnswer(
+  question: Pick<PackQuestion, 'rows' | 'choices'>,
+  keys: readonly string[],
+): string {
+  if (!isMatching(question)) return formatKeyList(keys as OptionKey[]);
+  const picks = matchPicksOf(keys);
+  const label = (k: string | undefined) =>
+    question.choices?.find((c) => c.key === k)?.text ?? '—';
+  return (question.rows ?? []).map((r) => label(picks[r.key])).join(' · ');
 }
 
 export interface RunnerState {
@@ -172,15 +234,17 @@ export function pickSessionFromBank(
 export interface BuildAttemptArgs {
   state: RunnerState;
   question: PackQuestion;
-  /** The chosen option key(s) — length 1 for single-answer questions. */
-  selected: OptionKey[];
+  /** The chosen option key(s) — length 1 for single-answer questions — or
+   *  one "row=choice" pick per row of a matching question. */
+  selected: AnswerKey[];
   categoryKey: string;
   now: number;
   attemptId: string;
   /** How the session runs — denormalised onto the attempt. */
   mode?: SessionMode;
-  /** The first option tapped before any revision, when the UI tracked it. */
-  firstSelected?: OptionKey;
+  /** The first option tapped before any revision, when the UI tracked it
+   *  (a matching question's first pick, "row=choice"). */
+  firstSelected?: AnswerKey;
   /** Override the measured time (Drive Mode times its own speech loop). */
   timeTakenSeconds?: number;
 }
@@ -200,9 +264,9 @@ export function buildAttempt(args: BuildAttemptArgs): Attempt {
     sessionId: state.sessionId,
     questionId: question.id,
     answeredAt: now,
-    // Persist as a sorted, comma-joined string ("A" or "A,C") — stays a
-    // plain string so storage/sync/stats read it unchanged.
-    selectedAnswer: [...selected].sort().join(','),
+    // Persist as a comma-joined string ("A", "A,C" or "1=yes,2=no") —
+    // stays a plain string so storage/sync/stats read it unchanged.
+    selectedAnswer: encodeSelection(question, selected),
     isCorrect: gradeSelection(question, selected),
     timeTakenSeconds: args.timeTakenSeconds ?? measured,
     // Subject is the engine type — packs store the category key here.

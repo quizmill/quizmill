@@ -147,6 +147,26 @@ export type PackOption = {
   explanation?: string;
 };
 
+/** A row of a matching question — a statement or item to assign a choice. */
+export type PackMatchRow = {
+  key: string;
+  text: string;
+  /** Short reason for this row's answer, shown under it in feedback. */
+  explanation?: string;
+};
+
+/** One of the shared choices every row of a matching question picks from. */
+export type PackMatchChoice = { key: string; text: string };
+
+/** One matching pick, "row=choice". Row and choice keys are slugs, so the
+ *  `=` and the `,` that joins picks on an attempt never collide. */
+export type MatchPick = `${string}=${string}`;
+
+/** What the runners keep in their selection array: option keys for a
+ *  single/multi-answer question, one `MatchPick` per row for a matching
+ *  question. Persisted comma-joined either way (Attempt.selectedAnswer). */
+export type AnswerKey = OptionKey | MatchPick;
+
 export type PackQuestion = {
   id: string;
   categoryKey: string;
@@ -158,7 +178,14 @@ export type PackQuestion = {
   difficulty: 1 | 2 | 3 | 4 | 5;
   prompt: string;
   image?: string;
-  options: PackOption[];
+  /** The answer options — absent on a matching question (`rows`). */
+  options?: PackOption[];
+  /** Matching question: rows, each answered with one of `choices`, keyed
+   *  by `correctMatch` (row key → choice key). Mutually exclusive with
+   *  options/correctKey(s). */
+  rows?: PackMatchRow[];
+  choices?: PackMatchChoice[];
+  correctMatch?: Record<string, string>;
   /** Single-answer key. Present unless the question is multi-answer. */
   correctKey?: OptionKey;
   /** Multi-answer keys ("select all that apply") — mutually exclusive with
@@ -191,6 +218,42 @@ export function correctKeysOf(
 ): OptionKey[] {
   if (q.correctKeys && q.correctKeys.length > 0) return q.correctKeys;
   return q.correctKey ? [q.correctKey] : [];
+}
+
+/** True for a matching question (rows × shared choices). */
+export function isMatching(q: Pick<PackQuestion, 'rows'>): boolean {
+  return Array.isArray(q.rows) && q.rows.length > 0;
+}
+
+/** The selection entry for picking `choice` on `row`. */
+export function matchPick(row: string, choice: string): MatchPick {
+  return `${row}=${choice}`;
+}
+
+/** Row key → picked choice key, read from a selection (or a stored
+ *  attempt's split `selectedAnswer`). Entries that aren't picks — option
+ *  keys — are ignored; a later pick for a row wins. */
+export function matchPicksOf(selected: readonly string[]): Record<string, string> {
+  const picks: Record<string, string> = {};
+  for (const s of selected) {
+    const at = s.indexOf('=');
+    if (at > 0) picks[s.slice(0, at)] = s.slice(at + 1);
+  }
+  return picks;
+}
+
+/**
+ * Every key a fully right answer selects: the option key(s) of a single-
+ * or multi-answer question, or one `row=choice` pick per row, in row
+ * order, for a matching question. Grading is set-equality against this.
+ */
+export function answerKeysOf(
+  q: Pick<PackQuestion, 'correctKey' | 'correctKeys' | 'rows' | 'correctMatch'>,
+): AnswerKey[] {
+  if (q.rows && q.rows.length > 0) {
+    return q.rows.map((r) => matchPick(r.key, q.correctMatch?.[r.key] ?? ''));
+  }
+  return correctKeysOf(q);
 }
 
 export const packManifest = activeManifest;
