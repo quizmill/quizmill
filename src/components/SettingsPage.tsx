@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Boxes,
   Car,
+  ClipboardCheck,
   Gamepad2,
   GraduationCap,
   Monitor,
@@ -378,14 +379,28 @@ export function SettingsPage({ extras }: SettingsPageProps) {
             keep each pack&apos;s progress. Practising now:{' '}
             <strong>{APP_CONFIG.title}</strong>.
           </p>
-          <Link
-            href="/packs/"
-            data-testid="open-packs"
-            className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-xs hover:bg-ink-50 dark:hover:bg-ink-100"
-          >
-            <Boxes className="h-4 w-4" />
-            Manage packs
-          </Link>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              href="/packs/"
+              data-testid="open-packs"
+              className="tap-feedback inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-xs hover:bg-ink-50 dark:hover:bg-ink-100"
+            >
+              <Boxes className="h-4 w-4" />
+              Manage packs
+            </Link>
+            <Link
+              href="/packs/review/"
+              data-testid="open-pack-review"
+              className="tap-feedback inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-xs hover:bg-ink-50 dark:hover:bg-ink-100"
+            >
+              <ClipboardCheck className="h-4 w-4" />
+              Review questions
+            </Link>
+          </div>
+          <p className="mt-2 text-xs text-ink-500">
+            Review questions shows a random 10 or 20 of this pack&apos;s questions with
+            their answers, for checking a pack&apos;s quality.
+          </p>
         </div>
 
         <UpgradeCard placement="settings" />
