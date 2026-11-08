@@ -96,7 +96,8 @@ export function encodeSelection(
   if (!isMatching(question)) return [...selected].sort().join(',');
   const picks = matchPicksOf(selected);
   return (question.rows ?? [])
-    .flatMap((r) => (picks[r.key] !== undefined ? [matchPick(r.key, picks[r.key])] : []))
+    .filter((r) => picks[r.key] !== undefined)
+    .map((r) => matchPick(r.key, picks[r.key]))
     .join(',');
 }
 
