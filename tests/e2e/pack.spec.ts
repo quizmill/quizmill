@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import {
   bodyText,
@@ -537,5 +539,48 @@ test.describe('reward mini-games', () => {
     await expect(page.locator(tid('games-none'))).toBeVisible();
     await expect(page.locator(tid('games-grid'))).toHaveCount(0);
     await waitForText(page, 'No games in this pack');
+  });
+
+  test('a good practice round earns one game, played on the results screen', async ({ page }) => {
+    // Answer the round right, keyed from the demo bank itself.
+    const bank = JSON.parse(
+      fs.readFileSync(path.join(process.cwd(), 'content/pack-demo/questions.json'), 'utf8'),
+    ) as { prompt: string; correctKey?: string; correctKeys?: string[] }[];
+
+    await page.goto('/practice/?subject=space-exploration');
+    await waitForText(page, /Q\s*1\s*\/\s*\d+/, 20_000);
+    const total = Number((await bodyText(page)).match(/Q\s*1\s*\/\s*(\d+)/)?.[1] ?? 0);
+    expect(total).toBeGreaterThan(0);
+
+    for (let i = 0; i < total; i++) {
+      const body = await bodyText(page);
+      const q = bank.find((b) => body.includes(b.prompt));
+      expect(q, 'the question on screen should be in the demo bank').toBeTruthy();
+      for (const key of q!.correctKeys ?? [q!.correctKey!]) {
+        await page.locator('button', { hasText: new RegExp(`^\\s*${key}`) }).first().click();
+      }
+      await clickButtonByText(page, 'Check answer');
+      await waitForText(page, /Correct\./);
+      await clickButtonByText(page, i === total - 1 ? 'See results' : 'Next question');
+    }
+    await waitForText(page, 'Practice complete');
+
+    // The offer is on the results card; Tetris is one of the picks.
+    const offer = page.locator(tid('earned-game'));
+    await expect(offer).toBeVisible();
+    await page.click(tid('earned-game-tetris'));
+    await expect(page.locator(tid('game-shell'))).toBeVisible();
+    await expect(page.locator(tid('tetris-board'))).toBeVisible();
+    await expect(page.locator(tid('tetris-next'))).toBeVisible();
+
+    // A hard drop (space) lands the first piece and scores.
+    await page.keyboard.press('Space');
+    await expect(page.locator(tid('tetris-score'))).not.toHaveText('0');
+
+    // Close it: the one game is spent — no second pick until another round.
+    await page.click('button[aria-label="Close game"]');
+    await expect(page.locator(tid('game-shell'))).toHaveCount(0);
+    await expect(page.locator(tid('earned-game-played'))).toBeVisible();
+    await expect(offer).toHaveCount(0);
   });
 });

@@ -59,7 +59,7 @@ describe('GamesPage gating by the active pack', () => {
     pack.games = {};
     await render(<GamesPage />);
     expect(byTestId('games-grid')).not.toBeNull();
-    expect(container.querySelectorAll('[data-testid^="game-card-"]')).toHaveLength(6);
+    expect(container.querySelectorAll('[data-testid^="game-card-"]')).toHaveLength(7);
     expect(byTestId('games-none')).toBeNull();
   });
 

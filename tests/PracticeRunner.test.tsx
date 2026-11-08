@@ -223,4 +223,43 @@ describe('PackPracticeRunner results screen', () => {
       './__snapshots__/practice-results.html',
     );
   });
+
+  /** Answer every question in the round — all right, or all wrong. */
+  async function playRound(right: boolean) {
+    for (let i = 0; i < 20 && !control('Another round'); i++) {
+      const current = packQuestions.find((p) =>
+        container.textContent?.includes(p.prompt),
+      )!;
+      const correct = correctKeysOf(current);
+      const keys = right
+        ? correct
+        : [(current.options ?? []).map((o) => o.key).find((k) => !correct.includes(k))!];
+      for (const key of keys) {
+        const option = buttons().find(
+          (b) => b.type === 'button' && (b.textContent ?? '').trim().startsWith(key),
+        );
+        await click(option!);
+      }
+      await click(control('Check answer')!);
+      await click((control('Next question') ?? control('See results'))!);
+    }
+  }
+
+  it('offers one game after a good round (the demo pack has games)', async () => {
+    await render();
+    await playRound(true);
+    const card = container.querySelector('[data-testid="earned-game"]');
+    expect(card).not.toBeNull();
+    expect(card!.textContent).toContain('You earned a game');
+    // Every game the pack enables is on offer — the demo keeps them all.
+    expect(container.querySelector('[data-testid="earned-game-tetris"]')).not.toBeNull();
+  });
+
+  it('offers no game after a poor round', async () => {
+    await render();
+    await playRound(false);
+    expect(container.textContent).toContain('Practice complete');
+    expect(container.querySelector('[data-testid="earned-game"]')).toBeNull();
+    expect(container.querySelector('[data-testid="earned-game-played"]')).toBeNull();
+  });
 });
