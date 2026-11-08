@@ -463,9 +463,10 @@ function MarkRow({
       </li>
     );
   }
+  const matching = isMatching(q);
   // A matching question's answer reads as its picked choices, row by
   // row; option letters stay letters.
-  const answerText = (k: AnswerKey[]) => (isMatching(q) ? formatAnswer(q, k) : k.join(' '));
+  const answerText = (k: AnswerKey[]) => (matching ? formatAnswer(q, k) : k.join(' '));
   const number = (
     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink-100 text-xs font-bold text-ink-700">
       {index + 1}
@@ -504,7 +505,7 @@ function MarkRow({
             {whenLabel(saved.answeredAt)}
           </span>
           <span className="flex-1" />
-          {isMatching(q) ? null : savedAnswer}
+          {matching ? null : savedAnswer}
           <button
             type="button"
             aria-label={`Question ${index + 1}: change answer`}
@@ -517,15 +518,14 @@ function MarkRow({
         </div>
         {/* A matching answer spells out every row, so it gets a line of
             its own instead of crowding the badge and the Change button. */}
-        {isMatching(q) ? <div className="flex min-w-0">{savedAnswer}</div> : null}
+        {matching ? <div className="flex min-w-0">{savedAnswer}</div> : null}
       </li>
     );
   }
 
   const multi = isMultiAnswer(q);
-  const matching = isMatching(q);
-  const picks = matchPicksOf(selected ?? []);
   const keys = selected ?? [];
+  const picks = matchPicksOf(keys);
   return (
     <li
       className={cn(

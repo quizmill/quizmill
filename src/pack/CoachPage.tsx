@@ -523,6 +523,16 @@ function ReplayCard({
     : undefined;
   const concept = question.conceptId ? PACK_CONCEPT_BY_ID[question.conceptId] : undefined;
   const pickGraded = isAnswerReady(question, pick) ? gradeSelection(question, pick) : null;
+  // What the answer area shows: the learner's attempt once revealed, else
+  // the parent's own pick (taps ignored after the reveal).
+  const answerProps = {
+    selected: revealed ? learnerKeys : pick,
+    stage: revealed ? ('feedback' as const) : ('choosing' as const),
+    onSelect: (key: AnswerKey) => {
+      if (revealed) return;
+      setPick((prev) => nextSelection(prev, key, multi));
+    },
+  };
   const priorWrong = prior.filter((a) => !a.isCorrect).length;
 
   return (
@@ -594,26 +604,13 @@ function ReplayCard({
         ) : null}
 
         {matching ? (
-          <MatchRows
-            question={question}
-            selected={revealed ? learnerKeys : pick}
-            stage={revealed ? 'feedback' : 'choosing'}
-            onSelect={(key) => {
-              if (revealed) return;
-              setPick((prev) => nextSelection(prev, key, multi));
-            }}
-          />
+          <MatchRows question={question} {...answerProps} />
         ) : (
           <OptionButtons
             options={question.options ?? []}
-            selected={revealed ? learnerKeys : pick}
-            stage={revealed ? 'feedback' : 'choosing'}
             correctKeys={correctKeysOf(question)}
             multi={multi}
-            onSelect={(key) => {
-              if (revealed) return;
-              setPick((prev) => nextSelection(prev, key, multi));
-            }}
+            {...answerProps}
           />
         )}
 

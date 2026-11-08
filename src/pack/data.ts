@@ -251,8 +251,8 @@ export function matchPicksOf(selected: readonly string[]): Record<string, string
 export function answerKeysOf(
   q: Pick<PackQuestion, 'correctKey' | 'correctKeys' | 'rows' | 'correctMatch'>,
 ): AnswerKey[] {
-  if (q.rows && q.rows.length > 0) {
-    return q.rows.map((r) => matchPick(r.key, q.correctMatch?.[r.key] ?? ''));
+  if (isMatching(q)) {
+    return (q.rows ?? []).map((r) => matchPick(r.key, q.correctMatch?.[r.key] ?? ''));
   }
   return correctKeysOf(q);
 }
