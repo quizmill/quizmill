@@ -40,6 +40,7 @@ import {
 } from '@/lib/progressionPref';
 import { loadPaperModeEnabled, savePaperModeEnabled } from '@/lib/paper';
 import { gamesRevealedPref } from '@/lib/gamesReveal';
+import { loadGamesShown, saveGamesShown } from '@/lib/gamesPref';
 import { useDevicePref } from '@/lib/useDevicePref';
 import {
   ANALYTICS_EVENT,
@@ -120,8 +121,9 @@ const LOOK_CHOICES: { value: LookPref; label: string }[] = [
  *                       declares one), question sources, `extras` slot
  *                       (e.g. the downvote browser)
  *  - Progress & sync  — SyncSettings, TransferSettings, the two resets
- *  - This device      — appearance, drive mode, coach mode, paper, XP,
- *                       usage analytics (only in builds that configure it)
+ *  - This device      — appearance, drive mode, coach mode, paper, timed
+ *                       exam, XP, games, usage analytics (only in builds
+ *                       that configure it)
  *  - About            — version + build (tap the version to reveal games)
  */
 export interface SettingsPageProps {
@@ -271,6 +273,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
     true,
   );
   const [examShown, toggleExamShown] = useDeviceToggle(loadExamShown, saveExamShown, true);
+  const [gamesShown, toggleGamesShown] = useDeviceToggle(loadGamesShown, saveGamesShown, true);
 
   // Usage analytics (device-level) — the anonymous funnel beacon a hosted
   // app sends its author. The card exists only in builds that configure
@@ -289,15 +292,18 @@ export function SettingsPage({ extras }: SettingsPageProps) {
   };
 
   // Hidden games easter egg — revealed by tapping the version pill, and
-  // remembered on this device once found. Only for packs with games; the
-  // taps still count on any pack, they just reveal nothing.
+  // remembered on this device once found. Only for packs with games, and
+  // only while the Games switch above is on (a device that hid the games
+  // hid this door too — the find is kept, so switching back on restores
+  // it); the taps still count otherwise, they just reveal nothing.
   const [versionTaps, setVersionTaps] = useState(0);
   const buildDateLabel = formatBuildDate(process.env.NEXT_PUBLIC_APP_BUILD_DATE);
   const [gamesFound, setGamesFound] = useDevicePref(gamesRevealedPref);
+  const gamesOn = gamesEnabled && gamesShown;
   const tapVersion = () => {
     const taps = versionTaps + 1;
     setVersionTaps(taps);
-    if (taps >= GAMES_REVEAL_TAPS && gamesEnabled && !gamesFound) {
+    if (taps >= GAMES_REVEAL_TAPS && gamesOn && !gamesFound) {
       setGamesFound(true);
     }
   };
@@ -305,7 +311,7 @@ export function SettingsPage({ extras }: SettingsPageProps) {
     setVersionTaps(0);
     setGamesFound(false);
   };
-  const gamesRevealed = gamesEnabled && gamesFound;
+  const gamesRevealed = gamesOn && gamesFound;
   const gameList = enabledGames(packGames?.include);
 
   const startOfToday = new Date();
@@ -556,6 +562,22 @@ export function SettingsPage({ extras }: SettingsPageProps) {
             checked={progressionShown}
             onToggle={toggleProgressionShown}
             testId="progression-toggle"
+          />
+        ) : null}
+
+        {/* Only for packs with a `games` block: the pack switches the
+            reward games on, this device may hide them — the earned game on
+            the results screen, the arcade and its easter egg. Practice is
+            recorded the same either way; the /games route stays. */}
+        {gamesEnabled ? (
+          <OptInCard
+            icon={Gamepad2}
+            title="Games"
+            blurb="A good practice round earns a quick game on the results screen, and there's a little arcade to find. For parents: turn this off to hide the games on this device — practice counts exactly the same."
+            checked={gamesShown}
+            onToggle={toggleGamesShown}
+            testId="games-toggle"
+            cardTestId="games-setting"
           />
         ) : null}
 

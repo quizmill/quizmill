@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Settings } from 'lucide-react';
 import { enabledGames, type GameId } from '@/lib/games/registry';
 import { recordEvent } from '@/lib/storage';
+import { gamesShownPref } from '@/lib/gamesPref';
+import { useDevicePref } from '@/lib/useDevicePref';
 import { gamesEnabled, packGames } from '@/pack/data';
 import { useSuspended } from '@/pack/games/useSuspended';
 
@@ -26,36 +28,41 @@ const GameModal = dynamic(
  * EarnedGameCard.) Gated on the ACTIVE pack's `games` block at render
  * time — the route exists in every build so a pack swapped in at runtime
  * gets its arcade, and a pack without games gets a plain "nothing here"
- * instead of a dead link.
+ * instead of a dead link. A device that hid the games (Settings → Games)
+ * gets the same treatment with the way back on pointed out.
  */
 export default function GamesPage() {
   const games = enabledGames(packGames?.include);
+  const [gamesShown] = useDevicePref(gamesShownPref);
 
   // The open game (null = the grid is showing).
   const [active, setActive] = useState<GameId | null>(null);
 
   if (!gamesEnabled) {
     return (
-      <main className="flex flex-col gap-6">
-        <header className="flex items-center justify-between">
-          <Link
-            href="/"
-            className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm font-medium text-ink-600 hover:bg-ink-100"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Home
-          </Link>
-        </header>
-        <div
-          data-testid="games-none"
-          className="rounded-2xl border border-ink-200 bg-surface p-5 text-center shadow-xs"
+      <ArcadeClosed
+        testId="games-none"
+        title="No games in this pack"
+        blurb="This pack doesn't include the arcade. Back to practice!"
+      />
+    );
+  }
+
+  if (!gamesShown) {
+    return (
+      <ArcadeClosed
+        testId="games-hidden"
+        title="Games are hidden on this device"
+        blurb="Someone switched the games off in Settings. Practice counts exactly the same without them."
+      >
+        <Link
+          href="/settings/"
+          className="tap-feedback mt-4 inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-surface px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-xs hover:bg-ink-50 dark:hover:bg-ink-100"
         >
-          <h1 className="text-xl font-bold text-ink-900">No games in this pack</h1>
-          <p className="mt-1 text-sm text-ink-500">
-            This pack doesn&apos;t include the arcade. Back to practice!
-          </p>
-        </div>
-      </main>
+          <Settings className="h-4 w-4" />
+          Open Settings
+        </Link>
+      </ArcadeClosed>
     );
   }
 
@@ -110,6 +117,41 @@ export default function GamesPage() {
       <p className="text-center text-xs text-ink-400">
         Games are just for fun — they don&apos;t affect your stats or stickers.
       </p>
+    </main>
+  );
+}
+
+/** The arcade with its shutters down: one card saying why, under a Home link. */
+function ArcadeClosed({
+  testId,
+  title,
+  blurb,
+  children,
+}: {
+  testId: string;
+  title: string;
+  blurb: string;
+  children?: ReactNode;
+}) {
+  return (
+    <main className="flex flex-col gap-6">
+      <header className="flex items-center justify-between">
+        <Link
+          href="/"
+          className="tap-feedback inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm font-medium text-ink-600 hover:bg-ink-100"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Home
+        </Link>
+      </header>
+      <div
+        data-testid={testId}
+        className="rounded-2xl border border-ink-200 bg-surface p-5 text-center shadow-xs"
+      >
+        <h1 className="text-xl font-bold text-ink-900">{title}</h1>
+        <p className="mt-1 text-sm text-ink-500">{blurb}</p>
+        {children}
+      </div>
     </main>
   );
 }

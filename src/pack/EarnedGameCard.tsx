@@ -6,6 +6,8 @@ import { enabledGames, type GameId } from '@/lib/games/registry';
 import { earnsGame } from '@/lib/games/reward';
 import { useSuspended } from '@/pack/games/useSuspended';
 import { recordEvent } from '@/lib/storage';
+import { gamesShownPref } from '@/lib/gamesPref';
+import { useDevicePref } from '@/lib/useDevicePref';
 import { gamesEnabled, packGames } from '@/pack/data';
 
 // The games themselves are the heavy part — fetched only when one is
@@ -28,13 +30,15 @@ type Phase = 'ready' | 'playing' | 'played';
  * played right here until game over. No "Play again" (the modal runs
  * under `replay: false`), nothing stored: leave the screen and the offer
  * is gone, finish another round and a fresh one appears. Renders nothing
- * for a pack without a `games` block or a round below the bar.
+ * for a pack without a `games` block, a device that hid the games
+ * (Settings → Games) or a round below the bar.
  */
 export function EarnedGameCard({ correct, total }: EarnedGameCardProps) {
   const [phase, setPhase] = useState<Phase>('ready');
   const [game, setGame] = useState<GameId | null>(null);
+  const [gamesShown] = useDevicePref(gamesShownPref);
 
-  if (!gamesEnabled || !earnsGame(correct, total)) return null;
+  if (!gamesEnabled || !gamesShown || !earnsGame(correct, total)) return null;
   const games = enabledGames(packGames?.include);
   if (games.length === 0) return null;
 
