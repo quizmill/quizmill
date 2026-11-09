@@ -39,9 +39,10 @@
  * Pure apart from storage and the injectable fetch — every outcome is
  * unit-tested without a browser.
  */
-import { insertedPackKey } from './packKeys';
 import {
   getActivePackPointer,
+  getInsertedPack,
+  hasInsertedPack,
   insertPack,
   listInsertedPacks,
   type PackLibraryEntry,
@@ -172,9 +173,7 @@ export async function checkPackUpdate(
   // answering: whatever it said, a pack that is no longer on the shelf
   // is not put back (the eject keeps the key and the progress, as every
   // eject does, so a later insert or unlock picks them up).
-  const storageKey = insertedPackKey(entry.id);
-  const before = window.localStorage.getItem(storageKey);
-  if (before === null) return 'ejected';
+  if (!hasInsertedPack(entry.id)) return 'ejected';
 
   if (!fetched.ok) {
     if (fetched.reason === 'offline' || fetched.reason === 'cancelled') return 'offline';
@@ -197,7 +196,8 @@ export async function checkPackUpdate(
     return 'error';
   }
 
-  const inserted = insertPack(fetched.candidate, {
+  const before = JSON.stringify(await getInsertedPack(entry.id));
+  const inserted = await insertPack(fetched.candidate, {
     origin: entry.origin,
     buildPackId: opts.buildPackId,
     unlockUrl,
@@ -206,14 +206,17 @@ export async function checkPackUpdate(
       : envelopeVersion(fetched.candidate)
         ? { packVersion: envelopeVersion(fetched.candidate) }
         : {}),
+    // Checked again where the write happens, after any eject queued first.
+    onlyIfOnShelf: true,
   });
+  if (!inserted.ok && inserted.reason === 'ejected') return 'ejected';
   saveUpdateCheck(entry.id, { checkedAt: now });
   if (!inserted.ok) return 'error';
 
   // A 200 for content the device already holds (an entry that had no
   // version to send, or an endpoint that ignores If-None-Match) is not
   // news — the version is noted and nothing is announced.
-  if (before === window.localStorage.getItem(storageKey)) return 'unchanged';
+  if (before === JSON.stringify(await getInsertedPack(entry.id))) return 'unchanged';
 
   recordEvent('pack_updated', { pack: entry.id });
   stashPackUpdatedNotice({
