@@ -313,11 +313,6 @@ export const PACK_PAPER_BY_KEY: Record<string, PackPaper> = Object.fromEntries(
   packPapers.map((p) => [p.key, p]),
 );
 
-/** Paper key → label, for chips and sheet headings. */
-export const PACK_PAPER_LABEL: Record<string, string> = Object.fromEntries(
-  packPapers.map((p) => [p.key, p.label]),
-);
-
 /** Question id → its paper key. Attempts store only the category, so
  *  per-paper progress joins back through this. */
 export const PACK_PAPER_BY_QUESTION_ID: Record<string, string> = Object.fromEntries(
