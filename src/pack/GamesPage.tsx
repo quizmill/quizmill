@@ -7,6 +7,7 @@ import { ArrowLeft } from 'lucide-react';
 import { enabledGames, type GameId } from '@/lib/games/registry';
 import { recordEvent } from '@/lib/storage';
 import { gamesEnabled, packGames } from '@/pack/data';
+import { useSuspended } from '@/pack/games/useSuspended';
 
 // The game components (six games + their logic) are the heavy part of this
 // feature. Load them ONLY when a game is actually opened — they're never in
@@ -97,7 +98,7 @@ export default function GamesPage() {
               {g.emoji}
             </span>
             <span className="text-sm font-semibold text-ink-900">{g.name}</span>
-            <span className="text-xs leading-tight text-ink-500">{g.blurb}</span>
+            <Blurb id={g.id} blurb={g.blurb} />
           </button>
         ))}
       </section>
@@ -110,5 +111,18 @@ export default function GamesPage() {
         Games are just for fun — they don&apos;t affect your stats or stickers.
       </p>
     </main>
+  );
+}
+
+/** The card's one-liner — or, for a game left paused, a nudge to carry on. */
+function Blurb({ id, blurb }: { id: GameId; blurb: string }) {
+  const paused = useSuspended(id);
+  return (
+    <span
+      data-testid={paused ? `game-resume-${id}` : undefined}
+      className={paused ? 'text-xs font-semibold leading-tight text-brand-700' : 'text-xs leading-tight text-ink-500'}
+    >
+      {paused ? 'Paused — tap to continue' : blurb}
+    </span>
   );
 }

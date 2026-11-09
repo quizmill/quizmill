@@ -4,6 +4,7 @@ import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { enabledGames, type GameId } from '@/lib/games/registry';
 import { earnsGame } from '@/lib/games/reward';
+import { useSuspended } from '@/pack/games/useSuspended';
 import { recordEvent } from '@/lib/storage';
 import { gamesEnabled, packGames } from '@/pack/data';
 
@@ -78,6 +79,7 @@ export function EarnedGameCard({ correct, total }: EarnedGameCardProps) {
               {g.emoji}
             </span>
             <span className="text-xs font-semibold text-ink-900">{g.name}</span>
+            <ContinueTag id={g.id} />
           </button>
         ))}
       </div>
@@ -93,5 +95,18 @@ export function EarnedGameCard({ correct, total }: EarnedGameCardProps) {
         />
       ) : null}
     </div>
+  );
+}
+
+/** "Continue" under a game left paused by an earlier session. */
+function ContinueTag({ id }: { id: GameId }) {
+  if (!useSuspended(id)) return null;
+  return (
+    <span
+      data-testid={`earned-resume-${id}`}
+      className="text-[10px] font-semibold uppercase tracking-wide text-brand-700"
+    >
+      Continue
+    </span>
   );
 }

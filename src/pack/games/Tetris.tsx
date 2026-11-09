@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { GameOver } from './GameOver';
 import { GameShell } from './GameShell';
 import { HowToPlay } from './HowToPlay';
+import { useResumable } from './useResumable';
 import {
   COLS,
   ROWS,
@@ -44,16 +45,16 @@ const PAD_BUTTON =
   'tap-feedback flex h-14 items-center justify-center rounded-xl bg-ink-100 text-2xl font-bold text-ink-700 hover:bg-ink-200 active:bg-ink-300 disabled:opacity-40 disabled:hover:bg-ink-100';
 
 export function Tetris({ onClose }: TetrisProps) {
-  const [state, setState] = useState<State>(() => newGame());
+  const [state, setState, held] = useResumable<State>('tetris', () => newGame());
   const level = levelFor(state.lines);
 
   // Gravity. The interval shortens with the level, so the loop restarts
   // whenever the level changes (and stops at game over).
   useEffect(() => {
-    if (state.gameOver) return;
+    if (state.gameOver || held) return;
     const id = setInterval(() => setState((s) => tick(s)), dropIntervalMs(level));
     return () => clearInterval(id);
-  }, [state.gameOver, level]);
+  }, [state.gameOver, held, level, setState]);
 
   // Keyboard controls — arrows (or WASD), space to hard-drop. Listening
   // only while a game is on, so at game over Space and the arrows go back
@@ -90,7 +91,7 @@ export function Tetris({ onClose }: TetrisProps) {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [state.gameOver]);
+  }, [state.gameOver, setState]);
 
   function handleRestart() {
     setState(newGame());
@@ -123,7 +124,9 @@ export function Tetris({ onClose }: TetrisProps) {
           {state.gameOver ? (
             <span className="font-semibold text-warn-700">Game over</span>
           ) : (
-            <span className="text-xs text-ink-500">Tap the pad or use arrow keys</span>
+            <span className="text-xs text-ink-500" data-testid={held ? 'game-held' : undefined}>
+              {held ? 'Paused — any move carries on' : 'Tap the pad or use arrow keys'}
+            </span>
           )}
         </div>
       }

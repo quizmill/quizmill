@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Tetris } from '@/pack/games/Tetris';
+import { forgetSuspended } from '@/lib/games/suspended';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
@@ -11,6 +12,8 @@ let container: HTMLDivElement;
 let root: Root | undefined;
 
 beforeEach(async () => {
+  // Each test closes its game mid-play, which pauses it for next time.
+  forgetSuspended('tetris');
   container = document.createElement('div');
   document.body.appendChild(container);
   await act(async () => {

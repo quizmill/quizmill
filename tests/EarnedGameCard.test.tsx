@@ -52,6 +52,8 @@ import { GameRulesContext } from '@/pack/games/GameRules';
 import { earnsGame } from '@/lib/games/reward';
 import { scoreTier } from '@/pack/ScoreCelebration';
 import { loadEvents } from '@/lib/storage';
+import { forgetSuspended, suspendGame } from '@/lib/games/suspended';
+import { newGame as newTetris } from '@/lib/games/tetris';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
@@ -66,6 +68,8 @@ let root: Root | undefined;
 beforeEach(() => {
   localStorage.clear();
   pack.games = {};
+  forgetSuspended('tetris');
+  forgetSuspended('snake');
   container = document.createElement('div');
   document.body.appendChild(container);
 });
@@ -138,6 +142,14 @@ describe('EarnedGameCard', () => {
       container.querySelectorAll('[data-testid^="earned-game-"]'),
     ).map((el) => el.getAttribute('data-testid'));
     expect(buttons).toEqual(['earned-game-tile-puzzle', 'earned-game-tetris']);
+  });
+
+  it('marks a game left paused by an earlier session as Continue', async () => {
+    pack.games = { include: ['snake', 'tetris'] };
+    suspendGame('tetris', newTetris());
+    await render(<EarnedGameCard correct={5} total={10} />);
+    expect(byTestId('earned-resume-tetris')?.textContent).toBe('Continue');
+    expect(byTestId('earned-resume-snake')).toBeNull();
   });
 
   it('shows nothing below half right', async () => {

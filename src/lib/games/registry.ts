@@ -28,6 +28,11 @@ export interface GameDef {
   blurb: string;
 }
 
+/** The longest any one game session runs — from opening a game to the
+ *  "Time's up" panel, however many times it's restarted in between. A
+ *  break between rounds of practice, not a sitting of its own. */
+export const GAME_SESSION_MS = 10 * 60 * 1000;
+
 export const GAMES: readonly GameDef[] = [
   {
     id: 'snake',
