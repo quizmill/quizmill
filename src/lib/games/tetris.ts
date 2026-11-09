@@ -234,11 +234,15 @@ export function rotate(state: State): State {
 }
 
 /** Merge the falling piece into the board, clear full rows, score them
- *  and spawn the next piece. Game over when the new piece has no room. */
+ *  and spawn the next piece. Game over when the new piece has no room, or
+ *  when the piece locked with any cell still above the top ("lock out") —
+ *  the board has no hidden rows, so that cell would otherwise vanish. */
 export function lock(state: State, rng: () => number = Math.random): State {
   const board = state.board.map((row) => [...row]);
+  let lockedOut = false;
   for (const c of cellsOf(state.current)) {
     if (c.y >= 0) board[c.y][c.x] = state.current.kind;
+    else lockedOut = true;
   }
   const kept = board.filter((row) => row.some((cell) => cell === null));
   const cleared = ROWS - kept.length;
@@ -257,7 +261,7 @@ export function lock(state: State, rng: () => number = Math.random): State {
     bag,
     score,
     lines,
-    gameOver: collides(kept, current),
+    gameOver: lockedOut || collides(kept, current),
   };
 }
 

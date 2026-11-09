@@ -63,12 +63,16 @@ export function EarnedGameCard({ correct, total }: EarnedGameCardProps) {
             key={g.id}
             type="button"
             data-testid={`earned-game-${g.id}`}
+            // One pick per offer: once a game is open (or its chunk is
+            // still loading) the others can't swap in behind the modal.
+            disabled={phase !== 'ready'}
             onClick={() => {
+              if (phase !== 'ready') return;
               recordEvent('game_open', { game: g.id, via: 'earned' });
               setGame(g.id);
               setPhase('playing');
             }}
-            className="tap-feedback flex flex-col items-center gap-1 rounded-xl border border-ink-200 bg-surface px-2 py-2.5 text-center shadow-xs transition hover:border-brand-500/40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500"
+            className="tap-feedback flex flex-col items-center gap-1 rounded-xl border border-ink-200 bg-surface px-2 py-2.5 text-center shadow-xs transition hover:border-brand-500/40 disabled:opacity-50 disabled:hover:border-ink-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <span className="text-2xl leading-none" aria-hidden>
               {g.emoji}

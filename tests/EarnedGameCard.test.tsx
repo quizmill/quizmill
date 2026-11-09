@@ -167,6 +167,15 @@ describe('EarnedGameCard', () => {
     expect(opens).toHaveLength(1);
     expect(opens[0].data).toEqual({ game: 'tile-puzzle', via: 'earned' });
 
+    // The other picks are locked while it's open: no swapping in a fresh
+    // game behind the modal without spending the offer.
+    const snake = byTestId('earned-game-snake') as HTMLButtonElement;
+    expect(snake.disabled).toBe(true);
+    await click(snake);
+    await settle();
+    expect(byTestId('tile-puzzle-board')).not.toBeNull();
+    expect(loadEvents().filter((e) => e.type === 'game_open')).toHaveLength(1);
+
     // One tap solves it; the result panel offers Done only.
     await click(byTestId('tile-8')!);
     expect(byTestId('tile-puzzle-solved')).not.toBeNull();

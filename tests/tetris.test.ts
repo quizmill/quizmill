@@ -245,4 +245,18 @@ describe('tetris game over', () => {
     expect(tick(over, lcg(0))).toBe(over);
     expect(hardDrop(over, lcg(0))).toBe(over);
   });
+
+  it('ends when a piece locks with a cell still above the board', () => {
+    // A vertical I at y = -1 resting on a stack that starts at row 3:
+    // one of its four cells is above the top. The centre stays clear so
+    // the next piece could spawn — the lock out alone ends the game.
+    const board = emptyBoard();
+    for (let y = 3; y < ROWS; y++) board[y][0] = 'J';
+    const s = staged(board, { kind: 'I', rotation: 1, x: -2, y: -1 }, { next: 'O' });
+    expect(cellsOf(s.current).map((c) => c.x)).toEqual([0, 0, 0, 0]);
+    expect(collides(s.board, s.current)).toBe(false);
+    const over = tick(s, lcg(0));
+    expect(over.gameOver).toBe(true);
+    expect(collides(over.board, over.current)).toBe(false);
+  });
 });

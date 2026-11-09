@@ -55,9 +55,21 @@ export function Tetris({ onClose }: TetrisProps) {
     return () => clearInterval(id);
   }, [state.gameOver, level]);
 
-  // Keyboard controls — arrows (or WASD), space to hard-drop.
+  // Keyboard controls — arrows (or WASD), space to hard-drop. Listening
+  // only while a game is on, so at game over Space and the arrows go back
+  // to the page (activating Done / Play again, scrolling).
   useEffect(() => {
+    if (state.gameOver) return;
     function onKey(e: KeyboardEvent) {
+      // Space on a focused control (Close, How to play, the pad) keeps its
+      // native activation rather than becoming a hard drop.
+      if (
+        e.key === ' ' &&
+        e.target instanceof Element &&
+        e.target.closest('button, a, input, select, textarea, summary, [role="button"]')
+      ) {
+        return;
+      }
       const actions: Record<string, ((s: State) => State) | undefined> = {
         ArrowLeft: moveLeft,
         a: moveLeft,
@@ -77,7 +89,7 @@ export function Tetris({ onClose }: TetrisProps) {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [state.gameOver]);
 
   function handleRestart() {
     setState(newGame());
