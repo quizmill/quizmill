@@ -278,10 +278,6 @@ export function saveSession(session: Session): void {
   notify({ table: 'sessions', row: session });
 }
 
-export function getSession(id: string): Session | undefined {
-  return loadSessions().find((s) => s.id === id);
-}
-
 // ---- attempts ----
 
 export function loadAttempts(): Attempt[] {
