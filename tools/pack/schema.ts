@@ -165,14 +165,16 @@ export const GAME_IDS = [
   'whack',
   'pong',
   'dodger',
+  'tetris',
 ] as const;
 export const gameIdSchema = z.enum(GAME_IDS);
 
 /**
- * Optional reward mini-games (additive). When
- * present, the app offers a small arcade of break-time games as a hidden
- * treat — found via the version-pill easter egg in Settings, then free to
- * play. Absent → no games anywhere, exactly as today.
+ * Optional reward mini-games (additive). When present, a practice round
+ * with half or more right earns one game, played on the results screen
+ * until game over; the full arcade also hides behind the version-pill
+ * easter egg in Settings, free to play. Absent → no games anywhere,
+ * exactly as today.
  */
 export const packGamesSchema = z.object({
   /** Restrict to a subset of the built-in games (by id). Omit → all of

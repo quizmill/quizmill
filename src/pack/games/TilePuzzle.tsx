@@ -5,6 +5,7 @@ import { GameOver } from './GameOver';
 import { GameShell } from './GameShell';
 import { HowToPlay } from './HowToPlay';
 import { isSolved, shuffle, tapTile, type Board } from '@/lib/games/tilePuzzle';
+import { useGameRules } from './GameRules';
 import { cn } from '@/lib/cn';
 
 interface TilePuzzleProps {
@@ -29,18 +30,23 @@ export function TilePuzzle({ onClose }: TilePuzzleProps) {
     setMoves(0);
   }
 
+  // An earned game is one game: no fresh scramble mid-way.
+  const { replay } = useGameRules();
+
   const status = (
     <div className="flex items-center justify-between">
       <span>
         Moves: <span className="font-semibold text-ink-900">{moves}</span>
       </span>
-      <button
-        type="button"
-        onClick={handleReset}
-        className="text-xs font-semibold uppercase tracking-wider text-brand-700 hover:underline"
-      >
-        Shuffle
-      </button>
+      {replay ? (
+        <button
+          type="button"
+          onClick={handleReset}
+          className="text-xs font-semibold uppercase tracking-wider text-brand-700 hover:underline"
+        >
+          Shuffle
+        </button>
+      ) : null}
     </div>
   );
 
@@ -86,7 +92,7 @@ export function TilePuzzle({ onClose }: TilePuzzleProps) {
           'Tap a numbered tile next to the empty space to slide it in.',
           'Get the tiles back to 1–8 in order, with the empty space bottom-right.',
           'Strategy: solve the top row first, then the left column, then juggle the last four.',
-          'SHUFFLE in the top-right starts you with a fresh scramble.',
+          ...(replay ? ['SHUFFLE in the top-right starts you with a fresh scramble.'] : []),
         ]}
       />
 

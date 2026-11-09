@@ -7,6 +7,7 @@ import { ArrowLeft } from 'lucide-react';
 import { enabledGames, type GameId } from '@/lib/games/registry';
 import { recordEvent } from '@/lib/storage';
 import { gamesEnabled, packGames } from '@/pack/data';
+import { useSuspended } from '@/pack/games/useSuspended';
 
 // The game components (six games + their logic) are the heavy part of this
 // feature. Load them ONLY when a game is actually opened — they're never in
@@ -20,10 +21,12 @@ const GameModal = dynamic(
 /**
  * The games arcade — a small set of break-time games, free to play. A
  * deliberately HIDDEN treat: there's no link from Home; you reach it via
- * the version-pill easter egg in Settings. Gated on the ACTIVE pack's
- * `games` block at render time — the route exists in every build so a
- * pack swapped in at runtime gets its arcade, and a pack without games
- * gets a plain "nothing here" instead of a dead link.
+ * the version-pill easter egg in Settings. (The front door is the
+ * practice results screen, where a good round earns one game —
+ * EarnedGameCard.) Gated on the ACTIVE pack's `games` block at render
+ * time — the route exists in every build so a pack swapped in at runtime
+ * gets its arcade, and a pack without games gets a plain "nothing here"
+ * instead of a dead link.
  */
 export default function GamesPage() {
   const games = enabledGames(packGames?.include);
@@ -86,7 +89,7 @@ export default function GamesPage() {
             type="button"
             data-testid={`game-card-${g.id}`}
             onClick={() => {
-              recordEvent('game_open', { game: g.id });
+              recordEvent('game_open', { game: g.id, via: 'arcade' });
               setActive(g.id);
             }}
             className="tap-feedback group flex flex-col items-center gap-1.5 rounded-2xl border border-ink-200 bg-surface p-4 text-center shadow-xs transition hover:border-brand-500/40 hover:shadow-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500"
@@ -95,7 +98,7 @@ export default function GamesPage() {
               {g.emoji}
             </span>
             <span className="text-sm font-semibold text-ink-900">{g.name}</span>
-            <span className="text-xs leading-tight text-ink-500">{g.blurb}</span>
+            <Blurb id={g.id} blurb={g.blurb} />
           </button>
         ))}
       </section>
@@ -108,5 +111,18 @@ export default function GamesPage() {
         Games are just for fun — they don&apos;t affect your stats or stickers.
       </p>
     </main>
+  );
+}
+
+/** The card's one-liner — or, for a game left paused, a nudge to carry on. */
+function Blurb({ id, blurb }: { id: GameId; blurb: string }) {
+  const paused = useSuspended(id);
+  return (
+    <span
+      data-testid={paused ? `game-resume-${id}` : undefined}
+      className={paused ? 'text-xs font-semibold leading-tight text-brand-700' : 'text-xs leading-tight text-ink-500'}
+    >
+      {paused ? 'Paused — tap to continue' : blurb}
+    </span>
   );
 }

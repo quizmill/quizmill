@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { GameOver } from './GameOver';
 import { GameShell } from './GameShell';
 import { HowToPlay } from './HowToPlay';
+import { useResumable } from './useResumable';
 import {
   newGame,
   step,
@@ -21,17 +22,17 @@ const TICK_MS = 180; // slightly slower than classic — friendlier for kids
 const SWIPE_MIN_PX = 24;
 
 export function Snake({ onClose }: SnakeProps) {
-  const [state, setState] = useState<State>(() => newGame(GRID));
+  const [state, setState, held] = useResumable<State>('snake', () => newGame(GRID));
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   // Game loop.
   useEffect(() => {
-    if (state.gameOver) return;
+    if (state.gameOver || held) return;
     const id = setInterval(() => {
       setState((s) => step(s));
     }, TICK_MS);
     return () => clearInterval(id);
-  }, [state.gameOver]);
+  }, [state.gameOver, held, setState]);
 
   // Keyboard controls.
   useEffect(() => {
@@ -53,7 +54,7 @@ export function Snake({ onClose }: SnakeProps) {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [setState]);
 
   // Touch-swipe controls on the playfield.
   function onTouchStart(e: React.TouchEvent) {
@@ -102,7 +103,9 @@ export function Snake({ onClose }: SnakeProps) {
           {state.gameOver ? (
             <span className="text-warn-700 font-semibold">Game over</span>
           ) : (
-            <span className="text-xs text-ink-500">Swipe or arrow keys</span>
+            <span className="text-xs text-ink-500" data-testid={held ? 'game-held' : undefined}>
+              {held ? 'Paused — swipe to carry on' : 'Swipe or arrow keys'}
+            </span>
           )}
         </div>
       }
