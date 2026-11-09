@@ -28,7 +28,7 @@ function lcg(seed: number): () => number {
   let s = seed;
   return () => {
     s = (s * 1103515245 + 12345) & 0x7fffffff;
-    return s / 0x7fffffff;
+    return s / 0x80000000; // strictly < 1, as the engine expects
   };
 }
 
@@ -222,10 +222,10 @@ describe('tetris lines and scoring', () => {
     expect(levelFor(9)).toBe(1);
     expect(levelFor(10)).toBe(2);
     expect(levelFor(35)).toBe(4);
-    expect(dropIntervalMs(1)).toBe(1000);
-    expect(dropIntervalMs(2)).toBe(800);
+    expect(dropIntervalMs(1)).toBe(700);
+    expect(dropIntervalMs(2)).toBe(560);
     expect(dropIntervalMs(3)).toBeLessThan(dropIntervalMs(2));
-    expect(dropIntervalMs(50)).toBe(120);
+    expect(dropIntervalMs(50)).toBe(100);
   });
 });
 

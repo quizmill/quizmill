@@ -45,6 +45,11 @@ describe('Tetris keyboard', () => {
     expect(score()).toBeGreaterThan(0);
   });
 
+  it('takes letter keys with Shift or Caps Lock on', async () => {
+    expect(await press('S')).toBe(true); // soft drop: a point a row
+    expect(score()).toBe(1);
+  });
+
   it('leaves Space on a focused control to the control', async () => {
     const close = container.querySelector('button[aria-label="Close game"]')!;
     expect(await press(' ', close)).toBe(false);

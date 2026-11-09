@@ -82,7 +82,8 @@ export function Tetris({ onClose }: TetrisProps) {
         s: (s) => softDrop(s),
         ' ': (s) => hardDrop(s),
       };
-      const action = actions[e.key];
+      // Shift or Caps Lock turns 'a' into 'A' — the letters work either way.
+      const action = actions[e.key.length === 1 ? e.key.toLowerCase() : e.key];
       if (!action) return;
       e.preventDefault();
       setState(action);

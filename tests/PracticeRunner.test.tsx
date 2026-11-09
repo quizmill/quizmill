@@ -226,7 +226,7 @@ describe('PackPracticeRunner results screen', () => {
 
   /** Answer every question in the round — all right, or all wrong. */
   async function playRound(right: boolean) {
-    for (let i = 0; i < 20 && !control('Another round'); i++) {
+    for (let i = 0; i <= packQuestions.length && !control('Another round'); i++) {
       const current = packQuestions.find((p) =>
         container.textContent?.includes(p.prompt),
       )!;

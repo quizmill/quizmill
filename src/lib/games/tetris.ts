@@ -193,10 +193,11 @@ export function levelFor(lines: number): number {
   return 1 + Math.floor(lines / 10);
 }
 
-/** Gravity interval. Starts at a gentle one row per second and speeds up
- *  a fifth per level, floored so a long game stays playable on a phone. */
+/** Gravity interval. Starts at a brisk 700 ms a row — slow enough to
+ *  learn on, fast enough not to drag — and speeds up a fifth per level,
+ *  floored so a long game stays playable on a phone. */
 export function dropIntervalMs(level: number): number {
-  return Math.max(120, Math.round(1000 * Math.pow(0.8, level - 1)));
+  return Math.max(100, Math.round(700 * Math.pow(0.8, level - 1)));
 }
 
 /** Points for clearing `n` rows at once, before the level multiplier —
