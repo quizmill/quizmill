@@ -273,6 +273,11 @@ image in the app or a refused bundle.
   answered correctly (`src/lib/mistakes.ts`)
 - **Question feedback** — thumbs up/down with comments, surfaced in
   Settings so pack authors can curate
+- **Pack review** — Settings → Packs → Review questions shows a random
+  10 or 20 questions with their answers, explanations and metadata
+  (id, review status, difficulty, source), spread across categories and
+  walking the whole bank before repeating; nothing counts as practice,
+  and the thumbs file ordinary question feedback
 - **Local-first storage** — everything in localStorage, namespaced per
   pack; works fully offline (PWA with a versioned service worker)
 - **Optional cloud sync** — a retry-on-reconnect queue mirroring to a

@@ -101,7 +101,11 @@ example.
    The app at http://localhost:3000 is now the user's practice app for
    that topic. (`pack:use` snapshots the pack into the gitignored
    `content/pack/`; the original under `packs/` remains the editable
-   source.)
+   source.) Point the user at **Settings → Packs → Review questions**
+   for a quality pass: it shows a random 10 or 20 questions with the
+   answers, explanations and metadata revealed, nothing recorded as
+   practice. A thumbs-down there (with a comment) lands in Settings →
+   Question feedback, which you can then work through to fix the pack.
 
 6. **Remind the user**: packs are private (gitignored). To keep one
    long-term, store the `packs/<pack-id>/` directory somewhere safe
