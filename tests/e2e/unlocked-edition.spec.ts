@@ -259,6 +259,45 @@ test('the same id from a plain file is refused, before and after unlocking', asy
   ).toHaveCount(1);
 });
 
+// A file inserted and made active while another pack was the build-time
+// one, on a device that then gets a deploy whose built-in pack has that id:
+// the pointer still names it, and it has no licence key behind it.
+test('a file stored under the built-in id never shadows the build, even with the pointer at it', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.evaluate(
+    ([id, p]) => {
+      const stale = { ...p, manifest: { ...p.manifest, id, title: 'Stale File' } };
+      localStorage.setItem(`quizmill.packLibrary.pack.${id}.v1`, JSON.stringify(stale));
+      localStorage.setItem(
+        'quizmill.packLibrary.index.v1',
+        JSON.stringify([
+          {
+            id,
+            title: 'Stale File',
+            description: stale.manifest.description,
+            themeColor: stale.manifest.themeColor,
+            questionCount: stale.questions.length,
+            categoryCount: 1,
+            insertedAt: Date.now(),
+            origin: 'stale.bundle.json',
+          },
+        ]),
+      );
+      localStorage.setItem('quizmill.activePackId', id);
+    },
+    [DEMO_ID, SAMPLER] as const,
+  );
+  await page.reload({ waitUntil: 'networkidle' });
+  await expect(page.locator('h1')).toHaveText('Solar System Practice');
+  expect(await bodyText(page)).toContain(`${demoPlanets} questions available`);
+  // The inline bootstrap itself left the build alone (not just the engine).
+  expect(
+    await page.evaluate(() => (window as { __QUIZMILL_PACK__?: unknown }).__QUIZMILL_PACK__),
+  ).toBeUndefined();
+});
+
 test('a sample on the shelf that sells its own id: the upgrade card goes once the key’s edition is in', async ({
   page,
 }) => {

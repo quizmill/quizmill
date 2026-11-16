@@ -137,14 +137,20 @@ export function unlockedEntry(id: string): PackLibraryEntry | null {
 /**
  * Whether the boot path renders this library pack (layout.tsx bootstrap,
  * src/pack/runtime.ts): the pointer names it, or it is the built-in
- * pack's unlocked edition and the pointer names nothing that is there.
+ * pack's unlocked edition and the pointer names it or nothing that is
+ * there. A pointer at the built-in pack's id never counts on its own: a
+ * pack stored under that id without a licence key is not rendered.
  */
 export function isActiveLibraryPack(id: string, buildPackId: string): boolean {
   if (!browser()) return false;
   const pointer = getActivePackPointer();
-  if (pointer === id) return true;
-  if (id !== buildPackId || unlockedEntry(id) === null) return false;
-  return pointer === null || window.localStorage.getItem(insertedPackKey(pointer)) === null;
+  if (id !== buildPackId) return pointer === id;
+  if (unlockedEntry(id) === null) return false;
+  return (
+    pointer === null ||
+    pointer === id ||
+    window.localStorage.getItem(insertedPackKey(pointer)) === null
+  );
 }
 
 /**

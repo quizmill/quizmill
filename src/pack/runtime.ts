@@ -83,7 +83,10 @@ function readHandedOffPack(builtInPackId?: string): ActivePack | undefined {
       raw = window.localStorage.getItem(HANDOFF_PACK_KEY);
       if (!raw) {
         const id = window.localStorage.getItem(ACTIVE_PACK_ID_KEY);
-        if (id) raw = window.localStorage.getItem(insertedPackKey(id));
+        // A pointer at the build's OWN id is never followed directly: what
+        // is stored there may be a file inserted back when another pack was
+        // the build-time one. It goes through `unlockedEditionOf` below.
+        if (id && id !== builtInPackId) raw = window.localStorage.getItem(insertedPackKey(id));
         if (!raw && builtInPackId) raw = unlockedEditionOf(builtInPackId);
       }
     }

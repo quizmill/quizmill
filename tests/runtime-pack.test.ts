@@ -224,6 +224,35 @@ describe('runtime pack source', () => {
       expect(isRuntimePack).toBe(false);
     });
 
+    // A pack inserted from a file and activated while ANOTHER pack was the
+    // build-time one leaves the pointer naming it. If a later deploy's
+    // built-in pack takes that id, the pointer must not hand the stale file
+    // the screen: a pointer at the build's own id means its unlocked edition
+    // or nothing.
+    it('is not reached through a pointer at the build’s own id either', async () => {
+      vi.resetModules();
+      stubBrowser({
+        entries: {
+          ...stored,
+          ...index({ origin: 'some.bundle.json' }),
+          'quizmill.activePackId': BUILD_ID,
+        },
+      });
+      const { activeManifest, isRuntimePack } = await import('@/pack/source');
+      expect(activeManifest.title).not.toBe('Solar System (unlocked)');
+      expect(isRuntimePack).toBe(false);
+    });
+
+    it('renders through a pointer at the build’s own id when a licence key fetched it', async () => {
+      vi.resetModules();
+      stubBrowser({
+        entries: { ...stored, ...unlockedIndex, 'quizmill.activePackId': BUILD_ID },
+      });
+      const { activeManifest, isRuntimePack } = await import('@/pack/source');
+      expect(activeManifest.title).toBe('Solar System (unlocked)');
+      expect(isRuntimePack).toBe(true);
+    });
+
     it('once removed, the build-time content is back', async () => {
       vi.resetModules();
       stubBrowser({ entries: {} });

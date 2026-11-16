@@ -31,7 +31,9 @@ const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 //   - a `#pack=<base64-json>` hash (cross-origin handoff), else
 //   - the external handoff blob (HANDOFF_PACK_KEY), else
 //   - the pack-library pointer (ACTIVE_PACK_ID_KEY → the inserted pack
-//     stored under insertedPackKey(id) — see src/lib/packLibrary.ts), else
+//     stored under insertedPackKey(id) — see src/lib/packLibrary.ts; a
+//     pointer at this build's own id is not followed, it takes the next
+//     rule), else
 //   - the built-in pack's unlocked edition: the pack a licence key stored
 //     under THIS build's own pack id (its library entry has `unlockUrl`).
 //     It outranks the content compiled in, so a new deploy never hides it.
@@ -61,9 +63,10 @@ var r=null,m=location.hash.match(/[#&]pack=([^&]+)/);
 if(m){r=decodeURIComponent(escape(atob(decodeURIComponent(m[1]))))}
 else if(window.localStorage){
 r=localStorage.getItem(${JSON.stringify(HANDOFF_PACK_KEY)});
+var b=${JSON.stringify(buildTimeManifest.id)};
 if(!r){var i=localStorage.getItem(${JSON.stringify(ACTIVE_PACK_ID_KEY)});
-if(i){r=localStorage.getItem(${JSON.stringify(PACK_KEY_BEFORE_ID)}+i+${JSON.stringify(PACK_KEY_AFTER_ID)})}}
-if(!r){var b=${JSON.stringify(buildTimeManifest.id)},x=JSON.parse(localStorage.getItem(${JSON.stringify(LIBRARY_INDEX_KEY)})||'[]');
+if(i&&i!==b){r=localStorage.getItem(${JSON.stringify(PACK_KEY_BEFORE_ID)}+i+${JSON.stringify(PACK_KEY_AFTER_ID)})}}
+if(!r){var x=JSON.parse(localStorage.getItem(${JSON.stringify(LIBRARY_INDEX_KEY)})||'[]');
 for(var k=0;k<x.length;k++){if(x[k]&&x[k].id===b&&x[k].unlockUrl){r=localStorage.getItem(${JSON.stringify(PACK_KEY_BEFORE_ID)}+b+${JSON.stringify(PACK_KEY_AFTER_ID)});break}}}
 }
 if(r){window.__QUIZMILL_PACK__=JSON.parse(r);

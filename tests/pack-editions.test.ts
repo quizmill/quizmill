@@ -189,6 +189,15 @@ describe('unlocking a pack that shares the built-in pack’s id', () => {
     storage.removeItem('quizmill.packLibrary.pack.another-pack.v1');
     expect(isActiveLibraryPack(BUILD, BUILD)).toBe(true);
   });
+
+  it('a file stored under an id the build later takes is not on screen, even with the pointer at it', () => {
+    // Inserted and made active while another pack was the build-time one…
+    expect(insertPack(bundle(BUILD, 3), { origin: 'old.bundle.json', buildPackId: 'earlier-build' }).ok).toBe(true);
+    activatePack(BUILD);
+    expect(isActiveLibraryPack(BUILD, 'earlier-build')).toBe(true);
+    // …then a deploy whose built-in pack has that id: the boot path renders the build.
+    expect(isActiveLibraryPack(BUILD, BUILD)).toBe(false);
+  });
 });
 
 describe('removing the unlocked edition', () => {
