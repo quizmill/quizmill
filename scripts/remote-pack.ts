@@ -61,11 +61,11 @@ export function parsePackSpec(raw: string): RemotePackSpec | null {
   const url = spec.match(/^https?:\/\/(?:www\.)?github\.com\/(.+)$/);
   if (url) spec = url[1];
 
-  spec = spec.replace(/\.git$/, '').replace(/\/+$/, '');
-
-  const segments = spec.split('/');
+  const segments = spec.replace(/\/+$/, '').split('/');
   if (segments.length < 2) return null;
-  const [owner, repo, ...rest] = segments;
+  const [owner, dotGitRepo, ...rest] = segments;
+  // `.git` belongs to the repo segment only: a directory may end in it.
+  const repo = dotGitRepo.replace(/\.git$/, '');
   if (!NAME.test(owner) || !NAME.test(repo)) return null;
 
   // What follows `owner/repo` is a directory inside the repo, or a
@@ -86,10 +86,18 @@ export function parsePackSpec(raw: string): RemotePackSpec | null {
   return { owner, repo, ref, path: dir.join('/') };
 }
 
-/** Human-readable form for logs and errors — itself a valid spec. */
+/**
+ * Human-readable form for logs, errors and install lines — itself a valid
+ * spec that parses back to the same thing. A directory under `tree/` would
+ * read back as a ref in the short form, so it takes the `/tree/HEAD/` URL.
+ */
 export function formatPackSpec(spec: RemotePackSpec): string {
+  const ref = spec.ref ? `#${spec.ref}` : '';
+  if (spec.path?.startsWith('tree/')) {
+    return `https://github.com/${spec.owner}/${spec.repo}/tree/HEAD/${spec.path}${ref}`;
+  }
   const dir = spec.path ? `/${spec.path}` : '';
-  return `${spec.owner}/${spec.repo}${dir}${spec.ref ? `#${spec.ref}` : ''}`;
+  return `${spec.owner}/${spec.repo}${dir}${ref}`;
 }
 
 function tryTarball(spec: RemotePackSpec, tmp: string): boolean {

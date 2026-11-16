@@ -112,6 +112,34 @@ describe('parsePackSpec', () => {
     expect(formatPackSpec(parsePackSpec('o/r')!)).toBe('o/r');
     expect(formatPackSpec(parsePackSpec('o/r/a/b#main')!)).toBe('o/r/a/b#main');
   });
+
+  it('strips .git from the repo only, never from a directory name', () => {
+    expect(parsePackSpec('o/r/study.git')).toEqual({
+      owner: 'o',
+      repo: 'r',
+      ref: undefined,
+      path: 'study.git',
+    });
+    expect(parsePackSpec('https://github.com/o/r/tree/HEAD/study.git')).toMatchObject({
+      repo: 'r',
+      path: 'study.git',
+    });
+    expect(parsePackSpec('https://github.com/o/r.git/')).toMatchObject({ repo: 'r' });
+    expect(parsePackSpec('o/r.git#v2')).toEqual({ owner: 'o', repo: 'r', ref: 'v2' });
+  });
+
+  it('formats a directory starting with tree/ so it is not read back as a ref', () => {
+    const spec = { owner: 'o', repo: 'r', path: 'tree/study' };
+    const printed = formatPackSpec(spec);
+    expect(printed).toBe('https://github.com/o/r/tree/HEAD/tree/study');
+    expect(parsePackSpec(printed)).toEqual({ ...spec, ref: undefined });
+
+    const pinned = formatPackSpec({ ...spec, ref: 'v2' });
+    expect(parsePackSpec(pinned)).toEqual({ ...spec, ref: 'v2' });
+    // A directory merely named `tree` is not ambiguous.
+    expect(formatPackSpec({ owner: 'o', repo: 'r', path: 'tree' })).toBe('o/r/tree');
+    expect(parsePackSpec('o/r/tree')).toMatchObject({ path: 'tree' });
+  });
 });
 
 describe('locatePackDir', () => {
