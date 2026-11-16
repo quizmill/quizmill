@@ -82,7 +82,11 @@ jobs:
   build-deploy:
     runs-on: ubuntu-latest
     steps:
+      # Full history: the Build tag below is the last commit that touched
+      # the pack's directory, which a shallow clone cannot answer.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # Reusable workflow: the checkout above is the CALLER's pack repo, so
       # there is no engine .nvmrc to read here — repeat its major literally
@@ -132,7 +136,17 @@ jobs:
           # engine's SHA. Leaving NEXT_PUBLIC_APP_VERSION unset lets the CLI
           # stamp the engine release semver, so Settings shows vX.Y.Z — not a
           # SHA — matching the showcase apps (try / world-capitals).
-          export NEXT_PUBLIC_APP_BUILD="$(git rev-parse --short HEAD)"
+          #
+          # In a repo that holds several packs (`pack` is a directory, not
+          # '.'), the tag is the last commit that touched THIS pack's
+          # directory, so a push to one pack — or the daily rebuild — does not
+          # fire the update banner in every other app built from the repo.
+          pack='${{ inputs.pack }}'
+          build=''
+          if [ "$pack" != . ] && [ -d "$pack" ]; then
+            build="$(git log -1 --format=%h -- "$pack")"
+          fi
+          export NEXT_PUBLIC_APP_BUILD="${build:-$(git rev-parse --short HEAD)}"
           npx --yes quizmill@${{ steps.engine.outputs.spec }} build ${{ inputs.pack }}
 
       - name: Deploy to Cloudflare Pages
