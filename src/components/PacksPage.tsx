@@ -188,14 +188,6 @@ function PackCard({
               Built in
             </span>
           ) : null}
-          {unlocked ? (
-            <span
-              data-testid="unlocked-pack-badge"
-              className="rounded-full border border-brand-300 bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand-800"
-            >
-              Unlocked
-            </span>
-          ) : null}
           {active ? (
             <span
               data-testid="active-pack-badge"
@@ -206,6 +198,18 @@ function PackCard({
           ) : null}
         </div>
       </div>
+      {/* Its own row: a third badge in the header squeezes the title away. */}
+      {unlocked ? (
+        <p className="mt-2">
+          <span
+            data-testid="unlocked-pack-badge"
+            className="rounded-full border border-brand-300 bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand-800"
+          >
+            Unlocked
+          </span>
+          <span className="ml-2 text-xs text-ink-500">Full edition, by licence key</span>
+        </p>
+      ) : null}
       {description ? (
         <p className="mt-1.5 line-clamp-2 text-sm text-ink-600">{description}</p>
       ) : null}

@@ -219,7 +219,9 @@ export function insertPack(
   if (manifest.id === opts.buildPackId && !(opts.unlocked && opts.unlockUrl)) {
     return {
       ok: false,
-      errors: [`"${manifest.id}" is the pack built into this app — it's always on the shelf.`],
+      errors: [
+        `"${manifest.id}" is the pack built into this app — it's always on the shelf. A fuller edition of it comes in with a licence key, not as a file.`,
+      ],
     };
   }
 
