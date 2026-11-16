@@ -9,6 +9,7 @@ import {
   buildDate,
   gitShortSha,
   latestReleaseVersion,
+  stableBuildId,
 } from '../scripts/app-version';
 
 // One reader for the facts next.config.ts, finalise-build.ts and the pack
@@ -62,6 +63,7 @@ beforeAll(() => {
 const saved = process.env.NEXT_PUBLIC_APP_VERSION;
 const savedDate = process.env.NEXT_PUBLIC_APP_BUILD_DATE;
 const savedEpoch = process.env.SOURCE_DATE_EPOCH;
+const savedBuild = process.env.NEXT_PUBLIC_APP_BUILD;
 afterEach(() => {
   if (saved === undefined) delete process.env.NEXT_PUBLIC_APP_VERSION;
   else process.env.NEXT_PUBLIC_APP_VERSION = saved;
@@ -69,6 +71,8 @@ afterEach(() => {
   else process.env.NEXT_PUBLIC_APP_BUILD_DATE = savedDate;
   if (savedEpoch === undefined) delete process.env.SOURCE_DATE_EPOCH;
   else process.env.SOURCE_DATE_EPOCH = savedEpoch;
+  if (savedBuild === undefined) delete process.env.NEXT_PUBLIC_APP_BUILD;
+  else process.env.NEXT_PUBLIC_APP_BUILD = savedBuild;
 });
 afterAll(() => {
   for (const dir of tmpDirs) fs.rmSync(dir, { recursive: true, force: true });
@@ -129,5 +133,24 @@ describe('app-version', () => {
     delete process.env.NEXT_PUBLIC_APP_BUILD_DATE;
     process.env.SOURCE_DATE_EPOCH = 'soon';
     expect(Date.parse(buildDate())).not.toBeNaN();
+  });
+
+  it('stableBuildId: the same sources give the same id, a new pack build a new one', () => {
+    delete process.env.NEXT_PUBLIC_APP_VERSION;
+    delete process.env.NEXT_PUBLIC_APP_BUILD;
+    const sha = gitShortSha(tagged);
+    expect(stableBuildId(tagged)).toBe(`1.2.3-${sha}`);
+    expect(stableBuildId(tagged)).toBe(stableBuildId(tagged));
+
+    process.env.NEXT_PUBLIC_APP_BUILD = 'abc1234';
+    expect(stableBuildId(tagged)).toBe(`1.2.3-${sha}-abc1234`);
+    // The id becomes a directory name and a URL segment.
+    process.env.NEXT_PUBLIC_APP_BUILD = 'a/b c';
+    expect(stableBuildId(tagged)).toBe(`1.2.3-${sha}-a_b_c`);
+  });
+
+  it('stableBuildId: null outside a git checkout, so Next keeps its random id', () => {
+    process.env.NEXT_PUBLIC_APP_BUILD = 'abc1234';
+    expect(stableBuildId(noGit)).toBeNull();
   });
 });

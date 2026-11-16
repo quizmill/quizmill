@@ -23,6 +23,8 @@ vi.mock('@/pack/data', async (importOriginal) => {
 });
 
 import GamesPage from '@/pack/GamesPage';
+import { forgetSuspended, suspendGame } from '@/lib/games/suspended';
+import { newGame as newSnake } from '@/lib/games/snake';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
@@ -59,7 +61,7 @@ describe('GamesPage gating by the active pack', () => {
     pack.games = {};
     await render(<GamesPage />);
     expect(byTestId('games-grid')).not.toBeNull();
-    expect(container.querySelectorAll('[data-testid^="game-card-"]')).toHaveLength(6);
+    expect(container.querySelectorAll('[data-testid^="game-card-"]')).toHaveLength(7);
     expect(byTestId('games-none')).toBeNull();
   });
 
@@ -70,6 +72,18 @@ describe('GamesPage gating by the active pack', () => {
       container.querySelectorAll('[data-testid^="game-card-"]'),
     ).map((el) => el.getAttribute('data-testid'));
     expect(cards).toEqual(['game-card-snake', 'game-card-pong']);
+  });
+
+  it('nudges a game left paused, and updates live as it is resumed', async () => {
+    pack.games = { include: ['snake', 'pong'] };
+    suspendGame('snake', newSnake(16));
+    await render(<GamesPage />);
+    expect(byTestId('game-resume-snake')?.textContent).toBe('Paused — tap to continue');
+    expect(byTestId('game-resume-pong')).toBeNull();
+    await act(async () => {
+      forgetSuspended('snake');
+    });
+    expect(byTestId('game-resume-snake')).toBeNull();
   });
 
   it('tells a pack without games that there is nothing here, with a way home', async () => {

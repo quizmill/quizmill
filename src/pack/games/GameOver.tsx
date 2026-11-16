@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
+import { useGameRules } from './GameRules';
 
 interface GameOverProps {
   /** Green for a win / finished round, amber for a loss. */
@@ -24,7 +25,9 @@ const TONE = {
 /**
  * The result panel every mini-game ends on: a tinted box, a headline, an
  * optional detail line and the "Play again" / "Done" pair. One component
- * so the six games can't drift apart in spacing or tint again.
+ * so the games can't drift apart in spacing or tint again. Under
+ * `replay: false` (a game earned by a practice round — one game, no
+ * restarts) only "Done" is offered.
  */
 export function GameOver({
   tone,
@@ -34,6 +37,7 @@ export function GameOver({
   onRestart,
   onClose,
 }: GameOverProps) {
+  const { replay } = useGameRules();
   const t = TONE[tone];
   return (
     <div
@@ -50,9 +54,11 @@ export function GameOver({
         </div>
       ) : null}
       <div className="mt-1 flex gap-2">
-        <Button size="md" variant="secondary" onClick={onRestart}>
-          Play again
-        </Button>
+        {replay ? (
+          <Button size="md" variant="secondary" onClick={onRestart}>
+            Play again
+          </Button>
+        ) : null}
         <Button size="md" onClick={onClose}>
           Done
         </Button>

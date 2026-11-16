@@ -8,12 +8,15 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { formatPackSpec } from './remote-pack';
 
 interface RegistryEntry {
   id: string;
   title: string;
   description: string;
   repo: string;
+  /** Directory inside `repo`, when the repo holds several packs. */
+  path?: string;
 }
 
 const registryPath = path.join(__dirname, '..', 'tools', 'pack', 'registry.json');
@@ -25,8 +28,10 @@ console.log('Published learning packs:\n');
 for (const pack of packs) {
   console.log(`  ${pack.title} (${pack.id})`);
   console.log(`    ${pack.description}`);
-  console.log(`    https://github.com/${pack.repo}`);
-  console.log(`    install: npm run pack:use ${pack.repo}\n`);
+  const link = `https://github.com/${pack.repo}`;
+  console.log(`    ${pack.path ? `${link}/tree/HEAD/${pack.path}` : link}`);
+  const [owner, repo] = pack.repo.split('/');
+  console.log(`    install: npm run pack:use ${formatPackSpec({ owner, repo, path: pack.path })}\n`);
 }
 console.log(
   'Any GitHub repo containing a valid pack installs the same way —\n' +

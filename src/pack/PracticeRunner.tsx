@@ -14,6 +14,7 @@ import { useClientState, useMounted } from '@/lib/useMounted';
 import { Celebration } from '@/components/Celebration';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { useLevelUp } from '@/pack/useLevelUp';
+import { EarnedGameCard } from '@/pack/EarnedGameCard';
 import {
   AnswerPanel,
   BackLink,
@@ -241,13 +242,17 @@ export function PackPracticeRunner(props: Props) {
   );
 
   if (finished) {
+    const score = scoreSummary(state);
     return (
       <RunnerResults
         eyebrow="Practice complete"
-        score={scoreSummary(state)}
+        score={score}
         note={scopeLabel}
         celebrations={celebrations}
       >
+        {/* A good round earns one game, played here. Renders nothing for
+            a pack without games or a round below the bar. */}
+        <EarnedGameCard correct={score.correct} total={score.total} />
         <Button
           size="lg"
           block

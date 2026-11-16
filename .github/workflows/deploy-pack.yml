@@ -82,7 +82,11 @@ jobs:
   build-deploy:
     runs-on: ubuntu-latest
     steps:
+      # Full history: the Build tag below is the last commit that touched
+      # the pack's directory, which a shallow clone cannot answer.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # Reusable workflow: the checkout above is the CALLER's pack repo, so
       # there is no engine .nvmrc to read here — repeat its major literally
@@ -132,7 +136,38 @@ jobs:
           # engine's SHA. Leaving NEXT_PUBLIC_APP_VERSION unset lets the CLI
           # stamp the engine release semver, so Settings shows vX.Y.Z — not a
           # SHA — matching the showcase apps (try / world-capitals).
-          export NEXT_PUBLIC_APP_BUILD="$(git rev-parse --short HEAD)"
+          #
+          # In a repo that holds several packs (`pack` is a directory, not
+          # '.'), the tag is the last commit that touched THIS pack's
+          # directory, so a push to one pack does not fire the update banner
+          # in every other app built from the repo.
+          pack='${{ inputs.pack }}'
+          commit=''
+          if [ "$pack" != . ] && [ -d "$pack" ]; then
+            commit="$(git log -1 --format=%H -- "$pack")"
+          fi
+          commit="${commit:-$(git rev-parse HEAD)}"
+          export NEXT_PUBLIC_APP_BUILD="$(git rev-parse --short "$commit")"
+
+          # Pin the build date to when the pack or the engine last changed
+          # (the later of the pack commit and the engine version's publish
+          # time), not to the moment of this run. With the engine's stable
+          # build id, a rebuild of an unchanged pack on an unchanged engine
+          # is then byte-identical, `sw.js` included, so the daily cron does
+          # not show learners an update banner for nothing. If npm cannot
+          # say when the engine was published, the pack's date stands.
+          spec='${{ steps.engine.outputs.spec }}'
+          pack_date="$(git log -1 --format=%cI "$commit")"
+          engine_date="$(npm view "quizmill@$spec" time --json 2>/dev/null \
+            | VERSION="$(npm view "quizmill@$spec" version 2>/dev/null)" node -e '
+                let s = ""; process.stdin.on("data", (d) => (s += d));
+                process.stdin.on("end", () => {
+                  try { process.stdout.write(JSON.parse(s)[process.env.VERSION] ?? ""); } catch {}
+                });' || true)"
+          export NEXT_PUBLIC_APP_BUILD_DATE="$(PACK="$pack_date" ENGINE="$engine_date" node -p '
+            const t = [process.env.PACK, process.env.ENGINE].map((d) => Date.parse(d)).filter(Number.isFinite);
+            new Date(Math.max(...t)).toISOString()')"
+          echo "Build tag $NEXT_PUBLIC_APP_BUILD, build date $NEXT_PUBLIC_APP_BUILD_DATE"
           npx --yes quizmill@${{ steps.engine.outputs.spec }} build ${{ inputs.pack }}
 
       - name: Deploy to Cloudflare Pages

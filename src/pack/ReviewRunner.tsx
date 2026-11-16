@@ -115,13 +115,15 @@ export function PackReviewRunner() {
     const ids =
       scope !== null
         ? sessionMistakeIds(attempts, scope)
-        : weakSpots(attempts, need)
-            .slice(0, REVIEW_BATCH_SIZE)
-            .map((m) => m.id);
+        : weakSpots(attempts, need).map((m) => m.id);
     if (ids.length === 0) {
       setNothingToReview(true);
       return;
     }
+    // Join to the bank BEFORE taking a batch: history may hold mistakes on
+    // questions this content lacks (a fuller edition of the same pack id,
+    // a question retired since), and a batch of those would open on nothing
+    // while reviewable mistakes wait behind them.
     const byId = new Map(packQuestions.map((q) => [q.id, q]));
     // A paper sheet's review follows a page the learner may hold in hand,
     // so it keeps the printed order. Exam and check reviews (also scoped)
@@ -129,10 +131,12 @@ export function PackReviewRunner() {
     const paperSheet =
       scope !== null &&
       attempts.some((a) => a.sessionId === scope && a.mode === 'paper');
-    const picked = ids
+    const known = ids
       .map((id) => byId.get(id))
-      .filter((q): q is PackQuestion => q !== undefined)
-      .map((q) => (paperSheet ? q : shuffleOptions(q)));
+      .filter((q): q is PackQuestion => q !== undefined);
+    const picked = (scope !== null ? known : known.slice(0, REVIEW_BATCH_SIZE)).map(
+      (q) => (paperSheet ? q : shuffleOptions(q)),
+    );
     if (picked.length === 0) {
       setNothingToReview(true);
       return;

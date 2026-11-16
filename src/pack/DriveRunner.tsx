@@ -121,11 +121,7 @@ export function DriveRunner() {
   const bank = useMemo(
     () =>
       packQuestions.filter(
-        (q) =>
-          !q.image &&
-          q.options !== undefined &&
-          q.options.every((o) => !o.image) &&
-          !isMultiAnswer(q),
+        (q) => !q.image && q.options?.every((o) => !o.image) && !isMultiAnswer(q),
       ),
     [],
   );

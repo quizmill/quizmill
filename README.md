@@ -53,7 +53,8 @@ npx quizmill run quizmill/pack-claude-cert   # install + run one
 | `your-name/your-pack` | Private repos install exactly the same way (family packs, exam prep, team material) — anyone whose `git clone` works can run it | private |
 
 `owner/repo`, `owner/repo#branch`, full GitHub URLs and SSH remotes all
-work.
+work. A repo that holds several packs takes the pack's directory too:
+`owner/repo/dir` (e.g. `quizmill/packs-aws/aws-clf`).
 
 ## Build a pack about anything
 
@@ -94,7 +95,9 @@ npx quizmill run your-name/your-pack-repo
 
 Keep it private and it still works for everyone with repo access. If
 the pack is public and you want it listed in `npx quizmill list`, PR an
-entry into [`tools/pack/registry.json`](tools/pack/registry.json).
+entry into [`tools/pack/registry.json`](tools/pack/registry.json) —
+`repo`, plus `path` when the pack sits in a directory of a repo that
+holds several.
 
 If your questions build on someone else's bank, keep the upstream
 license, record provenance in each question's `sourceRef` (the app
@@ -255,7 +258,14 @@ Beyond the required fields, all optional:
   any other bundle is refused), and `upgrade.unlockUrl` points at the
   author's own endpoint instead of the build's (see `NEXT_PUBLIC_UNLOCK_URL`
   below). CORS `*`, no cookies; how keys are issued is the author's
-  business.
+  business. `upgrade.packId` may be the pack's OWN id — one pack id, two
+  editions: the app is built from a sample, the key fetches a superset
+  of its questions under the same id, and the app shows that edition in
+  place of the built-in one from then on (one card on the shelf, marked
+  Unlocked). Progress, notes, stickers and sync never move, because the
+  id never changes; removing the unlocked edition under Packs returns to
+  the built-in one. Only a licence key can bring in a pack with the
+  built-in pack's id — a file or URL carrying it is refused.
 
 The validator (`npx quizmill validate <dir>`) cross-checks ids,
 category / scenario / concept / level / paper references, image paths, and

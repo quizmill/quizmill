@@ -22,6 +22,7 @@ import {
   PACK_CATEGORY_LABEL,
   EXAM_AVAILABLE_BY_CATEGORY,
   examInScope,
+  hasPackQuestion,
 } from '@/pack/data';
 import ExamReadiness from '@/pack/ExamReadiness';
 import { cn } from '@/lib/cn';
@@ -55,7 +56,10 @@ export default function ProgressPage() {
     { inScope: examInScope },
   );
   const byDay = accuracyByDay(attempts, null).slice(-DAILY_POINT_LIMIT);
-  const weakest = weakestQuestions(attempts).slice(0, WEAK_SPOT_LIMIT);
+  // A weak spot is a question to go back to — only ones this content has.
+  const weakest = weakestQuestions(attempts)
+    .filter((w) => hasPackQuestion(w.questionId))
+    .slice(0, WEAK_SPOT_LIMIT);
   const promptById = new Map(packQuestions.map((q) => [q.id, q.prompt]));
 
   return (

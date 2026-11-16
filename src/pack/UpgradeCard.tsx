@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { ArrowUpRight, Sparkles } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
 import { recordEvent } from '@/lib/storage';
-import { upgradeHref, type UpgradePlacement } from '@/lib/upgrade';
+import { upgradeHref, upgradeOnOffer, type UpgradePlacement } from '@/lib/upgrade';
 import { claimHref, startClaim } from '@/lib/upgradeClaim';
 import { watchUpgradeClaims } from '@/components/UpgradeClaimCheck';
 
@@ -31,7 +31,11 @@ const seen = new Set<UpgradePlacement>();
  * (src/lib/upgradeClaim.ts; UpgradeClaimCheck does the collecting).
  */
 export function UpgradeCard({ placement }: { placement: UpgradePlacement }) {
-  const upgrade = APP_CONFIG.upgrade;
+  // Nothing on offer once the pack's own unlocked edition is the one in
+  // use. A storage read during render, safely: an unlocked edition is
+  // always a runtime pack, which RuntimePackBoundary renders client-only
+  // (and the static build has no storage, so it prerenders the card).
+  const upgrade = upgradeOnOffer(APP_CONFIG.packId, APP_CONFIG.upgrade);
   const present = Boolean(upgrade);
   useEffect(() => {
     if (!present || seen.has(placement)) return;

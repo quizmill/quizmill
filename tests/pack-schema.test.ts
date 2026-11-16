@@ -788,7 +788,7 @@ describe('validatePack', () => {
     expect(validatePack(idOnly).ok).toBe(true);
   });
 
-  it('rejects an upgrade packId that is not a slug or is the pack itself', () => {
+  it('rejects an upgrade packId that is not a slug', () => {
     const notSlug = loadDemo();
     (notSlug.manifest as { upgrade?: unknown }).upgrade = {
       title: 'Get the full course',
@@ -797,15 +797,21 @@ describe('validatePack', () => {
     };
     expect(validatePack(notSlug).ok).toBe(false);
 
+    const result = validatePack(notSlug);
+    expect(result.errors.some((e) => e.includes('upgrade.packId'))).toBe(true);
+  });
+
+  // One pack id, two editions: the sample and the fuller bank a licence key
+  // fetches share an id (and so every learner's progress), so the hint may
+  // name the pack itself.
+  it('accepts an upgrade packId that is the pack’s own id', () => {
     const self = loadDemo();
     (self.manifest as { upgrade?: unknown }).upgrade = {
       title: 'Get the full course',
       url: 'https://example.com/course',
       packId: (self.manifest as { id: string }).id,
     };
-    const result = validatePack(self);
-    expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.includes('upgrade.packId'))).toBe(true);
+    expect(validatePack(self)).toMatchObject({ ok: true });
   });
 
   // ——— timed exam (exam.durationMinutes, opt-in) ———

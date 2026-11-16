@@ -12,7 +12,7 @@ import {
   loadProgressionShown,
 } from '@/lib/progressionPref';
 import { latestColdLook } from '@/lib/readiness';
-import { progressionEnabled, PACK_XP_LEVELS, packQuestions } from '@/pack/data';
+import { hasPackQuestion, progressionEnabled, PACK_XP_LEVELS, packQuestions } from '@/pack/data';
 import { recordLevelCrossings, recordedLevel } from '@/pack/useLevelUp';
 
 /**
@@ -59,7 +59,8 @@ export function ProgressCard({ attempts }: { attempts: readonly Attempt[] }) {
   // Totals count DISTINCT questions (latest cold look), not raw attempts —
   // a re-answered question is one answered question, so the numerator
   // never exceeds the bank and accuracy never tops 100%.
-  const looks = latestColdLook(attempts);
+  // Of the bank on screen: history can hold questions it lacks (hasPackQuestion).
+  const looks = latestColdLook(attempts, hasPackQuestion);
   const totalAnswered = looks.length;
   const totalCorrect = looks.filter((a) => a.isCorrect).length;
   const showTotals = totalAnswered > 0;
