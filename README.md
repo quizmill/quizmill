@@ -255,7 +255,14 @@ Beyond the required fields, all optional:
   any other bundle is refused), and `upgrade.unlockUrl` points at the
   author's own endpoint instead of the build's (see `NEXT_PUBLIC_UNLOCK_URL`
   below). CORS `*`, no cookies; how keys are issued is the author's
-  business.
+  business. `upgrade.packId` may be the pack's OWN id — one pack id, two
+  editions: the app is built from a sample, the key fetches a superset
+  of its questions under the same id, and the app shows that edition in
+  place of the built-in one from then on (one card on the shelf, marked
+  Unlocked). Progress, notes, stickers and sync never move, because the
+  id never changes; removing the unlocked edition under Packs returns to
+  the built-in one. Only a licence key can bring in a pack with the
+  built-in pack's id — a file or URL carrying it is refused.
 
 The validator (`npx quizmill validate <dir>`) cross-checks ids,
 category / scenario / concept / level / paper references, image paths, and

@@ -100,17 +100,20 @@ export function PackReviewRunner() {
     const scope = scopeFromHash();
     setScoped(scope !== null);
     const ids =
-      scope !== null
-        ? sessionMistakeIds(attempts, scope)
-        : unresolvedMistakeIds(attempts).slice(0, REVIEW_BATCH_SIZE);
+      scope !== null ? sessionMistakeIds(attempts, scope) : unresolvedMistakeIds(attempts);
     if (ids.length === 0) {
       setNothingToReview(true);
       return;
     }
+    // Join to the bank BEFORE taking a batch: history may hold mistakes on
+    // questions this content lacks (a fuller edition of the same pack id,
+    // a question retired since), and a batch of those would open on nothing
+    // while reviewable mistakes wait behind them.
     const byId = new Map(packQuestions.map((q) => [q.id, q]));
-    const picked = ids
+    const known = ids
       .map((id) => byId.get(id))
       .filter((q): q is PackQuestion => q !== undefined);
+    const picked = scope !== null ? known : known.slice(0, REVIEW_BATCH_SIZE);
     if (picked.length === 0) {
       setNothingToReview(true);
       return;
