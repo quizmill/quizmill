@@ -41,6 +41,28 @@ const COLOURS: Record<PieceKind, string> = {
 const BOARD_BG = '#f1f5f9'; // ink-100, as the Snake board
 const PREVIEW = 4; // the next-piece box is PREVIEW×PREVIEW cells
 
+/** Keyboard controls — arrows (or WASD), space to hard-drop. */
+const KEY_ACTIONS: Partial<Record<string, (s: State) => State>> = {
+  ArrowLeft: moveLeft,
+  a: moveLeft,
+  ArrowRight: moveRight,
+  d: moveRight,
+  ArrowUp: rotate,
+  w: rotate,
+  x: rotate,
+  ArrowDown: (s) => softDrop(s),
+  s: (s) => softDrop(s),
+  ' ': (s) => hardDrop(s),
+};
+
+/** The pad's single-glyph buttons; Drop, wider and labelled, follows them. */
+const PAD: readonly { label: string; glyph: string; action: (s: State) => State }[] = [
+  { label: 'Move left', glyph: '◀', action: moveLeft },
+  { label: 'Rotate', glyph: '↻', action: rotate },
+  { label: 'Move right', glyph: '▶', action: moveRight },
+  { label: 'Soft drop', glyph: '▼', action: (s) => softDrop(s) },
+];
+
 const PAD_BUTTON =
   'tap-feedback flex h-14 items-center justify-center rounded-xl bg-ink-100 text-2xl font-bold text-ink-700 hover:bg-ink-200 active:bg-ink-300 disabled:opacity-40 disabled:hover:bg-ink-100';
 
@@ -56,8 +78,7 @@ export function Tetris({ onClose }: TetrisProps) {
     return () => clearInterval(id);
   }, [state.gameOver, held, level, setState]);
 
-  // Keyboard controls — arrows (or WASD), space to hard-drop. Listening
-  // only while a game is on, so at game over Space and the arrows go back
+  // Keyboard controls (KEY_ACTIONS). Listening only while a game is on, so at game over Space and the arrows go back
   // to the page (activating Done / Play again, scrolling).
   useEffect(() => {
     if (state.gameOver) return;
@@ -71,20 +92,8 @@ export function Tetris({ onClose }: TetrisProps) {
       ) {
         return;
       }
-      const actions: Record<string, ((s: State) => State) | undefined> = {
-        ArrowLeft: moveLeft,
-        a: moveLeft,
-        ArrowRight: moveRight,
-        d: moveRight,
-        ArrowUp: rotate,
-        w: rotate,
-        x: rotate,
-        ArrowDown: (s) => softDrop(s),
-        s: (s) => softDrop(s),
-        ' ': (s) => hardDrop(s),
-      };
       // Shift or Caps Lock turns 'a' into 'A' — the letters work either way.
-      const action = actions[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+      const action = KEY_ACTIONS[e.key.length === 1 ? e.key.toLowerCase() : e.key];
       if (!action) return;
       e.preventDefault();
       setState(action);
@@ -143,32 +152,10 @@ export function Tetris({ onClose }: TetrisProps) {
             style={{ background: BOARD_BG, aspectRatio: `${COLS} / ${ROWS}` }}
           >
             {state.board.map((row, y) =>
-              row.map((cell, x) =>
-                cell ? (
-                  <rect
-                    key={`${x}-${y}`}
-                    x={x + 0.05}
-                    y={y + 0.05}
-                    width={0.9}
-                    height={0.9}
-                    rx={0.12}
-                    fill={COLOURS[cell]}
-                  />
-                ) : null,
-              ),
+              row.map((cell, x) => (cell ? <Block key={`${x}-${y}`} x={x} y={y} kind={cell} /> : null)),
             )}
             {falling.map((c) => (
-              <rect
-                key={`p-${c.x}-${c.y}`}
-                x={c.x + 0.05}
-                y={c.y + 0.05}
-                width={0.9}
-                height={0.9}
-                rx={0.12}
-                fill={COLOURS[state.current.kind]}
-                stroke="rgba(255,255,255,0.6)"
-                strokeWidth={0.06}
-              />
+              <Block key={`p-${c.x}-${c.y}`} x={c.x} y={c.y} kind={state.current.kind} outline />
             ))}
           </svg>
 
@@ -187,34 +174,12 @@ export function Tetris({ onClose }: TetrisProps) {
                 style={{ background: BOARD_BG }}
               >
                 {nextCells.map((c) => (
-                  <rect
-                    key={`${c.x}-${c.y}`}
-                    x={c.x + offX + 0.05}
-                    y={c.y + offY + 0.05}
-                    width={0.9}
-                    height={0.9}
-                    rx={0.12}
-                    fill={COLOURS[state.next]}
-                  />
+                  <Block key={`${c.x}-${c.y}`} x={c.x + offX} y={c.y + offY} kind={state.next} />
                 ))}
               </svg>
             </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
-                Lines
-              </div>
-              <div className="text-2xl font-bold text-ink-900" data-testid="tetris-lines">
-                {state.lines}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
-                Level
-              </div>
-              <div className="text-2xl font-bold text-ink-900" data-testid="tetris-level">
-                {level}
-              </div>
-            </div>
+            <Stat label="Lines" value={state.lines} testId="tetris-lines" />
+            <Stat label="Level" value={level} testId="tetris-level" />
           </div>
         </div>
 
@@ -222,42 +187,18 @@ export function Tetris({ onClose }: TetrisProps) {
             with a gap, like Snake's, so a small finger doesn't catch the
             neighbour. Disabled at game over: the result panel takes over. */}
         <div className="grid w-full max-w-[300px] grid-cols-3 gap-2">
-          <button
-            type="button"
-            aria-label="Move left"
-            disabled={state.gameOver}
-            onClick={() => setState(moveLeft)}
-            className={PAD_BUTTON}
-          >
-            ◀
-          </button>
-          <button
-            type="button"
-            aria-label="Rotate"
-            disabled={state.gameOver}
-            onClick={() => setState(rotate)}
-            className={PAD_BUTTON}
-          >
-            ↻
-          </button>
-          <button
-            type="button"
-            aria-label="Move right"
-            disabled={state.gameOver}
-            onClick={() => setState(moveRight)}
-            className={PAD_BUTTON}
-          >
-            ▶
-          </button>
-          <button
-            type="button"
-            aria-label="Soft drop"
-            disabled={state.gameOver}
-            onClick={() => setState((s) => softDrop(s))}
-            className={PAD_BUTTON}
-          >
-            ▼
-          </button>
+          {PAD.map(({ label, glyph, action }) => (
+            <button
+              key={label}
+              type="button"
+              aria-label={label}
+              disabled={state.gameOver}
+              onClick={() => setState(action)}
+              className={PAD_BUTTON}
+            >
+              {glyph}
+            </button>
+          ))}
           <button
             type="button"
             aria-label="Hard drop"
@@ -293,5 +234,43 @@ export function Tetris({ onClose }: TetrisProps) {
         ) : null}
       </div>
     </GameShell>
+  );
+}
+
+/** One cell of a piece, inset a touch so neighbours read apart; the
+ *  falling piece is `outline`d to stand out from the locked stack. */
+function Block({
+  x,
+  y,
+  kind,
+  outline = false,
+}: {
+  x: number;
+  y: number;
+  kind: PieceKind;
+  outline?: boolean;
+}) {
+  return (
+    <rect
+      x={x + 0.05}
+      y={y + 0.05}
+      width={0.9}
+      height={0.9}
+      rx={0.12}
+      fill={COLOURS[kind]}
+      stroke={outline ? 'rgba(255,255,255,0.6)' : undefined}
+      strokeWidth={outline ? 0.06 : undefined}
+    />
+  );
+}
+
+function Stat({ label, value, testId }: { label: string; value: number; testId: string }) {
+  return (
+    <div>
+      <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">{label}</div>
+      <div className="text-2xl font-bold text-ink-900" data-testid={testId}>
+        {value}
+      </div>
+    </div>
   );
 }

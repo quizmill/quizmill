@@ -20,8 +20,6 @@ interface EarnedGameCardProps {
   total: number;
 }
 
-type Phase = 'ready' | 'playing' | 'played';
-
 /**
  * The reward on the practice results screen: a good round (half or more
  * right — `earnsGame`) earns ONE game, picked from the pack's arcade and
@@ -31,14 +29,15 @@ type Phase = 'ready' | 'playing' | 'played';
  * for a pack without a `games` block or a round below the bar.
  */
 export function EarnedGameCard({ correct, total }: EarnedGameCardProps) {
-  const [phase, setPhase] = useState<Phase>('ready');
+  // The game being played (null before the pick), then `played` once closed.
   const [game, setGame] = useState<GameId | null>(null);
+  const [played, setPlayed] = useState(false);
 
   if (!gamesEnabled || !earnsGame(correct, total)) return null;
   const games = enabledGames(packGames?.include);
   if (games.length === 0) return null;
 
-  if (phase === 'played') {
+  if (played) {
     return (
       <div
         data-testid="earned-game-played"
@@ -66,12 +65,11 @@ export function EarnedGameCard({ correct, total }: EarnedGameCardProps) {
             data-testid={`earned-game-${g.id}`}
             // One pick per offer: once a game is open (or its chunk is
             // still loading) the others can't swap in behind the modal.
-            disabled={phase !== 'ready'}
+            disabled={game !== null}
             onClick={() => {
-              if (phase !== 'ready') return;
+              if (game !== null) return;
               recordEvent('game_open', { game: g.id, via: 'earned' });
               setGame(g.id);
-              setPhase('playing');
             }}
             className="tap-feedback flex flex-col items-center gap-1 rounded-xl border border-ink-200 bg-surface px-2 py-2.5 text-center shadow-xs transition hover:border-brand-500/40 disabled:opacity-50 disabled:hover:border-ink-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500"
           >
@@ -84,13 +82,13 @@ export function EarnedGameCard({ correct, total }: EarnedGameCardProps) {
         ))}
       </div>
 
-      {phase === 'playing' && game ? (
+      {game ? (
         <GameModal
           game={game}
           replay={false}
           onClose={() => {
             setGame(null);
-            setPhase('played');
+            setPlayed(true);
           }}
         />
       ) : null}
