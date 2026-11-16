@@ -138,7 +138,7 @@ describe('PacksPage — the built-in pack’s unlocked edition', () => {
     // On screen through the fallback: no pointer names it.
     expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBeNull();
     // happy-dom has no confirm() of its own.
-    const confirm = vi.fn((_message?: string) => true);
+    const confirm = vi.fn<(message?: string) => boolean>(() => true);
     window.confirm = confirm;
     await render();
     await act(async () => {
