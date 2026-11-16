@@ -30,7 +30,7 @@ import {
   isMultiAnswer,
   packQuestions,
   progressionEnabled,
-  type OptionKey,
+  type AnswerKey,
   type PackQuestion,
 } from '@/pack/data';
 import {
@@ -41,6 +41,7 @@ import {
   feedbackSecondsSince,
   isLastQuestion,
   moveToNext,
+  isAnswerReady,
   nextSelection,
   scoreSummary,
   type RunnerState,
@@ -84,10 +85,10 @@ export function PackReviewRunner() {
   const [stage, setStage] = useState<Stage>('choosing');
   // The chosen option key(s) — one for single-answer, several for
   // multi-answer ("select all") questions.
-  const [selected, setSelected] = useState<OptionKey[]>([]);
+  const [selected, setSelected] = useState<AnswerKey[]>([]);
   // First option tapped on the current question (first-instinct signal)
   // and the just-recorded attempt (to stamp feedbackSeconds on Next).
-  const firstSelectedRef = useRef<OptionKey | null>(null);
+  const firstSelectedRef = useRef<AnswerKey | null>(null);
   const lastAttemptRef = useRef<{ id: string; answeredAt: number } | null>(null);
   const [finished, setFinished] = useState(false);
 
@@ -99,17 +100,20 @@ export function PackReviewRunner() {
     const scope = scopeFromHash();
     setScoped(scope !== null);
     const ids =
-      scope !== null
-        ? sessionMistakeIds(attempts, scope)
-        : unresolvedMistakeIds(attempts).slice(0, REVIEW_BATCH_SIZE);
+      scope !== null ? sessionMistakeIds(attempts, scope) : unresolvedMistakeIds(attempts);
     if (ids.length === 0) {
       setNothingToReview(true);
       return;
     }
+    // Join to the bank BEFORE taking a batch: history may hold mistakes on
+    // questions this content lacks (a fuller edition of the same pack id,
+    // a question retired since), and a batch of those would open on nothing
+    // while reviewable mistakes wait behind them.
     const byId = new Map(packQuestions.map((q) => [q.id, q]));
-    const picked = ids
+    const known = ids
       .map((id) => byId.get(id))
       .filter((q): q is PackQuestion => q !== undefined);
+    const picked = scope !== null ? known : known.slice(0, REVIEW_BATCH_SIZE);
     if (picked.length === 0) {
       setNothingToReview(true);
       return;
@@ -214,14 +218,14 @@ export function PackReviewRunner() {
   const current = state.questions[state.currentIndex];
   const multi = isMultiAnswer(current);
 
-  function handleSelect(key: OptionKey) {
+  function handleSelect(key: AnswerKey) {
     if (stage !== 'choosing') return;
     firstSelectedRef.current ??= key;
     setSelected((prev) => nextSelection(prev, key, multi));
   }
 
   function handleCheck() {
-    if (!state || selected.length === 0) return;
+    if (!state || !isAnswerReady(current, selected)) return;
     // Snapshot XP before the write so the chip shows what this answer
     // earned — in review that's often the rescue bonus, on purpose.
     const showXp = progressionEnabled && loadProgressionShown();

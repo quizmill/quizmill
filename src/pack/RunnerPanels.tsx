@@ -24,10 +24,12 @@ import {
   isMultiAnswer,
   packScenarios,
   PACK_CONCEPT_BY_ID,
-  type OptionKey,
+  isMatching,
+  type AnswerKey,
   type PackQuestion,
 } from '@/pack/data';
-import { formatKeyList, gradeSelection } from './runner';
+import { MatchRows } from '@/pack/MatchRows';
+import { formatKeyList, gradeSelection, isAnswerReady, matchRowsRight } from './runner';
 
 /**
  * The screen pieces the visual runners (Practice, Review, Notes) share.
@@ -207,9 +209,9 @@ export function QuestionPanel({
   /** Share of the sitting's clock used, 0–1 — the bar when there is no
    *  `total`. */
   progress?: number;
-  selected: OptionKey[];
+  selected: AnswerKey[];
   stage: Stage;
-  onSelect: (key: OptionKey) => void;
+  onSelect: (key: AnswerKey) => void;
   back?: ReactNode;
   /** A mode chip rendered first in the metadata row ("Review mistakes"). */
   badge?: ReactNode;
@@ -220,6 +222,7 @@ export function QuestionPanel({
     ? packScenarios.find((s) => s.id === question.scenarioId)
     : undefined;
   const multi = isMultiAnswer(question);
+  const matching = isMatching(question);
 
   return (
     <>
@@ -283,21 +286,25 @@ export function QuestionPanel({
 
       <Scratchpad />
 
-      {multi ? (
+      {multi || matching ? (
         <div className="-mb-1 flex items-center gap-1.5 text-xs font-semibold text-brand-700">
           <ListChecks className="h-4 w-4" />
-          Select all that apply
+          {matching ? 'Choose one answer for each row' : 'Select all that apply'}
         </div>
       ) : null}
 
-      <OptionButtons
-        options={question.options}
-        selected={selected}
-        stage={stage}
-        correctKeys={correctKeysOf(question)}
-        multi={multi}
-        onSelect={onSelect}
-      />
+      {matching ? (
+        <MatchRows question={question} selected={selected} stage={stage} onSelect={onSelect} />
+      ) : (
+        <OptionButtons
+          options={question.options ?? []}
+          selected={selected}
+          stage={stage}
+          correctKeys={correctKeysOf(question)}
+          multi={multi}
+          onSelect={onSelect}
+        />
+      )}
     </>
   );
 }
@@ -318,7 +325,7 @@ export function AnswerPanel({
   onNext,
 }: {
   question: PackQuestion;
-  selected: OptionKey[];
+  selected: AnswerKey[];
   stage: Stage;
   /** Feedback headline for a right / wrong answer. */
   verdict: { correct: string; wrong: string };
@@ -331,7 +338,7 @@ export function AnswerPanel({
 }) {
   if (stage === 'choosing') {
     return (
-      <Button size="lg" block onClick={onCheck} disabled={selected.length === 0}>
+      <Button size="lg" block onClick={onCheck} disabled={!isAnswerReady(question, selected)}>
         Check answer
       </Button>
     );
@@ -339,6 +346,9 @@ export function AnswerPanel({
 
   const isCorrect = gradeSelection(question, selected);
   const answerKeys = correctKeysOf(question);
+  // A matching question shows its answers row by row (MatchRows), so the
+  // missed line is a count rather than a list of letters.
+  const rowsRight = isMatching(question) ? matchRowsRight(question, selected) : null;
   const concept = question.conceptId ? PACK_CONCEPT_BY_ID[question.conceptId] : undefined;
 
   return (
@@ -368,7 +378,14 @@ export function AnswerPanel({
           </span>
         ) : null}
       </div>
-      {!isCorrect ? (
+      {!isCorrect && rowsRight ? (
+        <div className="text-[15px] text-ink-700" data-testid="rows-right">
+          <span className="font-semibold text-ink-900">
+            {rowsRight.right} of {rowsRight.total}
+          </span>{' '}
+          rows right — every row has to be right to score the question.
+        </div>
+      ) : !isCorrect ? (
         <div className="text-[15px] text-ink-700">
           {answerKeys.length > 1 ? 'The answers are ' : 'The answer is '}
           <span className="font-semibold text-ink-900">

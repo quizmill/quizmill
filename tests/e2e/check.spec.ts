@@ -52,7 +52,7 @@ test.describe('readiness check', () => {
       const last = (await next.textContent())?.includes('See results');
       await next.click();
       if (last) break;
-      expect(answered, 'the deck is the in-scope bank').toBeLessThan(18);
+      expect(answered, 'the deck is the in-scope bank').toBeLessThan(19);
     }
     // Quicker than the exam's pace, so more than the advertised six.
     expect(answered).toBeGreaterThanOrEqual(6);

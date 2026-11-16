@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import PackHome from '@/pack/Home';
 import ExamReadiness from '@/pack/ExamReadiness';
 import { SESSIONS_KEY, loadPrefs } from '@/lib/storage';
+import { packQuestions } from '@/pack/data';
 import type { Attempt, Session } from '@/data/types';
 
 // React needs this flag to allow act() outside @testing-library.
@@ -153,9 +154,12 @@ describe('ExamReadiness → readiness check', () => {
 
   it('drops the link once enough history gives a real verdict', async () => {
     // Twelve first attempts in the 60%-weight domain clear the judged gate.
-    const attempts = Array.from({ length: 12 }, (_, i) =>
-      attempt(`demo-planets-${i}`, 'planets', true),
-    );
+    // (Real questions: readiness only counts what the bank contains.)
+    const attempts = packQuestions
+      .filter((q) => q.categoryKey === 'planets')
+      .slice(0, 12)
+      .map((q) => attempt(q.id, 'planets', true));
+    expect(attempts).toHaveLength(12);
     await render(<ExamReadiness attempts={attempts} />);
     const verdict = container.querySelector('[data-testid="readiness-verdict"]');
     expect(verdict!.getAttribute('data-verdict')).not.toBe('no-data');

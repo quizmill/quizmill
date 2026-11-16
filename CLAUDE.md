@@ -75,6 +75,13 @@ code or in `docs/investigations/`.
   `src/lib/devicePref.ts` + `useDevicePref` — a new switch declares
   key/event/parse/serialise/fallback and nothing else. Device opt-ins hide
   UI; they never stop recording.
+- **One pack id may have two editions**: only a pack fetched with a
+  licence key may be stored under the built-in pack's id (its unlocked
+  edition, `insertPack`'s `unlocked`), and the boot path (layout
+  bootstrap + `runtime.ts`, kept in step) renders it over the build-time
+  content. Progress is never copied or aliased — the id is the same.
+  History can therefore hold questions the content on screen lacks:
+  anything that counts or lists questions scopes through `hasPackQuestion`.
 - **Every route exists in every build** and gates on the ACTIVE pack at
   render time (the static export prerenders once; the pack library can
   swap a different pack in at runtime). No build-time `notFound()`.

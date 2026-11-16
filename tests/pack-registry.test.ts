@@ -6,6 +6,7 @@ import {
   REGISTRY_API_URL,
   REGISTRY_RAW_URL,
 } from '@/lib/packRegistry';
+import { resolvePackUrl } from '@/lib/packInsert';
 
 const API_LISTING = {
   packs: [
@@ -89,7 +90,22 @@ describe('builtinRegistry', () => {
 
   it('lists every published AWS cert pack', () => {
     const ids = builtinRegistry().map((p) => p.id);
-    expect(ids).toEqual(expect.arrayContaining(['aws-arch-pro', 'aws-genai', 'aws-saa', 'aws-clf']));
+    expect(ids).toEqual(expect.arrayContaining(['aws-arch-pro', 'aws-genai', 'aws-saa', 'aws-clf', 'aws-aif']));
+  });
+
+  it('lists each pack once — ids and install sources (repo + path) are unique', () => {
+    const packs = builtinRegistry();
+    const dupes = (keys: string[]) => keys.filter((k, i) => keys.indexOf(k) !== i);
+    expect(dupes(packs.map((p) => p.id))).toEqual([]);
+    expect(dupes(packs.map((p) => registryRepoUrl(p)))).toEqual([]);
+  });
+
+  it('points the AWS packs at their directory in the shared repo', () => {
+    const aws = builtinRegistry().filter((p) => p.id.startsWith('aws-'));
+    expect(aws).toHaveLength(5);
+    for (const p of aws) {
+      expect(p).toMatchObject({ repo: 'quizmill/packs-aws', path: p.id });
+    }
   });
 });
 
@@ -98,5 +114,38 @@ describe('registryRepoUrl', () => {
     expect(
       registryRepoUrl({ id: 'x', title: 'X', description: '', repo: 'quizmill/pack-x' }),
     ).toBe('https://github.com/quizmill/pack-x');
+  });
+
+  it('points at the directory when the entry has a path', () => {
+    const url = registryRepoUrl({
+      id: 'aws-clf',
+      title: 'X',
+      description: '',
+      repo: 'quizmill/packs-aws',
+      path: 'aws-clf',
+    });
+    expect(url).toBe('https://github.com/quizmill/packs-aws/tree/HEAD/aws-clf');
+    expect(resolvePackUrl(url)).toEqual({
+      kind: 'dir',
+      base: 'https://raw.githubusercontent.com/quizmill/packs-aws/HEAD/aws-clf',
+    });
+  });
+});
+
+describe('registry entries with a path', () => {
+  const entry = (path: unknown) => ({ id: 'p', title: 'P', description: '', repo: 'a/b', path });
+  const load = async (path: unknown) =>
+    (await loadRegistry(fetchStub({ [REGISTRY_API_URL]: { packs: [entry('ok'), entry(path)] } })))
+      .listings;
+
+  it('keeps a well-formed path', async () => {
+    const listings = await load('packs/deep-one');
+    expect(listings.map((l) => l.path)).toEqual(['ok', 'packs/deep-one']);
+  });
+
+  it('drops an entry whose path is malformed or climbs out of the repo', async () => {
+    for (const bad of ['../x', '/abs', 'a//b', 'a/../b', 'has space', '', 42, 'x?y=1']) {
+      expect((await load(bad)).map((l) => l.path)).toEqual(['ok']);
+    }
   });
 });

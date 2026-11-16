@@ -365,6 +365,9 @@ export async function unlockPack(
     origin: `licence key · ${new URL(config.unlockUrl).host}`,
     buildPackId: opts.buildPackId,
     unlockUrl: config.unlockUrl,
+    // A key may open the fuller edition of the very pack this app was
+    // built from (same id): the one insert allowed to carry that id.
+    unlocked: true,
     ...(fetched.version ? { packVersion: fetched.version } : {}),
     signal,
   });
@@ -386,7 +389,7 @@ export async function unlockPack(
   const { entry } = inserted;
   // The pack is on the shelf even when it can't be made active (no room
   // left in localStorage for the copy the boot reads) — say why.
-  const activated = await activatePack(entry.id, { signal });
+  const activated = await activatePack(entry.id, { signal, buildPackId: opts.buildPackId });
   if (signal?.aborted) return CANCELLED;
   if (!activated.ok) return fail('storage', activated.error, entry.id, [activated.error]);
   recordEvent('pack_unlocked', { pack: entry.id });

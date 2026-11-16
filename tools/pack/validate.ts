@@ -51,7 +51,7 @@ export function referencedImages(questions: PackQuestion[]): string[] {
   };
   for (const q of questions) {
     add(q.image);
-    for (const o of q.options) add(o.image);
+    for (const o of q.options ?? []) add(o.image);
   }
   return [...seen];
 }

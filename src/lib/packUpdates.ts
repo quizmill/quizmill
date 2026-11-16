@@ -40,9 +40,9 @@
  * unit-tested without a browser.
  */
 import {
-  getActivePackPointer,
   getInsertedPack,
   hasInsertedPack,
+  isActiveLibraryPack,
   insertPack,
   listInsertedPacks,
   type PackLibraryEntry,
@@ -201,6 +201,9 @@ export async function checkPackUpdate(
     origin: entry.origin,
     buildPackId: opts.buildPackId,
     unlockUrl,
+    // Same pass as the unlock itself: the entry may be the built-in
+    // pack's unlocked edition, which shares the build's id.
+    unlocked: true,
     ...(fetched.version
       ? { packVersion: fetched.version }
       : envelopeVersion(fetched.candidate)
@@ -223,7 +226,7 @@ export async function checkPackUpdate(
     id: entry.id,
     title: inserted.entry.title,
     count: inserted.entry.questionCount,
-    reload: getActivePackPointer() === entry.id,
+    reload: isActiveLibraryPack(entry.id, opts.buildPackId),
   });
   return 'updated';
 }

@@ -65,6 +65,14 @@ async function render() {
 async function finishRound() {
   for (let i = 0; i < 20; i++) {
     if (control('Another round')) return;
+    // A matching question: the first choice on every row.
+    const groups = [...container.querySelectorAll('[data-testid="match-rows"] [role="radiogroup"]')];
+    if (groups.length > 0 && !groups[0].querySelector('[role="radio"]:disabled')) {
+      for (const g of groups) await click(g.querySelector('[role="radio"]')!);
+      await click(control('Check answer')!);
+      await click((control('Next question') ?? control('See results'))!);
+      continue;
+    }
     const option = buttons().find(
       (b) =>
         b.type === 'button' &&

@@ -26,6 +26,8 @@ import {
 import { generateSyncKey } from '../src/lib/syncKey';
 import * as storage from '../src/lib/storage';
 import { CHECK_MODE, CHECK_SUBJECT, checkHistory } from '../src/lib/readinessCheck';
+import { latestColdLook } from '../src/lib/readiness';
+import { unresolvedMistakeIds } from '../src/lib/mistakes';
 import type { Attempt } from '../src/data/types';
 
 // node:sqlite is a real builtin (node 22.5+), but vite's resolver doesn't
@@ -284,6 +286,71 @@ describe('readiness check sync end-to-end (#215)', () => {
     ]);
     // …so its result and the Home card's retirement follow; the close does not.
     expect(storage.loadCheckPromptDismissed()).toBe(false);
+  });
+});
+
+describe('one pack id, two editions — sync never notices (src/lib/packLibrary.ts)', () => {
+  // The app is built from a sample; a licence key fetches a fuller bank
+  // under the SAME pack id. Rows are keyed (user, pack, table, id), so a
+  // device with the fuller edition and one still on the built-in edition
+  // share one history. The second device shows what it has questions for,
+  // and all of it once it unlocks too — with nothing copied or migrated.
+  const BANK = ['q-001', 'q-002', 'q-003', 'q-004', 'q-005'];
+  /** The built-in edition has the first two; the unlocked one, all five. */
+  const builtIn = new Set(BANK.slice(0, 2));
+  const unlocked = new Set(BANK);
+
+  it('a device still on the built-in edition receives the whole history and counts what it can show', async () => {
+    const key = generateSyncKey();
+
+    // Device A, unlocked: answers across the whole fuller bank.
+    await useDevice(key);
+    BANK.forEach((questionId, i) =>
+      storage.saveAttempt({
+        id: `a${i}`,
+        sessionId: 's1',
+        questionId,
+        answeredAt: 1000 + i,
+        selectedAnswer: 'A',
+        isCorrect: i % 2 === 0,
+        timeTakenSeconds: 5,
+        subject: 'planets',
+        topic: questionId,
+        difficulty: 1,
+      }),
+    );
+    for (const row of storage.loadAttempts()) {
+      await httpBackend.runOp({ t: 'attempts', op: 'upsert', row }, 'unused');
+    }
+
+    // Device B, same key, the app as deployed (built-in edition).
+    await useDevice(key);
+    const pulled = await httpBackend.pullAll('unused');
+    storage.mergeRemote(pulled);
+    const attempts = storage.loadAttempts();
+    // Every row arrived and is kept — nothing is filtered at the door…
+    expect(attempts.map((a) => a.questionId).sort()).toEqual(BANK);
+    // …the screen counts the questions this edition has…
+    const shown = latestColdLook(attempts, (id) => builtIn.has(id));
+    expect(shown.map((a) => a.questionId).sort()).toEqual(['q-001', 'q-002']);
+    expect(unresolvedMistakeIds(attempts).filter((id) => builtIn.has(id))).toEqual(['q-002']);
+    // …and all of it once this device unlocks: same rows, wider bank.
+    expect(latestColdLook(attempts, (id) => unlocked.has(id))).toHaveLength(5);
+    expect(unresolvedMistakeIds(attempts).filter((id) => unlocked.has(id))).toEqual([
+      'q-002',
+      'q-004',
+    ]);
+
+    // What B answers on its own edition merges back onto A like any row.
+    storage.saveAttempt({ ...attempts[0], id: 'b1', sessionId: 's2', questionId: 'q-002', answeredAt: 9000, isCorrect: true });
+    await httpBackend.runOp(
+      { t: 'attempts', op: 'upsert', row: storage.loadAttempts().find((a) => a.id === 'b1')! },
+      'unused',
+    );
+    await useDevice(key);
+    storage.mergeRemote(await httpBackend.pullAll('unused'));
+    expect(storage.loadAttempts()).toHaveLength(6);
+    expect(unresolvedMistakeIds(storage.loadAttempts())).toEqual(['q-004']);
   });
 });
 

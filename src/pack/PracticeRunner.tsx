@@ -14,6 +14,7 @@ import { useClientState, useMounted } from '@/lib/useMounted';
 import { Celebration } from '@/components/Celebration';
 import { useAchievementUnlock } from '@/pack/useAchievementUnlock';
 import { useLevelUp } from '@/pack/useLevelUp';
+import { EarnedGameCard } from '@/pack/EarnedGameCard';
 import {
   AnswerPanel,
   BackLink,
@@ -33,7 +34,7 @@ import {
   progressionEnabled,
   PACK_CATEGORY_LABEL,
   PACK_PAPER_BY_KEY,
-  type OptionKey,
+  type AnswerKey,
 } from '@/pack/data';
 import { paperSubject } from '@/pack/papers';
 import {
@@ -52,6 +53,7 @@ import {
   isLastQuestion,
   loadPackLevelFilter,
   moveToNext,
+  isAnswerReady,
   nextSelection,
   pickSessionFromBank,
   scoreSummary,
@@ -118,7 +120,7 @@ export function PackPracticeRunner(props: Props) {
   const [stage, setStage] = useState<Stage>('choosing');
   // The chosen option key(s). Single-answer questions hold one entry;
   // multi-answer ("select all") questions accumulate several.
-  const [selected, setSelected] = useState<OptionKey[]>([]);
+  const [selected, setSelected] = useState<AnswerKey[]>([]);
   const [finished, setFinished] = useState(false);
   // When today's practice goal is reached, the streak length to celebrate
   // (null when there's nothing to show). Distinct from sticker unlocks so a
@@ -134,7 +136,7 @@ export function PackPracticeRunner(props: Props) {
   const [levelFilter] = useClientState(loadPackLevelFilter, null);
   // First option tapped on the current question (first-instinct signal)
   // and the just-recorded attempt (to stamp feedbackSeconds on Next).
-  const firstSelectedRef = useRef<OptionKey | null>(null);
+  const firstSelectedRef = useRef<AnswerKey | null>(null);
   const lastAttemptRef = useRef<{ id: string; answeredAt: number } | null>(null);
 
   const { categoryKey, paperKey } = props;
@@ -240,13 +242,17 @@ export function PackPracticeRunner(props: Props) {
   );
 
   if (finished) {
+    const score = scoreSummary(state);
     return (
       <RunnerResults
         eyebrow="Practice complete"
-        score={scoreSummary(state)}
+        score={score}
         note={scopeLabel}
         celebrations={celebrations}
       >
+        {/* A good round earns one game, played here. Renders nothing for
+            a pack without games or a round below the bar. */}
+        <EarnedGameCard correct={score.correct} total={score.total} />
         <Button
           size="lg"
           block
@@ -273,14 +279,14 @@ export function PackPracticeRunner(props: Props) {
   const current = state.questions[state.currentIndex];
   const multi = isMultiAnswer(current);
 
-  function handleSelect(key: OptionKey) {
+  function handleSelect(key: AnswerKey) {
     if (stage !== 'choosing') return;
     firstSelectedRef.current ??= key;
     setSelected((prev) => nextSelection(prev, key, multi));
   }
 
   function handleCheck() {
-    if (!state || selected.length === 0) return;
+    if (!state || !isAnswerReady(current, selected)) return;
     // Snapshot XP before the write so the chip can show exactly what
     // this answer earned (first-correct/rescue bonuses included).
     const showXp = progressionEnabled && loadProgressionShown();

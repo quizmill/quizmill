@@ -97,8 +97,11 @@ export function Dodger({ onClose }: DodgerProps) {
     );
   }
 
-  // Keyboard: ← → moves the player.
+  // Keyboard: ← → moves the player — only while running. Once a rock has
+  // hit, the ship stays put: moving it off the frozen rock would clear
+  // `gameOver` and restart the loop without a restart.
   useEffect(() => {
+    if (!running) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === 'ArrowLeft' || e.key === 'a') {
         setPlayerX((x) => Math.max(PLAYER_W / 2, x - 0.06));
@@ -108,7 +111,7 @@ export function Dodger({ onClose }: DodgerProps) {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [running]);
 
   return (
     <GameShell
@@ -130,10 +133,10 @@ export function Dodger({ onClose }: DodgerProps) {
       <div
         ref={boardRef}
         data-testid="dodger-board"
-        onTouchStart={(e) => setPlayerX(pointerToX(e.touches[0].clientX))}
+        onTouchStart={(e) => running && setPlayerX(pointerToX(e.touches[0].clientX))}
         onTouchMove={(e) => {
           e.preventDefault();
-          setPlayerX(pointerToX(e.touches[0].clientX));
+          if (running) setPlayerX(pointerToX(e.touches[0].clientX));
         }}
         onMouseMove={(e) => running && setPlayerX(pointerToX(e.clientX))}
         className="relative w-full touch-none select-none overflow-hidden rounded-xl border border-ink-200 bg-linear-to-b from-night-900 to-night-800"

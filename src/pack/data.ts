@@ -147,6 +147,26 @@ export type PackOption = {
   explanation?: string;
 };
 
+/** A row of a matching question — a statement or item to assign a choice. */
+export type PackMatchRow = {
+  key: string;
+  text: string;
+  /** Short reason for this row's answer, shown under it in feedback. */
+  explanation?: string;
+};
+
+/** One of the shared choices every row of a matching question picks from. */
+export type PackMatchChoice = { key: string; text: string };
+
+/** One matching pick, "row=choice". Row and choice keys are slugs, so the
+ *  `=` and the `,` that joins picks on an attempt never collide. */
+export type MatchPick = `${string}=${string}`;
+
+/** What the runners keep in their selection array: option keys for a
+ *  single/multi-answer question, one `MatchPick` per row for a matching
+ *  question. Persisted comma-joined either way (Attempt.selectedAnswer). */
+export type AnswerKey = OptionKey | MatchPick;
+
 export type PackQuestion = {
   id: string;
   categoryKey: string;
@@ -158,7 +178,14 @@ export type PackQuestion = {
   difficulty: 1 | 2 | 3 | 4 | 5;
   prompt: string;
   image?: string;
-  options: PackOption[];
+  /** The answer options — absent on a matching question (`rows`). */
+  options?: PackOption[];
+  /** Matching question: rows, each answered with one of `choices`, keyed
+   *  by `correctMatch` (row key → choice key). Mutually exclusive with
+   *  options/correctKey(s). */
+  rows?: PackMatchRow[];
+  choices?: PackMatchChoice[];
+  correctMatch?: Record<string, string>;
   /** Single-answer key. Present unless the question is multi-answer. */
   correctKey?: OptionKey;
   /** Multi-answer keys ("select all that apply") — mutually exclusive with
@@ -191,6 +218,43 @@ export function correctKeysOf(
 ): OptionKey[] {
   if (q.correctKeys && q.correctKeys.length > 0) return q.correctKeys;
   return q.correctKey ? [q.correctKey] : [];
+}
+
+/** True for a matching question (rows × shared choices). */
+export function isMatching(q: Pick<PackQuestion, 'rows'>): boolean {
+  return Array.isArray(q.rows) && q.rows.length > 0;
+}
+
+/** The selection entry for picking `choice` on `row`. */
+export function matchPick(row: string, choice: string): MatchPick {
+  return `${row}=${choice}`;
+}
+
+/** Row key → picked choice key, read from a selection (or a stored
+ *  attempt's split `selectedAnswer`). Entries that aren't picks — option
+ *  keys — are ignored; a later pick for a row wins. Null-prototype, so a
+ *  row keyed `constructor` (a valid slug) reads unanswered until picked. */
+export function matchPicksOf(selected: readonly string[]): Record<string, string> {
+  const picks: Record<string, string> = Object.create(null);
+  for (const s of selected) {
+    const at = s.indexOf('=');
+    if (at > 0) picks[s.slice(0, at)] = s.slice(at + 1);
+  }
+  return picks;
+}
+
+/**
+ * Every key a fully right answer selects: the option key(s) of a single-
+ * or multi-answer question, or one `row=choice` pick per row, in row
+ * order, for a matching question. Grading is set-equality against this.
+ */
+export function answerKeysOf(
+  q: Pick<PackQuestion, 'correctKey' | 'correctKeys' | 'rows' | 'correctMatch'>,
+): AnswerKey[] {
+  if (isMatching(q)) {
+    return (q.rows ?? []).map((r) => matchPick(r.key, q.correctMatch?.[r.key] ?? ''));
+  }
+  return correctKeysOf(q);
 }
 
 export const packManifest = activeManifest;
@@ -249,11 +313,6 @@ export const PACK_PAPER_BY_KEY: Record<string, PackPaper> = Object.fromEntries(
   packPapers.map((p) => [p.key, p]),
 );
 
-/** Paper key → label, for chips and sheet headings. */
-export const PACK_PAPER_LABEL: Record<string, string> = Object.fromEntries(
-  packPapers.map((p) => [p.key, p.label]),
-);
-
 /** Question id → its paper key. Attempts store only the category, so
  *  per-paper progress joins back through this. */
 export const PACK_PAPER_BY_QUESTION_ID: Record<string, string> = Object.fromEntries(
@@ -293,14 +352,31 @@ export function sheetScopeLabel(s: {
   return s.level ? `${category} · ${PACK_LEVEL_LABEL[s.level] ?? s.level}` : category;
 }
 
+const PACK_QUESTION_IDS: ReadonlySet<string> = new Set(packQuestions.map((q) => q.id));
+
+/**
+ * Whether the ACTIVE pack content contains this question. History can be
+ * wider than the content: attempts are stored and synced per pack id, and
+ * one id may have a fuller edition (a licence key unlocks it —
+ * src/lib/packLibrary.ts) or a question retired since. Those rows stay in
+ * storage and keep earning what they earned (XP, streak); anything that
+ * counts, lists or queues QUESTIONS scopes through this, so the numbers
+ * never exceed the bank and nothing points at a question the app can't
+ * show.
+ */
+export function hasPackQuestion(questionId: string): boolean {
+  return PACK_QUESTION_IDS.has(questionId);
+}
+
 /**
  * Whether a question counts toward exam readiness. When the exam declares a
  * `scope.level` only questions in that level band count (a pack mixing exam
- * and non-exam material); otherwise the whole bank is in scope.
+ * and non-exam material); otherwise the whole bank is in scope — the bank
+ * on screen, not every question the history has seen (`hasPackQuestion`).
  */
 export function examInScope(questionId: string): boolean {
   const level = packExam?.scope?.level;
-  if (!level) return true;
+  if (!level) return hasPackQuestion(questionId);
   return PACK_LEVEL_BY_QUESTION_ID[questionId] === level;
 }
 

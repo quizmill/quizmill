@@ -9,8 +9,10 @@
  * localStorage (`insertedPackKey(id)`): the inline bootstrap in layout.tsx
  * and `src/pack/runtime.ts` resolve the pointer to the mirror synchronously
  * before the engine bundle evaluates, and a reload rebinds the whole app
- * to it. Only the active pack is mirrored — localStorage is ~5 MB per
- * origin, shared with all progress, and two or three packs filled it.
+ * to it. Only the pack the boot reads is mirrored (the active one, or the
+ * built-in pack's unlocked edition below — `bootPackId`) — localStorage is
+ * ~5 MB per origin, shared with all progress, and two or three packs
+ * filled it.
  * Without IndexedDB (some private modes) packs fall back to living in
  * localStorage, as they all did before; `migrateInsertedPacks` moves
  * those over once it is there.
@@ -19,6 +21,16 @@
  * `quizmill.<packId>.*`, so each pack's sessions/attempts/stickers wait
  * under its own keys while another pack is active, and ejecting a pack
  * deliberately KEEPS them — re-insert the pack and the progress is back.
+ *
+ * ONE pack may share its id with the pack compiled into the deployment:
+ * the UNLOCKED EDITION of the built-in pack — the fuller bank a licence
+ * key fetched for the sample this app was built from (same id, same
+ * question ids, more of them). It is stored like any inserted pack, but
+ * only the licence-key path may put it there (`insertPack`'s `unlocked`),
+ * and the boot path renders it in place of the build-time content
+ * whenever no other pack is pointed at — so a new deploy of the app never
+ * hides it, and progress never moves because the id never changes.
+ * Ejecting it returns the app to the built-in edition.
  *
  * Every mutation dispatches `PACK_LIBRARY_EVENT` on window so mounted UI
  * can re-read.
@@ -182,11 +194,27 @@ export async function getInsertedPack(id: string): Promise<ActivePack | null> {
  * is unavailable. A pack is only ever removed from localStorage once
  * IndexedDB holds it.
  */
-export function migrateInsertedPacks(): Promise<void> {
-  return serial(migrate);
+export function migrateInsertedPacks(buildPackId?: string): Promise<void> {
+  return serial(() => migrate(buildPackId));
 }
 
-async function migrate(): Promise<void> {
+/**
+ * The library pack whose localStorage copy the boot reads (layout.tsx
+ * bootstrap, src/pack/runtime.ts): the pack the pointer names, or — when
+ * the pointer names nothing, or the build's own id — the built-in pack's
+ * unlocked edition. `buildPackId` is the pack compiled into the deployment;
+ * without it only the pointer counts. `index` lets an insert ask about the
+ * shelf as it is about to be.
+ */
+function bootPackId(buildPackId: string | undefined, index = readIndex()): string | null {
+  const pointer = getActivePackPointer();
+  if (pointer !== null && pointer !== buildPackId) return pointer;
+  return buildPackId !== undefined && index.some((e) => e.id === buildPackId && e.unlockUrl)
+    ? buildPackId
+    : pointer;
+}
+
+async function migrate(buildPackId?: string): Promise<void> {
   if (!browser() || !(await packStoreAvailable())) return;
   for (const { id, localOnly } of readIndex()) {
     const local = readLocalPack(id);
@@ -198,7 +226,7 @@ async function migrate(): Promise<void> {
       }
       // Read the pointer now, not before the awaits: another tab may have
       // made this pack active meanwhile, and the boot needs its copy.
-      if (id !== getActivePackPointer()) window.localStorage.removeItem(insertedPackKey(id));
+      if (id !== bootPackId(buildPackId)) window.localStorage.removeItem(insertedPackKey(id));
     } catch {
       // IndexedDB refused it — the localStorage copy stays, nothing lost
     }
@@ -238,6 +266,35 @@ export function getActivePackPointer(): string | null {
 }
 
 /**
+ * The shelf entry of a pack that arrived through a licence key (the entry
+ * records the endpoint that served it), or null — absent, or held as a
+ * plain file. For the built-in pack's id this is its unlocked edition.
+ */
+export function unlockedEntry(id: string): PackLibraryEntry | null {
+  if (!browser()) return null;
+  return readIndex().find((e) => e.id === id && Boolean(e.unlockUrl)) ?? null;
+}
+
+/**
+ * Whether the boot path renders this library pack (layout.tsx bootstrap,
+ * src/pack/runtime.ts): the pointer names it, or it is the built-in
+ * pack's unlocked edition and the pointer names it or nothing that is
+ * there. A pointer at the built-in pack's id never counts on its own: a
+ * pack stored under that id without a licence key is not rendered.
+ */
+export function isActiveLibraryPack(id: string, buildPackId: string): boolean {
+  if (!browser()) return false;
+  const pointer = getActivePackPointer();
+  if (id !== buildPackId) return pointer === id;
+  if (unlockedEntry(id) === null) return false;
+  return (
+    pointer === null ||
+    pointer === id ||
+    window.localStorage.getItem(insertedPackKey(pointer)) === null
+  );
+}
+
+/**
  * The images a bundle carries inline (`quizmill bundle`), kept only when
  * they are what they claim: a plain relative image path mapped to a
  * `data:image/…` URL. Anything else (a script URL, a remote URL, a path
@@ -268,7 +325,12 @@ function embeddedAssets(raw: unknown): Record<string, string> | undefined {
  * input — full schema + cross-file validation runs before anything is
  * stored. Re-inserting an existing id replaces its content (pack update);
  * progress is unaffected either way. `buildPackId` (the pack compiled into
- * this deployment) is refused — that one is built in, not inserted.
+ * this deployment) is refused — that one is built in, not inserted —
+ * unless `unlocked` says a licence key fetched it: then it is stored as
+ * the built-in pack's unlocked edition (see the module note). A plain
+ * file or URL never gets that pass: a stray file carrying the app's own
+ * id would silently replace what the app shows, outlive every deploy and
+ * never update, with no key to say where it came from.
  * `packVersion` overrides the version the bundle envelope carries (the
  * unlock path passes the endpoint's ETag); `unlockUrl` is kept only when
  * given, so a later file insert of the same pack simply forgets it.
@@ -284,6 +346,8 @@ export async function insertPack(
     buildPackId: string;
     packVersion?: string;
     unlockUrl?: string;
+    /** Fetched with a licence key (src/lib/unlock.ts, packUpdates.ts). */
+    unlocked?: boolean;
     onlyIfOnShelf?: boolean;
     signal?: AbortSignal;
   },
@@ -305,10 +369,12 @@ export async function insertPack(
   if (!result.ok) return { ok: false, errors: result.errors };
 
   const manifest = candidate.manifest as ActivePack['manifest'];
-  if (manifest.id === opts.buildPackId) {
+  if (manifest.id === opts.buildPackId && !(opts.unlocked && opts.unlockUrl)) {
     return {
       ok: false,
-      errors: [`"${manifest.id}" is the pack built into this app — it's always on the shelf.`],
+      errors: [
+        `"${manifest.id}" is the pack built into this app — it's always on the shelf. A fuller edition of it comes in with a licence key, not as a file.`,
+      ],
     };
   }
 
@@ -361,7 +427,7 @@ export async function insertPack(
 async function storePack(
   entry: PackLibraryEntry,
   pack: ActivePack,
-  opts: { onlyIfOnShelf?: boolean; signal?: AbortSignal },
+  opts: { buildPackId: string; onlyIfOnShelf?: boolean; signal?: AbortSignal },
 ): Promise<{ ok: true } | { ok: false; errors: string[]; reason?: 'ejected' | 'cancelled' }> {
   const key = insertedPackKey(entry.id);
   let ls: Storage | null = null;
@@ -373,7 +439,7 @@ async function storePack(
     // Merely touching localStorage throws where the browser blocks storage.
     ls = window.localStorage;
     // Free localStorage of packs an older build kept there before adding one.
-    await migrate();
+    await migrate(opts.buildPackId);
     inStore = await packStoreAvailable();
     prevStored = inStore ? await readStoredPack(entry.id) : null;
     // Last checks before the first write — nothing awaits after them
@@ -387,13 +453,18 @@ async function storePack(
       await writeStoredPack(entry.id, pack);
       wroteStore = true;
     }
-    // The active pack's mirror follows its update; without IndexedDB,
-    // localStorage is the only home a pack has.
-    if (!inStore || getActivePackPointer() === entry.id) ls.setItem(key, JSON.stringify(pack));
-    writeIndex([
+    const index = [
       ...readIndex().filter((e) => e.id !== entry.id),
-      inStore ? entry : { ...entry, localOnly: true },
-    ]);
+      inStore ? entry : { ...entry, localOnly: true as const },
+    ];
+    // The mirror of the pack the boot reads follows its update — and the
+    // built-in pack's unlocked edition is that pack from the moment it is
+    // on the shelf, if no other pack is pointed at. Without IndexedDB,
+    // localStorage is the only home a pack has.
+    if (!inStore || bootPackId(opts.buildPackId, index) === entry.id) {
+      ls.setItem(key, JSON.stringify(pack));
+    }
+    writeIndex(index);
     // Back on the shelf: a deletion an earlier eject left pending must not
     // take this record. Best effort — the pack is in, and the migration
     // skips a pending id that is on the shelf anyway.
@@ -430,18 +501,30 @@ async function storePack(
  * notes — everything under `quizmill.<id>.*`) is deliberately kept, so
  * re-inserting the pack later picks up exactly where the learner left off.
  * Ejecting the ACTIVE pack clears the pointer — the app falls back to the
- * build-time pack on next load. Returns whether a reload is needed.
+ * build-time pack on next load. Returns whether the pointer named it (the
+ * built-in pack's unlocked edition can be on screen with no pointer at
+ * all — the shelf reloads for that case itself).
  */
-export async function ejectPack(id: string): Promise<{ wasActive: boolean }> {
+export async function ejectPack(
+  id: string,
+  opts: { buildPackId?: string } = {},
+): Promise<{ wasActive: boolean }> {
   if (!browser()) return { wasActive: false };
-  return serial(() => removePack(id));
+  return serial(() => removePack(id, opts.buildPackId));
 }
 
-async function removePack(id: string): Promise<{ wasActive: boolean }> {
+async function removePack(id: string, buildPackId: string | undefined): Promise<{ wasActive: boolean }> {
   // Capture the pack before removal so its offline-cached images can be
   // dropped too (fire-and-forget).
   const pack = await getInsertedPack(id);
   if (pack) void dropPackAssets(pack);
+  // Ejecting the active pack hands the boot back to the built-in pack — to
+  // its unlocked edition when there is one, whose copy left localStorage
+  // when this pack was opened. Read it now; it goes back below.
+  const edition =
+    buildPackId !== undefined && id !== buildPackId && getActivePackPointer() === id && unlockedEntry(buildPackId)
+      ? await getInsertedPack(buildPackId).catch(() => null)
+      : null;
   let dropped = true;
   try {
     await deleteStoredPack(id);
@@ -454,6 +537,13 @@ async function removePack(id: string): Promise<{ wasActive: boolean }> {
   // Read the pointer after the awaits: another tab may have switched away.
   const wasActive = getActivePackPointer() === id;
   if (wasActive) ls.removeItem(ACTIVE_PACK_ID_KEY);
+  if (edition && buildPackId !== undefined && bootPackId(buildPackId) === buildPackId) {
+    try {
+      ls.setItem(insertedPackKey(buildPackId), JSON.stringify(edition));
+    } catch {
+      // no room: the built-in edition shows until the pack is opened from the shelf
+    }
+  }
   // IndexedDB refused: the pack has still left the shelf (reads go through
   // the index, so the record is never served) and the next migration
   // deletes it — if there is room to note it; that note is the last thing,
@@ -482,47 +572,60 @@ export type ActivateResult = { ok: true } | { ok: false; error: string; cancelle
  * the previous mirror, and back if the switch fails. `signal` abandons the
  * switch (`cancelled: true`) if it fires before anything is written.
  * Never rejects: a storage failure comes back as `{ ok: false, error }`.
+ * `buildPackId` names the pack compiled into the deployment, so the copy
+ * of its unlocked edition moves like any other: out when another pack is
+ * opened, back in when the app returns to the built-in pack.
  */
 export async function activatePack(
   id: string | null,
-  opts: { signal?: AbortSignal } = {},
+  opts: { signal?: AbortSignal; buildPackId?: string } = {},
 ): Promise<ActivateResult> {
   if (!browser()) return { ok: false, error: 'not in a browser' };
   return serial(() =>
-    pointAt(id, opts.signal).catch((e: unknown): ActivateResult => ({ ok: false, error: storageErrorMessage(e) })),
+    pointAt(id, opts.signal, opts.buildPackId).catch(
+      (e: unknown): ActivateResult => ({ ok: false, error: storageErrorMessage(e) }),
+    ),
   );
 }
 
-async function pointAt(id: string | null, signal: AbortSignal | undefined): Promise<ActivateResult> {
+async function pointAt(
+  id: string | null,
+  signal: AbortSignal | undefined,
+  buildPackId: string | undefined,
+): Promise<ActivateResult> {
   // First, so storage the browser blocks is reported as such, not as a
   // missing pack.
   const ls = window.localStorage;
-  await migrate();
-  const pack = id === null ? null : await getInsertedPack(id);
+  await migrate(buildPackId);
+  let pack = id === null ? null : await getInsertedPack(id);
   if (id !== null && pack === null) return { ok: false, error: `"${id}" is not on this device` };
+  // Back to the built-in pack: the boot then reads its unlocked edition,
+  // if a licence key fetched one, so that is the copy to put in place.
+  let target = id;
+  if (id === null && buildPackId !== undefined && unlockedEntry(buildPackId)) {
+    pack = await getInsertedPack(buildPackId);
+    if (pack !== null) target = buildPackId;
+  }
 
-  const previous = getActivePackPointer();
+  const previous = bootPackId(buildPackId);
   // Only a copy IndexedDB also holds (and holds current) may go —
   // otherwise it is the pack.
   const prevKey =
-    previous && previous !== id && !entryFor(previous)?.localOnly && (await readStoredPack(previous))
+    previous && previous !== target && !entryFor(previous)?.localOnly && (await readStoredPack(previous))
       ? insertedPackKey(previous)
       : null;
   // The last await is behind us: from here to the end nothing yields.
   if (signal?.aborted) return { ok: false, error: 'cancelled', cancelled: true };
   const prevRaw = prevKey === null ? null : ls.getItem(prevKey);
-  const targetKey = id === null ? null : insertedPackKey(id);
+  const targetKey = target === null ? null : insertedPackKey(target);
   const targetRaw = targetKey === null ? null : ls.getItem(targetKey);
   const handoffRaw = ls.getItem(HANDOFF_PACK_KEY);
   try {
     if (prevKey !== null) ls.removeItem(prevKey);
     ls.removeItem(HANDOFF_PACK_KEY);
-    if (id !== null && targetKey !== null) {
-      ls.setItem(targetKey, JSON.stringify(pack));
-      ls.setItem(ACTIVE_PACK_ID_KEY, id);
-    } else {
-      ls.removeItem(ACTIVE_PACK_ID_KEY);
-    }
+    if (targetKey !== null) ls.setItem(targetKey, JSON.stringify(pack));
+    if (id !== null) ls.setItem(ACTIVE_PACK_ID_KEY, id);
+    else ls.removeItem(ACTIVE_PACK_ID_KEY);
   } catch (e) {
     // Undo in reverse: the target's copy goes back to what it was (gone,
     // unless it was already there), which frees the room the previous

@@ -46,7 +46,7 @@ import {
   type CheckPlan,
 } from '@/lib/readinessCheck';
 import { cn } from '@/lib/cn';
-import { isMultiAnswer, progressionEnabled, type OptionKey } from '@/pack/data';
+import { isMultiAnswer, progressionEnabled, type AnswerKey } from '@/pack/data';
 import {
   CHECK_PLAN,
   CHECK_RECOMMENDED_MINUTES,
@@ -64,6 +64,7 @@ import {
   buildSessionStart,
   feedbackSecondsSince,
   moveToNext,
+  isAnswerReady,
   nextSelection,
   type RunnerState,
 } from './runner';
@@ -110,12 +111,12 @@ export function PackCheckRunner() {
   const [now, setNow] = useState(() => Date.now());
   const [ending, setEnding] = useState<Ending>('finished');
   const [stage, setStage] = useState<Stage>('choosing');
-  const [selected, setSelected] = useState<OptionKey[]>([]);
+  const [selected, setSelected] = useState<AnswerKey[]>([]);
   const [xpGained, setXpGained] = useState<number | null>(null);
   // The result on show: the sitting just finished, or a past one opened
   // from the intro.
   const [shownId, setShownId] = useState<string | null>(null);
-  const firstSelectedRef = useRef<OptionKey | null>(null);
+  const firstSelectedRef = useRef<AnswerKey | null>(null);
   const lastAttemptRef = useRef<{ id: string; answeredAt: number } | null>(null);
 
   const history = checkHistory(sessions);
@@ -460,14 +461,14 @@ export function PackCheckRunner() {
     state.questions.slice(0, answered).map((q) => q.categoryKey),
   );
 
-  function handleSelect(key: OptionKey) {
+  function handleSelect(key: AnswerKey) {
     if (stage !== 'choosing') return;
     firstSelectedRef.current ??= key;
     setSelected((prev) => nextSelection(prev, key, multi));
   }
 
   function handleCheck() {
-    if (!state || !clock || selected.length === 0) return;
+    if (!state || !clock || !isAnswerReady(current, selected)) return;
     const t = Date.now();
     // The interval only polls once a second, so an answer sent between
     // the bell and the next tick must still be refused.

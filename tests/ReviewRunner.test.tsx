@@ -70,7 +70,7 @@ async function finishRound() {
     const current = packQuestions.find((p) =>
       container.textContent?.includes(p.prompt),
     )!;
-    const wrongKey = current.options
+    const wrongKey = current.options!
       .map((o) => o.key)
       .find((k) => !correctKeysOf(current).includes(k))!;
     const option = buttons().find(

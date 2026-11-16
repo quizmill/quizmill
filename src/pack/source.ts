@@ -5,7 +5,10 @@
 // A host may instead inject a pack at runtime via `setActivePack()` in
 // `runtime.ts` — when present, that override wins wholesale (a runtime pack
 // brings its own scenarios/concepts, so missing ones default to empty rather
-// than leaking the build-time pack's). Everything downstream (`config`,
+// than leaking the build-time pack's). The override may carry the build-time
+// pack's OWN id: its unlocked edition, the fuller bank a licence key fetched
+// (src/lib/packLibrary.ts) — same id, so the same progress, with more
+// questions than were compiled in. Everything downstream (`config`,
 // `data`) derives from these four exports, so neither the build-time path nor
 // the runtime path needs to know which source won.
 
@@ -16,7 +19,7 @@ import buildConcepts from '../../content/pack/concepts.json';
 import { getActivePackOverride } from './runtime';
 import type { PackManifest, PackQuestion, PackScenario, PackConcept } from './data';
 
-const override = getActivePackOverride();
+const override = getActivePackOverride((buildManifest as PackManifest).id);
 
 /**
  * Whether a runtime pack won over the build-time one on THIS evaluation.

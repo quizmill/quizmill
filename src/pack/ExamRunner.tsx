@@ -35,7 +35,7 @@ import {
   startClock,
   type ExamClock,
 } from '@/lib/examClock';
-import { PACK_LEVEL_LABEL, type OptionKey, isMultiAnswer } from '@/pack/data';
+import { PACK_LEVEL_LABEL, type AnswerKey, isMultiAnswer } from '@/pack/data';
 import { EXAM_SITTING, passed } from '@/pack/exam';
 import {
   advanceAfterAnswer,
@@ -45,6 +45,7 @@ import {
   buildSessionStart,
   isLastQuestion,
   moveToNext,
+  isAnswerReady,
   nextSelection,
   pickSessionFromBank,
   scoreSummary,
@@ -88,9 +89,9 @@ export function PackExamRunner() {
   // Re-read once a second while sitting so the countdown moves; the clock
   // itself is a pure value over Date.now() (src/lib/examClock.ts).
   const [now, setNow] = useState(() => Date.now());
-  const [selected, setSelected] = useState<OptionKey[]>([]);
+  const [selected, setSelected] = useState<AnswerKey[]>([]);
   // First option tapped on the current question (first-instinct signal).
-  const firstSelectedRef = useRef<OptionKey | null>(null);
+  const firstSelectedRef = useRef<AnswerKey | null>(null);
 
   function finish(finalState: RunnerState, how: Ending) {
     const t = Date.now();
@@ -309,7 +310,7 @@ export function PackExamRunner() {
   // Last minute, or last tenth of a short sitting — the clock turns amber.
   const lowTime = remaining <= Math.max(60, sitting.durationSeconds / 10);
 
-  function handleSelect(key: OptionKey) {
+  function handleSelect(key: AnswerKey) {
     if (paused) return;
     firstSelectedRef.current ??= key;
     setSelected((prev) => nextSelection(prev, key, multi));
@@ -333,7 +334,7 @@ export function PackExamRunner() {
   }
 
   function handleNext() {
-    if (!state || !clock || !sitting || selected.length === 0 || paused) return;
+    if (!state || !clock || !sitting || !isAnswerReady(current, selected) || paused) return;
     const t = Date.now();
     // The interval only polls once a second (and the browser may throttle
     // it further), so an answer sent between the bell and the next tick
@@ -461,7 +462,7 @@ export function PackExamRunner() {
           </span>
         }
       />
-      <Button size="lg" block onClick={handleNext} disabled={selected.length === 0}>
+      <Button size="lg" block onClick={handleNext} disabled={!isAnswerReady(current, selected)}>
         {isLastQuestion(state) ? 'Finish exam' : 'Next question'}
       </Button>
     </main>

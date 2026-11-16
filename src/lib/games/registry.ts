@@ -1,8 +1,10 @@
 /**
  * Reward mini-game registry. A pack switches games on via its `games`
- * manifest block; the app then keeps this little arcade as a hidden treat
- * (found by tapping the version pill in Settings, nothing on Home) —
- * a break between rounds of practice, not an always-on distraction.
+ * manifest block; the app then offers a game two ways — earned, one per
+ * good practice round, on the results screen (src/pack/EarnedGameCard.tsx,
+ * src/lib/games/reward.ts), and as a hidden free-play arcade found by
+ * tapping the version pill in Settings. Nothing on Home: a break between
+ * rounds of practice, not an always-on distraction.
  *
  * Pure data, no React — the components in src/pack/games/ render these.
  * The id union here is the engine's source of truth; the pack validator
@@ -15,7 +17,8 @@ export type GameId =
   | 'memory'
   | 'whack'
   | 'pong'
-  | 'dodger';
+  | 'dodger'
+  | 'tetris';
 
 export interface GameDef {
   id: GameId;
@@ -24,6 +27,11 @@ export interface GameDef {
   /** One-liner shown on the game's card. */
   blurb: string;
 }
+
+/** The longest any one game session runs — from opening a game to the
+ *  "Time's up" panel, however many times it's restarted in between. A
+ *  break between rounds of practice, not a sitting of its own. */
+export const GAME_SESSION_MS = 10 * 60 * 1000;
 
 export const GAMES: readonly GameDef[] = [
   {
@@ -61,6 +69,12 @@ export const GAMES: readonly GameDef[] = [
     name: 'Dodger',
     emoji: '☄️',
     blurb: 'Dodge the falling rocks.',
+  },
+  {
+    id: 'tetris',
+    name: 'Tetris',
+    emoji: '🧱',
+    blurb: 'Stack the blocks. Clear the rows.',
   },
 ];
 

@@ -25,7 +25,7 @@ import { UnlockedToast } from '@/components/UnlockedToast';
 import { PackUpdatedNotice } from '@/components/PackUpdatedNotice';
 import { useStorageData } from '@/lib/useStorage';
 import { useClientState, useMounted } from '@/lib/useMounted';
-import { unresolvedMistakeCount } from '@/lib/mistakes';
+import { unresolvedMistakeIds } from '@/lib/mistakes';
 import {
   saveLevelFilter,
   loadDismissedNudge,
@@ -50,6 +50,7 @@ import {
   PACK_LEVEL_LABEL,
   PACK_LEVEL_BY_QUESTION_ID,
   PACK_PAPER_BY_QUESTION_ID,
+  hasPackQuestion,
 } from '@/pack/data';
 import { groupPapers, paperProgress } from '@/pack/papers';
 import { MIXED_LABEL, QUESTION_COUNT, loadPackLevelFilter } from '@/pack/runner';
@@ -62,6 +63,7 @@ import { formatClock } from '@/lib/examClock';
 import { HomeCard, LockedModeTile, ModeTile } from '@/pack/HomeCard';
 import { StreakChip } from '@/pack/StreakChip';
 import { UpgradeCard } from '@/pack/UpgradeCard';
+import { upgradeOnOffer } from '@/lib/upgrade';
 import { StarterPackCard } from '@/pack/StarterCard';
 import { recordLevelCrossings } from '@/pack/useLevelUp';
 
@@ -137,7 +139,7 @@ export default function PackHome() {
   // its fuller edition shows the real exam as a locked tile instead —
   // unless this device has hidden timed exams.
   const examLocked =
-    examShown && APP_CONFIG.upgrade?.packId ? EXAM_WITHHELD : null;
+    examShown && upgradeOnOffer(APP_CONFIG.packId, APP_CONFIG.upgrade)?.packId ? EXAM_WITHHELD : null;
   // In runtime-pack mode, hold the first paint until mount (see RUNTIME_PACK_MODE).
   const mounted = useMounted() || !RUNTIME_PACK_MODE;
   useEffect(() => {
@@ -179,7 +181,9 @@ export default function PackHome() {
     setLevel(nudge.to);
   };
 
-  const mistakeCount = unresolvedMistakeCount(attempts);
+  // Only mistakes this content can show: history may hold questions of a
+  // fuller edition of the same pack id (see hasPackQuestion).
+  const mistakeCount = unresolvedMistakeIds(attempts).filter(hasPackQuestion).length;
 
   const statsByCategory = new Map<
     string,
@@ -198,7 +202,7 @@ export default function PackHome() {
   // available denominator — and a re-answered question counts once.
   const categoryLooks = latestColdLook(
     attempts,
-    (id) => !level || PACK_LEVEL_BY_QUESTION_ID[id] === level,
+    (id) => hasPackQuestion(id) && (!level || PACK_LEVEL_BY_QUESTION_ID[id] === level),
   );
   for (const a of categoryLooks) {
     const slot = statsByCategory.get(a.subject);

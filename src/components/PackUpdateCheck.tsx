@@ -28,7 +28,7 @@ export function PackUpdateCheck() {
     if (swept) return;
     swept = true;
     // Packs an older build kept in localStorage move to IndexedDB first.
-    void migrateInsertedPacks()
+    void migrateInsertedPacks(buildTimeManifest.id)
       .catch(() => undefined)
       .then(() => checkPackUpdates({ buildPackId: buildTimeManifest.id }))
       .then(async (outcomes) => {

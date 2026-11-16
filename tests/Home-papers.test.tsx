@@ -80,7 +80,7 @@ describe('PackHome papers list', () => {
       /^\/practice\/?\?paper=starter-paper-2$/,
     );
     expect(row('starter-paper-1').textContent).toContain('Paper 1');
-    expect(row('starter-paper-1').textContent).toContain('6 questions');
+    expect(row('starter-paper-1').textContent).toContain('7 questions');
     expect(row('starter-paper-2').textContent).toContain('5 questions');
     // A paper owned by a category says which (two books can both be "Paper 1").
     expect(row('starter-paper-1').textContent).toContain('Planets');
@@ -99,7 +99,7 @@ describe('PackHome papers list', () => {
       ]),
     );
     await render();
-    expect(row('starter-paper-1').textContent).toContain('2/6 answered');
+    expect(row('starter-paper-1').textContent).toContain('2/7 answered');
     expect(row('starter-paper-1').textContent).toContain('50%');
     expect(row('starter-paper-2').textContent).toContain('5 questions');
   });
@@ -108,7 +108,7 @@ describe('PackHome papers list', () => {
     // Paper 1 has 3 Basics + 3 Advanced questions.
     saveLevelFilter('basics');
     await render();
-    expect(row('starter-paper-1').textContent).toContain('6 questions');
+    expect(row('starter-paper-1').textContent).toContain('7 questions');
   });
 
   it('sits after the categories and before the mode rail', async () => {

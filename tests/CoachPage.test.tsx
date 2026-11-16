@@ -64,7 +64,7 @@ function q(sel: string): HTMLElement {
 /** Two sessions on one day plus one the day before, over the demo pack. */
 function seedHistory() {
   const [q1, q2, q3] = packQuestions;
-  const wrongKey = q1.options.find((o) => o.key !== q1.correctKey)!.key;
+  const wrongKey = q1.options!.find((o) => o.key !== q1.correctKey)!.key;
   const day = new Date(2026, 8, 21, 19, 0).getTime();
   const sessions: Session[] = [
     {
