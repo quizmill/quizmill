@@ -164,6 +164,75 @@ describe('runtime pack source', () => {
     expect(activeManifest.id).not.toBe('injected-pack');
   });
 
+  // One pack id, two editions: a licence key stores the fuller bank under
+  // the build-time pack's OWN id, and it renders in place of the compiled-in
+  // content on every load — each `import('@/pack/source')` here is a fresh
+  // evaluation, exactly what a reload or a new deploy of the app is.
+  describe('the built-in pack’s unlocked edition', () => {
+    const BUILD_ID = 'solar-system-demo';
+    const UNLOCKED: ActivePack = {
+      ...INJECTED,
+      manifest: { ...INJECTED.manifest, id: BUILD_ID, title: 'Solar System (unlocked)' },
+    };
+    const stored = { [`quizmill.packLibrary.pack.${BUILD_ID}.v1`]: JSON.stringify(UNLOCKED) };
+    const index = (entry: Record<string, unknown>) => ({
+      'quizmill.packLibrary.index.v1': JSON.stringify([{ id: BUILD_ID, title: 'x', ...entry }]),
+    });
+    const unlockedIndex = index({ unlockUrl: 'https://unlock.test' });
+
+    it('replaces the build-time content with no pointer at all, on every evaluation', async () => {
+      for (let load = 0; load < 2; load++) {
+        vi.resetModules();
+        globalThis.__QUIZMILL_PACK__ = undefined;
+        stubBrowser({ entries: { ...stored, ...unlockedIndex } });
+        const { activeManifest, activeQuestions, buildTimeManifest, isRuntimePack } =
+          await import('@/pack/source');
+        expect(buildTimeManifest.id).toBe(BUILD_ID);
+        expect(activeManifest.id).toBe(BUILD_ID);
+        expect(activeManifest.title).toBe('Solar System (unlocked)');
+        expect(activeQuestions).toHaveLength(1);
+        expect(isRuntimePack).toBe(true);
+      }
+    });
+
+    it('stands in when the pointer names a pack that is gone', async () => {
+      vi.resetModules();
+      stubBrowser({ entries: { ...stored, ...unlockedIndex, 'quizmill.activePackId': 'gone' } });
+      const { activeManifest } = await import('@/pack/source');
+      expect(activeManifest.title).toBe('Solar System (unlocked)');
+    });
+
+    it('yields to another pack that is pointed at', async () => {
+      vi.resetModules();
+      stubBrowser({
+        entries: {
+          ...stored,
+          ...unlockedIndex,
+          'quizmill.activePackId': 'injected-pack',
+          'quizmill.packLibrary.pack.injected-pack.v1': JSON.stringify(INJECTED),
+        },
+      });
+      const { activeManifest } = await import('@/pack/source');
+      expect(activeManifest.id).toBe('injected-pack');
+    });
+
+    it('is not a pack stored under the same id any other way — that must not shadow the build', async () => {
+      vi.resetModules();
+      stubBrowser({ entries: { ...stored, ...index({ origin: 'some.bundle.json' }) } });
+      const { activeManifest, isRuntimePack } = await import('@/pack/source');
+      expect(activeManifest.title).not.toBe('Solar System (unlocked)');
+      expect(isRuntimePack).toBe(false);
+    });
+
+    it('once removed, the build-time content is back', async () => {
+      vi.resetModules();
+      stubBrowser({ entries: {} });
+      const { activeManifest, activeQuestions, buildTimeQuestionCount } = await import('@/pack/source');
+      expect(activeManifest.id).toBe(BUILD_ID);
+      expect(activeQuestions).toHaveLength(buildTimeQuestionCount);
+    });
+  });
+
   it('ignores junk in localStorage and falls back to the build-time pack', async () => {
     vi.resetModules();
     stubBrowser({ stored: 'not json {' });

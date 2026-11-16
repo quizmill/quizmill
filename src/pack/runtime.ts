@@ -68,9 +68,10 @@ export function setActivePack(pack: ActivePack): void {
  * lose the race and render the build-time one. Mirrors the bootstrap's
  * sources and precedence: `#pack=<base64-json>` hash, then the external
  * handoff blob (HANDOFF_PACK_KEY), then the pack-library pointer
- * (ACTIVE_PACK_ID_KEY → the inserted pack it names).
+ * (ACTIVE_PACK_ID_KEY → the inserted pack it names), then the built-in
+ * pack's unlocked edition (`unlockedEditionOf`).
  */
-function readHandedOffPack(): ActivePack | undefined {
+function readHandedOffPack(builtInPackId?: string): ActivePack | undefined {
   if (typeof window === 'undefined') return undefined; // SSG build
   try {
     let raw: string | null = null;
@@ -83,6 +84,7 @@ function readHandedOffPack(): ActivePack | undefined {
       if (!raw) {
         const id = window.localStorage.getItem(ACTIVE_PACK_ID_KEY);
         if (id) raw = window.localStorage.getItem(insertedPackKey(id));
+        if (!raw && builtInPackId) raw = unlockedEditionOf(builtInPackId);
       }
     }
     if (!raw) return undefined;
@@ -93,6 +95,26 @@ function readHandedOffPack(): ActivePack | undefined {
   } catch {
     return undefined; // junk hash/storage → build-time pack
   }
+}
+
+/**
+ * The stored JSON of the built-in pack's UNLOCKED EDITION, or null: the
+ * fuller bank a licence key fetched under the build-time pack's own id
+ * (src/lib/packLibrary.ts). When no other pack is pointed at, it renders
+ * in place of the content compiled into the deployment — which is what
+ * keeps it on screen across reloads and new deploys of the app. Only an
+ * entry the library marked as arrived by licence key (`unlockUrl`)
+ * counts: a pack stored under this id any other way (inserted from a
+ * file while another pack was the build-time one) must not shadow the
+ * build. Same lookup as the inline bootstrap in layout.tsx.
+ */
+function unlockedEditionOf(builtInPackId: string): string | null {
+  const rawIndex = window.localStorage.getItem(LIBRARY_INDEX_KEY);
+  if (!rawIndex) return null;
+  const entries = JSON.parse(rawIndex) as { id?: string; unlockUrl?: string }[];
+  if (!Array.isArray(entries)) return null;
+  if (!entries.some((e) => e && e.id === builtInPackId && e.unlockUrl)) return null;
+  return window.localStorage.getItem(insertedPackKey(builtInPackId));
 }
 
 /**
@@ -133,10 +155,15 @@ function backfillAssetsBase(pack: ActivePack): ActivePack {
   return pack;
 }
 
-/** The injected pack, if any. `source.ts` reads this once at module load. */
-export function getActivePackOverride(): ActivePack | undefined {
+/**
+ * The injected pack, if any. `source.ts` reads this once at module load,
+ * naming the pack compiled into the deployment (`builtInPackId`) so that
+ * pack's unlocked edition can stand in for it; this module stays free of
+ * the build-time JSON.
+ */
+export function getActivePackOverride(builtInPackId?: string): ActivePack | undefined {
   if (typeof globalThis !== 'undefined' && globalThis.__QUIZMILL_PACK__) {
     return backfillAssetsBase(globalThis.__QUIZMILL_PACK__);
   }
-  return readHandedOffPack();
+  return readHandedOffPack(builtInPackId);
 }

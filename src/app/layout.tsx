@@ -15,8 +15,10 @@ import { RUNTIME_PACK_PENDING_ATTR } from '@/lib/runtimePackPending';
 import {
   ACTIVE_PACK_ID_KEY,
   HANDOFF_PACK_KEY,
+  LIBRARY_INDEX_KEY,
   insertedPackKey,
 } from '@/lib/packKeys';
+import { buildTimeManifest } from '@/pack/source';
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
@@ -29,7 +31,10 @@ const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 //   - a `#pack=<base64-json>` hash (cross-origin handoff), else
 //   - the external handoff blob (HANDOFF_PACK_KEY), else
 //   - the pack-library pointer (ACTIVE_PACK_ID_KEY → the inserted pack
-//     stored under insertedPackKey(id) — see src/lib/packLibrary.ts).
+//     stored under insertedPackKey(id) — see src/lib/packLibrary.ts), else
+//   - the built-in pack's unlocked edition: the pack a licence key stored
+//     under THIS build's own pack id (its library entry has `unlockUrl`).
+//     It outranks the content compiled in, so a new deploy never hides it.
 // No stored pack → global stays unset → the build-time pack renders, exactly
 // as before. A stored pack also marks <html> pending, which keeps the
 // prerendered build-time page hidden until RuntimePackBoundary swaps the
@@ -58,6 +63,8 @@ else if(window.localStorage){
 r=localStorage.getItem(${JSON.stringify(HANDOFF_PACK_KEY)});
 if(!r){var i=localStorage.getItem(${JSON.stringify(ACTIVE_PACK_ID_KEY)});
 if(i){r=localStorage.getItem(${JSON.stringify(PACK_KEY_BEFORE_ID)}+i+${JSON.stringify(PACK_KEY_AFTER_ID)})}}
+if(!r){var b=${JSON.stringify(buildTimeManifest.id)},x=JSON.parse(localStorage.getItem(${JSON.stringify(LIBRARY_INDEX_KEY)})||'[]');
+for(var k=0;k<x.length;k++){if(x[k]&&x[k].id===b&&x[k].unlockUrl){r=localStorage.getItem(${JSON.stringify(PACK_KEY_BEFORE_ID)}+b+${JSON.stringify(PACK_KEY_AFTER_ID)});break}}}
 }
 if(r){window.__QUIZMILL_PACK__=JSON.parse(r);
 document.documentElement.setAttribute(${JSON.stringify(RUNTIME_PACK_PENDING_ATTR)},'')}

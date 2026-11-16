@@ -145,6 +145,7 @@ function PackCard({
   questionCount,
   categoryCount,
   builtIn,
+  unlocked,
   active,
   onActivate,
   onEject,
@@ -155,6 +156,9 @@ function PackCard({
   questionCount: number;
   categoryCount?: number;
   builtIn?: boolean;
+  /** The built-in pack's unlocked edition is in place: its eject removes
+   *  that edition, not the pack. */
+  unlocked?: boolean;
   active: boolean;
   onActivate?: () => void;
   onEject?: () => void;
@@ -182,6 +186,14 @@ function PackCard({
           {builtIn ? (
             <span className="rounded-full border border-ink-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-500">
               Built in
+            </span>
+          ) : null}
+          {unlocked ? (
+            <span
+              data-testid="unlocked-pack-badge"
+              className="rounded-full border border-brand-300 bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand-800"
+            >
+              Unlocked
             </span>
           ) : null}
           {active ? (
@@ -216,7 +228,7 @@ function PackCard({
               className="text-warn-700"
             >
               <PackageX className="h-4 w-4" />
-              Eject
+              {unlocked ? 'Remove unlocked edition' : 'Eject'}
             </Button>
           ) : null}
         </div>
@@ -268,6 +280,12 @@ export function PacksPage() {
   // nor on the shelf — still show it, so "Active" is never invisible.
   const externalActive =
     activeId !== buildId && !entries.some((e) => e.id === activeId);
+  // One pack id, one card: the fuller edition a licence key fetched for
+  // the built-in pack (same id — src/lib/packLibrary.ts) is not a second
+  // pack on the shelf. The built-in card shows its counts and offers to
+  // remove it.
+  const unlockedEdition = entries.find((e) => e.id === buildId && e.unlockUrl) ?? null;
+  const shelfEntries = entries.filter((e) => e !== unlockedEdition);
 
   // Bring whichever feedback just rendered (result or errors) into view: the
   // card sits at the foot of the page, so a panel appended below the
@@ -391,6 +409,24 @@ export function PacksPage() {
     refresh();
   }
 
+  function handleRemoveUnlocked(entry: PackLibraryEntry) {
+    const ok = window.confirm(
+      `Remove the unlocked edition of “${entry.title}”?\n\nThe app goes back to the ${buildTimeQuestionCount} question${
+        buildTimeQuestionCount === 1 ? '' : 's'
+      } it came with. Your progress and your licence key are kept — enter the key again and all ${entry.questionCount} questions are back.`,
+    );
+    if (!ok) return;
+    ejectPack(entry.id);
+    // On screen with or without the pointer naming it (the boot path
+    // prefers it either way), so the pointer can't say whether to reload.
+    if (entry.id === activeId) {
+      window.location.reload();
+      return;
+    }
+    setMessage(`Removed the unlocked edition of “${entry.title}”. Progress kept.`);
+    refresh();
+  }
+
   return (
     <main className="flex flex-col gap-5">
       <header className="flex items-center justify-between">
@@ -436,15 +472,17 @@ export function PacksPage() {
         ) : null}
         <PackCard
           id={buildId}
-          title={buildTimeManifest.title}
-          description={buildTimeManifest.description}
-          questionCount={buildTimeQuestionCount}
-          categoryCount={buildTimeManifest.categories.length}
+          title={unlockedEdition?.title ?? buildTimeManifest.title}
+          description={unlockedEdition?.description ?? buildTimeManifest.description}
+          questionCount={unlockedEdition?.questionCount ?? buildTimeQuestionCount}
+          categoryCount={unlockedEdition?.categoryCount ?? buildTimeManifest.categories.length}
           builtIn
+          unlocked={unlockedEdition !== null}
           active={mounted && activeId === buildId}
-          onActivate={() => switchTo(null, buildTimeManifest.title)}
+          onActivate={() => switchTo(null, unlockedEdition?.title ?? buildTimeManifest.title)}
+          onEject={unlockedEdition ? () => handleRemoveUnlocked(unlockedEdition) : undefined}
         />
-        {entries.map((entry) => (
+        {shelfEntries.map((entry) => (
           <PackCard
             key={entry.id}
             id={entry.id}

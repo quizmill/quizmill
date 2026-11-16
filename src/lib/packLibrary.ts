@@ -14,6 +14,16 @@
  * under its own keys while another pack is active, and ejecting a pack
  * deliberately KEEPS them — re-insert the pack and the progress is back.
  *
+ * ONE pack may share its id with the pack compiled into the deployment:
+ * the UNLOCKED EDITION of the built-in pack — the fuller bank a licence
+ * key fetched for the sample this app was built from (same id, same
+ * question ids, more of them). It is stored like any inserted pack, but
+ * only the licence-key path may put it there (`insertPack`'s `unlocked`),
+ * and the boot path renders it in place of the build-time content
+ * whenever no other pack is pointed at — so a new deploy of the app never
+ * hides it, and progress never moves because the id never changes.
+ * Ejecting it returns the app to the built-in edition.
+ *
  * Every mutation dispatches `PACK_LIBRARY_EVENT` on window so mounted UI
  * can re-read.
  */
@@ -115,6 +125,29 @@ export function getActivePackPointer(): string | null {
 }
 
 /**
+ * The shelf entry of a pack that arrived through a licence key (the entry
+ * records the endpoint that served it), or null — absent, or held as a
+ * plain file. For the built-in pack's id this is its unlocked edition.
+ */
+export function unlockedEntry(id: string): PackLibraryEntry | null {
+  if (!browser()) return null;
+  return readIndex().find((e) => e.id === id && Boolean(e.unlockUrl)) ?? null;
+}
+
+/**
+ * Whether the boot path renders this library pack (layout.tsx bootstrap,
+ * src/pack/runtime.ts): the pointer names it, or it is the built-in
+ * pack's unlocked edition and the pointer names nothing that is there.
+ */
+export function isActiveLibraryPack(id: string, buildPackId: string): boolean {
+  if (!browser()) return false;
+  const pointer = getActivePackPointer();
+  if (pointer === id) return true;
+  if (id !== buildPackId || unlockedEntry(id) === null) return false;
+  return pointer === null || window.localStorage.getItem(insertedPackKey(pointer)) === null;
+}
+
+/**
  * The images a bundle carries inline (`quizmill bundle`), kept only when
  * they are what they claim: a plain relative image path mapped to a
  * `data:image/…` URL. Anything else (a script URL, a remote URL, a path
@@ -145,14 +178,26 @@ function embeddedAssets(raw: unknown): Record<string, string> | undefined {
  * input — full schema + cross-file validation runs before anything is
  * stored. Re-inserting an existing id replaces its content (pack update);
  * progress is unaffected either way. `buildPackId` (the pack compiled into
- * this deployment) is refused — that one is built in, not inserted.
+ * this deployment) is refused — that one is built in, not inserted —
+ * unless `unlocked` says a licence key fetched it: then it is stored as
+ * the built-in pack's unlocked edition (see the module note). A plain
+ * file or URL never gets that pass: a stray file carrying the app's own
+ * id would silently replace what the app shows, outlive every deploy and
+ * never update, with no key to say where it came from.
  * `packVersion` overrides the version the bundle envelope carries (the
  * unlock path passes the endpoint's ETag); `unlockUrl` is kept only when
  * given, so a later file insert of the same pack simply forgets it.
  */
 export function insertPack(
   raw: unknown,
-  opts: { origin?: string; buildPackId: string; packVersion?: string; unlockUrl?: string },
+  opts: {
+    origin?: string;
+    buildPackId: string;
+    packVersion?: string;
+    unlockUrl?: string;
+    /** Fetched with a licence key (src/lib/unlock.ts, packUpdates.ts). */
+    unlocked?: boolean;
+  },
 ): InsertResult {
   if (!browser()) return { ok: false, errors: ['not in a browser'] };
   if (typeof raw !== 'object' || raw === null) {
@@ -171,7 +216,7 @@ export function insertPack(
   if (!result.ok) return { ok: false, errors: result.errors };
 
   const manifest = candidate.manifest as ActivePack['manifest'];
-  if (manifest.id === opts.buildPackId) {
+  if (manifest.id === opts.buildPackId && !(opts.unlocked && opts.unlockUrl)) {
     return {
       ok: false,
       errors: [`"${manifest.id}" is the pack built into this app — it's always on the shelf.`],
@@ -229,7 +274,9 @@ export function insertPack(
  * notes — everything under `quizmill.<id>.*`) is deliberately kept, so
  * re-inserting the pack later picks up exactly where the learner left off.
  * Ejecting the ACTIVE pack clears the pointer — the app falls back to the
- * build-time pack on next load. Returns whether a reload is needed.
+ * build-time pack on next load. Returns whether the pointer named it (the
+ * built-in pack's unlocked edition can be on screen with no pointer at
+ * all — the shelf reloads for that case itself).
  */
 export function ejectPack(id: string): { wasActive: boolean } {
   if (!browser()) return { wasActive: false };

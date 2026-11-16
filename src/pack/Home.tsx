@@ -62,6 +62,7 @@ import { formatClock } from '@/lib/examClock';
 import { HomeCard, LockedModeTile, ModeTile } from '@/pack/HomeCard';
 import { StreakChip } from '@/pack/StreakChip';
 import { UpgradeCard } from '@/pack/UpgradeCard';
+import { upgradeOnOffer } from '@/lib/upgrade';
 import { StarterPackCard } from '@/pack/StarterCard';
 import { recordLevelCrossings } from '@/pack/useLevelUp';
 
@@ -137,7 +138,7 @@ export default function PackHome() {
   // its fuller edition shows the real exam as a locked tile instead —
   // unless this device has hidden timed exams.
   const examLocked =
-    examShown && APP_CONFIG.upgrade?.packId ? EXAM_WITHHELD : null;
+    examShown && upgradeOnOffer(APP_CONFIG.packId, APP_CONFIG.upgrade)?.packId ? EXAM_WITHHELD : null;
   // In runtime-pack mode, hold the first paint until mount (see RUNTIME_PACK_MODE).
   const mounted = useMounted() || !RUNTIME_PACK_MODE;
   useEffect(() => {
