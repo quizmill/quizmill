@@ -21,6 +21,9 @@ export interface RegistryEntry {
   title: string;
   description: string;
   repo: string; // "owner/name"
+  /** Directory inside `repo` that holds the pack, when the repo holds
+   *  several. Absent = the repo root. */
+  path?: string;
 }
 
 /** Registry entry, possibly enriched by the website API from the pack's
@@ -44,10 +47,22 @@ export const REGISTRY_API_URL = 'https://quizmill.dev/api/registry';
 export const REGISTRY_RAW_URL =
   'https://raw.githubusercontent.com/quizmill/quizmill/main/tools/pack/registry.json';
 
-/** The GitHub repo URL an entry installs from — feed it to
- *  `fetchPackFromUrl`, which rewrites it to raw HEAD (any default branch). */
+/** The GitHub URL an entry installs from: the repo, or the pack's
+ *  directory in it — feed it to `fetchPackFromUrl`, which rewrites either
+ *  form to raw HEAD (any default branch). */
 export function registryRepoUrl(entry: RegistryEntry): string {
-  return `https://github.com/${entry.repo}`;
+  const repo = `https://github.com/${entry.repo}`;
+  return entry.path ? `${repo}/tree/HEAD/${entry.path}` : repo;
+}
+
+/** A relative directory of plain name segments. The path ends up in a
+ *  fetched URL, so nothing that could climb out of the repo or smuggle in
+ *  a query gets through. */
+function isRepoPath(path: unknown): boolean {
+  return (
+    typeof path === 'string' &&
+    path.split('/').every((s) => /^[\w.-]+$/.test(s) && s !== '.' && s !== '..')
+  );
 }
 
 function isEntry(p: unknown): p is PackListing {
@@ -57,7 +72,8 @@ function isEntry(p: unknown): p is PackListing {
     typeof e.id === 'string' &&
     typeof e.title === 'string' &&
     typeof e.repo === 'string' &&
-    /^[\w.-]+\/[\w.-]+$/.test(e.repo)
+    /^[\w.-]+\/[\w.-]+$/.test(e.repo) &&
+    (e.path === undefined || isRepoPath(e.path))
   );
 }
 

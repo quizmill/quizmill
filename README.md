@@ -53,7 +53,8 @@ npx quizmill run quizmill/pack-claude-cert   # install + run one
 | `your-name/your-pack` | Private repos install exactly the same way (family packs, exam prep, team material) — anyone whose `git clone` works can run it | private |
 
 `owner/repo`, `owner/repo#branch`, full GitHub URLs and SSH remotes all
-work.
+work. A repo that holds several packs takes the pack's directory too:
+`owner/repo/dir` (e.g. `quizmill/packs-aws/aws-clf`).
 
 ## Build a pack about anything
 
@@ -94,7 +95,9 @@ npx quizmill run your-name/your-pack-repo
 
 Keep it private and it still works for everyone with repo access. If
 the pack is public and you want it listed in `npx quizmill list`, PR an
-entry into [`tools/pack/registry.json`](tools/pack/registry.json).
+entry into [`tools/pack/registry.json`](tools/pack/registry.json) —
+`repo`, plus `path` when the pack sits in a directory of a repo that
+holds several.
 
 If your questions build on someone else's bank, keep the upstream
 license, record provenance in each question's `sourceRef` (the app

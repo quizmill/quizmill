@@ -247,7 +247,8 @@ export function PacksPage() {
   // The published-pack registry — loaded once on mount, best source wins
   // (website API → raw GitHub → the copy baked into this build).
   const [registry, setRegistry] = useState<RegistryResult | null>(null);
-  const [busyRepo, setBusyRepo] = useState<string | null>(null);
+  // Keyed on the pack id: several listings can share one repo.
+  const [busyListing, setBusyListing] = useState<string | null>(null);
 
   const refresh = useCallback(() => setEntries(listInsertedPacks()), [setEntries]);
   useEffect(() => {
@@ -357,13 +358,13 @@ export function PacksPage() {
   }
 
   async function handleRegistryInsert(listing: PackListing) {
-    if (busyRepo) return;
-    setBusyRepo(listing.repo);
+    if (busyListing) return;
+    setBusyListing(listing.id);
     clearFeedback();
     try {
       finishInsert(await fetchPackFromUrl(registryRepoUrl(listing)), registryRepoUrl(listing));
     } finally {
-      setBusyRepo(null);
+      setBusyListing(null);
     }
   }
 
@@ -512,11 +513,11 @@ export function PacksPage() {
                       variant="secondary"
                       className="mt-0.5 shrink-0"
                       data-testid={`registry-insert-${l.id}`}
-                      disabled={busyRepo !== null}
+                      disabled={busyListing !== null}
                       onClick={() => void handleRegistryInsert(l)}
                     >
                       <Download className="h-4 w-4" />
-                      {busyRepo === l.repo ? 'Inserting…' : 'Insert'}
+                      {busyListing === l.id ? 'Inserting…' : 'Insert'}
                     </Button>
                   )}
                 </li>

@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { PacksPage } from '@/components/PacksPage';
 import { ACTIVE_PACK_ID_KEY } from '@/lib/packKeys';
+import { loadRegistry } from '@/lib/packRegistry';
 
 // The registry browser fetches on mount and the insert prefetches images —
 // neither is under test here, and neither may touch the network.
@@ -372,5 +373,35 @@ describe('PacksPage licence key line', () => {
     await insertFixture('plain-pack');
     expect(card('plain-pack').querySelector('[data-testid="pack-licence-key"]')).toBeNull();
     expect(container.querySelector('[data-testid="pack-licence-key"]')).toBeNull();
+  });
+});
+
+describe('PacksPage registry browser', () => {
+  it('marks only the listing being inserted as busy when several share a repo', async () => {
+    const listing = (id: string) => ({
+      id,
+      title: id,
+      description: '',
+      repo: 'quizmill/packs-many',
+      path: id,
+    });
+    vi.mocked(loadRegistry).mockResolvedValueOnce({
+      source: 'api',
+      listings: [listing('many-one'), listing('many-two')],
+    });
+    await render();
+    const insert = (id: string) =>
+      container.querySelector<HTMLButtonElement>(`[data-testid="registry-insert-${id}"]`)!;
+
+    await act(async () => {
+      insert('many-two').click();
+    });
+
+    expect(fetchPackFromUrl).toHaveBeenCalledWith(
+      'https://github.com/quizmill/packs-many/tree/HEAD/many-two',
+    );
+    expect(insert('many-two').textContent).toContain('Inserting…');
+    expect(insert('many-one').textContent).not.toContain('Inserting…');
+    expect(insert('many-one').disabled).toBe(true);
   });
 });
