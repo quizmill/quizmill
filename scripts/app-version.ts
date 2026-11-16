@@ -40,12 +40,32 @@ export function appVersion(cwd?: string): string {
   return process.env.NEXT_PUBLIC_APP_VERSION || latestReleaseVersion(cwd) || pkg.version;
 }
 
+/** A Next.js build id that is the same for the same engine commit and the
+ *  same pack build (NEXT_PUBLIC_APP_BUILD), instead of Next's random one.
+ *  The id names a directory under `_next/static/` that every page and the
+ *  service worker's precache list refer to, so a random id made each
+ *  rebuild of unchanged sources a different app: a new `sw.js`, and an
+ *  update banner for nothing on every daily pack rebuild. Null outside a
+ *  git checkout, where nothing identifies the sources: Next then falls
+ *  back to its random id. */
+export function stableBuildId(cwd?: string): string | null {
+  const sha = gitShortSha(cwd);
+  if (!sha) return null;
+  return [appVersion(cwd), sha, process.env.NEXT_PUBLIC_APP_BUILD]
+    .filter(Boolean)
+    .join('-')
+    .replace(/[^A-Za-z0-9._-]/g, '_');
+}
+
 /** When this build was made, as an ISO timestamp — the "last updated" a
  *  learner reads next to the version in Settings. The moment of the build
  *  (not a commit date: a pack repo's deploy builds a months-old engine
  *  with fresh content, and it's the deploy the learner cares about), so
  *  it works outside a git checkout too. NEXT_PUBLIC_APP_BUILD_DATE pins
  *  it; so does SOURCE_DATE_EPOCH, the reproducible-builds convention.
+ *  deploy-pack.yml pins it to when the pack or the engine last changed, so
+ *  a rebuild of unchanged sources is byte-identical and a learner's "last
+ *  updated" does not move on a rebuild that changed nothing.
  *  An unparseable override is ignored rather than stamped. */
 export function buildDate(): string {
   const pinned = process.env.NEXT_PUBLIC_APP_BUILD_DATE;

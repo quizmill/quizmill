@@ -1,5 +1,5 @@
 import type { NextConfig } from 'next';
-import { appVersion, buildDate, gitShortSha } from './scripts/app-version';
+import { appVersion, buildDate, gitShortSha, stableBuildId } from './scripts/app-version';
 
 // Cloudflare Pages serves at the domain root, so the default base path is
 // empty. (Set NEXT_PUBLIC_BASE_PATH to a sub-path only if hosting under one.)
@@ -25,6 +25,9 @@ const nextConfig: NextConfig = {
   images: { unoptimized: true },
   trailingSlash: true,
   reactStrictMode: true,
+  // Same sources, same build id: without this every build gets a random id,
+  // so no two builds are alike and each redeploy looks like an update.
+  generateBuildId: () => stableBuildId(),
   env: {
     NEXT_PUBLIC_BASE_PATH: effectiveBasePath,
     NEXT_PUBLIC_APP_VERSION: semver,
