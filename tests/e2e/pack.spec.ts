@@ -389,12 +389,15 @@ test.describe('progress page', () => {
     // planets 11/13, exploration 3/5. Blueprint weights are 0.6/0.4, so
     // the estimate is 0.6·84.6% + 0.4·60% ≈ 75% — above the line, but the
     // band's low end dips below → a deterministic "likely" verdict.
+    // Real question ids: readiness counts only questions the pack contains
+    // (history may hold others — a fuller edition of the same pack id).
+    const demoId = (prefix: string, i: number) => `${prefix}-${String(i + 1).padStart(3, '0')}`;
     const planets = Array.from({ length: 13 }, (_, i) => ({
-      questionId: `rp-${i}`, subject: 'planets', topic: `rp-${i}`,
+      questionId: demoId('demo-planets', i), subject: 'planets', topic: `rp-${i}`,
       isCorrect: i < 11, agoMs: 60_000 - i * 100,
     }));
     const exploration = Array.from({ length: 5 }, (_, i) => ({
-      questionId: `re-${i}`, subject: 'space-exploration', topic: `re-${i}`,
+      questionId: demoId('demo-explore', i), subject: 'space-exploration', topic: `re-${i}`,
       isCorrect: i < 3, agoMs: 50_000 - i * 100,
     }));
     await seedAttempts(page, [...planets, ...exploration]);

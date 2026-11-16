@@ -352,14 +352,31 @@ export function sheetScopeLabel(s: {
   return s.level ? `${category} · ${PACK_LEVEL_LABEL[s.level] ?? s.level}` : category;
 }
 
+const PACK_QUESTION_IDS: ReadonlySet<string> = new Set(packQuestions.map((q) => q.id));
+
+/**
+ * Whether the ACTIVE pack content contains this question. History can be
+ * wider than the content: attempts are stored and synced per pack id, and
+ * one id may have a fuller edition (a licence key unlocks it —
+ * src/lib/packLibrary.ts) or a question retired since. Those rows stay in
+ * storage and keep earning what they earned (XP, streak); anything that
+ * counts, lists or queues QUESTIONS scopes through this, so the numbers
+ * never exceed the bank and nothing points at a question the app can't
+ * show.
+ */
+export function hasPackQuestion(questionId: string): boolean {
+  return PACK_QUESTION_IDS.has(questionId);
+}
+
 /**
  * Whether a question counts toward exam readiness. When the exam declares a
  * `scope.level` only questions in that level band count (a pack mixing exam
- * and non-exam material); otherwise the whole bank is in scope.
+ * and non-exam material); otherwise the whole bank is in scope — the bank
+ * on screen, not every question the history has seen (`hasPackQuestion`).
  */
 export function examInScope(questionId: string): boolean {
   const level = packExam?.scope?.level;
-  if (!level) return true;
+  if (!level) return hasPackQuestion(questionId);
   return PACK_LEVEL_BY_QUESTION_ID[questionId] === level;
 }
 

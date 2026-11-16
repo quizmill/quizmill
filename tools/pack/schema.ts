@@ -223,7 +223,10 @@ export const packUpgradeSchema = z.object({
    *  of. The app sends it as `pack=` so the service refuses a key for any
    *  other pack, and refuses any other bundle itself. Without it the key
    *  alone says which pack (the bundle's manifest does). Both optional:
-   *  the /unlock route and "Have a licence key?" exist in every build. */
+   *  the /unlock route and "Have a licence key?" exist in every build.
+   *  It may be this pack's OWN id: one pack id with two editions, where
+   *  the key fetches a superset of these questions under the same id and
+   *  the learner's progress carries straight over (src/lib/packLibrary.ts). */
   packId: z.string().regex(slug).max(40).optional(),
   /** Base URL of the author's own unlock endpoint (https), overriding the
    *  build's default service. The app calls
@@ -333,13 +336,6 @@ export const packManifestSchema = z
             message: `categoryKey "${p.categoryKey}" not declared in categories`,
           });
         }
-      });
-    }
-    if (m.upgrade?.packId === m.id) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['upgrade', 'packId'],
-        message: 'must name a different pack — a licence key unlocks the fuller edition, not this pack',
       });
     }
   });

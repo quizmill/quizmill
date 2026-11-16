@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { isStandaloneDisplay } from '@/lib/install';
 import { APP_CONFIG } from '@/config';
 import { insertedPackKey } from '@/lib/packKeys';
+import { unlockedEntry } from '@/lib/packLibrary';
 import {
   openUnlockedPack,
   unlockConfig,
@@ -67,6 +68,10 @@ export function UpgradeClaimCheck() {
       now: () => Date.now(),
       isUnlocked: (key) => {
         try {
+          // A sample whose purchase opens its OWN id (one id, two
+          // editions): the sample itself may be what is stored under
+          // it, so only the edition a licence key fetched counts.
+          if (target === packId) return unlockedEntry(target) !== null;
           if (target) return window.localStorage.getItem(insertedPackKey(target)) !== null;
           // No hint which pack the purchase is for: a pack already kept
           // under this very key is the one it would unlock.

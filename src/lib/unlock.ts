@@ -361,6 +361,9 @@ export async function unlockPack(
     origin: `licence key · ${new URL(config.unlockUrl).host}`,
     buildPackId: opts.buildPackId,
     unlockUrl: config.unlockUrl,
+    // A key may open the fuller edition of the very pack this app was
+    // built from (same id): the one insert allowed to carry that id.
+    unlocked: true,
     ...(fetched.version ? { packVersion: fetched.version } : {}),
   });
   if (!inserted.ok) {

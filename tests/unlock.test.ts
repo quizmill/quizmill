@@ -440,14 +440,21 @@ describe('unlockPack', () => {
     expect(loadEvents()).toEqual([]);
   });
 
-  it('refuses the pack built into this app, like any insert', async () => {
+  // The one insert that may carry the built-in pack's id: a key can open
+  // the fuller edition of the very pack this app was built from
+  // (tests/pack-editions.test.ts has the whole story).
+  it('stores a bundle carrying the built-in pack’s own id as its unlocked edition', async () => {
     const r = await unlockPack(KEY, {
       config: CONFIG,
       buildPackId: 'solar-system-full',
       fetchImpl: respond(200, bundle()),
     });
-    expect(r.ok).toBe(false);
-    expect(getActivePackPointer()).toBeNull();
+    expect(r.ok).toBe(true);
+    expect(getActivePackPointer()).toBe('solar-system-full');
+    expect(listInsertedPacks()[0]).toMatchObject({
+      id: 'solar-system-full',
+      unlockUrl: CONFIG.unlockUrl,
+    });
   });
 });
 
