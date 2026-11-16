@@ -34,9 +34,10 @@
     {
       "id": "aws-saa",
       "title": "AWS Solutions Architect Associate",
-      "description": "Unofficial practice for the AWS Certified Solutions Architect – Associate (SAA-C03) exam — secure, resilient, high-performing and cost-optimized architectures. 60 original scenario questions across the four exam domains, each grounded in the AWS documentation.",
+      "description": "Unofficial practice for the AWS Certified Solutions Architect – Associate (SAA-C03) exam — secure, resilient, high-performing and cost-optimized architectures. 260 original scenario questions, 65 in each of the four exam domains, each grounded in the AWS documentation.",
       "repo": "quizmill/packs-aws",
-      "path": "aws-saa"
+      "path": "aws-saa",
+      "url": "https://aws-saa.quizmill.dev"
     },
     {
       "id": "aws-clf",

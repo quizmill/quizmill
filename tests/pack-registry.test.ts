@@ -107,6 +107,14 @@ describe('builtinRegistry', () => {
       expect(p).toMatchObject({ repo: 'quizmill/packs-aws', path: p.id });
     }
   });
+
+  // `url` is read by the website's pack directory, not by the app, so it
+  // is not on the listing type.
+  it('links every AWS pack to its hosted app', () => {
+    for (const p of builtinRegistry().filter((p) => p.id.startsWith('aws-'))) {
+      expect(p).toMatchObject({ url: `https://${p.id}.quizmill.dev` });
+    }
+  });
 });
 
 describe('registryRepoUrl', () => {
