@@ -329,6 +329,15 @@ describe('the unlocked edition’s boot copy, with packs in IndexedDB', () => {
     expect(copyCount(BUILD)).toBe(7);
   });
 
+  it('is put back on the next app open when it has gone missing', async () => {
+    await unlock(7);
+    await activatePack(null, { buildPackId: BUILD });
+    storage.removeItem(insertedPackKey(BUILD));
+
+    await migrateInsertedPacks(BUILD);
+    expect(copyCount(BUILD)).toBe(7);
+  });
+
   it('survives the move to IndexedDB of an edition an older build kept in localStorage', async () => {
     // Stored by a build that had no IndexedDB store: unlock without one.
     vi.stubGlobal('indexedDB', undefined);

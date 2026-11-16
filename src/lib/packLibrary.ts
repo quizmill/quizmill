@@ -195,7 +195,31 @@ export async function getInsertedPack(id: string): Promise<ActivePack | null> {
  * IndexedDB holds it.
  */
 export function migrateInsertedPacks(buildPackId?: string): Promise<void> {
-  return serial(() => migrate(buildPackId));
+  return serial(async () => {
+    await migrate(buildPackId);
+    await restoreBootCopy(buildPackId);
+  });
+}
+
+/**
+ * Put back the localStorage copy of the pack the boot reads when it has
+ * gone missing while IndexedDB still holds the pack (an eject that had no
+ * room to hand the boot back to the unlocked edition, storage cleared in
+ * part). Best effort, on app open: the next load then shows it again.
+ */
+async function restoreBootCopy(buildPackId: string | undefined): Promise<void> {
+  if (!browser()) return;
+  try {
+    const ls = window.localStorage;
+    const id = bootPackId(buildPackId);
+    if (id === null || !hasInsertedPack(id) || ls.getItem(insertedPackKey(id)) !== null) return;
+    const pack = await readStoredPack(id);
+    if (pack && bootPackId(buildPackId) === id && hasInsertedPack(id)) {
+      ls.setItem(insertedPackKey(id), JSON.stringify(pack));
+    }
+  } catch {
+    // no room, or no IndexedDB: the built-in pack shows, as it did
+  }
 }
 
 /**
