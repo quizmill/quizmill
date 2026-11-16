@@ -250,8 +250,7 @@ export function lock(state: State, rng: () => number = Math.random): State {
   while (kept.length < ROWS) kept.unshift(Array<BoardCell>(COLS).fill(null));
 
   const lines = state.lines + cleared;
-  const score =
-    state.score + (cleared > 0 ? (LINE_POINTS[cleared] ?? 0) * levelFor(state.lines) : 0);
+  const score = state.score + (LINE_POINTS[cleared] ?? 0) * levelFor(state.lines);
 
   const current = spawnPiece(state.next);
   const [next, bag] = draw(state.bag, rng);

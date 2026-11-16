@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 import { GAMES, GAME_SESSION_MS, type GameId } from '@/lib/games/registry';
 import { Dodger } from './Dodger';
 import { GameOver } from './GameOver';
@@ -25,26 +25,15 @@ interface GameModalProps {
   replay?: boolean;
 }
 
-function pick(game: GameId, onClose: () => void) {
-  switch (game) {
-    case 'snake':
-      return <Snake onClose={onClose} />;
-    case 'tile-puzzle':
-      return <TilePuzzle onClose={onClose} />;
-    case 'memory':
-      return <Memory onClose={onClose} />;
-    case 'whack':
-      return <Whack onClose={onClose} />;
-    case 'pong':
-      return <Pong onClose={onClose} />;
-    case 'dodger':
-      return <Dodger onClose={onClose} />;
-    case 'tetris':
-      return <Tetris onClose={onClose} />;
-    default:
-      return null;
-  }
-}
+const COMPONENTS: Record<GameId, ComponentType<{ onClose: () => void }>> = {
+  snake: Snake,
+  'tile-puzzle': TilePuzzle,
+  memory: Memory,
+  whack: Whack,
+  pong: Pong,
+  dodger: Dodger,
+  tetris: Tetris,
+};
 
 /**
  * Picks the right game component for `game` and renders it under the
@@ -90,9 +79,10 @@ export function GameModal({ game, onClose, replay = true }: GameModalProps) {
     );
   }
 
+  const Game = COMPONENTS[game];
   return (
     <GameRulesContext.Provider value={{ replay }}>
-      {pick(game, onClose)}
+      {Game ? <Game onClose={onClose} /> : null}
     </GameRulesContext.Provider>
   );
 }
