@@ -79,6 +79,7 @@ describe('PackReviewPage', () => {
         q.reviewStatus,
       );
       expect(card.textContent).toContain(`Difficulty ${q.difficulty}/5`);
+      if (q.sourceRef) expect(card.textContent).toContain(`Source ref: ${q.sourceRef}`);
       // The explanation is open and the right answer is lit.
       expect(card.textContent).toContain(q.explanation.slice(0, 30));
       if (isMatching(q)) {
@@ -86,6 +87,10 @@ describe('PackReviewPage', () => {
         expect(rows).toHaveLength(q.rows?.length ?? 0);
       } else {
         const answered = answerKeysOf(q);
+        // Named in words too, not only by colour.
+        expect(card.querySelector('[data-testid="review-answer"]')?.textContent).toContain(
+          answered.length > 1 ? 'The answers are' : `The answer is ${answered[0]}`,
+        );
         // The option buttons are the disabled ones (the thumbs stay live).
         const lit = [...card.querySelectorAll('button[disabled]')].filter((b) =>
           b.className.includes('border-success-500 '),

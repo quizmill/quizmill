@@ -26,6 +26,7 @@ import {
   PACK_CONCEPT_BY_ID,
   type PackQuestion,
 } from '@/pack/data';
+import { formatKeyList } from '@/pack/runner';
 import {
   drawReviewSample,
   REVIEW_BATCH_SIZES,
@@ -174,8 +175,7 @@ function ReviewCard({ question, index }: { question: PackQuestion; index: number
   const multi = isMultiAnswer(question);
   const matching = isMatching(question);
   const answer = answerKeysOf(question);
-  // Only a URL gets the SourceRef link; show any other ref as text.
-  const refIsUrl = /^https?:\/\//.test(question.sourceRef?.trim() ?? '');
+  const correct = correctKeysOf(question);
 
   return (
     <article
@@ -253,6 +253,14 @@ function ReviewCard({ question, index }: { question: PackQuestion; index: number
       )}
 
       <div className="flex flex-col gap-2 rounded-xl border border-success-500/30 bg-success-100/50 p-3">
+        {/* The lit option is colour and an icon; name the answer in words
+            too, for screen readers and for a quick scan down the page. */}
+        {!matching ? (
+          <div className="text-[15px] text-ink-700" data-testid="review-answer">
+            {correct.length > 1 ? 'The answers are ' : 'The answer is '}
+            <span className="font-semibold text-ink-900">{formatKeyList(correct)}</span>.
+          </div>
+        ) : null}
         <div className="text-[11px] font-semibold uppercase tracking-wider text-success-700">
           Explanation
         </div>
@@ -260,9 +268,12 @@ function ReviewCard({ question, index }: { question: PackQuestion; index: number
           <McqMarkdown text={question.explanation} />
         </div>
         {concept ? <ConceptCard concept={concept} /> : null}
-        {question.sourceRef && !refIsUrl ? (
-          <div className="text-xs text-ink-500">
-            Source ref: <span className="font-mono">{question.sourceRef}</span>
+        {question.sourceRef ? (
+          // The whole value, verbatim: SourceRef below links only the first
+          // URL, and a ref like "https://…/bank; internal-note-42" carries
+          // provenance an author needs to see in full.
+          <div className="text-xs text-ink-500" data-testid="review-source-ref">
+            Source ref: <span className="font-mono break-all">{question.sourceRef}</span>
           </div>
         ) : null}
         <SourceRef sourceRef={question.sourceRef} />
