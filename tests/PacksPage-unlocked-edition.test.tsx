@@ -93,8 +93,8 @@ async function render() {
   await act(async () => {});
 }
 
-function seedUnlocked() {
-  const r = insertPack(bundle(BUILD, FULL_COUNT), {
+async function seedUnlocked() {
+  const r = await insertPack(bundle(BUILD, FULL_COUNT), {
     origin: 'licence key · unlock.test',
     buildPackId: BUILD,
     unlockUrl: 'https://unlock.test',
@@ -118,7 +118,7 @@ describe('PacksPage — the built-in pack’s unlocked edition', () => {
   });
 
   it('shows one card for the id: Built in, Unlocked, the fuller count, the key and the progress', async () => {
-    seedUnlocked();
+    await seedUnlocked();
     await render();
     expect(cards()).toHaveLength(1);
     const card = cards()[0];
@@ -134,7 +134,7 @@ describe('PacksPage — the built-in pack’s unlocked edition', () => {
   });
 
   it('removing it reloads into the built-in edition, with progress and the key kept', async () => {
-    seedUnlocked();
+    await seedUnlocked();
     // On screen through the fallback: no pointer names it.
     expect(localStorage.getItem(ACTIVE_PACK_ID_KEY)).toBeNull();
     // happy-dom has no confirm() of its own.
@@ -156,7 +156,7 @@ describe('PacksPage — the built-in pack’s unlocked edition', () => {
   });
 
   it('declining the confirmation changes nothing', async () => {
-    seedUnlocked();
+    await seedUnlocked();
     window.confirm = vi.fn(() => false);
     await render();
     await act(async () => {

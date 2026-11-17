@@ -11,6 +11,8 @@
  * tests/e2e/unlocked-edition.spec.ts.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { IDBFactory } from 'fake-indexeddb';
+import { insertedPackKey } from '@/lib/packKeys';
 import {
   activatePack,
   ejectPack,
@@ -19,9 +21,11 @@ import {
   insertPack,
   isActiveLibraryPack,
   listInsertedPacks,
+  migrateInsertedPacks,
   packProgress,
   unlockedEntry,
 } from '@/lib/packLibrary';
+import { readStoredPack } from '@/lib/packStore';
 import { PACK_UPDATE_INTERVAL_MS, checkPackUpdates, takePackUpdatedNotices } from '@/lib/packUpdates';
 import { DEFAULT_UNLOCK_URL, licenceKeyStorageKey, unlockPack } from '@/lib/unlock';
 import { upgradeOnOffer } from '@/lib/upgrade';
@@ -138,7 +142,7 @@ describe('unlocking a pack that shares the built-in pack’s id', () => {
     // One shelf entry, under the one id, marked as arrived by licence key.
     expect(listInsertedPacks().map((e) => e.id)).toEqual([BUILD]);
     expect(unlockedEntry(BUILD)).toMatchObject({ questionCount: 7, unlockUrl: DEFAULT_UNLOCK_URL });
-    expect(getInsertedPack(BUILD)?.questions).toHaveLength(7);
+    expect((await getInsertedPack(BUILD))?.questions).toHaveLength(7);
     expect(isActiveLibraryPack(BUILD, BUILD)).toBe(true);
 
     // Progress did not move: same keys, same bytes.
@@ -159,29 +163,29 @@ describe('unlocking a pack that shares the built-in pack’s id', () => {
   });
 
   it('still refuses the same id from a plain file or URL — before and after unlocking', async () => {
-    const refused = insertPack(bundle(BUILD, 9), { origin: 'full.bundle.json', buildPackId: BUILD });
+    const refused = await insertPack(bundle(BUILD, 9), { origin: 'full.bundle.json', buildPackId: BUILD });
     expect(refused.ok).toBe(false);
     if (!refused.ok) expect(refused.errors[0]).toContain('built into this app');
     expect(listInsertedPacks()).toEqual([]);
 
     // `unlocked` alone is not a pass either: it takes the endpoint that served it.
-    expect(insertPack(bundle(BUILD, 9), { buildPackId: BUILD, unlocked: true }).ok).toBe(false);
+    expect((await insertPack(bundle(BUILD, 9), { buildPackId: BUILD, unlocked: true })).ok).toBe(false);
 
     await unlock(7);
-    expect(insertPack(bundle(BUILD, 9), { origin: 'full.bundle.json', buildPackId: BUILD }).ok).toBe(false);
-    expect(getInsertedPack(BUILD)?.questions).toHaveLength(7);
+    expect((await insertPack(bundle(BUILD, 9), { origin: 'full.bundle.json', buildPackId: BUILD })).ok).toBe(false);
+    expect((await getInsertedPack(BUILD))?.questions).toHaveLength(7);
     expect(unlockedEntry(BUILD)?.unlockUrl).toBe(DEFAULT_UNLOCK_URL);
   });
 
   it('is the active pack with or without the pointer, but never over another pack that is pointed at', async () => {
     await unlock(7);
     // The built-in card's "Make active" clears the pointer: still the unlocked edition.
-    activatePack(null);
+    await activatePack(null, { buildPackId: BUILD });
     expect(getActivePackPointer()).toBeNull();
     expect(isActiveLibraryPack(BUILD, BUILD)).toBe(true);
 
-    insertPack(bundle('another-pack', 2), { buildPackId: BUILD });
-    activatePack('another-pack');
+    await insertPack(bundle('another-pack', 2), { buildPackId: BUILD });
+    await activatePack('another-pack', { buildPackId: BUILD });
     expect(isActiveLibraryPack(BUILD, BUILD)).toBe(false);
     expect(isActiveLibraryPack('another-pack', BUILD)).toBe(true);
 
@@ -190,10 +194,10 @@ describe('unlocking a pack that shares the built-in pack’s id', () => {
     expect(isActiveLibraryPack(BUILD, BUILD)).toBe(true);
   });
 
-  it('a file stored under an id the build later takes is not on screen, even with the pointer at it', () => {
+  it('a file stored under an id the build later takes is not on screen, even with the pointer at it', async () => {
     // Inserted and made active while another pack was the build-time one…
-    expect(insertPack(bundle(BUILD, 3), { origin: 'old.bundle.json', buildPackId: 'earlier-build' }).ok).toBe(true);
-    activatePack(BUILD);
+    expect((await insertPack(bundle(BUILD, 3), { origin: 'old.bundle.json', buildPackId: 'earlier-build' })).ok).toBe(true);
+    await activatePack(BUILD, { buildPackId: 'earlier-build' });
     expect(isActiveLibraryPack(BUILD, 'earlier-build')).toBe(true);
     // …then a deploy whose built-in pack has that id: the boot path renders the build.
     expect(isActiveLibraryPack(BUILD, BUILD)).toBe(false);
@@ -206,10 +210,10 @@ describe('removing the unlocked edition', () => {
     await unlock(7);
     const before = storage.snapshot(`quizmill.${BUILD}.`);
 
-    ejectPack(BUILD);
+    await ejectPack(BUILD, { buildPackId: BUILD });
 
     expect(listInsertedPacks()).toEqual([]);
-    expect(getInsertedPack(BUILD)).toBeNull();
+    expect(await getInsertedPack(BUILD)).toBeNull();
     expect(unlockedEntry(BUILD)).toBeNull();
     expect(getActivePackPointer()).toBeNull();
     expect(isActiveLibraryPack(BUILD, BUILD)).toBe(false);
@@ -225,7 +229,7 @@ describe('the daily update check, keyed on the shared id', () => {
   it('replaces the unlocked edition’s content, leaves progress alone and asks Home to reload', async () => {
     seedProgress();
     await unlock(7, '"v1"');
-    activatePack(null); // on screen through the built-in card, no pointer
+    await activatePack(null, { buildPackId: BUILD }); // on screen through the built-in card, no pointer
     const before = storage.snapshot(`quizmill.${BUILD}.attempts`);
     calls = [];
 
@@ -237,7 +241,7 @@ describe('the daily update check, keyed on the shared id', () => {
 
     expect(outcomes).toEqual({ [BUILD]: 'updated' });
     expect(calls).toEqual([`${DEFAULT_UNLOCK_URL}/v1/unlock?key=${KEY}&pack=${BUILD}`]);
-    expect(getInsertedPack(BUILD)?.questions).toHaveLength(9);
+    expect((await getInsertedPack(BUILD))?.questions).toHaveLength(9);
     expect(unlockedEntry(BUILD)).toMatchObject({ questionCount: 9, packVersion: 'v2' });
     expect(storage.snapshot(`quizmill.${BUILD}.attempts`)).toEqual(before);
     expect(takePackUpdatedNotices()).toEqual([
@@ -247,14 +251,103 @@ describe('the daily update check, keyed on the shared id', () => {
 
   it('does not bring back an unlocked edition that was removed', async () => {
     await unlock(7);
-    ejectPack(BUILD);
+    await ejectPack(BUILD, { buildPackId: BUILD });
     const outcomes = await checkPackUpdates({
       buildPackId: BUILD,
       fetchImpl: respond(200, bundle(BUILD, 9), { etag: '"v2"' }),
       now: Date.now() + 2 * PACK_UPDATE_INTERVAL_MS,
     });
     expect(outcomes).toEqual({});
-    expect(getInsertedPack(BUILD)).toBeNull();
+    expect(await getInsertedPack(BUILD)).toBeNull();
+  });
+});
+
+// With IndexedDB the library keeps only ONE pack's copy in localStorage:
+// the one the boot reads. With no other pack pointed at, that is the
+// unlocked edition — pointer or no pointer.
+describe('the unlocked edition’s boot copy, with packs in IndexedDB', () => {
+  const copy = (id: string) => storage.getItem(insertedPackKey(id));
+  const copyCount = (id: string) => (JSON.parse(copy(id)!) as { questions: unknown[] }).questions.length;
+
+  beforeEach(() => {
+    vi.stubGlobal('indexedDB', new IDBFactory());
+  });
+
+  it('stays in localStorage when no pack is pointed at, through a migration and an update', async () => {
+    await unlock(7);
+    await activatePack(null, { buildPackId: BUILD });
+    expect(getActivePackPointer()).toBeNull();
+    expect(copyCount(BUILD)).toBe(7);
+
+    await migrateInsertedPacks(BUILD);
+    expect(copyCount(BUILD)).toBe(7);
+
+    await checkPackUpdates({
+      buildPackId: BUILD,
+      fetchImpl: respond(200, bundle(BUILD, 9), { etag: '"v2"' }),
+      now: Date.now() + 2 * PACK_UPDATE_INTERVAL_MS,
+    });
+    expect(copyCount(BUILD)).toBe(9);
+  });
+
+  it('is there straight after the insert, before anything points at it', async () => {
+    const inserted = await insertPack(bundle(BUILD, 7), {
+      buildPackId: BUILD,
+      unlockUrl: DEFAULT_UNLOCK_URL,
+      unlocked: true,
+    });
+    expect(inserted.ok).toBe(true);
+    expect(getActivePackPointer()).toBeNull();
+    expect(copyCount(BUILD)).toBe(7);
+  });
+
+  it('moves out when another pack is opened and back when the app returns to the built-in pack', async () => {
+    await unlock(7);
+    await activatePack(null, { buildPackId: BUILD });
+    await insertPack(bundle('another-pack', 2), { buildPackId: BUILD });
+    expect(copy('another-pack')).toBeNull();
+
+    expect(await activatePack('another-pack', { buildPackId: BUILD })).toEqual({ ok: true });
+    expect(copy(BUILD)).toBeNull();
+    expect(copyCount('another-pack')).toBe(2);
+    expect((await getInsertedPack(BUILD))?.questions).toHaveLength(7);
+
+    expect(await activatePack(null, { buildPackId: BUILD })).toEqual({ ok: true });
+    expect(copy('another-pack')).toBeNull();
+    expect(copyCount(BUILD)).toBe(7);
+    expect(isActiveLibraryPack(BUILD, BUILD)).toBe(true);
+  });
+
+  it('comes back when the other, active pack is ejected', async () => {
+    await unlock(7);
+    await insertPack(bundle('another-pack', 2), { buildPackId: BUILD });
+    await activatePack('another-pack', { buildPackId: BUILD });
+    expect(copy(BUILD)).toBeNull();
+
+    expect(await ejectPack('another-pack', { buildPackId: BUILD })).toEqual({ wasActive: true });
+    expect(getActivePackPointer()).toBeNull();
+    expect(copyCount(BUILD)).toBe(7);
+  });
+
+  it('is put back on the next app open when it has gone missing', async () => {
+    await unlock(7);
+    await activatePack(null, { buildPackId: BUILD });
+    storage.removeItem(insertedPackKey(BUILD));
+
+    await migrateInsertedPacks(BUILD);
+    expect(copyCount(BUILD)).toBe(7);
+  });
+
+  it('survives the move to IndexedDB of an edition an older build kept in localStorage', async () => {
+    // Stored by a build that had no IndexedDB store: unlock without one.
+    vi.stubGlobal('indexedDB', undefined);
+    await unlock(7);
+    await activatePack(null, { buildPackId: BUILD });
+    vi.stubGlobal('indexedDB', new IDBFactory());
+
+    await migrateInsertedPacks(BUILD);
+    expect(copyCount(BUILD)).toBe(7);
+    expect((await readStoredPack(BUILD))?.questions).toHaveLength(7);
   });
 });
 
@@ -265,7 +358,7 @@ describe('the upgrade pitch', () => {
     expect(upgradeOnOffer(BUILD, upgrade)).toBe(upgrade);
     await unlock(7);
     expect(upgradeOnOffer(BUILD, upgrade)).toBeUndefined();
-    ejectPack(BUILD);
+    await ejectPack(BUILD, { buildPackId: BUILD });
     expect(upgradeOnOffer(BUILD, upgrade)).toBe(upgrade);
   });
 
@@ -276,7 +369,7 @@ describe('the upgrade pitch', () => {
     expect(upgradeOnOffer(BUILD, undefined)).toBeUndefined();
 
     // A sample inserted as a plain pack (no licence key) that names itself.
-    insertPack(bundle('shelf-sample', 3), { buildPackId: BUILD });
+    await insertPack(bundle('shelf-sample', 3), { buildPackId: BUILD });
     const own = { ...upgrade, packId: 'shelf-sample' };
     expect(upgradeOnOffer('shelf-sample', own)).toBe(own);
   });
