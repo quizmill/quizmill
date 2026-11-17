@@ -49,7 +49,7 @@
     {
       "id": "aws-aif",
       "title": "AWS AI Practitioner",
-      "description": "Unofficial practice for the AWS Certified AI Practitioner (AIF-C01) exam — AI and ML fundamentals, generative AI, applications of foundation models, responsible AI, and security and governance for AI on AWS. 200 original questions across the five exam domains in the blueprint's 20/24/28/14/14 mix, each grounded in the AWS documentation.",
+      "description": "Unofficial practice for the AWS Certified AI Practitioner (AIF-C01) exam — AI and ML fundamentals, generative AI, applications of foundation models, responsible AI, and security and governance for AI on AWS. A 30-question sample across the five exam domains and three tiers, every question original and grounded in the AWS documentation; a licence key unlocks the full 200-question bank in place, under the same pack id.",
       "repo": "quizmill/packs-aws",
       "path": "aws-aif",
       "url": "https://aws-aif.quizmill.dev"
