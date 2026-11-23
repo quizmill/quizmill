@@ -291,6 +291,7 @@ export function PacksPage() {
   // remove it.
   const unlockedEdition = entries.find((e) => e.id === buildId && e.unlockUrl) ?? null;
   const shelfEntries = entries.filter((e) => e !== unlockedEdition);
+  const builtInTitle = unlockedEdition?.title ?? buildTimeManifest.title;
 
   // Bring whichever feedback just rendered (result or errors) into view: the
   // card sits at the foot of the page, so a panel appended below the
@@ -383,8 +384,9 @@ export function PacksPage() {
     if (busyListing) return;
     setBusyListing(listing.id);
     clearFeedback();
+    const repoUrl = registryRepoUrl(listing);
     try {
-      finishInsert(await fetchPackFromUrl(registryRepoUrl(listing)), registryRepoUrl(listing));
+      finishInsert(await fetchPackFromUrl(repoUrl), repoUrl);
     } finally {
       setBusyListing(null);
     }
@@ -477,14 +479,14 @@ export function PacksPage() {
         ) : null}
         <PackCard
           id={buildId}
-          title={unlockedEdition?.title ?? buildTimeManifest.title}
+          title={builtInTitle}
           description={unlockedEdition?.description ?? buildTimeManifest.description}
           questionCount={unlockedEdition?.questionCount ?? buildTimeQuestionCount}
           categoryCount={unlockedEdition?.categoryCount ?? buildTimeManifest.categories.length}
           builtIn
           unlocked={unlockedEdition !== null}
           active={mounted && activeId === buildId}
-          onActivate={() => switchTo(null, unlockedEdition?.title ?? buildTimeManifest.title)}
+          onActivate={() => switchTo(null, builtInTitle)}
           onEject={unlockedEdition ? () => handleRemoveUnlocked(unlockedEdition) : undefined}
         />
         {shelfEntries.map((entry) => (

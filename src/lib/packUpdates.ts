@@ -47,7 +47,12 @@ import {
   type PackLibraryEntry,
 } from './packLibrary';
 import { recordEvent } from './storage';
-import { fetchUnlockBundle, licenceKeyStorageKey, updateCheckStorageKey } from './unlock';
+import {
+  fetchUnlockBundle,
+  licenceKeyStorageKey,
+  manifestId,
+  updateCheckStorageKey,
+} from './unlock';
 
 /** How long a pack rests between two checks. */
 export const PACK_UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -131,20 +136,6 @@ export function updateDue(entry: PackLibraryEntry, now: number): boolean {
   return now - state.checkedAt >= PACK_UPDATE_INTERVAL_MS;
 }
 
-/** The manifest id a bundle claims, or null. */
-function manifestId(candidate: unknown): string | null {
-  const m = (candidate as { manifest?: unknown }).manifest;
-  if (typeof m !== 'object' || m === null) return null;
-  const id = (m as { id?: unknown }).id;
-  return typeof id === 'string' ? id : null;
-}
-
-/** The envelope's own revision, when the endpoint set no ETag. */
-function envelopeVersion(candidate: unknown): string | undefined {
-  const v = (candidate as { packVersion?: unknown }).packVersion;
-  return typeof v === 'string' && v ? v : undefined;
-}
-
 /**
  * Ask the endpoint about ONE pack and act on the answer. Assumes the
  * caller checked `updateDue`. Records the check for every answer that
@@ -204,11 +195,9 @@ export async function checkPackUpdate(
     // Same pass as the unlock itself: the entry may be the built-in
     // pack's unlocked edition, which shares the build's id.
     unlocked: true,
-    ...(fetched.version
-      ? { packVersion: fetched.version }
-      : envelopeVersion(fetched.candidate)
-        ? { packVersion: envelopeVersion(fetched.candidate) }
-        : {}),
+    // The ETag when the endpoint set one; insertPack falls back to the
+    // bundle envelope's own revision otherwise.
+    ...(fetched.version ? { packVersion: fetched.version } : {}),
   });
   saveUpdateCheck(entry.id, { checkedAt: now });
   if (!inserted.ok) return 'error';

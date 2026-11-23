@@ -206,11 +206,8 @@ export function insertPack(
   },
 ): InsertResult {
   if (!browser()) return { ok: false, errors: ['not in a browser'] };
-  if (typeof raw !== 'object' || raw === null) {
-    return { ok: false, errors: ['not a pack: expected a JSON object with "manifest" and "questions"'] };
-  }
-  const candidate = raw as Partial<ActivePack>;
-  if (!candidate.manifest || !candidate.questions) {
+  const candidate = (typeof raw === 'object' ? raw : null) as Partial<ActivePack> | null;
+  if (!candidate?.manifest || !candidate.questions) {
     return { ok: false, errors: ['not a pack: expected a JSON object with "manifest" and "questions"'] };
   }
   const result = validatePack({
