@@ -209,8 +209,8 @@ function isBundle(value: unknown): value is { manifest: unknown; questions: unkn
 }
 
 /** The id a bundle's manifest claims, or null when it has none. */
-function manifestId(bundle: { manifest: unknown }): string | null {
-  const m = bundle.manifest;
+export function manifestId(bundle: unknown): string | null {
+  const m = (bundle as { manifest?: unknown } | null)?.manifest;
   if (typeof m !== 'object' || m === null) return null;
   const id = (m as { id?: unknown }).id;
   return typeof id === 'string' ? id : null;
@@ -342,7 +342,7 @@ export async function unlockPack(
   // active pack hinted at the pack it expects (a sampler and its full
   // bank), a bundle for any other pack is a misconfiguration, not
   // something to install under a surprise id.
-  const arriving = manifestId(fetched.candidate as { manifest: unknown }) ?? undefined;
+  const arriving = manifestId(fetched.candidate) ?? undefined;
   if (config.packId && arriving !== config.packId) {
     return fail(
       'wrong-pack',
